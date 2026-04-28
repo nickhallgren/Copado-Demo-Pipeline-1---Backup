@@ -1,0 +1,463 @@
+<apex:page standardcontroller="KimbleOne__Resource__c" extensions="KimbleOne.ResourceUtilisationSummaryController" tabStyle="KimbleOne__ReferenceData__c" sidebar="false" >
+    <apex:composition template="KimbleOne__SiteMaster">
+
+		<apex:define name="Menu" >
+			<c:Menu id="resourceUtilsationSummaryMenu" DefaultHelpPage="TimeExpenseEntryCalendarView.html" MenuContextName="{!$Label.kimbleone__resourceutilisationsummarytitle}"/> 
+		</apex:define>
+
+        <apex:define name="Content">
+   			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__ChartJs)}" />
+
+			<!-- Kimble Guidance -->
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+			<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+				<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/ResourceUtilisationSummaryNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+				<apex:outputPanel layout="none" rendered="{!ResourceUtilisationSummaryTipOverrideEnabled}">
+					<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+				</apex:outputPanel>
+			</apex:outputPanel>
+			
+			<style>
+				.utilisation-summary-container {
+					display: inline-block;
+					text-align: center;
+					margin-bottom: 8px;
+					min-width: 300px;
+					margin-left: 10px;
+					color: #222;					
+				}
+				.utilisation-percentage-container {
+					font-size: 38px;
+					font-weight: bold;
+					padding-top: 39px;
+					position: relative;
+				    display: inline-block
+				}
+				.utilisation-percentage-units {
+					font-size: 12px;
+					font-weight: bold;
+					position: absolute;
+					right: -13px;
+					top: 44px;
+				}
+				.utilisation-header {
+					font-size: 26px;
+					font-weight: bold;
+					display: block;
+					vertical-align: top;
+					padding: 2px 6px 2px 6px;
+					border-radius: 4px;
+					margin-bottom: 10px;
+					text-align: center;
+				}
+				.utilisation-chart {
+				    margin-left: 50px;
+				}				
+				.collapsed-view {
+					cursor: pointer;
+				}
+				.donut-chart.more-fifty-pct {
+				    width: 200px;
+				    height: 200px;
+				    background: #e1e1e1;
+				}
+				.donut-chart.less-fifty-pct {
+				    width: 200px;
+				    height: 200px;
+				    background: #48b2c1;
+				}
+				.donut-chart {
+				    position: relative;
+				    border-radius: 50%;
+				    overflow: hidden;
+				}
+				.donut-chart.more-fifty-pct .slice.one {
+				    clip: rect(0 200px 100px 0);
+				    -webkit-transform: rotate(90deg);
+				    transform: rotate(90deg);
+				    background: #48b2c1;
+				}
+				.donut-chart.more-fifty-pct .slice.two {
+				    clip: rect(0 100px 200px 0);
+				    -webkit-transform: rotate(327.6deg);
+				    transform: rotate(180deg); /*180 -> 360*/
+				    background: #48b2c1;
+				}
+				.donut-chart.less-fifty-pct .slice.one {
+				    clip: rect(0 200px 100px 0);
+				    -webkit-transform: rotate(90deg);
+				    transform: rotate(270deg);
+				    background: #e1e1e1;
+				}
+				.donut-chart.less-fifty-pct .slice.two {
+				    clip: rect(0 100px 200px 0);
+				    -webkit-transform: rotate(180deg);
+				    transform: rotate(180deg); /*180 -> 360*/
+				    background: #e1e1e1;
+				}
+				.donut-chart .slice {
+					position: absolute;
+					top: 0;
+					left: 0;
+					width: 100%;
+					height: 100%;
+				}
+				.chart-center {
+					top: 40px;
+					left: 40px;
+					width: 120px;
+					height: 120px;
+					background: #fff;
+				}
+				.donut-chart .chart-center {
+					position: absolute;
+					border-radius: 50%;
+				}
+				#monthly-breakdown {
+					width: 800px;
+				    margin-top: unset;
+    				margin-left: 10px;
+				}
+				.detail-view {
+					margin-top: 0px;
+					vertical-align: top;
+					display: inline-block;
+					height: 400px;
+   				}
+   				.detail-view .utilisation-chart {
+				    margin-top: 66px;
+				}
+				.utilisation-detail-container {
+				    display: inline-block;
+				}
+				th.headerRow {
+				    text-align: center;
+				}
+				th.activityHeader {
+					text-align: left !important;
+				}
+				td.usageCell {
+				    text-align: center;
+				}
+				.resourced-activity-detail {
+					margin-top: 10px;
+					margin-left: 10px;
+					margin-bottom: 10px;
+					display: inline-block;
+   				}
+				td.activityCol {
+				    width: 360px;
+				}
+				tr.totalRow {
+				    font-weight: bold;
+				}
+				tr.utlisationRow {
+				    font-weight: bold;
+				    font-size: 16px;
+				}
+				tr.utlisationRow td,
+				tr.totalRow td {
+				    border-top: 3px solid #cccccc !important;
+				}
+			</style>
+			
+            <div class="utilisation-summary-container inner-card hidden-item">
+            <div class="utilisation-header"><apex:outputText value="{!$Label.kimbleone__resourceutilisationlabel02}"/></div>
+
+			<div class="utilisation-chart">            
+				<div class="donut-chart less-fifty-pct" >
+					<div class="slice one"></div>
+					<div id="less-fifty" class="slice two"></div>
+					<div class="chart-center">
+						<div class="utilisation-percentage-container">
+			            	<div class="utilisation-percentage"></div><div class="utilisation-percentage-units">%</div>
+			            </div>					
+					</div>
+				</div>
+				  
+				<div class="donut-chart more-fifty-pct" style="display:none;">
+					<div class="slice one"></div>
+					<div id="more-fifty" class="slice two"></div>
+					<div class="chart-center">
+						<div class="utilisation-percentage-container">
+			            	<div class="utilisation-percentage"></div><div class="utilisation-percentage-units">%</div>
+			            </div>					
+					</div>
+				</div>
+			</div>
+			</div>
+
+            <div class="utilisation-detail-container hidden-item">
+            	<div id="monthly-breakdown" class="inner-card">
+					<canvas id="monthly-breakdown-canvas"></canvas>
+				</div>
+            </div>
+            <div class="resource-activity-detail-container hidden-item">
+            	<div class="resourced-activity-detail inner-card"></div>
+            </div>
+			<apex:form >
+				<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+				<apex:actionFunction action="{!UpdateToolTipSetting}" name="updateTipsConfigSetting" rerender="kimbleTooltipsResource" oncomplete="loadGuidance();">
+					<apex:param name="newValue" value="" />
+				</apex:actionFunction>
+			</apex:form>
+			<div style="display:none;" kimble-tip="null"></div>
+			
+            <script>
+            	var isExpanded  = <apex:outputText value="{!IsExpandedDisplay}"/>;
+				var expandedDisplayUrl  = '<apex:outputText value="{!$Page.KimbleOne__ResourceUtilisationSummary}?expDisp=1"/>';
+                var utilisationSummary = <apex:outputText value="{!ResourceUtilisationSummaryJson}" />
+                
+                var l = {};
+                l['ExpectedUsage'] = '<apex:outputText value="{!$Label.kimbleone__expectedhoursgraphheading}"/>';
+                l['ActualUsage'] = '<apex:outputText value="{!$Label.kimbleone__actuallabel}"/>';
+                l['ChartTitle'] = '<apex:outputText value="{!$Label.kimbleone__resourceutilisationlabel01}"/>';
+                l['Activity'] = '<apex:outputText value="{!$Label.kimbleone__activity}"/>';
+				l['Total'] = '<apex:outputText value="{!$Label.kimbleone__total}"/>';
+				l['Utilisation'] = '<apex:outputText value="{!$Label.kimbleone__resourceutilisationlabel03} (%)"/>';
+				l['TotalToDate'] = '<apex:outputText value="{!$Label.kimbleone__resourceutilisationlabel04}"/>';				
+				
+				var chartColors = {};
+				chartColors['ExpectedUsage'] = '#bbb';
+				chartColors['ActualUsage'] = '#72c6c8';
+                
+				jQuery(window).load(function()
+				{
+					initialise();
+					
+					if(isExpanded)
+						populateDetailView();
+					else
+						populateDashboardView();
+						
+					initialisePageTips();
+				});
+
+				function initialise()
+				{
+					// hide the banner if in lightning as Lighting renders it's own header
+					if(isSFLightning())
+					{
+						jQuery('span[id$="resourceUtilsationSummaryMenu"]').hide();
+						jQuery('#content-pane').css('overflow', 'hidden');
+					}
+					
+					if(!isExpanded) jQuery('.utilisation-summary-container').addClass('collapsed-view');
+					initialiseActions();
+				}
+
+				function initialiseActions()
+				{
+					if(!isExpanded) jQuery(document).off('click', '.utilisation-summary-container').on('click', '.utilisation-summary-container', jumpToExpandedView);
+				}
+				                
+                function jumpToExpandedView()
+                {
+                	safeRedirectParentToSForceURL(expandedDisplayUrl);
+                }
+                
+                function populateDetailView()
+                {
+					var periods = [];
+					var expectedUsage = [];
+					var actualUsage = [];
+					
+					for(var periodCounter = 0; periodCounter < utilisationSummary.PeriodIds.length; periodCounter++)
+					{
+						var periodId = utilisationSummary.PeriodIds[periodCounter];
+						periods.push(utilisationSummary.ForecastingPeriodNames[periodId]);
+						expectedUsage.push(utilisationSummary.ForecastingPeriodSummaries[periodId].TotalTrackedUsageDays);
+						actualUsage.push(utilisationSummary.ForecastingPeriodSummaries[periodId].TotalResourcedActivityDays);
+					}
+					
+					
+					var barChartData = {
+						labels: periods,
+						datasets: [{
+							label: l['ExpectedUsage'],
+							backgroundColor: chartColors['ExpectedUsage'],
+							data: expectedUsage
+						}, {
+							label: l['ActualUsage'],
+							backgroundColor: chartColors['ActualUsage'],
+							data: actualUsage
+						}]
+			
+					};
+			
+					var ctx = document.getElementById('monthly-breakdown-canvas').getContext('2d');
+					window.myBar = new Chart(ctx, {
+						type: 'bar',
+						data: barChartData,
+						options: {
+							responsive: true,
+							legend: {
+								position: 'top',
+							},
+							title: {
+								display: true,
+								text: l['ChartTitle']
+							},
+							scaleShowValues: true,
+							scales: {
+							  yAxes: [{
+							    ticks: {
+							      beginAtZero: true
+							    }
+							  }],
+							  xAxes: [{
+							    ticks: {
+							      autoSkip: false
+							    }
+							  }]
+							}
+						}
+					});
+					
+					populateResourcedActivitySummary();
+					
+					populateDashboardView();
+					jQuery('.utilisation-summary-container').addClass('detail-view').addClass('inner-card');
+					jQuery('.utilisation-detail-container, .resource-activity-detail-container').removeClass('hidden-item');
+                }
+                
+                function populateResourcedActivitySummary()
+                {
+                	var html = '';
+                	
+                	html += '<table border="0" cellpadding="0" cellspacing="0" class="list kimble-enhanced-table">';
+                	html += '<thead>';
+                	html += '<tr class="headerRow">';
+                	html += '<th class="headerRow activityHeader">' + l['Activity'] + '</th>';
+                	
+                	for(var periodCounter = 0; periodCounter < utilisationSummary.PeriodIds.length; periodCounter++)
+					{
+						var periodId = utilisationSummary.PeriodIds[periodCounter];
+						html += '<th class="headerRow">' + utilisationSummary.ForecastingPeriodNames[periodId] + '</th>';
+					}
+                	html += '<th class="headerRow">' + l['TotalToDate'] + '</th>';
+                	html += '</tr>';
+                	html += '</thead>';
+                	html += '<tbody>';
+                	for(var raCounter = 0; raCounter < utilisationSummary.ResourcedActivityIds.length; raCounter++)
+					{
+	                	html += '<tr class="dataRow">';
+						var resourcedActivityId = utilisationSummary.ResourcedActivityIds[raCounter];
+
+						html += '<td class="activityCol">' + utilisationSummary.ResourcedActivityNames[resourcedActivityId] + '</td>';
+
+	                	for(var periodCounter = 0; periodCounter < utilisationSummary.PeriodIds.length; periodCounter++)
+						{
+							var periodId = utilisationSummary.PeriodIds[periodCounter];
+							var usage = (resourcedActivityId in utilisationSummary.ForecastingPeriodSummaries[periodId].ResourcedActivityDays) ? utilisationSummary.ForecastingPeriodSummaries[periodId].ResourcedActivityDays[resourcedActivityId] : 0;
+							html += '<td class="usageCell">' + kimble.formatNumber(usage, '#,##0.#') + '</td>';
+						}
+						
+						html += '<td class="usageCell">' + utilisationSummary.ResourcedActivityTotals[resourcedActivityId] + '</td>';
+    		        	html += '</tr>';
+   					}
+
+                	html += '<tr class="totalRow">';
+
+					html += '<td class="totalHeading">' + l['Total'] + '</td>';
+
+                	for(var periodCounter = 0; periodCounter < utilisationSummary.PeriodIds.length; periodCounter++)
+					{
+						var periodId = utilisationSummary.PeriodIds[periodCounter];
+						var usage = utilisationSummary.ForecastingPeriodSummaries[periodId].TotalResourcedActivityDays;
+						html += '<td class="usageCell">' + kimble.formatNumber(usage, '#,##0.#') + '</td>';
+					}
+
+					html += '<td class="usageCell">' + kimble.formatNumber(utilisationSummary.TotalUtilisedDays, '#,##0.#') + '</td>';
+   		        	html += '</tr>';
+
+                	html += '<tr class="expectedRow">';
+
+					html += '<td class="totalHeading">' + l['ExpectedUsage'] + '</td>';
+
+                	for(var periodCounter = 0; periodCounter < utilisationSummary.PeriodIds.length; periodCounter++)
+					{
+						var periodId = utilisationSummary.PeriodIds[periodCounter];
+						var usage = utilisationSummary.ForecastingPeriodSummaries[periodId].TotalTrackedUsageDays;
+						html += '<td class="usageCell">' + kimble.formatNumber(usage, '#,##0.#') + '</td>';
+					}
+
+					html += '<td class="usageCell">' + kimble.formatNumber(utilisationSummary.TotalTrackedUsageDays, '#,##0.#') + '</td>';
+   		        	html += '</tr>';
+
+                	html += '<tr class="utlisationRow">';
+
+					html += '<td class="totalHeading">' + l['Utilisation'] + '</td>';
+
+                	for(var periodCounter = 0; periodCounter < utilisationSummary.PeriodIds.length; periodCounter++)
+					{
+						var periodId = utilisationSummary.PeriodIds[periodCounter];
+						var usage = utilisationSummary.ForecastingPeriodSummaries[periodId].UtilisationPct;
+						html += '<td class="usageCell">' + kimble.formatNumber(usage, '#,##0.#') + '</td>';
+					}
+					html += '<td class="usageCell">' + kimble.formatNumber(utilisationSummary.OverallUtilisation, '#,##0.#') + '</td>';
+   		        	html += '</tr>';
+					html += '</tbody>';
+                	html += '</table>';
+                	
+                	jQuery('.resourced-activity-detail').html(html);
+                	if(utilisationSummary.ResourcedActivityIds.length > 10) jQuery('.kimble-enhanced-table').enhancedTable();
+                }
+                
+                function populateDashboardView()
+                {
+                	jQuery('.utilisation-percentage').text(kimble.formatNumber(utilisationSummary.OverallUtilisation, '#,##0.#'));
+
+					var utilisation = Math.min(utilisationSummary.OverallUtilisation, 100);
+					
+					if (utilisation <= 50)
+					{
+						var deg = 180 + (utilisation * 3.6);
+						jQuery('#less-fifty').css({transform: 'rotate(' + deg + 'deg)'}).parent().show();
+						jQuery('#more-fifty').parent().hide();
+					}
+					else
+					{
+						var deg = utilisation * 3.6;
+						jQuery('#more-fifty').css({transform: 'rotate(' + deg + 'deg)'}).parent().show();
+						jQuery('#less-fifty').parent().hide();
+					}                	
+
+                	jQuery('.utilisation-summary-container').removeClass('hidden-item');
+                }
+                
+				/* Tooltips */
+				var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+				var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+				var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+				var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+				var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+				var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+			
+				function initialisePageTips()
+				{
+					ApplyTipAttributes();
+					initialiseTips();
+				}
+				
+				// add tip attributes to elements
+				function ApplyTipAttributes()
+				{
+					if(enableTips)
+					{
+						jQuery('.utilisation-percentage').attr('kimble-tip','UtilisationPct').attr('kimble-tip-extended-text','ActualCostExtendedText');
+						jQuery('.totalRow').attr('kimble-tip','Total');
+						jQuery('.dataRow').attr('kimble-tip','Activity');
+						jQuery('.expectedRow').attr('kimble-tip','Expected').attr('kimble-tip-extended-text','ExpectedExtendedText');
+						jQuery('[id$="monthly-breakdown-canvas"]').attr('kimble-tip','DaysByMonth').attr('kimble-tip-extended-text','DaysByMonthExtendedText');
+					}
+				}
+            </script>
+
+        </apex:define>
+    </apex:composition>
+</apex:page>

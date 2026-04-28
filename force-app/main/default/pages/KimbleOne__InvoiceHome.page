@@ -1,0 +1,705 @@
+<apex:page standardController="KimbleOne__Invoice__c" extensions="KimbleOne.InvoiceHomeController,KimbleOne.SecurityController,KimbleOne.TooltipsController" showHeader="true" sidebar="false" tabStyle="KimbleOne__Invoice__c" action="{!CheckRedirect}">
+
+	<apex:composition template="KimbleOne__SiteMaster">
+		<apex:define name="Menu">
+			<c:Menu DefaultHelpPage="ManagingInvoices.html" MenuContextType="Invoice" MenuContextId="{!KimbleOne__Invoice__c.Id}" MenuContextName="{!KimbleOne__Invoice__c.KimbleOne__Reference__c}"/>
+		</apex:define>
+
+		<apex:define name="Content">
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+
+			<!-- Kimble Guidance -->
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+			<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+				<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/InvoiceHomeNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+				<apex:outputPanel layout="none" rendered="{!InvoiceHomeTipOverrideEnabled}">
+					<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+				</apex:outputPanel>
+			</apex:outputPanel>
+
+			<style>
+			.documents-table{
+				min-width: 400px;
+				max-height: 500px;
+			}
+			.contact-table {
+				display: block;
+				min-width: 200px;
+				max-height: 300px;
+				overflow-y: auto;
+			}
+			.contacts-header {
+				display: none;
+			}
+			h1.contacts-title {
+				width: 100%;
+				margin: 5px 0 5px 0;
+				text-align: center;
+				display: block;
+			}
+			.add-rem-container {
+				max-width:30px;
+				padding-top:25px;
+			}
+			.add-rem-container input {
+				width: 100%;
+				margin-top: 5px;
+			}
+			.downloadLink {
+			    text-decoration: underline;
+			}
+			.status-icons {
+	    		float: right;
+	    	    display: inline-flex;
+			}
+			.email-icon > i.bottom-ind {
+			    font-size: 22px;
+				color: #505050;
+			}
+
+			.email-icon > i.top-ind {
+			    color: #505050;
+			    left: 16px;
+			    position: absolute;
+	    		top: 13px;
+	   	 		background-color: white;
+	   			font-size: 13px;
+			}
+
+			.email-icon {
+			    position: relative;
+			    margin-left: 10px;
+			}
+
+			.download-icon > i.bottom-ind {
+			    font-size: 22px;
+				color: #505050;
+				margin-top: 2px;
+
+			}
+			.download-icon > i.top-ind {
+			    color: #505050;
+			    left: 16px;
+			    position: absolute;
+	    		top: 13px;
+	   	 		background-color: white;
+	   			font-size: 13px;
+			}
+			.download-icon{
+			 	position: relative;
+			    margin-left: 10px;
+			}
+	       	/* SELECT 2 STYLING */
+			.select2-results li {margin-left:0px;}
+			.select2-container-multi .select2-choices
+			{
+				border: 2px solid rgb(224,224,224);
+				background-image:none;
+			}
+			.select2-container-multi .select2-choices .select2-search-choice {
+			    border: 1px solid #aaaaaa;
+			    border-radius: 4px;
+			    padding: 5px 20px 5px 5px;
+				background-image:none;
+			}
+
+			.select2-container-multi .select2-search-choice-close {
+				background-image:  url({!URLFOR($Resource.AssignmentImages, 'assignmentSprite.png')});
+				background-position: -2px -29px;
+				background-repeat: no-repeat;
+				left:auto;
+			}
+
+			.select2-container-multi .select2-choices .select2-search-choice .select2-search-choice-close:hover {
+				background-position: -2px -1px;
+			}
+
+			.loadingIndicator {
+				   display:none;
+				   top:0;
+				   right:0;
+				   width:100%;
+				   height:100%;
+				   font-weight: bold;
+				   position:absolute;
+				   text-align:center;
+				   /* IE filter */
+				   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+				   -moz-opacity:0.7;    /* Mozilla extension */
+				   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+				   opacity:0.7; /* CSS3 */
+				   z-index:1000;
+				   background-color:white;
+				}
+
+				.loadingIndicator img {
+					margin-right:9px;
+				}
+
+				#loadingIndicatorInnerContainer {
+					position:absolute;
+					top:50%;
+					height:10em;
+					margin-top:-2em;
+					width:100%;
+				}
+		</style>
+			<div id="loadingIndicatorOuterContainer" class="loadingIndicator">
+				<div id="loadingIndicatorInnerContainer">
+					<img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+				</div>
+			</div>
+			<chatter:feedWithFollowers entityId="{!KimbleOne__Invoice__c.Id}"/>
+
+			<apex:form id="TheForm">
+
+				<apex:pageMessages escape="false"/>
+
+				<apex:pageBlock title="{!$ObjectType.KimbleOne__Invoice__c.Label}">
+
+					<apex:pageBlockButtons location="top" styleclass="InvoiceButtonPanel">
+						<apex:commandButton id="sendInvoiceForApprovalBtn" action="{!SendForApproval}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__sendforapprovalbutton}" rerender="TheForm, ApprovalHistoryPanel" rendered="{!KimbleOne__Invoice__c.Status__r.KimbleOne__Enum__c = 'Draft' && $ObjectType.KimbleOne__Invoice__c.updateable}"/>
+						<apex:commandButton id="deleteInvoiceBtn" onclick="var d = confirmDelete();if(!d) return;DisableButtonPanel('InvoiceButtonPanel','',[]);" action="{!Del}" styleclass="" value="{!$Label.kimbleone__deletebutton}" rerender="TheForm" rendered="{!KimbleOne__Invoice__c.Status__r.KimbleOne__Enum__c = 'Draft' && $ObjectType.KimbleOne__Invoice__c.deletable}"/>
+						<apex:commandButton id="dispatchInvoiceBtn" action="{!Dispatch}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__dispatch}" rerender="TheForm" rendered="{!KimbleOne__Invoice__c.Status__r.KimbleOne__Enum__c = 'Approved' && $ObjectType.KimbleOne__Invoice__c.updateable && HasPermission['DispatchInvoice']}"/>
+						<apex:outputPanel layout="none" rendered="{!KimbleOne__Invoice__c.Status__r.KimbleOne__Enum__c = 'Approved' && $ObjectType.KimbleOne__Invoice__c.updateable && HasPermission['DispatchInvoice']}">
+							<input id="dispatchAndSendEmailBtn" class="btn" type="button" onclick="initialiseModalBoxy('#sendEmailPopup', '{!JSENCODE($Label.DispatchEmailInvoiceLabel)}', jQuery('form[id$=\'TheForm\']'));initialiseEmail('yes');" value="{!$Label.DispatchEmailLabel}" />
+						</apex:outputPanel>
+						<apex:commandButton id="revertToDraftBtn" action="{!Revert}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__reverttodraft}" rerender="TheForm" rendered="{!CanRevert && HasPermission['RevertApprovedInvoice']}"/>
+						<apex:outputPanel layout="none" rendered="{!CanRaiseCreditNote && !PartialCreditNotesEnabled && $ObjectType.KimbleOne__CreditNote__c.createable}">
+							<input id="raiseCreditNoteBtn" class="btn" type="button" onclick="initialiseModalBoxy('#newCreditNotePopup', '{!JSENCODE($Label.New)} {!$ObjectType.CreditNote__c.label}');newCreditNote()" value="{!$Label.RaiseCreditNote}" />
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!CanRaiseCreditNote && PartialCreditNotesEnabled && $ObjectType.KimbleOne__CreditNote__c.createable}">
+							<input id="raiseCreditNoteBtn" class="btn" type="button" onclick="safeNavigateToSForceURL('{!$Page.CreditNoteNew}?invid={!KimbleOne__Invoice__c.Id}');" value="{!$Label.RaiseCreditNote}" />
+						</apex:outputPanel>
+
+						<apex:outputPanel layout="none" rendered="{!Invoice__c.Status__r.Enum__c = 'Dispatched' || Invoice__c.Status__r.Enum__c = 'Credited' || Invoice__c.Status__r.Enum__c = 'PartiallyCredited' || Invoice__c.Status__r.Enum__c = 'Paid' }">
+							<input id="sendEmailBtn" class="btn" type="button" onclick="initialiseModalBoxy('#sendEmailPopup', '{!JSENCODE($Label.EmailInvoiceLabel)}', jQuery('form[id$=\'TheForm\']'));initialiseEmail('no');" value="{!$Label.EmailInvoiceLabel}" />
+							<input id="downloadBtn" class="btn" type="button" onclick="initialiseModalBoxy('#DownloadPopup', '{!JSENCODE($Label.Download)} {!$ObjectType.KimbleOne__Invoice__c.Label}', jQuery('form[id$=\'TheForm\']'));initialiseDownload();" value="{!$Label.Download}" />
+						</apex:outputPanel>
+
+						<div class="status-icons">
+							<apex:outputPanel layout="none" rendered="{!KimbleOne__Invoice__c.KimbleOne__IsEmailed__c}">
+								<div class="email-icon" title="{!JSENCODE(EmailSentLabel)}">
+									<i class="fa fa-envelope-o bottom-ind"></i>
+									<i class="fa fa-check-circle top-ind"></i>
+								</div>
+							</apex:outputPanel>
+							<apex:outputPanel layout="none" rendered="{!KimbleOne__Invoice__c.KimbleOne__IsDownloaded__c}">
+								<div class="download-icon" title="{!JSENCODE(DownloadedLabel)}">
+									<i class="fa fa-download bottom-ind"></i>
+									<i class="fa fa-check-circle top-ind"></i>
+								</div>
+							</apex:outputPanel>
+						</div>
+
+					</apex:pageBlockButtons>
+
+
+					<apex:pageBlockSection columns="2" title="{!$Label.kimbleone__invoicedetailsheading}">
+
+						<apex:outputField id="invoiceAccount" value="{!KimbleOne__Invoice__c.KimbleOne__Account__c}" />
+
+						<apex:outputField id="invoiceContact" value="{!KimbleOne__Invoice__c.KimbleOne__Contact__c}"/>
+
+						<apex:pageBlockSectionItem rendered="{!!ISBLANK(KimbleOne__Invoice__c.KimbleOne__SecondaryAddressees__c)}"></apex:pageBlockSectionItem>
+						<apex:outputField value="{!KimbleOne__Invoice__c.KimbleOne__SecondaryAddressees__c}" rendered="{!!ISBLANK(KimbleOne__Invoice__c.KimbleOne__SecondaryAddressees__c)}"/>
+
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel for="invoiceStatus" value="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__Status__c.Label}"></apex:outputLabel>
+							<apex:outputField id="invoiceStatus" value="{!KimbleOne__Invoice__c.Status__r.Name}" />
+						</apex:pageBlockSectionItem>
+
+						<apex:outputField id="invoiceDate" value="{!KimbleOne__Invoice__c.KimbleOne__InvoiceDate__c}"/>
+
+						<apex:outputField id="invoiceNetAmount" value="{!KimbleOne__Invoice__c.KimbleOne__NetAmount__c}"/>
+
+						<apex:outputField id="invoiceGrossAmount" value="{!KimbleOne__Invoice__c.KimbleOne__GrossAmount__c}"/>
+
+						<apex:outputField id="invoiceTaxCode" value="{!KimbleOne__Invoice__c.KimbleOne__TaxCode__c}" />
+
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__TaxAmount__c.Label}"></apex:outputLabel>
+							<apex:outputField id="invoiceTaxAmount" value="{!KimbleOne__Invoice__c.KimbleOne__TaxAmount__c}" rendered="{!KimbleOne__Invoice__c.KimbleOne__TaxAmount__c != 0}"/>
+						</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__PurchaseOrder__c.Label}"></apex:outputLabel>
+							<apex:outputText id="purchaseOrderReference" value="{!PurchaseOrderReference}"/>
+						</apex:pageBlockSectionItem>
+
+						<apex:outputField id="invoiceRecBankAccount" value="{!KimbleOne__Invoice__c.KimbleOne__ReceivableBankAccount__c}" />
+
+						<apex:outputField id="invoiceNotes" value="{!KimbleOne__Invoice__c.KimbleOne__Notes__c}"/>
+
+						<apex:outputText id="invoice-reference" value="{!KimbleOne__Invoice__c.KimbleOne__Reference__c}"/>
+
+						<apex:repeat value="{!$ObjectType.KimbleOne__Invoice__c.FieldSets.KimbleOne__InvoiceDetails}" var="i">
+							<apex:outputField value="{!KimbleOne__Invoice__c[i]}"/>
+						</apex:repeat>
+
+					</apex:pageBlockSection>
+
+					<apex:pageBlockSection columns="2" rendered="{!KimbleOne__Invoice__c.KimbleOne__CreditedNetAmount__c > 0}">
+						<apex:outputField value="{!KimbleOne__Invoice__c.KimbleOne__CreditedNetAmount__c}" />
+						<apex:outputField value="{!KimbleOne__Invoice__c.KimbleOne__CreditedGrossAmount__c}"/>
+					</apex:pageBlockSection>
+
+					<apex:pageBlockSection rendered="{!KimbleOne__Invoice__c.Status__r.KimbleOne__Enum__c == 'Dispatched' || KimbleOne__Invoice__c.Status__r.KimbleOne__Enum__c == 'Credited' || KimbleOne__Invoice__c.Status__r.KimbleOne__Enum__c = 'PartiallyCredited' || KimbleOne__Invoice__c.Status__r.KimbleOne__Enum__c == 'Paid'}">
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$Label.kimbleone__dispatchinvoicelabel}"></apex:outputLabel>
+							<a id="theDispatchedInvoiceFilename" href="/servlet/servlet.FileDownload?file={!JSENCODE(TheDispatchedInvoiceAttachment.Id)}">{!JSENCODE(TheDispatchedInvoiceAttachment.Name)}</a>
+						</apex:pageBlockSectionItem>
+						<apex:outputField value="{!KimbleOne__Invoice__c.KimbleOne__PaidGrossAmount__c}"/>
+					</apex:pageBlockSection>
+
+					<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheCreditNotes)}">
+
+						<apex:pageBlockSection rendered="{!(TheCreditNotes.size==1) && !PartialCreditNotesEnabled}">
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__CreditNote__c.Label}"></apex:outputLabel>
+								<apex:outputLink value="/{!TheCreditNotes[0].id}"><apex:outputText id="theCreditNoteReference" value="{!TheCreditNotes[0].Reference__c}"/></apex:outputLink>
+							</apex:pageBlockSectionItem>
+							<apex:outputField value="{!TheCreditNotes[0].CreditNoteDate__c}"/>
+						</apex:pageBlockSection>
+
+						<apex:pageBlockSection columns="1" title="{!$ObjectType.KimbleOne__CreditNote__c.LabelPlural}" collapsible="true" rendered="{!(TheCreditNotes.size>1)||PartialCreditNotesEnabled}">
+							<apex:pageBlockTable value="{!TheCreditNotes}" var="creditNote">
+								<apex:column width="20%" value="{!creditNote.KimbleOne__CreditNoteDate__c}"/>
+								<apex:column width="20%" value="{!creditNote.Status__r.KimbleOne__Enum__c}" headerValue="{!$ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__Status__c.Label}"/>
+								<apex:column width="20%" headerValue="{!$ObjectType.KimbleOne__CreditNote__c.Label}">
+									<apex:outputLink value="/{!creditNote.id}"><apex:outputText id="theCreditNoteReference" value="{!creditNote.KimbleOne__Reference__c}"/></apex:outputLink>
+								</apex:column>
+								<apex:column width="20%" value="{!creditNote.KimbleOne__NetAmount__c}"/>
+								<apex:column width="20%" value="{!creditNote.KimbleOne__TaxAmount__c}"/>
+							</apex:pageBlockTable>
+						</apex:pageBlockSection>
+
+					</apex:outputPanel>
+
+					<apex:repeat value="{!TheInvoiceSections}" var="section">
+						<apex:pageBlockSection columns="1" title="{!section.Name}" collapsible="false">
+							<apex:pageBlockTable value="{!section.InvoiceLines__r}" var="line" rendered="{!KimbleOne__Invoice__c.Status__r.KimbleOne__Enum__c != 'PartiallyCredited'}">
+								<apex:column id="invoiceLineNumber" width="15%" value="{!line.KimbleOne__LineNumber__c}"/>
+								<apex:column id="invoiceLineNarrative" width="55%" value="{!line.KimbleOne__Narrative__c}"/>
+								<apex:column id="invoiceLineNetAmount" width="15%" value="{!line.KimbleOne__NetAmount__c}"/>
+								<apex:column id="invoiceLineTaxAmount" width="15%" value="{!line.KimbleOne__TaxAmount__c}"/>
+							</apex:pageBlockTable>
+
+							<apex:pageBlockTable value="{!section.InvoiceLines__r}" var="line" rendered="{!KimbleOne__Invoice__c.Status__r.KimbleOne__Enum__c == 'PartiallyCredited'}">
+								<apex:column id="invoiceLineNumber" width="10%" value="{!line.KimbleOne__LineNumber__c}"/>
+								<apex:column width="10%" value="{!line.Status__r.KimbleOne__Enum__c}" headerValue="{!$ObjectType.KimbleOne__InvoiceLine__c.Fields.KimbleOne__Status__c.Label}"/>
+								<apex:column id="invoiceLineNarrative" width="55%" value="{!line.KimbleOne__Narrative__c}"/>
+								<apex:column id="invoiceLineNetAmount" width="15%" value="{!line.KimbleOne__NetAmount__c}"/>
+								<apex:column id="invoiceLineTaxAmount" width="10%" value="{!line.KimbleOne__TaxAmount__c}"/>
+							</apex:pageBlockTable>
+						</apex:pageBlockSection>
+					</apex:repeat>
+
+					<apex:pageBlockSection id="expenseDownloadsSection" columns="1" title="{!DownloadFilesHeading}" collapsible="false" rendered="{!DownloadFiles.size>0}">
+						<apex:pageBlockTable value="{!DownloadFiles}" var="download">
+							<apex:column headerValue="{!$Label.kimbleone__file}">
+								<apex:outputLabel rendered="{!EnableCustomInvoiceTimeAndExpDownloads && download.IsCustom}" styleClass="downloadLink" value="{!download.Name}"
+                                                  onclick="initialiseModalBoxy('#selectDownloadTypePopup', '{!$Label.kimbleone__selectdownloadtypelabel}');updateHiddenDocumentFields('{!download.Name}', '{!download.IsCustom}', '{!download.ObjectType}');showModalBoxy();"/>
+
+								<apex:outputLink rendered="{!!EnableCustomInvoiceTimeAndExpDownloads || !download.IsCustom}" styleClass="actionLink" value="{!download.Url}">{!download.Name}</apex:outputLink>
+							</apex:column>
+						</apex:pageBlockTable>
+						<apex:inputText styleClass="documentName" style="display:none"/>
+						<apex:inputText styleClass="documentIsCustom" style="display:none"/>
+						<apex:inputText styleClass="documentObjectType" style="display:none"/>
+					</apex:pageBlockSection>
+
+				</apex:pageBlock>
+
+				<apex:actionFunction action="{!LoadNewCreditNote}" 	name="newCreditNote" rerender="newCreditNotePanel" oncomplete="showModalBoxy();"></apex:actionFunction>
+				<apex:actionFunction action="{!InitialiseEmail}" name="initialiseEmail" rerender="sendEmailPanel" oncomplete="initialiseEmailComplete();">
+					<apex:param name="dispatchFirst" value="" />
+				</apex:actionFunction>
+				<apex:actionFunction action="{!InitialiseDownload}" name="initialiseDownload" rerender="DownloadPanel" oncomplete="showModalBoxy()">
+				</apex:actionFunction>
+
+				<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+				<div style="display:none;" kimble-tip="null"></div>
+
+				<div id="sendEmailPopup" style="display:none">
+					<apex:outputPanel id="sendEmailPanel">
+						<apex:inputHidden id="CombinedAttachmentsId" value="{!CombinedAttachmentsId}"/>
+						<apex:pageBlock >
+							<div id="sendEmailErrors"><apex:pageMessages escape="false"/></div>
+							<apex:pageBlockButtons location="bottom">
+								<apex:commandButton id="sendEmailBtn" value="{!$Label.kimbleone__ok}" styleclass="DisableButtonWhileBusy" action="{!SendEmail}" oncomplete="hideModalBoxyWithErrorCheck('#sendEmailErrors')" rerender="sendEmailPanel" rendered="{!!IsDispatchBeforeSendingEmail}" />
+								<apex:commandButton id="disptachAndSendEmailBtn" value="{!$Label.kimbleone__ok}" styleclass="DisableButtonWhileBusy" action="{!DispatchAndSendEmail}" oncomplete="hideModalBoxyWithErrorCheck('#sendEmailErrors')" rerender="sendEmailPanel" rendered="{!IsDispatchBeforeSendingEmail}"/>
+								<input class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+							</apex:pageBlockButtons>
+							<apex:pageBlockSection columns="1" >
+								<apex:pageBlockSectionItem >
+									<apex:outputLabel value="{!$Label.kimbleone__to}..."></apex:outputLabel>
+									<apex:outputPanel layout="block">
+										<apex:selectList value="{!ContactsToEmail}" styleclass="select-contacts select2-filter" size="1" multiselect="true" style="width: 300px;">
+											<apex:selectOptions value="{!AvailableContacts}" />
+										</apex:selectList>
+										<script>
+										jQuery('.select-contacts').select2();
+									</script>
+									</apex:outputPanel>
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem >
+									<apex:outputLabel value="{!$Label.kimbleone__emailtemplatelabel}"></apex:outputLabel>
+									<apex:selectList id="emailTemplate" value="{!TheSelectedDocTemplateId}" size="1">
+										<apex:selectOptions value="{!TheEmailTemplates}" />
+									</apex:selectList>
+								</apex:pageBlockSectionItem>
+
+							</apex:pageBlockSection>
+
+							<apex:pageBlockSection title="{!$Label.kimbleone__attachmentoptionslabel}" columns="2">
+								<apex:pageBlockSectionItem rendered="{!EnableCustomInvoiceTimeAndExpDownloads && HasTimeEntries}">
+									<apex:inputField value="{!IncludeTimeEntrySummaryAttachment.KimbleOne__InputCheckbox__c}" />
+									<apex:outputLabel value="{!$Label.kimbleone__includetimeentrysummaryattachmentlabel}"/>
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem rendered="{!EnableCustomInvoiceTimeAndExpDownloads && HasTimeEntries}">
+									<apex:outputLabel for="timeEntryDownloadTypes" value="{!$Label.kimbleone__typelabel}" />
+									<apex:selectList id="timeEntryDownloadTypes" value="{!TimeEntryDownloadType}" styleClass="downloadType" size="1">
+										<apex:selectOptions value="{!TheTimeEntryDownloadTypes}"/>
+									</apex:selectList>
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem rendered="{!HasExpenses}">
+									<apex:inputField value="{!IncludeExpenseSummaryAttachment.KimbleOne__InputCheckbox__c}" />
+									<apex:outputLabel value="{!$Label.kimbleone__includeexpensesummaryattachmentlabel}"/>
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem rendered="{!EnableCustomInvoiceTimeAndExpDownloads && HasExpenses}">
+									<apex:outputLabel for="expenseItemDownloadTypes" value="{!$Label.kimbleone__typelabel}" />
+									<apex:selectList id="expenseItemDownloadTypes" value="{!ExpenseItemDownloadType}" styleClass="downloadType" size="1">
+										<apex:selectOptions value="{!TheExpenseItemDownloadTypes}"/>
+									</apex:selectList>
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem rendered="{!!EnableCustomInvoiceTimeAndExpDownloads && HasExpenses}"/>
+
+								<apex:pageBlockSectionItem rendered="{!HasExpenses && HasExpenseAttachments}">
+									<apex:inputField value="{!IncludeExpenseReceipts.KimbleOne__InputCheckbox__c}" />
+									<apex:outputLabel value="{!$Label.kimbleone__includeexpensereceiptslabel}"/>
+								</apex:pageBlockSectionItem>
+
+							</apex:pageBlockSection>
+						</apex:pageBlock>
+					</apex:outputPanel>
+				</div>
+
+				<div id="DownloadPopup" style="display:none">
+					<apex:outputPanel id="DownloadPanel">
+						<apex:inputText value="{!SelectedDocuments}" styleClass="SelectedDocuments" style="display:none"/>
+						<apex:pageBlock >
+							<div id="dowloadErrors"><apex:pageMessages escape="false"/></div>
+							<apex:pageBlockButtons location="bottom">
+								<apex:commandButton value="{!$Label.kimbleone__ok}" styleclass="DisableButtonWhileBusy" action="{!DownloadInvoice}" onclick="performDownloads()" oncomplete="hideModalBoxyWithErrorCheck('#dowloadErrors')" rerender="DownloadPanel"/>
+								<input class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+							</apex:pageBlockButtons>
+							<apex:outputPanel layout="block" styleClass="documents-table">
+								<apex:pageblocktable value="{!TheDispatchedInvoiceAttachments}" var="att" >
+									<apex:column style="width:20px">
+										<input type="checkbox" class="document-cb" data-id="{!att.id}" theDownload="/servlet/servlet.FileDownload?file={!JSENCODE(att.id)}"/></apex:column>
+									<apex:column value="{!att.name}"/>
+								</apex:pageblocktable>
+							</apex:outputPanel>
+						</apex:pageBlock>
+					</apex:outputPanel>
+				</div>
+
+			</apex:form>
+
+			<apex:include pageName="{!$Page.ApproveRejectItem}" rendered="{!InPageApproveRejectEnabled}"/>
+
+			<apex:outputPanel layout="none" id="ApprovalHistoryPanel">
+				<apex:relatedList list="ProcessSteps" id="InvoiceApprovalHistory"></apex:relatedList>
+
+				<apex:outputPanel layout="none" rendered="{!InPageApproveRejectEnabled}">
+				<script>
+					jQuery(window).load(function()
+					{
+						var approvalItemId = '<apex:outputText value="{!KimbleOne__Invoice__c.Id}"/>';
+
+						overrideSFApproveRejectLink(approvalItemId);
+					});
+				</script>
+				</apex:outputPanel>
+
+				<script>
+
+				$(document).ready(function(){
+					$(function() {
+						hideSalesForceApprovalProcessButtons();
+					})
+
+					initialisePageTips();
+				});
+
+				function hideSalesForceApprovalProcessButtons()
+				{
+						$('input[name="piSubmit"]').remove();
+						$('input[name="piRemove"]').remove();
+				}
+
+				function performDownloads(){
+					var selectedDocsStr = '';
+
+					$('.document-cb:checked').each(function(i, el) {
+						selectedDocsStr = selectedDocsStr + $(el).attr('data-id')+',';
+    					window.open('/servlet/servlet.FileDownload?file='+$(el).attr('data-id'));
+    				});
+
+
+    				$('.SelectedDocuments').val(selectedDocsStr);
+				}
+			</script>
+			</apex:outputPanel>
+
+			<apex:relatedList list="ActivityHistories" id="InvoiceActivities"></apex:relatedList>
+
+			<div id="newCreditNotePopup" style="display: none">
+				<apex:outputPanel id="newCreditNotePanel">
+					<apex:form >
+						<apex:pageBlock >
+							<div id="creditNoteErrors"><apex:pageMessages escape="false"/></div>
+							<apex:pageBlockButtons location="bottom">
+								<apex:commandButton value="{!$Label.kimbleone__save}" 	styleclass="DisableButtonWhileBusy" action="{!CreateCreditNote}" oncomplete="hideModalBoxyWithErrorCheck('#creditNoteErrors')" rerender="TheForm" />
+								<input class="btn" type="button" onclick="hideModalBoxy();"
+									   value="{!$Label.Cancel}" />
+							</apex:pageBlockButtons>
+							<apex:pageBlockSection columns="1">
+								<apex:inputField id="creditNoteDate" required="true"
+												 value="{!newCreditNote.KimbleOne__CreditNoteDate__c}" />
+								<apex:pageBlockSectionItem >
+									<apex:outputLabel for="reasonCode" value="{!$ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__ReasonCode__c.Label}" />
+									<apex:selectList id="reasonCode" value="{!newCreditNote.KimbleOne__ReasonCode__c}" size="1">
+										<apex:selectOptions value="{!TheCreditNoteReasonCodes}"/>
+									</apex:selectList>
+								</apex:pageBlockSectionItem>
+								<apex:inputField id="reasonDescription" required="true"
+												 value="{!newCreditNote.KimbleOne__ReasonDescription__c}" />
+							</apex:pageBlockSection>
+						</apex:pageBlock>
+					</apex:form>
+				</apex:outputPanel>
+			</div>
+
+			<div id="selectDownloadTypePopup" style="display: none">
+				<apex:outputPanel id="selectDownloadTypePanel">
+					<apex:form >
+						<apex:pageBlock >
+							<div id="selectDownloadTypeErrors"><apex:pageMessages escape="false"/></div>
+							<apex:pageBlockButtons location="bottom">
+								<apex:commandButton value="{!$Label.kimbleone__ok}" styleclass="DisableButtonWhileBusy" onclick="downloadFile();" oncomplete="hideModalBoxyWithErrorCheck('#dowloadErrors')" rerender="selectDownloadTypePanel"/>
+								<input class="btn" type="button" onclick="hideModalBoxy();"	value="{!$Label.Cancel}" />
+							</apex:pageBlockButtons>
+							<apex:pageBlockSection columns="1">
+								<apex:outputPanel id="expenseDownloadTypesId">
+									<apex:pageBlockSectionItem >
+										<apex:outputLabel for="downloadTypes" value="{!$Label.kimbleone__downloadtypelabel}" />
+										<apex:selectList styleClass="expenseDownloadTypeSelector" size="1">
+											<apex:selectOptions value="{!TheExpenseItemDownloadTypes}"/>
+										</apex:selectList>
+									</apex:pageBlockSectionItem>
+								</apex:outputPanel>
+								<apex:outputPanel id="timeEntryDownloadTypesId">
+									<apex:pageBlockSectionItem >
+										<apex:outputLabel for="downloadTypes" value="{!$Label.kimbleone__downloadtypelabel}" />
+										<apex:selectList styleClass="timeDownloadTypeSelector" size="1">
+											<apex:selectOptions value="{!TheTimeEntryDownloadTypes}"/>
+										</apex:selectList>
+									</apex:pageBlockSectionItem>
+								</apex:outputPanel>
+							</apex:pageBlockSection>
+						</apex:pageBlock>
+					</apex:form>
+				</apex:outputPanel>
+			</div>
+
+			<apex:include pageName="{!$Page.ExpenseExport}"/>
+
+			<script>
+
+				var logoData = '{!JSENCODE(LogoData)}';
+				var logoContentType = '{!JSENCODE(LogoContentType)}';
+				var maxSizeLabel = '{!JSENCODE($Label.EmailAttachmentsExceedLimit)}';
+				function initialiseEmailComplete()
+				{
+					if ({!AttachmentConversionEnabled})
+					{
+					    currentBoxy.hide();
+
+					    var ongenerateComplete = function() {
+					        //Validate pdf to email size - thePdfToDownload.output().length / 1024 / 1024 - 26214400 (25 MB)
+					        if (thePdfToDownload.output().length > 26214400) {
+					            alert(maxSizeLabel.format('25MB'));
+					            return;
+                            }
+
+					        jQuery('#loadingIndicatorOuterContainer').show();
+
+					        var attachment = new sforce.SObject("Attachment");
+					        attachment.Name = 'tmp.pdf';
+                			attachment.ContentType = 'application/pdf';
+                			attachment.Body = btoa(thePdfToDownload.output())
+                			attachment.ParentId = '{!JSENCODE(CombinedAttachmentsParentId)}';
+
+							sforce.connection.create([attachment],
+							{
+								 onSuccess : function(result, source)
+								 {
+									 if(result[0].getBoolean("success")) {
+
+										 console.log('file added successfully:' + result[0].id);
+										 jQuery('[id$="CombinedAttachmentsId"').val(result[0].id);
+
+									     jQuery('#loadingIndicatorOuterContainer').hide();
+
+									     currentBoxy.show();
+					        			 showModalBoxy();
+									 }
+								 },
+								 onFailure : function(error, source)
+								 {
+								 	    console.log(error);
+								 	    alert(error);
+								 	    jQuery('#loadingIndicatorOuterContainer').hide();
+         						 }
+
+                     		});
+					    }
+
+					    generateAttachments('{!JSENCODE(Invoice__c.Id)}', '{!JSENCODE(Invoice__c.Reference__c)}',{showLogo:<apex:outputText value="{!KimbleOne__Invoice__c.InvoiceTemplate__r.KimbleOne__ShowLogo__c}"/>, showFooter:<apex:outputText value="{!KimbleOne__Invoice__c.InvoiceTemplate__r.KimbleOne__ShowFooter__c}"/>, showPageNumbers:<apex:outputText value="{!KimbleOne__Invoice__c.InvoiceTemplate__r.KimbleOne__ShowPageNumbers__c}"/>, footerText:'<apex:outputText value="{!JSENCODE(KimbleOne__Invoice__c.BusinessUnitTradingEntity__r.KimbleOne__InvoiceFooter__c)}"/>', logoWidth:{!JSENCODE($Label.INVOICEPRINTT1ImageWidth)}, logoHeight:{!JSENCODE($Label.INVOICEPRINTT1ImageHeight)}, logoData:logoData, logoContentType:logoContentType} , ongenerateComplete)
+     				}
+     				else
+     				{
+     					showModalBoxy();
+         			}
+    			}
+
+				function downloadFile()
+				{
+					var docName = document.getElementsByClassName("documentName")[0].value;
+					var docIsCustom = document.getElementsByClassName("documentIsCustom")[0].value;
+					var docObjectType = document.getElementsByClassName("documentObjectType")[0].value;
+					var e;
+
+					if (docObjectType.includes('TimeEntry__c') && docIsCustom)
+						e = document.getElementsByClassName("timeDownloadTypeSelector")[0];
+					else
+						e = document.getElementsByClassName("expenseDownloadTypeSelector")[0];
+
+					var intTypeId = e.options[e.selectedIndex].value;
+					safeNavigateToSForceURL('{!$Page.InterfaceTypeGenerateOutput}?id={!TheInvoice.Id}&intType=' + intTypeId + '&fileName=' + docName);
+				}
+
+				function updateHiddenDocumentFields(fileName, isCustom, objectType)
+				{
+					var docName = document.getElementsByClassName("documentName")[0];
+					docName.value = fileName;
+					var docIsCustom = document.getElementsByClassName("documentIsCustom")[0];
+					docIsCustom.value = isCustom;
+					var docObjectType = document.getElementsByClassName("documentObjectType")[0];
+					docObjectType.value = objectType;
+
+					if (objectType.includes('TimeEntry__c') && isCustom)
+					{
+						jQuery('[id$="timeEntryDownloadTypesId"]').show();
+						jQuery('[id$="expenseDownloadTypesId"]').hide();
+					}
+					else
+					{
+						jQuery('[id$="expenseDownloadTypesId"]').show();
+						jQuery('[id$="timeEntryDownloadTypesId"]').hide();
+					}
+				}
+
+                /* Tooltips */
+                var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+                var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+                var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+                var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+				var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+				var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+
+                function initialisePageTips()
+                {
+                    ApplyTipAttributes();
+                    initialiseTips();
+                }
+
+                // add tip attributes to elements
+
+                function ApplyTipAttributes()
+                {
+                    if(enableTips)
+                    {
+                        // Invoice Details
+                        jQuery('[id$="invoiceAccount"]').attr('kimble-tip','Account');
+                        jQuery('[id$="invoiceContact"]').attr('kimble-tip','Contact');
+                        jQuery('[id$="invoiceStatus"]').attr('kimble-tip','Status');
+                        jQuery('[id$="invoiceDate"]').attr('kimble-tip','InvoiceDate');
+                        jQuery('[id$="invoiceNetAmount"]').attr('kimble-tip','NetAmount');
+                        jQuery('[id$="invoiceGrossAmount"]').attr('kimble-tip','GrossAmount');
+                        jQuery('[id$="invoiceTaxCode"]').attr('kimble-tip','TaxCode');
+                        jQuery('[id$="invoiceTaxAmount"]').attr('kimble-tip','TaxAmount');
+                        jQuery('[id$="purchaseOrderReference"]').attr('kimble-tip','PurchaseOrder');
+                        jQuery('[id$="invoiceRecBankAccount"]').attr('kimble-tip','ReceivableBankAccount');
+                        jQuery('[id$="invoiceNotes"]').attr('kimble-tip','Notes');
+                        jQuery('[id$="invoice-reference"]').attr('kimble-tip','Reference');
+                        jQuery('[id$="theDispatchedInvoiceFilename"]').attr('kimble-tip','TheDispatchedInvoice');
+
+			            // Element Fields
+                        jQuery('[id$="invoiceLineNarrativeheader"]').attr('kimble-tip','Narrative');
+                        jQuery('[id$="invoiceLineNumberheader"]').attr('kimble-tip','LineNumber').attr('kimble-tip-extended-text','LineNumberExtendedText');
+                        jQuery('[id$="invoiceLineNetAmountheader"]').attr('kimble-tip','NetAmountLine');
+                        jQuery('[id$="invoiceLineTaxAmountheader"]').attr('kimble-tip','TaxAmountLine');
+
+                        // buttons
+                        jQuery('[id$="downloadBtn"]').attr('kimble-tip','Download');
+                        jQuery('[id$="deleteInvoiceBtn"]').attr('kimble-tip','Delete');
+                        jQuery('[id$="raiseCreditNoteBtn"]').attr('kimble-tip','RaiseCreditNote').attr('kimble-tip-extended-text','RaiseCreditNoteExtendedText');
+                        jQuery('[id$="dispatchAndSendEmailBtn"]').attr('kimble-tip','DispatchAndEmail').attr('kimble-tip-extended-text','DispatchAndEmailExtendedText');
+                        jQuery('[id$="revertToDraftBtn"]').attr('kimble-tip','RevertToDraft').attr('kimble-tip-extended-text','RevertToDraftExtendedText');
+                        jQuery('[id$="sendInvoiceForApprovalBtn"]').attr('kimble-tip','SendForApproval');
+                        jQuery('[id$="sendEmailBtn"]').attr('kimble-tip','SendEmail');
+                        jQuery('[id$="dispatchInvoiceBtn"]').attr('kimble-tip','Dispatch').attr('kimble-tip-extended-text','DispatchExtendedText');
+
+                        // other
+                        jQuery('[id$="InvoiceApprovalHistory"]').attr('kimble-tip','ApprovalHistory');
+                        jQuery('[id$="expenseDownloadsSection"]').attr('kimble-tip','DownloadsFile');
+                }
+            }
+
+            function updateTipsConfigSetting(newTipSetting)
+            {
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+                    newTipSetting,
+                        function(result, event){
+                            if (event.status)
+                            {
+                                var data = {};
+                                data.results = result;
+                                loadGuidance();
+                            }
+                            else
+                            {
+                                alert(event.message);
+                            }
+                    },
+                    {escape: false, timeout: 60000}
+                );
+            }
+
+			</script>
+
+		</apex:define>
+	</apex:composition>
+
+</apex:page>

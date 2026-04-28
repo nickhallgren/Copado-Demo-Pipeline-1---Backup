@@ -1,0 +1,259 @@
+<apex:page standardController="KimbleOne__Resource__c" extensions="KimbleOne.ResourceTenureEndController,KimbleOne.TooltipsController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__Resource__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+	<apex:define name="Menu"><c:Menu rendered="{!!ISBLANK(KimbleOne__Resource__c.Id)}" DefaultHelpPage="PermanentStaffLeaving.html" MenuContextType="Resource" MenuContextId="{!KimbleOne__Resource__c.Id}" MenuContextName="{!KimbleOne__Resource__c.Name}"/></apex:define>
+	<apex:define name="Content">
+
+		<!-- Kimble Guidance -->
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+		<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+		<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/ResourceTenureEndNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+			<apex:outputPanel layout="none" rendered="{!ResourceTenureEndTipOverrideEnabled}">
+				<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+			</apex:outputPanel>
+		</apex:outputPanel>
+		
+		<style>
+			.activity-name {
+				width: 500px;
+			}
+		</style>
+		<apex:form id="TheForm">
+			<div id="pageErrors">
+				<apex:pageMessages escape="False" />
+			</div>
+		
+		<apex:pageBlock title="{!$Label.kimbleone__resourcetenureendheading}">
+			<apex:pageBlockButtons location="bottom">
+				<apex:commandButton action="{!Cancel}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__cancel}" rerender="TheForm" rendered="{!TheResourceTenureEndWizard.CanCancel}"/>
+				<apex:commandButton id="goPreviousBtn" onComplete="initialisePageTips(); initialiseItems();" action="{!TheResourceTenureEndWizard.GoPrevious}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__previous}" reRender="TheForm" rendered="{!TheResourceTenureEndWizard.CanGoPrevious}"/>
+				<apex:commandButton id="goNextBtn" onComplete="initialisePageTips(); initialiseItems();" action="{!TheResourceTenureEndWizard.GoNext}" styleclass="DisableButtonWhileBusy theNextButton" value="{!TheResourceTenureEndWizard.NextLabel}" reRender="TheForm" rendered="{!TheResourceTenureEndWizard.CanGoNext}" disabled="{!TheResourceTenureEndWizard.DisableNextBtn}"/>
+			</apex:pageBlockButtons>
+
+			<!-- Enter Resource End Date -->
+			<apex:outputPanel rendered="{!TheResourceTenureEndWizard.CurrentStep.StepName == 'EnterResourceEndDate'}">
+			<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__entertenureenddateheading}" columns="2" >
+				
+				<apex:outputField id="ResourceNameOutput" value="{!TheResourceTenureEndWizard.TheResourceTenure.KimbleOne__Resource__c}"/>
+				
+				<apex:outputField id="StartDateOutput" value="{!TheResourceTenureEndWizard.TheResourceTenure.KimbleOne__StartDate__c}"/>
+				
+				<apex:inputField id="EndDateInput" value="{!TheResourceTenureEndWizard.TheResourceTenure.KimbleOne__EndDate__c}" styleClass="kimbleDatePicker" required="true"/>
+				
+			</apex:pageblockSection>
+			</apex:outputPanel>
+			
+			<!-- Remove Remaining Assignment Forecast -->
+			<apex:outputPanel rendered="{!TheResourceTenureEndWizard.CurrentStep.StepName == 'RemoveRemainingAssignmentForecast'}">
+			<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__removeremainingassignmentforecast}" columns="1">
+			<!--  Display assignments to end? -->
+			
+				<apex:outputpanel id="WarningMsgPanel">
+					<apex:pageMessage strength="2" severity="warning" summary="{!$Label.kimbleone__timeafterendtenuremessage}" rendered="{!TheResourceTenureEndWizard.DisableNextBtn}"/>
+				</apex:outputpanel>
+				
+				<apex:pageBlockTable value="{!TheResourceTenureEndWizard.AssignmentsToEnd}" var="ass">
+					<apex:column id="ActionButton" headerValue="{!$Label.kimbleone__actionlinksheader}">
+						<apex:outputPanel layout="none" rendered="{!ass.ActivityAssignmentType__r.KimbleOne__Enum__c == 'Candidate'}"> 
+							<apex:outputLink value="#" onclick="safeNavigateToSForceURL('{!JSENCODE($Page.KimbleOne__ActivityAssignmentDemand)}?id={!JSENCODE(ass.KimbleOne__ActivityAssignmentDemand__c)}');" >
+								<apex:outputText value="{!$Label.kimbleone__review}"/>
+							</apex:outputLink>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!ass.ResourcedActivity__r.ResourcedActivityType__r.KimbleOne__Enum__c == 'DeliveryElement' && ass.ActivityAssignmentType__r.KimbleOne__Enum__c != 'Candidate'}"> 
+							<apex:outputLink value="#" onclick="safeNavigateToSForceURL('{!JSENCODE($Page.KimbleOne__ActivityAssignmentsDelivery)}?id={!JSENCODE(ass.ResourcedActivity__r.KimbleOne__DeliveryGroup__c)}');"  >
+								<apex:outputText value="{!$Label.kimbleone__review}"/>
+							</apex:outputLink>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!ass.ResourcedActivity__r.ResourcedActivityType__r.KimbleOne__Enum__c == 'SalesOpportunity' && ass.ActivityAssignmentType__r.KimbleOne__Enum__c != 'Candidate'}"> 
+							<apex:outputLink value="#" onclick="safeNavigateToSForceURL('{!JSENCODE($Page.KimbleOne__BidTeamAssignments)}?id={!JSENCODE(ass.KimbleOne__ResourcedActivity__c)}');" >
+								<apex:outputText value="{!$Label.kimbleone__review}"/>
+							</apex:outputLink>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!ass.ResourcedActivity__r.ResourcedActivityType__r.KimbleOne__Enum__c == 'Other' && ass.ActivityAssignmentType__r.KimbleOne__Enum__c != 'Candidate'}"> 
+							<apex:outputLink value="#" onclick="safeNavigateToSForceURL('{!JSENCODE($Page.KimbleOne__ActivityAssignmentsOther)}?id={!JSENCODE(ass.KimbleOne__ResourcedActivity__c)}');" >
+								<apex:outputText value="{!$Label.kimbleone__review}"/>
+							</apex:outputLink>
+						</apex:outputPanel>
+					</apex:column>
+					<apex:column id="ResourcedActivityTypeColumn" value="{!ass.ResourcedActivity__r.ResourcedActivityType__r.Name}" headerValue="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__ResourcedActivityType__c.Label}" />
+					<apex:column id="ActivityAssignmentTypeColumn" value="{!ass.ActivityAssignmentType__r.Name}" headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ActivityAssignmentType__c.Label}" />
+					<apex:column id="ResourcedActivityColumn" value="{!ass.ResourcedActivity__r.KimbleOne__FullName__c}" styleClass="activity-name" headerValue="{!$ObjectType.KimbleOne__ResourcedActivity__c.Label}" width="400"/>
+					<apex:column id="ResourcedActivityOwnerColumn" value="{!ass.ResourcedActivity__r.Owner.Name}" headerValue="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.OwnerId.Label}" />
+					<apex:column id="StartDate3Column" value="{!ass.KimbleOne__StartDate__c}" />
+					<apex:column id="ForecastP3EndDateColumn" value="{!ass.KimbleOne__ForecastP3EndDate__c}" />
+					<apex:column id="LatestTimeEntryDateColumn" value="{!ass.KimbleOne__LatestTimeEntryDate__c}" />
+					<apex:column id="LatestScheduledDateColumn" value="{!ass.KimbleOne__LatestScheduledDate__c}"/>
+					<apex:column headerValue="" >
+						<apex:image value="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'warning.png')}" title="{!$Label.kimbleone__timeafterendtenuremessage}" rendered="{!!ISBLANK(ass.KimbleOne__LatestTimeEntryDate__c) && (TheResourceTenureEndWizard.TheResourceTenure.KimbleOne__EndDate__c < ass.KimbleOne__LatestTimeEntryDate__c) || !ISBLANK(ass.KimbleOne__LatestScheduledDate__c) && (TheResourceTenureEndWizard.TheResourceTenure.KimbleOne__EndDate__c < ass.KimbleOne__LatestScheduledDate__c)}"/>
+					</apex:column>
+					
+				</apex:pageBlockTable>
+			
+			</apex:pageblockSection>
+			
+			</apex:outputPanel>
+			
+			<!--End Date Resource Group Membership -->
+			<apex:outputPanel rendered="{!TheResourceTenureEndWizard.CurrentStep.StepName == 'EndDateResourceGroupMembership'}">
+			<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__endresourcegroupmemberships}" columns="1" >
+				<!-- Maybe show the resource end date in column 3 here? -->
+				<apex:pageBlockTable value="{!TheResourceTenureEndWizard.GroupMembershipToEnd}" var="grp">
+					<apex:column id="GroupColumn" value="{!grp.KimbleOne__ParentResource__c}" />
+					<apex:column id="GroupOwnerColumn" value="{!grp.ParentResource__r.Owner.Name}" headerValue="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.OwnerId.Label}"/>
+					<apex:column id="GroupStartDateColumn" value="{!grp.KimbleOne__StartDate__c}" />
+					<apex:column id="GroupEndDateColumn" value="{!grp.KimbleOne__EndDate__c}" />
+					
+				</apex:pageBlockTable>
+			</apex:pageblockSection>
+			</apex:outputPanel>
+			
+			<!--Pending Approvals -->
+			<apex:outputPanel rendered="{!TheResourceTenureEndWizard.CurrentStep.StepName == 'PendingApprovals'}">
+			<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__approvalrequestspendingheading}" columns="1" >
+				<apex:pageBlockTable value="{!TheResourceTenureEndWizard.PendingApprovals}" var="app">
+					<apex:column id="ApprovalTypeColumn" headerValue="{!$ObjectType.KimbleOne__ApprovalType__c.Label}" value="{!app.TypeName}" />
+					<apex:column id="ApprovalRequestColumn" headerValue="{!$ObjectType.KimbleOne__ApprovalRequest__c.Label}">
+						<a href="{!app.ObjectLink}"><apex:outputText value="{!app.DisplayName}"/></a>
+					</apex:column>
+				</apex:pageBlockTable>
+			</apex:pageblockSection>
+			</apex:outputPanel>
+			
+			<!--Confirm End Date Resource -->
+			<apex:outputPanel rendered="{!TheResourceTenureEndWizard.CurrentStep.StepName == 'ConfirmEndDateResource'}">
+			
+			<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__confirmtenureendheading}" columns="2" >
+
+				<apex:inputField id="EndDateConfirm" value="{!TheResourceTenureEndWizard.TheResourceTenure.KimbleOne__EndDate__c}" styleClass="kimbleDatePicker" required="true"/>
+				<apex:pageBlockSectionItem />
+			</apex:pageblockSection>
+			
+			<apex:pageblockSection id="endpage" rendered="{!!ISBLANK(TheResourceTenureEndWizard.TheResourceTenure.Resource__r.KimbleOne__User__c)}">
+				
+				<apex:outputField value="{!TheResourceTenureEndWizard.TheResourceTenure.Resource__r.KimbleOne__User__c}"/>
+				
+				<apex:outputField value="{!TheResourceTenureEndWizard.TheResourceTenure.Resource__r.User__r.IsActive}" rendered="{!!TheResourceTenureEndWizard.TheResourceTenure.Resource__r.User__r.IsActive || TheResourceTenureEndWizard.HasDraftItems || TheResourceTenureEndWizard.OwnsObjects}"/>
+
+				<apex:pageBlockSectionItem rendered="{!TheResourceTenureEndWizard.TheResourceTenure.Resource__r.User__r.IsActive && !TheResourceTenureEndWizard.HasDraftItems && !TheResourceTenureEndWizard.OwnsObjects}">
+					<apex:outputText value="{!$Label.kimbleone__deactivateuserprompt}" />
+						<apex:actionregion >						
+							<apex:inputField id="DeactivateUserInput" value="{!TheResourceTenureEndWizard.DeactivateUser.KimbleOne__InputCheckbox__c}">
+								<apex:actionSupport event="onchange" reRender="endpage"/>
+							</apex:inputField>
+						</apex:actionregion>							
+				</apex:pageBlockSectionItem>
+				
+				<apex:pageBlockSectionItem rendered="{!TheResourceTenureEndWizard.TheResourceTenure.Resource__r.User__r.IsActive && TheResourceTenureEndWizard.DeactivateUser.KimbleOne__InputCheckbox__c}">
+					<apex:outputText value="{!$Label.kimbleone__removekimblelicenselabel}" />
+					<apex:inputField value="{!TheResourceTenureEndWizard.RemoveKimbleLicense.KimbleOne__InputCheckbox__c}"/>				
+				</apex:pageBlockSectionItem>
+				
+			</apex:pageblockSection>
+			
+			</apex:outputPanel>
+			
+			<apex:outputPanel rendered="{!TheResourceTenureEndWizard.HasFinished}">
+				<script>
+					safeNavigateToSForceURL('{!JSENCODE(RedirectResourceHome)}');
+				</script>
+			</apex:outputPanel>
+		</apex:pageBlock>
+
+		<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+		<div style="display:none;" kimble-tip="null"></div>
+
+		</apex:form>
+		
+		<script>
+			$(window).load(function(){
+				initialisePageTips();
+				initialiseItems();
+				jQuery(':focus').blur();
+			});
+			
+			/* Tooltips */
+			var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+			var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+			var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+			var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+			var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+			var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+		
+			function initialisePageTips()
+			{
+				ApplyTipAttributes();
+				initialiseTips();
+			}
+			
+			// add tip attributes to elements
+			function ApplyTipAttributes()
+			{
+				if(enableTips)
+				{
+					jQuery('[id$="EndDateInput"]').attr('kimble-tip','EndDate3').attr('kimble-tip-help-link','LeavingLink');
+					jQuery('[id$="DeactivateUserInput"]').attr('kimble-tip','DeactivateUser').attr('kimble-tip-extended-text','DeactivateUserExtendedText').attr('kimble-tip-help-link','LeavingLink');
+					jQuery('[id$="EndDateConfirm"]').attr('kimble-tip','EndDate').attr('kimble-tip-help-link','LeavingLink');
+					jQuery('[id$="StartDateOutput"]').attr('kimble-tip','StartDate2');
+					jQuery('[id$="ResourceNameOutput"]').attr('kimble-tip','Resource');
+					jQuery('[id$="ActionButtonheader"]').attr('kimble-tip','Action').attr('kimble-tip-extended-text','ActionExtendedText');
+					jQuery('[id$="ActivityAssignmentTypeColumnheader"]').attr('kimble-tip','ActivityAssignmentType');
+					jQuery('[id$="ForecastP3EndDateColumnheader"]').attr('kimble-tip','ForecastP3EndDate').attr('kimble-tip-extended-text','ForecastP3EndDateExtendedText');
+					jQuery('[id$="LatestScheduledDateColumnheader"]').attr('kimble-tip','LatestScheduledDate').attr('kimble-tip-extended-text','LatestScheduledDateExtendedText');
+					jQuery('[id$="LatestTimeEntryDateColumnheader"]').attr('kimble-tip','LatestTimeEntryDate').attr('kimble-tip-extended-text','LatestTimeEntryDateExtendedText');
+					jQuery('[id$="ResourcedActivityColumnheader"]').attr('kimble-tip','ResourcedActivity');
+					jQuery('[id$="ResourcedActivityTypeColumnheader"]').attr('kimble-tip','ResourcedActivityType');
+					jQuery('[id$="StartDate3Columnheader"]').attr('kimble-tip','StartDate3');
+					
+					jQuery('[id$="GroupColumnheader"]').attr('kimble-tip','ResourceGroup').attr('kimble-tip-extended-text','ResourceGroupExtendedText').attr('kimble-tip-help-link','ManagingGroupLink');
+					jQuery('[id$="GroupStartDateColumnheader"]').attr('kimble-tip','StartDate').attr('kimble-tip-extended-text','StartDateExtendedText').attr('kimble-tip-help-link','ManagingGroupLink');
+					jQuery('[id$="GroupEndDateColumnheader"]').attr('kimble-tip','EndDate2').attr('kimble-tip-extended-text','EndDate2ExtendedText').attr('kimble-tip-help-link','ManagingGroupLink');
+					
+					jQuery('[id$="ResourcedActivityOwnerColumnheader"]').attr('kimble-tip','ActivityOwner');
+					jQuery('[id$="GroupOwnerColumnheader"]').attr('kimble-tip','GroupOwner');
+					jQuery('[id$="ApprovalRequestColumnheader"]').attr('kimble-tip','ApprovalRequest');
+					
+				}
+			}
+		
+			function updateTipsConfigSetting(newTipSetting)
+			{
+				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+					newTipSetting,
+						function(result, event){
+							if (event.status)
+							{
+								var data = {};
+								data.results = result;
+								loadGuidance();
+							}
+							else
+							{
+								alert(event.message);
+							}
+					},
+					{escape: false, timeout: 60000}
+				);
+			}
+
+			function initialiseItems()
+			{
+			SetupDatePicker();
+			}
+
+			function SetupDatePicker()
+			{
+				//dateFormat: 'yy-mm-dd',
+				jQuery('.kimbleDatePicker').datepicker({
+						dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+						showOtherMonths: true,
+						selectOtherMonths: true,
+						changeMonth: true,
+						changeYear: true});
+			}
+
+		</script>
+	</apex:define>
+</apex:composition>
+</apex:page>

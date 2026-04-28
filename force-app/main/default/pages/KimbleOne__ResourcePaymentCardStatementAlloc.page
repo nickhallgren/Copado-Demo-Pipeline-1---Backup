@@ -1,0 +1,493 @@
+<apex:page standardController="KimbleOne__Resource__c" extensions="KimbleOne.ResourcePaymentCardStatementAllocCntrllr" showHeader="true" sidebar="false" tabStyle="KimbleOne__Resource__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+      	<c:Menu DefaultHelpPage="AllocateCardStatement.html" MenuContextType="{!IF(ISBLANK($CurrentPage.parameters.id), '', 'Resource')}" MenuContextId="{!KimbleOne__Resource__c.Id}" MenuContextName="{!KimbleOne__Resource__c.Name}"/>
+    </apex:define>
+    
+    <apex:define name="Content">
+    	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryMultiSelectDND)}" />
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+		<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+
+    	<apex:form id="TheForm">
+			<div id="pageErrors">
+				<apex:pageMessages escape="False" />
+			</div>
+		
+			<apex:pageBlock title="">
+				<apex:pageblockButtons location="bottom">
+					<apex:commandButton styleClass="submit-button" action="{!SavePaymentCardAllocation}" value="{!$Label.kimbleone__save}" onclick="updateJson();"/>
+					<span class="hidden-item loading-indicator" style="font-weight: bold;color: #4A4A56;font-size: 91%;"><img class="loading-indicator-img" src="{!URLFOR($Resource.LoadingImage)}" />{!$Label.Loading}</span>
+				</apex:pageblockButtons>
+
+				<div id="container">
+					<div id="theToAllocateItemsContainer" style="float:left;margin-left:4px;margin-right:4px;width:400px;">
+						<div id="theToAllocateItemsHeader" class="containerHeader">{!$Label.ItemsToAllocateHeading}</div>
+						<div id="theToAllocateItems" class="categorys"></div>
+
+					</div>
+					<div id="theAllocatedItemsContainer" style="float:left;width:650px">
+						<div id="theAllocatedItemsHeader" class="containerHeader"><div style="float:left">{!$Label.AllocatedItemsHeading}</div><div style="float:right"><apex:outputLink styleclass="actionLink" style="text-decoration:none;" value="javascript:void(0)" onclick="initialiseModalBoxy('#AssignmentPopup', '{!$Label.kimbleone__selectlabel} {!$Label.kimbleone__assignmentsheading}');showModalBoxy();disableActivitiesWithPendingItems()">{!$Label.kimbleone__add} {!$Label.kimbleone__assignmentsheading}</apex:outputLink></div></div>
+						<ul id="theAllocatedItems" class="categorys"></ul>
+						<div id="theIgnoredItemsHeader" class="containerHeader">{!$Label.IgnoredItemsHeading}</div>
+						<ul class="categorys" style="min-height:46px">
+							<li class="category" id="theIgnoredItems">
+								<div class="droppable" style="min-height:38px">
+									<ul class="selectable"></ul>
+									<div style="clear:both"></div>
+								</div>
+							</li>
+						</ul>
+					</div>
+					<div style="clear:both"></div>
+				</div><!--Container End-->
+			</apex:pageBlock>
+			<apex:inputText styleClass="JsonToAllocateItems" style="display:none" value="{!TheToAllocateJSON}"/>
+			<apex:inputText styleClass="JsonToIgnoreItems" style="display:none" value="{!TheToIgnoreJSON}"/>
+			<apex:inputText styleClass="JsonAllActivities" style="display:none" value="{!AllActivitiesJSON}"/>
+			<apex:inputText styleClass="JsonAllocatedItems" style="display:none" value="{!TheAllocatedItemsJSON}"/>
+			<apex:inputText styleClass="SelectedActivities" style="display:none" value="{!SelectedActivities}"/>
+			<apex:actionFunction action="{!refreshForSelectedActivityChange}" name="refreshSelectedActivities" rerender="TheForm" onComplete="loadItems(); jQuery('.activitySection').show(); "/>
+		</apex:form>
+		
+		<div id="AssignmentPopup" style="display: none;">
+			<apex:outputPanel id="AssignmentDetails1" rendered="{! !HasMaxActivities}">
+				<apex:pageBlock mode="edit">
+					<apex:pageBlockButtons location="bottom">
+	           			<input type="button" onclick="hideModalBoxy() " class="btn" value="{!$Label.Close}" />
+          			</apex:pageBlockButtons>
+					<div style="height:400px;overflow-y:auto;min-width:200px">
+						<apex:pageBlockTable value="{!AllActivitiesList}" var="activity">
+									<apex:column >
+										<input type="checkbox" onclick="return toggleActivity(this, '{!JSINHTMLENCODE(activity.Id)}');"/>
+									</apex:column>
+									<apex:column headervalue="{!$ObjectType.KimbleOne__ExpenseClaim__c.Fields.KimbleOne__ResourcedActivity__c.Label}" value="{!activity.Name}"/>
+						</apex:pageBlockTable>
+					</div>
+				</apex:pageBlock>
+
+			</apex:outputPanel>
+
+			<apex:outputPanel id="AssignmentDetails2"  rendered="{! HasMaxActivities}" >
+				<apex:pageBlock mode="edit" >
+
+					<apex:pageBlockButtons location="bottom">
+						<input type="button" onclick="jQuery('.SelectedActivities').val(jQuery('.activity-dynamic').select2('val').toString());refreshSelectedActivities(); hideModalBoxy() " class="btn" value="{!$Label.AddSelected}" />
+						<input type="button" onclick="hideModalBoxy() " class="btn" value="{!$Label.Cancel}" />
+					</apex:pageBlockButtons>
+					<apex:outputPanel layout="none" >
+						<input type="text" id="dynamicActivity" class="activity-dynamic" style="width: width:400px;" />
+					</apex:outputPanel>
+
+				</apex:pageBlock>
+
+			</apex:outputPanel>
+		</div>
+		
+		<style>
+			body {-webkit-touch-callout: none;-webkit-user-select: none;-user-select: none;	-moz-user-select: none;	-ms-user-select: none;user-select: none;}
+			.containerHeader{background-color: #F2F3F3;border: 1px solid #E0E3E5;height: 22px;border-bottom: 1px solid #E3DEB8;padding-left: 8px;padding-right:8px;line-height: 22px;vertical-align: middle;font-size: 11px;color: #333;font-weight: bold;}
+			.pbBody{margin-left:0px !important}
+			.lineItem {background-color:#E68F1A; line-height: 15px;vertical-align: middle;border: 1px solid #BBB;color: beige;font-weight: bold;margin: 2px 2px 2px 0;padding: 1px;float: left;width: 70px;height: 32px;font-size: 9px;text-align: center;overflow:hidden;}
+			.lineItem div {height: 10px;vertical-align: middle;line-height: 10px;overflow:hidden;}
+			.dragactive {background-color:#FFEF8F;}
+			.category {margin-top:4px; margin-left:4px;margin-right:2px;clear:both;}
+			.categoryHeader{text-align: left;background-color: #1797C0;color: white;font-weight: bold;min-height: 20px;line-height: 20px;padding-left: 4px;padding-right:4px;}
+			.selectable{list-style-type: none; margin: 0; padding: 0;}
+			.selectable .ui-selecting { background: #FECA40; }
+			.selectable .ui-selected { background: #CCC; color: white; }
+			.ui-droppable {overflow:auto;}
+			.ui-draggable-dragging {z-index:100;}
+			.droppable{;min-height:25px;}
+			.activityCategories {list-style-type: none;}
+			.categorys {list-style-type: none;background-color: #FFE;margin-top: 0px;border-left: 1px solid #E0E3E5;border-right: 1px solid #E0E3E5;border-bottom: 1px solid #E0E3E5;padding-top: 2px;padding-bottom: 0px;padding-left: 0px;padding-right: 0px;min-height: 100px;}
+			.line-drop-hover {margin-top:4px; margin-left:4px;clear:both;border-bottom: 4px solid #45A500;}
+			.hover-highlight {background: #FFEF8F url(images/ui-bg_highlight-soft_25_ffef8f_1x100.png) 50% top repeat-x;color: #363636;}
+			.activitySection{position: relative; margin-left: 6px;margin-bottom:6px;}
+			.activitySectionHeader {position: relative;width: 40px; background-color:#BBB;height: 100%;text-align: center;}
+            .loading-indicator-img {padding-right: 4px;vertical-align: middle;}
+			#dynamicActivity {width: 227px;}
+			.activitySection-selected {background-color:#eee; border:1px solid #bbb;}
+			.toggle {cursor:pointer;]}
+			.sectionText {position: absolute;
+				bottom: -1px;
+				-webkit-transform: rotate(-90deg) translate(0%,105%);
+				-webkit-transform-origin: 0% 100%;
+				-moz-transform: rotate(-90deg) translate(0%,105%);
+				-moz-transform-origin: 0% 100%;
+				-o-transform: rotate(-90deg) translate(0%,105%);
+				-o-transform-origin: 0% 100%;
+				-ms-transform: rotate(-90deg) translate(0%,105%);
+				-ms-transform-origin: 0% 100%;
+				width: 95px;
+				overflow: hidden;
+				height: 30px;
+				line-height: 15px;
+				vertical-align: middle;}
+			.activitySectionName {
+				position: absolute;
+				min-width: 36px;
+				bottom: 0px;
+				top:0px;
+				left:0px;
+				background-color:#bbb;
+				border:1px solid #bbb;
+			}
+			a.select2-choice {
+				height: 18px !important;
+				line-height: 18px !important;
+				background-image: none !important;
+				border-radius: 0px !important;
+				color: black !important;
+				padding-left: 4px !important;
+				text-align: left;
+				font-weight: normal;
+
+				letter-spacing: normal;
+				word-spacing: normal;
+				text-transform: none;
+				text-indent: 0px;
+				text-shadow: none;
+				display: inline-block;
+				text-align: start;
+				margin: 0em;
+				font: 400 13.3333px Arial;
+			}
+			.select2-choice div {
+				<!-- border-left: none !important; -->
+			}
+			/* SELECT 2 STYLING */
+			.select2-results li {margin-left:0px;}
+			.select2-container-multi .select2-choices
+			{
+				border: 2px solid rgb(224,224,224);
+				background-image:none;
+			}
+			.select2-container-multi .select2-choices .select2-search-choice {
+				border: 1px solid #aaaaaa;
+				border-radius: 4px;
+				padding: 5px 20px 5px 5px;
+				background-image:none;
+			}
+			.locked-tag .select2-search-choice-close-remove{
+ 				 display: none!important;
+			}
+			.select2-container-multi .select2-search-choice-close {
+				background-image:  url({!URLFOR($Resource.AssignmentImages, 'assignmentSprite.png')});
+				background-position: -2px -29px;
+				background-repeat: no-repeat;
+				left:auto;
+			}
+
+			.select2-container-multi .select2-choices .select2-search-choice .select2-search-choice-close:hover {
+				background-position: -2px -1px;
+			}
+		</style>
+			<script>
+
+			function updateJson()
+			{
+                jQuery(".submit-button").hide();
+                jQuery(".loading-indicator").show();
+
+				var theActivities = new Array();
+				
+				jQuery.each($('.activitySection'), function(i, activity) {
+					if ($(activity).find('.lineItem').length != 0)
+						theActivities[theActivities.length] = $(activity).data('jsonActivity');
+				});
+				
+				$('.JsonAllocatedItems').val(JSON.stringify(theActivities));
+				
+				$('.JsonToIgnoreItems').val(JSON.stringify($('#theIgnoredItems').data('jsonCategory')));
+			}
+			
+			var activityHtml = '<div class="activitySection"><div class="activitySectionName"><div class="sectionText"></div></div><ul class="activityCategories"></ul></div>';
+		
+			var categoryHtml = '<li class="category"><div class="categoryHeader"><div class="narrative"></div></div><div class="droppable"><ul class="selectable"></ul><div style="clear:both"></div></div></li>';
+			var lineItemHtml = '<li class="lineItem"><div class="name"></div><div class="date"></div><div class="amount"></div></li>';
+
+			function disableActivitiesWithPendingItems(){
+				var theActivities = [];
+				jQuery.each(droppedItems, function(activityId, categoryIds) {
+					jQuery.each(categoryIds, function(categoryId, itemIds) {
+			            if(itemIds.length > 0)
+							theActivities.push(activityId);
+					  });
+				});
+				var newData = [];
+			    var data = jQuery('.activity-dynamic').select2('data');
+			    jQuery.each(data, function(key, dataItem) {
+			        console.log(key);console.log(dataItem);
+			       if(theActivities.includes(dataItem.id))
+			       		newData.push({id:dataItem.id, text: dataItem.text, locked: true});
+			       else
+			       		newData.push({id:dataItem.id, text: dataItem.text, locked: false});
+			      });
+				jQuery(".activity-dynamic").select2('data',newData);
+   			}
+
+   			/*function rePlayPreviousDroppedItems(){
+   			    jQuery.each(droppedItems, function(key, categoryIds) {
+					 jQuery.each(categoryIds, function(categoryId, itemIds) {
+					     jQuery.each(itemIds, function(itemId, itemIds) {
+//theToAllocateItemsContainer
+					     });
+
+					 });
+				});
+      		}*/
+
+			$(document).ready(function(){
+			    jQuery('.activity-dynamic').select2({
+												minimumInputLength: 2,
+												multiple: true,
+												query: function (params)
+												{
+													var find = function() {findActivities(params);};
+													find();
+												},
+												initSelection : function (element, callback) {
+												    var data = {id: element.val(), text: element.attr('data-name')};
+													callback(data);
+												}
+										});
+
+
+				loadItems();
+			});
+			var droppedItems = {};
+			droppedItems["IGNORE"] = {};
+			droppedItems["IGNORE"]["IGNORE"] = [];
+
+			function loadItems(){
+
+			    var itemsAlreadyDropped = [];
+			    var itemsAlreadyDroppedJson = {};
+			    var itemsAlreadyDroppedHtml = {};
+
+			    jQuery.each(droppedItems, function(key, categoryIds) {
+					 jQuery.each(categoryIds, function(categoryId, itemIds) {
+					     jQuery.each(itemIds, function(key, itemId) {
+					         itemsAlreadyDropped.push(itemId);
+					     });
+					 });
+				});
+
+				var theCategories = jQuery.parseJSON($('.JsonToAllocateItems').val());
+				var theActivities = jQuery.parseJSON($('.JsonAllActivities').val());
+				var container = $('#theToAllocateItems');
+				container.html("");
+
+				jQuery.each(theCategories, function(i, category){
+					var categoryInstance = $(categoryHtml);
+					categoryInstance.data('jsonCategory', category);
+					categoryInstance.find('.narrative').text(category.Name);
+					categoryInstance.find('.droppable').addClass('toAllocate');
+
+					var itemsContainer = categoryInstance.find('ul');
+					if (category.TheItems == undefined)
+						category.TheItems = new Array();
+
+					jQuery.each(category.TheItems, function(i, item){
+					    var lineItem = $(lineItemHtml);
+							lineItem.data('jsonItem', item);
+							lineItem.find('.name').text(item.CategoryName);
+							lineItem.find('.amount').text(item.IncurredAmount);
+							lineItem.find('.date').text(item.FormattedIncurredDate);
+
+					   	if(itemsAlreadyDropped.includes(item.Id)){
+							itemsAlreadyDroppedJson[item.Id] = item;
+							itemsAlreadyDroppedHtml[item.Id] = lineItem;
+						}
+					    else{
+							lineItem.appendTo(itemsContainer);
+						}
+					});
+
+					categoryInstance.appendTo(container);
+				});
+
+				var activitiesContainer = $('#theAllocatedItems');
+				activitiesContainer.html("");
+
+				jQuery.each(theActivities, function (i, activity){
+					var activityInstance = $(activityHtml);
+					activityInstance.data('jsonActivity', activity);
+					activityInstance.attr('id', activity.Id);
+					if (droppedItems[activity.Id] == undefined)
+						droppedItems[activity.Id] = {};
+
+					var dateRange = '';
+
+					jQuery.each(activity.DateRange, function (i, range){
+						dateRange += ('[' + range.FormattedStartDate + ' - ' + range.FormattedEndDate + '] ');
+					});
+
+					activity.IsValid = function(dte){
+
+						var valid = false;
+
+						jQuery.each(this.DateRange, function (i, range){
+							if (dte >= sforce.internal.stringToDate(range.StartDate).valueOf() && dte <= sforce.internal.stringToDate(range.EndDate).valueOf())
+							{
+								valid = true;
+							}
+						});
+
+						return valid;
+					};
+
+					activityInstance.find('.sectionText').text(activity.Name).attr('title', activity.Name + dateRange);
+
+					jQuery.each(activity.TheExpenseCategories, function(i, obj){
+						var categoryInstance = $(categoryHtml);
+
+						if (droppedItems[activity.Id][obj.Id] == undefined){
+							droppedItems[activity.Id][obj.Id] = [];
+						}
+						else{
+						    var items = droppedItems[activity.Id][obj.Id];
+						    for ( i = 0; i < items.length; i++) {
+						        var item = itemsAlreadyDroppedJson[items[i]];
+						    	var itemHtml = itemsAlreadyDroppedHtml[items[i]];
+
+								obj.TheItems[obj.TheItems.length] = item;
+								categoryInstance.find('ul').append(itemHtml);
+						    }
+      					}
+						categoryInstance.data('jsonCategory', obj);
+						categoryInstance.attr('id',obj.Id);
+
+						categoryInstance.find('.narrative').text(obj.Name);
+						//append line to section lines element
+						categoryInstance.appendTo(activityInstance.find('.activityCategories'));
+					});
+
+					activityInstance.appendTo(activitiesContainer);
+					activityInstance.find('.sectionText').width(activityInstance.height() + 'px');
+					activityInstance.hide();
+				});
+
+                var items = droppedItems["IGNORE"]["IGNORE"];
+                var ignoreCategoryJson = jQuery.parseJSON($('.JsonToIgnoreItems').val());
+			    for ( i = 0; i < items.length; i++) {
+				    var item = itemsAlreadyDroppedJson[items[i]];
+				    var itemHtml = itemsAlreadyDroppedHtml[items[i]];
+                    ignoreCategoryJson.TheItems[ignoreCategoryJson.TheItems.length] = item;
+                    jQuery('#theIgnoredItems>>ul').append(itemHtml);
+			     }
+
+                $('#theIgnoredItems').data('jsonCategory', ignoreCategoryJson);
+
+				// Set the default function - executes per dropped item
+				$.fn.drag_drop_multi_select.defaults.after_drop_action = function($item,$old,$new,e,ui){
+					// Possible param $item_instance, $old_container, $new_container, event, helper
+					var $target = $(e.target);
+
+					//source line - remove lineItem from source line items and subtract amount
+					//$item.parent().parent().parent().data()
+					var htmlCatgeory =  $item.parent().parent().parent();
+					var jsonCategory = htmlCatgeory.data('jsonCategory');
+					var jsonItem = $item.data('jsonItem');
+					findAndRemove(jsonCategory.TheItems, 'Id', jsonItem.Id);
+
+					//target line - add lineItem to target and add amount
+					//$target.data()
+					var htmlLineTarget = $target.parent();
+					jsonCategory = htmlLineTarget.data('jsonCategory');
+					jsonCategory.TheItems[jsonCategory.TheItems.length] = jsonItem;
+					if(jsonCategory.Id == undefined && jsonCategory.Name != 'To Ignore'){
+                        jQuery.each(droppedItems, function(key, categoryIds) {
+					        jQuery.each(categoryIds, function(itemId, itemIds) {
+								if (itemIds.includes(jsonItem.Id))
+									itemIds.remove(jsonItem.Id);
+						  	});
+					   	});
+					}
+					else{
+					    if (jsonCategory.Id == undefined && jsonCategory.Name == 'To Ignore'){
+					        droppedItems["IGNORE"]["IGNORE"].push(jsonItem.Id);
+                        }
+                        else{
+                            jQuery.each(droppedItems, function(key, categoryIds) {
+					            jQuery.each(categoryIds, function(itemId, itemIds) {
+								    if (itemIds.includes(jsonItem.Id))
+									    itemIds.remove(jsonItem.Id);
+						  	    });
+					   	    });
+
+                            jQuery.each(droppedItems, function(key, result) {
+                                if (result[jsonCategory.Id] != undefined)
+                                    result[jsonCategory.Id].push(jsonItem.Id);
+                            });
+				   		}
+					}
+					//droppedItems[jsonCategory.Id].add(jsonItem.Id);
+					$target.find('ul').append($item);
+
+				};
+
+				// Initiate the drag & drop
+				jQuery('#container').drag_drop_multi_select({
+					element_to_drag_drop_select:'.category div ul li',
+					elements_to_drop:'.category div.droppable',
+					elements_to_cancel_select:'.category div.categoryHeader , a'
+				});
+   			}
+
+			function toggleActivity(obj, activityId)
+			{
+			 	if ($('#' + activityId).find('.lineItem').length > 0)
+			 		return false;
+			 		
+			 	$('#' + activityId).toggle();
+			 	return true;
+			}
+			 
+			
+			function findAndRemove(array, property, value)
+			{
+				 $.each(array, function(index, result) {
+				     if(result != undefined && result[property] == value) {
+				     {
+				         //Remove from array
+				         array.splice(index, 1);
+				         return;
+				     }
+				     }
+				 });
+			}
+
+			function findActivities(params) {
+
+				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ResourcePaymentCardStatementAllocCntrllr.FindActivities}',
+								"{!JSENCODE(TheResource.Id)}",
+								params.term,
+								function(result, event){
+									if (event.status)
+								{
+									var data = {};
+									data.results = result;
+									params.callback(data);
+								}
+								else if (event.type === 'exception')
+								{
+									alert(event.message);
+								}
+								else
+								{
+									alert(event.message);
+								}
+							},
+							{escape: false, timeout: 60000}
+						);
+			}
+			</script>
+
+	</apex:define>
+	
+	</apex:composition>
+	
+</apex:page>

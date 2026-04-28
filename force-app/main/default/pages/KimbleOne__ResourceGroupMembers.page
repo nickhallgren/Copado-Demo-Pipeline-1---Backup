@@ -1,0 +1,265 @@
+<apex:page standardController="KimbleOne__Resource__c" extensions="KimbleOne.ResourceGroupMembersController" sidebar="false" >
+	
+<apex:composition template="KimbleOne__SiteMaster">
+
+	<apex:define name="Menu">
+		<c:Menu DefaultHelpPage="ManagingGroupMembership.html" MenuContextType="Resource" MenuContextId="{!KimbleOne__Resource__c.Id}" MenuContextName="{!KimbleOne__Resource__c.Name}"/>
+	</apex:define>
+
+	<apex:define name="Content">
+	
+		<style>
+			.middle-align {
+				vertical-align: middle;
+			}
+		</style>
+	
+		<apex:outputPanel id="ResourceGroupMembers" layout="block">
+			
+			<div id="DeleteErrors">
+				<apex:pageMessages id="Errors" escape="false"/>
+			</div>
+			
+			<apex:form >
+			
+				<apex:pageBlock id="theResourceGroupMembers">
+
+					<apex:pageBlockButtons >
+						<apex:outputPanel rendered="{!$ObjectType.KimbleOne__ResourceGroupMember__c.createable}">
+                  			<input type="button" class="btn" value="{!$Label.Add}" 
+								onclick="initialiseModalBoxy('#AddResourceGroupMembersPopup', '{!JSENCODE($Label.Add)} {!$ObjectType.ResourceGroupMember__c.label}');initialisePopup();"></input>
+						</apex:outputPanel>
+					</apex:pageBlockButtons>
+						
+					<apex:pageBlockTable value="{!TheMembers}" var="member" >
+					
+						<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+							<apex:outputPanel rendered="{!$ObjectType.KimbleOne__ResourceGroupMember__c.deletable}">
+							<a href="javascript:void(0);" onclick="delResourceGroupMember('{!JSINHTMLENCODE(member.Id)}')">{!$Label.Remove}</a>
+							&nbsp;|&nbsp;
+       						</apex:outputPanel>
+       						<apex:outputPanel rendered="{!$ObjectType.KimbleOne__ResourceGroupMember__c.updateable}">
+       							<a href="javascript:initialiseModalBoxy('#ResourceGroupMemberPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__ResourceGroupMember__c.label}');editResourceGroupMember('{!JSINHTMLENCODE(member.Id)}','')">{!$Label.kimbleone__edit}</a>
+       						</apex:outputPanel>
+						</apex:column>
+
+						<apex:column value="{!member.KimbleOne__ChildResource__c}"  headerValue="{!$ObjectType.KimbleOne__ResourceGroupMember__c.Fields.KimbleOne__ChildResource__c.Label}"/>
+						<apex:column value="{!member.KimbleOne__StartDate__c}"  headerValue="{!$ObjectType.KimbleOne__ResourceGroupMember__c.Fields.KimbleOne__StartDate__c.Label}"/>
+						<apex:column value="{!member.KimbleOne__EndDate__c}"  headerValue="{!$ObjectType.KimbleOne__ResourceGroupMember__c.Fields.KimbleOne__EndDate__c.Label}"/>
+							
+					</apex:pageBlockTable>
+
+					<apex:pageBlockSection columns="3" collapsible="false">
+						<apex:outputPanel >
+							<div class="page-numbering">
+								<apex:outputText styleClass="middle-align" value="{!(pageNumber * ThePageSize)+1-ThePageSize} - {!IF((pageNumber * ThePageSize)>noOfRecords, noOfRecords,(pageNumber * ThePageSize))} {!$Label.kimbleone__oflabel} {!noOfRecords}"/>
+							</div>
+						</apex:outputPanel>
+						<apex:pageBlockSectionItem >
+							<apex:selectRadio value="{!ThePageSize}">
+					            <apex:actionSupport event="onclick"  action="{!Reset}"  rerender="ResourceGroupMembers" status="pageStatus"/>
+								<apex:selectOptions value="{!pageResultsOptions}" />
+							</apex:selectRadio>
+						</apex:pageBlockSectionItem>
+						<apex:pageBlockSectionItem >
+							<apex:outputPanel >
+								<div style="float: right; margin-right: 15px; margin-top:5px;">
+							    	<apex:commandLink status="pageStatus" style="color: #015BA7;text-decoration: none;" action="{!previous}" rerender="theResourceGroupMembers" rendered="{!hasPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+							    	<apex:outputText styleclass="greyedLink" rendered="{!!hasPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+							    	&nbsp;|&nbsp;
+							    	<apex:commandLink status="pageStatus" style="color: #015BA7;text-decoration: none;" action="{!next}" rerender="theResourceGroupMembers" rendered="{!hasNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+							    	<apex:outputText styleclass="greyedLink" rendered="{!!hasNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+								</div>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+					</apex:pageBlockSection>
+					<apex:actionStatus id="pageStatus"  startText=".. {!$Label.kimbleone__refreshinglabel}"  stopText=""/>
+				
+					<apex:actionFunction action="{!newResourceGroupMember}" name="newResourceGroupMember" rerender="ResourceGroupMember" oncomplete="initialisePopup();">
+					</apex:actionFunction>
+					
+					<apex:actionFunction action="{!getResourceGroupMember}" name="editResourceGroupMember" rerender="ResourceGroupMember" oncomplete="initialisePopup();">
+			  			<apex:param name="rgmId" value="" />
+					</apex:actionFunction>
+						
+					<apex:actionFunction action="{!DeleteResourceGroupMember}" name="delResourceGroupMember" rerender="ResourceGroupMembers">
+			  			<apex:param name="rgmId" value="" />
+					</apex:actionFunction>
+						
+				</apex:pageBlock>
+					
+			</apex:form>
+					
+		</apex:outputPanel>
+
+		<script type="text/javascript">
+		
+		function setSelectedMembers()
+		{
+			var selectedItems=''; 
+			$("input:checkbox[name=Resources]:checked").each(function(){
+				selectedItems=selectedItems+','+$(this).val();
+	  		});
+			$('.SelectedMembers').val(selectedItems);
+		}
+
+		function setUpCheckBoxes()
+		{
+			jQuery('#AllResources').unbind('change');
+			jQuery('#AllResources').change(function(){
+				UncheckOrCheckGroup(jQuery(this),'Resources');
+			});
+			jQuery('.AResource').unbind('change');
+			jQuery('.AResource').change(function(){
+				UnCheckParent($(this),'AllResources');
+			});
+		}		
+		</script>
+							
+		<div id="ResourceGroupMemberPopup" style="display: none">
+	
+			<apex:outputPanel id="ResourceGroupMember">
+
+				<apex:form >
+
+					<apex:pageBlock >
+
+						<div id="EditResourceGroupMemberErrors">
+							<apex:pageMessages escape="false"/>
+						</div>
+
+						<apex:pageBlockButtons location="bottom">
+							<apex:commandButton styleClass="DisableButtonWhileBusy" action="{!saveResourceGroupMember}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#EditResourceGroupMemberErrors');initialiseDates()" reRender="ResourceGroupMembers, ResourceGroupMember" />
+							<input class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}" />
+						</apex:pageBlockButtons>
+
+						<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+
+							<apex:pageBlockSectionItem labelStyle="text-align:left" rendered="{! ISBLANK(ResourceGroupMember.Id)}" >
+								 <apex:outputText value="{!$ObjectType.KimbleOne__ResourceGroupMember__c.Fields.KimbleOne__ChildResource__c.Label}"></apex:outputText>
+								 <apex:outputPanel layout="none">
+								 	<apex:selectList value="{!ResourceGroupMember.KimbleOne__ChildResource__c}" required="true" size="1" rendered="{!!UseResourceEnhancedLookup}">
+						            	<apex:selectOptions value="{!SpecificResources}"/>
+						        	</apex:selectList>
+						        	<apex:inputField required="true" styleclass="kimbleSearch" value="{!ResourceGroupMember.KimbleOne__ChildResource__c}" rendered="{!UseResourceEnhancedLookup}"/>
+						        </apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem labelStyle="text-align:left" rendered="{! !ISBLANK(ResourceGroupMember.Id)}" >
+								 <apex:outputText value="{!$ObjectType.KimbleOne__ResourceGroupMember__c.Fields.KimbleOne__ChildResource__c.Label}"></apex:outputText>
+								<apex:outputField value="{!ResourceGroupMember.KimbleOne__ChildResource__c}" />
+							</apex:pageBlockSectionItem>
+							
+							<apex:inputField value="{!ResourceGroupMember.KimbleOne__StartDate__c}" styleclass="kimbleDatePicker "/>
+													
+							<apex:inputField value="{!ResourceGroupMember.KimbleOne__EndDate__c}" styleclass="kimbleDatePicker "/>
+							
+						</apex:pageblockSection>
+						
+					</apex:pageBlock>
+
+				</apex:form>
+
+			</apex:outputPanel>
+			
+		</div>
+
+	   <div id="AddResourceGroupMembersPopup" style="display:none;">
+	 
+		<apex:outputPanel id="AddableMembers">
+		
+	      <div id="EditAddableMembersErrors">
+			<apex:pageMessages id="AddResourcePageMessages" escape="false"/>
+		  </div>
+		  
+			<apex:form >
+	 			<apex:inputText value="{!resourcesToAssign}"  styleclass="HideControl SelectedMembers"/> 
+					
+	       		<apex:actionFunction action="{!searchResource}" name="searchResource" rerender="resultsPanel, AddResourcePageMessages" status="resultsPanel" oncomplete="setUpCheckBoxes()">
+	       			<apex:param name="searchText" value="" />
+	       		</apex:actionFunction>
+	
+	       		<apex:actionFunction action="{!assignResources}" name="assignResources" oncomplete="hideModalBoxyWithErrorCheck('#EditAddableMembersErrors');initialiseDates()" rerender="ResourceGroupMembers, AddableMembers"/>
+	 		
+				<apex:pageBlock >               
+					<apex:pageBlockSection columns="3">
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourceGroupMember__c.Fields.KimbleOne__ChildResource__c.Label}"/>
+		            		<input type="text" value="" class="queryText"/>
+		            	</apex:pageBlockSectionItem>
+		            	
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourceGroupMember__c.Fields.KimbleOne__StartDate__c.Label}" />
+							<apex:outputPanel layout="none">
+								<div class="requiredInput">
+									<div class="requiredBlock"></div>
+									<apex:inputText value="{!bulkAssignDate}" styleClass="kimbleDatePicker"/>
+								</div>
+							</apex:outputPanel>
+		            	</apex:pageBlockSectionItem>
+						
+		            	<apex:pageBlockSectionItem >
+		            		<input type="button" class="btn" value="{!$Label.SearchLabel} {!$ObjectType.KimbleOne__ResourceGroupMember__c.Fields.KimbleOne__ChildResource__c.Label}" onclick="searchResource($('.queryText').val());"/>
+		            		&nbsp;
+		            	</apex:pageBlockSectionItem>
+						
+		            </apex:pageBlockSection>
+		         
+		           	<apex:actionStatus id="resultsPanel">
+						<apex:facet name="start">
+							<div style="margin-top:20px; margin-bottom:20px;margin-left:12px">
+								<span style="font-weight: bold;color: #4A4A56;font-size: 91%;"><img src="{!URLFOR($Resource.KimbleOne__LoadingImage)}" style="margin-right: 8px;position: relative;top: 2px;"/>{!$Label.kimbleone__loading}</span>
+							</div>
+						</apex:facet>
+						<apex:facet name="stop">
+							<apex:outputpanel style="height:200px;overflow-y: auto; overflow-x: auto;" layout="block">
+
+								<apex:pageBlockTable value="{!resourceList}" var="resource" >
+									<apex:column >
+					 					<apex:facet name="header">
+					 						<apex:outputPanel layout="none" rendered="{!resourceList!=null || resourceList.size!=0}">
+					 							<input type="checkbox" name="Members" value="AllResources" id="AllResources"  />
+					 						</apex:outputPanel>		
+					 					</apex:facet>
+					 					<input type="checkbox" name="Resources" value="{!resource.Id}" class="AResource"/>
+					 				</apex:column>
+									<apex:column >
+										{!resource.Name}
+									</apex:column>
+								</apex:pageBlockTable>
+							</apex:outputpanel>	            	
+						</apex:facet>
+					</apex:actionStatus>
+	
+	            	<apex:pageBlockButtons location="bottom">	            		
+	            		<input type="button" class="btn DisableButtonWhileBusy" value="{!$Label.kimbleone__save}" onclick="setSelectedMembers();assignResources();" reRender="ResourceGroupMembers"/>
+						<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>	            		
+	            	</apex:pageBlockButtons>
+		            
+	       		</apex:pageBlock>
+			</apex:form>    
+		</apex:outputpanel>     
+	    </div>
+		<script>
+		
+		function initialisePopup()
+		{
+			initialiseDates();
+			
+			showModalBoxy();
+		}
+
+		function initialiseDates()
+		{
+		    jQuery('.kimbleDatePicker').datepicker({
+			   	dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+				showOtherMonths: true,
+				selectOtherMonths: true
+			});
+  		}
+
+		</script>
+	</apex:define>
+		
+</apex:composition>
+	
+</apex:page>

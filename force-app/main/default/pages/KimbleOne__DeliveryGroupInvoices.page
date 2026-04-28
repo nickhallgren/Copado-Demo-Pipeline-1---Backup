@@ -1,0 +1,1011 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.DeliveryGroupInvoicesController,KimbleOne.TooltipsController,KimbleOne.SecurityController" showHeader="true" sidebar="false">
+<apex:composition template="KimbleOne__SiteMaster">
+
+	<apex:define name="Menu">
+		<c:Menu DefaultHelpPage="ManagingInvoices.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryGroup__c.Id}" MenuContextName="{!KimbleOne__DeliveryGroup__c.Name}"/>
+	</apex:define>
+	     
+	<apex:define name="Content">
+		<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+		<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleJS, 'Charm.js')}"/>
+	
+    	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+    	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+
+		<!-- Kimble Guidance -->
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+		<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+		<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/DeliveryGroupInvoicesNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+			<apex:outputPanel layout="none" rendered="{!DeliveryGroupInvoicesTipOverrideEnabled}">
+				<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+			</apex:outputPanel>
+		</apex:outputPanel>
+		
+		<style>
+			.right-align
+			{
+				text-align: right;
+				padding-right: 5px !important;
+			}
+			.indent {display: inline-block;width: 8px;height: 8px;margin-right: 2px;}
+			.has-children .indent {cursor:pointer;background-image: url({!URLFOR($Resource.TaskGanttIcons, 'arrows.gif')});background-position: -4px, 0px;}
+			.has-children.expanded .indent {cursor:pointer;background-image: url({!URLFOR($Resource.TaskGanttIcons, 'arrows.gif')});background-position: -22px, 0px;}
+			.child {display:none;}
+			.child .indent {margin-left: 4px;}
+			/* restrict the height of the edit popup as with all fields the page block buttons are off the page */
+			.popup-body-container {
+			    max-height: 380px;
+			    overflow: auto;
+			}
+			.popup-body-container .pbSubheader {
+			    margin-top: 6px;
+			}
+			.popup-body-container label {
+			    white-space: nowrap;
+			}
+			div[id$="groupBillingDetails"] tr {
+			    background-color: white;
+			}
+			div[id$="groupBillingDetails"] th,
+			div[id$="groupBillingDetails"] td {
+			    border-bottom: 1px solid #ededed !important;
+			    border-top: 1px solid #ededed !important;
+			    background-color: white;
+			}
+			div[id$="groupBillingDetails"] td:first-child{
+			    width: 80px !important;
+			    border-left : 1px solid #ededed;
+			}
+			div[id$="groupBillingDetails"] td:last-child {
+			    border-right : 1px solid #ededed !important;
+			}
+			/* Billing contacts */
+			div.select2-container.find-billing-contact a.select2-choice {
+				height: 18px !important;
+				line-height: 18px !important;
+				background-image: none !important;
+				border-radius: 0px !important;
+				color: black !important;
+				padding-left: 4px !important;
+			}
+			div.select2-container.find-billing-contact .select2-choice div {
+				border-left: none !important;
+			}
+			td.action-btn {
+			    font-size: 16px;
+			    text-align: center;
+			    cursor: pointer;
+			    width: 18px;
+			}
+			th.primary-cell {
+			    width: 100px;
+			}
+			td.primary-cell {
+			    text-align: center;
+			}
+			.select2-container.find-billing-contact {
+			    width: 100% !important;
+			    padding-right: 2px;
+			}
+			label.billing-contacts-label {
+			    font-size: 91%;
+			    font-weight: bold;
+			    color: #4a4a56;
+			    padding-left: 1px;
+			}
+			.action-btn {
+				color: #BBB;
+				cursor: pointer;
+			}
+		</style>
+
+		<div id="delivery-group-invoices-title">
+			<apex:outputPanel id="deliveryGroupCard" layout="none">
+			<div class="title-card-container">
+			<div class="title-card">
+				<div class="title-card-heading" ></div>	
+				<div class="title-card-body">
+		  			<div id="embeddedCharmsContainer" pageSource="DeliveryGroupInvoicesCharmsCard"><i class="charm-loading fa fa-circle-o-notch fa-spin fa-3x fa-fw"/></div>
+				</div>
+			</div>
+			</div>
+ 			</apex:outputPanel>
+	  	</div>			
+		<apex:form id="TheForm">
+		<apex:pageMessages escape="false"/>
+		<apex:pageBlock >
+			<apex:pageBlockSection id="groupBillingDetails" collapsible="false" columns="3" title="{!$Label.kimbleone__deliverygroupbillingdetails}" rendered="{!ShowGroupLevelInvoicingDetails}">
+				<apex:outputLink styleClass="actionLink edit-dg-billling" value="#" onclick="initialiseModalBoxy('#DeliveryGroupPopup', '{!JSENCODE($Label.kimbleone__deliverygroupbillingdetails)}');editDeliveryGroup();" rendered="{!$ObjectType.KimbleOne__DeliveryGroup__c.updateable}">{!$Label.kimbleone__edit}</apex:outputLink>
+				<apex:outputField value="{!TheDeliveryGroup.KimbleOne__BillingAccount__c}" rendered="{!!ISBLANK(TheDeliveryGroup.KimbleOne__BillingAccount__c)}">
+					<a class="action-btn" onclick="javascript:safeNavigateToSForceURL('{!$Page.AccountEdit}?id={!JSENCODE(TheDeliveryGroup.BillingAccount__c)}&rId={!JSENCODE(TheDeliveryGroup.Id)}');"
+					   title="{!$Label.kimbleone__edit} {!$ObjectType.Account.label}"><iclass="fa fa-pencil-square-o"></i></a>
+				</apex:outputField>
+				<apex:pageBlockSectionItem rendered="{!ISBLANK(TheDeliveryGroup.KimbleOne__BillingAccount__c)}">
+ 					<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__BillingAccount__c.Label}"/>
+ 					<apex:outputText value="{!$Label.kimbleone__defaultnonedropdownentry}"/>
+ 				</apex:pageBlockSectionItem>
+
+				<apex:outputField value="{!TheDeliveryGroup.KimbleOne__BillingContact__c}" rendered="{!!ISBLANK(TheDeliveryGroup.KimbleOne__BillingContact__c)}"/>
+				<apex:pageBlockSectionItem rendered="{!ISBLANK(TheDeliveryGroup.KimbleOne__BillingContact__c)}">
+ 					<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__BillingContact__c.Label}"/>
+ 					<apex:outputText value="{!$Label.kimbleone__defaultnonedropdownentry}"/>
+ 				</apex:pageBlockSectionItem>
+			</apex:pageBlockSection>
+		
+			<apex:pageBlockSection id="elementBillingDetails" collapsible="false" columns="1" title="{!$ObjectType.KimbleOne__PeriodReceivable__c.LabelPlural}"></apex:pageBlockSection>
+			<table class="list" border="0" cellpadding="0" cellspacing="0">
+				<thead>
+				<tr class="headerRow">
+					<th class="headerRow"><h2>{!$Label.kimbleone__actionlinksheader}</h2></th>
+					<th class="headerRow"><h2>{!$ObjectType.DeliveryElement__c.Fields.Name.Label}</h2></th>
+					<th class="headerRow"></th>
+					<th id="RuleColumn" class="headerRow"><h2>{!$Label.RuleHeading}</h2></th>
+					<th id="BillingAccountColumn1" class="headerRow"><h2>{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__BillingAccount__c.Label}</h2></th>
+					<th id="TaxCodeColumn" class="headerRow"><h2>{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__TaxCode__c.Label}</h2></th>
+					<th id="InvoiceableAmountColumn" class="headerRow"><h2>{!$Label.InvoiceableAmountLabel}</h2></th>
+				</tr>
+				</thead>
+				<tbody>
+				<apex:repeat value="{!InvoiceableDeliveryElements}" var="ele">							
+				<tr node-id="{!JSENCODE(ele.Id)}" class="dataRow {!IF(!ISBLANK(ele.DeliveryElementsInvoicedWith__r) && ele.DeliveryElementsInvoicedWith__r.size > 0, 'has-children','')}">
+					<td class="dataCell"><apex:outputLink styleClass="actionLink" value="#" onclick="initialiseModalBoxy('#DeliveryElementPopup', '{!JSENCODE($Label.kimbleone__edit)}');editDeliveryElement('{!JSENCODE(ele.Id)}')" rendered="{!$ObjectType.KimbleOne__DeliveryElement__c.updateable}">{!$Label.kimbleone__edit}</apex:outputLink></td>
+					<td class="dataCell" style="white-space: nowrap;"><span class="indent"></span><apex:outputText value="{!ele.Name}"/></td>
+					<td class="dataCell"><apex:outputText value="{!$Label.kimbleone__serviceslabel}"/></td>
+					<td class="dataCell" style="white-space: pre-wrap;white-space: -moz-pre-wrap;white-space: -pre-wrap;white-space: -o-pre-wrap;word-wrap: break-word;"><apex:outputText value="{!ServicesNarrative[ele.id]}"/></td>
+					<td class="dataCell"><apex:outputField value="{!ele.KimbleOne__BillingAccount__c}"/></td>
+					<td class="dataCell"><apex:outputField value="{!ele.KimbleOne__TaxCode__c}"/></td>
+					<td class="dataCell right-align">
+						<apex:outputPanel layout="none" rendered="{!!ISBLANK(ele.KimbleOne__InvoicingCcyServicesInvoiceableAmount__c)}">
+							<apex:outputText value="{!ele.KimbleOne__InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+							<apex:outputField value="{!ele.KimbleOne__InvoicingCcyServicesInvoiceableAmount__c}" />
+						</apex:outputPanel>
+					</td>
+				</tr>
+				<apex:outputPanel layout="none" rendered="{!ele.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsExpenseGenerated__c && ele.Product__r.ProductDomain__r.KimbleOne__IsResourced__c}">
+					<tr class="dataRow">
+						<td class="dataCell"></td>
+						<td class="dataCell"></td>
+						<td class="dataCell"><apex:outputText value="{!$Label.kimbleone__expenseslabel}" /></td>
+						<td class="dataCell"><apex:outputText value="{!$Label.kimbleone__invoicegenerationruleforexpenseslabel}" /></td>
+						<td class="dataCell"></td>
+						<td class="dataCell"></td>
+						<td class="dataCell right-align">
+							<apex:outputPanel layout="none" rendered="{!!ISBLANK(ele.KimbleOne__InvoicingCcyExpensesInvoiceableAmount__c)}">
+								<apex:outputText value="{!ele.KimbleOne__InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+								<apex:outputField value="{!ele.KimbleOne__InvoicingCcyExpensesInvoiceableAmount__c}" />
+							</apex:outputPanel>
+						</td>
+					</tr>
+				</apex:outputPanel>
+				
+				<apex:repeat value="{!ele.DeliveryElementsInvoicedWith__r}" var="child">
+					<tr class="dataRow child" parent-id="{!JSENCODE(ele.Id)}">
+						<td class="dataCell"><apex:outputLink styleClass="actionLink" value="#" onclick="initialiseModalBoxy('#DeliveryElementPopup', '{!JSENCODE($Label.kimbleone__edit)}');editDeliveryElement('{!JSENCODE(child.Id)}')" rendered="{!$ObjectType.KimbleOne__DeliveryElement__c.updateable}">{!$Label.kimbleone__edit}</apex:outputLink></td>
+						<td class="dataCell" colspan="6" style="white-space: nowrap;"><span class="indent"></span><apex:outputText value="{!child.Name}"/></td>
+					</tr>
+				</apex:repeat>
+				
+				</apex:repeat>
+				</tbody>
+			</table>
+		</apex:pageBlock>
+		<apex:pageBlock title="{!$ObjectType.KimbleOne__Invoice__c.LabelPlural}">
+			<apex:pageBlockButtons location="top">
+    			<apex:commandButton action="{!NewInvoice}" value="{!$Label.kimbleone__new}" rerender="TheForm" styleclass="DisableButtonWhileBusy" rendered="{!$ObjectType.KimbleOne__Invoice__c.createable && TheDeliveryGroup.DeliveryStage__r.KimbleOne__AllowNewInvoices__c}"/>
+    		</apex:pageBlockButtons>
+
+			<apex:outputPanel id="TheInvoicesPanel">
+				<apex:pageBlockTable value="{!ThePagedInvoices.TheRecords}" var="invoice" rendered="{!ThePagedInvoices.TheRecords.size > 0}">
+					<apex:column width="5%" headerValue="{!$Label.kimbleone__actionlinksheader}">
+						<apex:outputLink styleClass="actionLink" value="#" onclick="deleteInvoice('{!JSINHTMLENCODE(invoice.Id)}')" rendered="{!invoice.Status__r.KimbleOne__Enum__c = 'Draft' && $ObjectType.KimbleOne__Invoice__c.deletable}">{!$Label.kimbleone__delete}</apex:outputLink>
+					</apex:column>
+					<apex:column id="ReferenceColumn1" width="10%"  headerValue="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__Reference__c.Label}">
+						<apex:outputLink value="/{!invoice.Id}"><apex:outputText value="{!invoice.KimbleOne__Reference__c}"/></apex:outputLink>
+					</apex:column>
+					<apex:column id="BillingAccountColumn2" width="25%" headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__BillingAccount__c.Label}" value="{!invoice.KimbleOne__Account__c}"/>
+					<apex:column width="10%" value="{!invoice.KimbleOne__InvoiceDate__c}"/>
+					<apex:column width="10%" value="{!invoice.KimbleOne__NetAmount__c}"/>
+					<apex:column width="10%" value="{!invoice.KimbleOne__TaxAmount__c}"/>
+					<apex:column width="10%" value="{!invoice.KimbleOne__GrossAmount__c}"/>
+					<apex:column id="StatusColumn1" width="10%" headerValue="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__Status__c.Label}" value="{!invoice.Status__r.Name}"/>
+				</apex:pageBlockTable>
+				<div style="margin: 5px 0px 0px 1px;">
+					<div style="text-align:left; width:50%; display:inline-block;">
+						<apex:outputText value="{!ThePagedInvoices.CurrentPageDescription}"/>
+					</div>
+					<div style="text-align:right; width:50%; display:inline-block;float: right;">
+						<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheInvoicesPanel" rendered="{!ThePagedInvoices.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+						<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedInvoices.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+						&nbsp;|&nbsp;
+						<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheInvoicesPanel" rendered="{!ThePagedInvoices.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+						<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedInvoices.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+					</div>
+				</div>
+			</apex:outputPanel>
+		</apex:pageBlock>
+		
+		<apex:pageBlock id="CreditNotesPageBlock" title="{!$ObjectType.KimbleOne__CreditNote__c.LabelPlural}">
+			<apex:pageBlockButtons location="top">
+    			<apex:commandButton action="{!NewNegativeInvoice}" value="{!$Label.kimbleone__new}" rerender="TheForm" styleclass="DisableButtonWhileBusy" rendered="{!$ObjectType.KimbleOne__Invoice__c.createable && $ObjectType.KimbleOne__CreditNote__c.createable && TheDeliveryGroup.DeliveryStage__r.KimbleOne__AllowNewInvoices__c && HasPermission['EditAllNegativeInvoice'] && AllowAdhocCreditNotes}"/>
+    		</apex:pageBlockButtons>
+
+			<apex:pageBlockTable value="{!TheCreditNotes}" var="creditNote" rendered="{!TheCreditNotes.size > 0}">
+				<apex:column width="5%"  headerValue="{!$Label.kimbleone__actionlinksheader}">
+					<apex:outputLink styleClass="actionLink" value="#" onclick="deleteCreditNote('{!JSINHTMLENCODE(creditNote.Id)}')" rendered="{!creditNote.Status__r.KimbleOne__Enum__c = 'Draft' && $ObjectType.KimbleOne__CreditNote__c.deletable}">{!$Label.kimbleone__delete}</apex:outputLink>
+				</apex:column>
+				<apex:column id="ReferenceColumn2" width="10%"  headerValue="{!$ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__Reference__c.Label}">
+					<apex:outputLink value="/{!creditNote.Id}"><apex:outputText value="{!creditNote.KimbleOne__Reference__c}"/></apex:outputLink>
+				</apex:column>
+				<apex:column id="InvoiceColumn" width="10%"  headerValue="{!$ObjectType.KimbleOne__Invoice__c.Label}">
+					<apex:outputLink value="/{!creditNote.KimbleOne__Invoice__c}"><apex:outputText value="{!creditNote.Invoice__r.KimbleOne__Reference__c}"/></apex:outputLink>
+				</apex:column>
+				<apex:column id="BillingAccountColumn3" width="15%"  headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__BillingAccount__c.Label}" value="{!creditNote.KimbleOne__Account__c}"/>
+				<apex:column width="10%"  value="{!creditNote.KimbleOne__CreditNoteDate__c}"/>
+				<apex:column width="10%"  value="{!creditNote.KimbleOne__NetAmount__c}"/>
+				<apex:column width="10%"  value="{!creditNote.KimbleOne__TaxAmount__c}"/>
+				<apex:column width="10%"  value="{!creditNote.KimbleOne__GrossAmount__c}"/>
+				<apex:column id="StatusColumn2" width="10%"  headerValue="{!$ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__Status__c.Label}" value="{!creditNote.Status__r.Name}"/>
+			</apex:pageBlockTable>
+		
+		</apex:pageBlock>
+		
+		<apex:pageBlock title="{!$ObjectType.KimbleOne__Invoice__c.LabelPlural} ({!$Label.kimbleone__intercompany})" rendered="{!IsIntercompanyInvoicingEnabled && TheInternalInvoices.size > 0}">
+			<apex:outputPanel id="TheInternalInvoicesPanel">
+				<apex:pageBlockTable value="{!ThePagedInternalInvoices.TheRecords}" var="invoice">
+				<apex:column id="ReferenceColumn3" width="10%"  headerValue="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__Reference__c.Label}">
+						<apex:outputLink value="/{!invoice.Id}"><apex:outputText value="{!invoice.KimbleOne__Reference__c}"/></apex:outputLink>
+					</apex:column>
+					<apex:column id="BusinessUnitColumn" width="25%" headerValue="{!$ObjectType.KimbleOne__BusinessUnit__c.Label}" value="{!invoice.KimbleOne__BusinessUnitTradingEntity__c}"/>
+					<apex:column width="10%" value="{!invoice.KimbleOne__InvoiceDate__c}"/>
+					<apex:column width="10%" value="{!invoice.KimbleOne__NetAmount__c}"/>
+					<apex:column width="10%" value="{!invoice.KimbleOne__TaxAmount__c}"/>
+					<apex:column width="10%" value="{!invoice.KimbleOne__GrossAmount__c}"/>
+					<apex:column id="StatusColumn3" width="10%" headerValue="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__Status__c.Label}" value="{!invoice.Status__r.Name}"/>
+				</apex:pageBlockTable>
+				<div style="margin: 5px 0px 0px 1px;">
+					<div style="text-align:left; width:50%; display:inline-block;">
+						<apex:outputText value="{!ThePagedInternalInvoices.CurrentPageDescription}"/>
+					</div>
+					<div style="text-align:right; width:50%; display:inline-block;float: right;">
+						<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheInternalInvoicesPanel" rendered="{!ThePagedInternalInvoices.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}">
+							<apex:param name="internal" value="true"/>
+						</apex:commandLink>
+						<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedInternalInvoices.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+						&nbsp;|&nbsp;
+						<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheInternalInvoicesPanel" rendered="{!ThePagedInternalInvoices.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}">
+							<apex:param name="internal" value="true"/>
+						</apex:commandLink>
+						<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedInternalInvoices.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+					</div>
+				</div>
+			</apex:outputPanel>
+		</apex:pageBlock>
+
+		<apex:actionFunction action="{!EditDeliveryElement}" name="editDeliveryElement" reRender="DeliveryElementDetails" oncomplete="populateBillingContacts();showModalBoxy()">
+			<apex:param name="deliveryElementId" value=""/>
+		</apex:actionFunction>
+
+		<apex:actionFunction action="{!EditDeliveryGroup}" name="editDeliveryGroup" reRender="DeliveryGroupDetails" oncomplete="populateGroupBillingContacts();showModalBoxy()">
+		</apex:actionFunction>
+		
+		<apex:actionFunction action="{!DeleteInvoice}" name="deleteInvoice" reRender="TheForm">
+			<apex:param name="invoiceId" value=""/>
+		</apex:actionFunction>
+		
+		<apex:actionFunction action="{!DeleteCreditNote}" name="deleteCreditNote" reRender="TheForm">
+			<apex:param name="creditNoteId" value=""/>
+		</apex:actionFunction>
+		
+		<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+		<div style="display:none;" kimble-tip="null"></div>
+		
+	</apex:form>	
+	
+	<script>
+        var defaultAccountId = '<apex:outputText value="{!TheDeliveryGroup.KimbleOne__Account__c}"/>';
+		        
+		var l = {};
+		l['contactname'] = '<apex:outputText value="{!$ObjectType.KimbleOne__BillingContact__c.Fields.Name.Label}"/>';
+		l['primaryind'] = '<apex:outputText value="{!$Label.kimbleone__primarybillingcontact}"/>';
+		l['delete'] = '<apex:outputText value="{!$Label.kimbleone__deletebutton}"/>';
+			
+		jQuery(window).load(function()
+		{
+			jQuery(document).off('click', '.has-children .indent');
+			jQuery(document).on('click', '.has-children .indent', function (){
+				var j = jQuery(this).closest('tr');
+				
+				j.toggleClass('expanded');
+				
+				jQuery.each(jQuery('tr.child[parent-id="' + j.attr('node-id') + '"]'), function (i, obj) {
+					
+					if (j.hasClass('expanded'))
+						jQuery(obj).show();
+					else
+						jQuery(obj).hide();
+				});
+				
+				
+			});
+
+			var contextId = '<apex:outputText value="{!TheDeliveryGroup.Id}"/>';
+			
+			jQuery('div[pageSource]').each(function() {
+	   		var theComponent = jQuery( this );
+	   		var pageSourceName = theComponent.attr('pageSource');
+	   		
+	   		// kick off the population of the page with an ajax call
+			jQuery.ajax({ url: kimble.pages[pageSourceName] + contextId})
+				.done(function(html) {
+					theComponent.empty();
+					jQuery(html).appendTo("#" + theComponent.attr('id'));
+					if(!jQuery('#miniCardBody').length) jQuery('#delivery-group-invoices-title').slideUp();
+				})
+				.fail(function(xhr, status, error) {
+					if(error !=null && error !="") alert(error);								
+				})				
+			});
+			
+			initialisePageTips();
+		});
+				
+		function sortByBillingContactName(a,b)
+	   	{
+	   		return (a.ContactName < b.ContactName) ? -1 : (a.ContactName > b.ContactName) ? 1 : 0; 
+	   	}
+
+		function findBillingContacts(params)
+		{				
+			var existingBillingContactIds = [];
+			jQuery('.billing-contact-row:not(.deleted)').each(function() {existingBillingContactIds.push(jQuery(this).attr('contactId'));});
+			
+			var targetAccountId = (jQuery('select[id$="billingAccount"]:visible').val() != '' ? jQuery('select[id$="billingAccount"]:visible').val() : defaultAccountId);
+			
+			if(jQuery('[id$="billingAccountLookup"]:visible').length > 0)
+			{
+			    var theAccount = jQuery('[id$="billingAccountLookup"]:visible').parent().parent().find('.billing-account-lookup');
+			    targetAccountId = (theAccount.text() != '' && theAccount.text() != undefined ? theAccount.text() : defaultAccountId); 
+			}
+			
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupInvoicesController.GetApplicableBillingContacts}',
+		      		targetAccountId, existingBillingContactIds, params.term,
+		     			function(result, event){          
+		            		if (event.status) 
+			            {
+			             	var data = {};
+			             	data.results = result;
+			             	params.callback(data);
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+		        	}, 
+		        	{escape: false, timeout: 60000}
+		    	);
+		}		
+		
+		/* Tooltips */
+		var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+		var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+		var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+		var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+		var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+		var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+	
+		function initialisePageTips()
+		{
+			ApplyTipAttributes();
+			initialiseTips();
+		}
+		
+		// add tip attributes to elements
+		function ApplyTipAttributes()
+		{
+			if(enableTips)
+			{
+				// summary
+				jQuery('.edit-dg-billling').attr('kimble-tip','Action1');
+				jQuery('[id$="BillingAccountColumn1"]').attr('kimble-tip','BillingAccount1');
+				jQuery('[id$="InvoiceableAmountColumn"]').attr('kimble-tip','InvoiceableAmount').attr('kimble-tip-extended-text','InvoiceableAmountExtendedText');
+				jQuery('[id$="RuleColumn"]').attr('kimble-tip','Rule').attr('kimble-tip-help-link','SettingInvoicingRulesHelpLink');
+				jQuery('[id$="TaxCodeColumn"]').attr('kimble-tip','TaxCode').attr('kimble-tip-extended-text','TaxCodeExtendedText').attr('kimble-tip-help-link','SettingInvoicingRulesHelpLink');
+				
+				// invoices
+				jQuery('[id$="StatusColumn1header"]').attr('kimble-tip','Status1').attr('kimble-tip-extended-text','Status1ExtendedText');
+				jQuery('[id$="BillingAccountColumn2header"]').attr('kimble-tip','BillingAccount2');
+				jQuery('[id$="ReferenceColumn1header"]').attr('kimble-tip','Reference1').attr('kimble-tip-help-link','SequencesHelpLink');
+				
+				// credit notes
+				jQuery('[id$="CreditNotesPageBlock"]').attr('kimble-tip','CreditNotes');
+				jQuery('[id$="InvoiceColumnheader"]').attr('kimble-tip','Invoice').attr('kimble-tip-extended-text','InvoiceExtendedText').attr('kimble-tip-help-link','CreateCreditNoteHelpLink');
+				jQuery('[id$="ReferenceColumn2header"]').attr('kimble-tip','Reference2').attr('kimble-tip-help-link','SequencesHelpLink');
+				jQuery('[id$="BillingAccountColumn3header"]').attr('kimble-tip','BillingAccount3');
+				jQuery('[id$="StatusColumn2header"]').attr('kimble-tip','Status2').attr('kimble-tip-extended-text','Status2ExtendedText').attr('kimble-tip-help-link','CreateCreditNoteHelpLink');
+			}
+		}
+		
+		function updateTipsConfigSetting(newTipSetting)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+				newTipSetting,
+					function(result, event){
+						if (event.status)
+						{
+							var data = {};
+							data.results = result;
+							loadGuidance();
+						}
+						else
+						{
+							alert(event.message);
+						}
+				},
+				{escape: false, timeout: 60000}
+			);
+		}
+	</script>
+	
+	<div id="DeliveryElementPopup" style="display: none; min-width:600px;">
+			<apex:outputPanel id="DeliveryElementDetails">
+				<apex:form id="ThePopupForm">
+				<div id="errors">
+					<apex:pageMessages escape="false" />
+				</div>
+				<apex:inputText styleClass="TheBillingContacts" style="display:none" value="{!TheBillingContactsJson}" id="billingAccountsData"/>
+				<apex:pageBlock >
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton value="{!$Label.kimbleone__save}" styleclass="DisableButtonWhileBusy" onclick="processBillingContacts();" action="{!UpdateDeliveryElement}" oncomplete="hideModalBoxyWithErrorCheck('#errors')" rerender="TheForm" />
+						<input type="button" onclick="hideModalBoxy()" class="btn" value="{!$Label.Cancel}" />
+					</apex:pageBlockButtons>
+					<div class="popup-body-container">
+					<apex:pageBlockSection collapsible="false" columns="2" title="{!$Label.kimbleone__invoicingtitle}" rendered="{!AllowElementsGroupedForInvoicing && !ISBLANK(TheAvailableInvoicingElements) && TheAvailableInvoicingElements.size > 0}">
+						<apex:pageBlockSectionItem >
+		 					<apex:outputLabel value="{!$Label.kimbleone__invoicewithotherelement}"/>
+		 					<apex:inputField value="{!InvoicedWith.KimbleOne__InputCheckbox__c}">
+		 					<apex:actionSupport event="onchange" rerender="ThePopupForm" />
+		 					</apex:inputField>
+		 				</apex:pageBlockSectionItem>
+		 				
+		 				<apex:pageBlockSectionItem rendered="{!InvoicedWith.KimbleOne__InputCheckbox__c}">
+		 				<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__DeliveryElementInvoicedWith__c.Label}"/>
+		 				<apex:selectList value="{!TheDeliveryElement.KimbleOne__DeliveryElementInvoicedWith__c}" size="1">
+								<apex:selectOptions value="{!TheAvailableInvoicingElements}" />
+							</apex:selectList>
+		 				</apex:pageBlockSectionItem>
+					</apex:pageBlockSection>
+					
+					<apex:pageBlockSection collapsible="false" columns="1" title="{!$Label.kimbleone__invoicingtitle}" rendered="{!InvoicedWith.KimbleOne__InputCheckbox__c && (ISBLANK(TheAvailableInvoicingElements) || TheAvailableInvoicingElements.size = 0)}">
+						<apex:pageBlockSectionItem >
+		 					<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__DeliveryElementInvoicedWith__c.Label}"/>
+		 					<apex:outputText value="{!TheDeliveryElement.DeliveryElementInvoicedWith__r.Name}"/>
+		 				</apex:pageBlockSectionItem>
+					</apex:pageBlockSection>
+					
+					<apex:pageBlockSection collapsible="false" columns="2" rendered="{!!InvoicedWith.KimbleOne__InputCheckbox__c}">
+						
+						<apex:pageBlockSectionItem >
+		 					<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__BillingAccount__c.Label}"/>
+							<apex:outputPanel id="elementBillingAccount">
+								<apex:selectList value="{!TheDeliveryElement.KimbleOne__BillingAccount__c}" id="billingAccount" size="1" rendered="{!!(BillingAccountValidationSetting == 'None')}">
+									<apex:actionSupport event="onchange" action="{!RefreshBillingContacts}" rerender="BillingContactSelect,BillingContactSelectEnhanced, billingAccountsData" oncomplete="populateBillingContacts();"/>
+									<apex:selectOptions value="{!BillingAccounts}" />
+								</apex:selectList>
+								<apex:inputField value="{!TheDeliveryElement.KimbleOne__BillingAccount__c}" id="billingAccountLookup" rendered="{!(BillingAccountValidationSetting == 'None')}">
+                                    <apex:outputText id="elementBillingAccountId" styleClass="billing-account-lookup hidden-item" value="{!TheDeliveryElement.KimbleOne__BillingAccount__c}"/>
+									<apex:actionSupport event="onchange" action="{!RefreshBillingContacts}" rerender="BillingContactSelect,BillingContactSelectEnhanced,billingAccountsData,elementBillingAccountId" oncomplete="populateBillingContacts();"/>
+								</apex:inputField>
+							</apex:outputPanel>
+		 				</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem rendered="{!!ShowMultipleContacts}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__BillingContact__c.Label}"/>
+							<apex:outputPanel >
+								<apex:selectList id="BillingContactSelect" value="{!TheDeliveryElement.KimbleOne__BillingContact__c}" size="1" rendered="{!!EnhancedContactLookupEnabled}">
+									<apex:selectOptions value="{!BillingContacts}" />
+								</apex:selectList>
+								<apex:inputField rendered="{!EnhancedContactLookupEnabled}" id="BillingContactSelectEnhanced" styleclass="kimbleSearch" value="{!TheDeliveryElement.KimbleOne__BillingContact__c}" html-data-typename="BillingContact" html-data-filter="{!'AccountId:' + IF(!ISBLANK(TheDeliveryElement.KimbleOne__BillingAccount__c),(TheDeliveryElement.KimbleOne__BillingAccount__c),(TheDeliveryGroup.KimbleOne__Account__c)) + ';BillingAccount:null;SelectedContact:null'}"/>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+						
+						
+		 				<apex:pageBlockSectionItem rendered="{!ShowMultipleContacts}">
+		 				</apex:pageBlockSectionItem>
+					</apex:pageBlockSection>
+
+					<apex:pageBlockSection collapsible="false" columns="1" rendered="{!!InvoicedWith.KimbleOne__InputCheckbox__c && ShowMultipleContacts}">
+						<apex:outputLabel styleClass="billing-contacts-label" value="{!$ObjectType.KimbleOne__BillingContact__c.LabelPlural}"/>
+		 				<apex:pageBlockSectionItem >
+		 					<apex:outputPanel layout="none" id="BillingContactSelect">
+								<div class="billing-contacts-container">
+									<div id="billing-contacts">
+									</div>
+								</div>			 					
+		 					</apex:outputPanel>
+		 				</apex:pageBlockSectionItem>
+					</apex:pageBlockSection>
+
+					<apex:pageBlockSection collapsible="false" columns="2" rendered="{!!InvoicedWith.KimbleOne__InputCheckbox__c}">		 				
+						<apex:pageBlockSectionItem rendered="{!AllowInvoicingCurrencyEdit}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__InvoicingCurrencyIsoCode__c.Label}"/>
+	                        <apex:inputText value="{!TheDeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c}" styleclass="kimblecustomlookup GetActiveCurrencyTypes null true true" />
+						</apex:pageBlockSectionItem>
+						
+						<apex:outputField value="{!TheDeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c}" rendered="{!!AllowInvoicingCurrencyEdit}"/>
+						
+		 				<apex:pageBlockSectionItem >
+		 					<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__TaxCode__c.Label}"/>
+		 					<apex:inputText value="{!TheDeliveryElement.KimbleOne__TaxCode__c}" styleclass="kimblecustomlookup GetTaxCodeList null false true"/>
+		 				</apex:pageBlockSectionItem>
+					
+					</apex:pageBlockSection>
+					
+					<apex:pageblockSection collapsible="false" showheader="true" title="{!$ObjectType.KimbleOne__PeriodReceivable__c.LabelPlural}" columns="2" rendered="{!!InvoicedWith.KimbleOne__InputCheckbox__c && TheDeliveryElement.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsMilestoneGenerated__c}">
+						
+						<apex:pageBlockSectionItem >
+		 					<apex:outputLabel value="{!$ObjectType.KimbleOne__InvoicingRule__c.Fields.KimbleOne__InvoicingPoint__c.Label}"/>
+		 					<apex:selectList value="{!TheInvoicingRule.KimbleOne__InvoicingPoint__c}" size="1" required="true">
+								<apex:actionSupport event="onchange" action="{!UpdateNarrative}" rerender="NarrativeLabel" />
+								<apex:selectOptions value="{!MilestoneInvoicingPoints}" />
+							</apex:selectList>
+		 					
+		 				</apex:pageBlockSectionItem>
+		 				
+		 				
+						<apex:inputField value="{!TheInvoicingRule.KimbleOne__InvoicingRequiresCompletion__c}">
+							<apex:actionSupport event="onchange" action="{!UpdateNarrative}" rerender="NarrativeLabel" />
+						</apex:inputField>
+						
+						<apex:outputField value="{!TheInvoicingRule.KimbleOne__InvoicingOffsetPeriodType__c}"/>
+						
+						<apex:inputField value="{!TheInvoicingRule.KimbleOne__InvoicingOffsetNumberOfPeriods__c}" required="true">
+							<apex:actionSupport event="onchange" action="{!UpdateNarrative}" rerender="NarrativeLabel" />
+						</apex:inputField>
+
+						<apex:inputField value="{!TheInvoicingRule.KimbleOne__InvoicingCanIncludeZeroRevenueItem__c}" />
+						
+					</apex:pageblockSection>
+					
+					<apex:pageblockSection collapsible="false" showheader="true" title="{!$ObjectType.KimbleOne__PeriodReceivable__c.LabelPlural}" columns="2" rendered="{!!InvoicedWith.KimbleOne__InputCheckbox__c && TheDeliveryElement.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsPeriodGenerated__c}">
+						<apex:pageBlockSectionItem >
+		 					<apex:outputLabel value="{!$ObjectType.KimbleOne__InvoicingRule__c.Fields.KimbleOne__InvoicingPoint__c.Label}"/>
+		 					<apex:selectList value="{!TheInvoicingRule.KimbleOne__InvoicingPoint__c}" size="1" required="true">
+								<apex:actionSupport event="onchange" action="{!UpdateNarrative}" rerender="NarrativeLabel" />
+								<apex:selectOptions value="{!PeriodInvoicingPoints}" />
+							</apex:selectList>
+		 					
+		 				</apex:pageBlockSectionItem>
+		 				
+						<apex:inputField value="{!TheInvoicingRule.KimbleOne__InvoicingRequiresCompletion__c}">
+							<apex:actionSupport event="onchange" action="{!UpdateNarrative}" rerender="NarrativeLabel" />
+						</apex:inputField>
+						
+						<apex:outputField value="{!TheInvoicingRule.KimbleOne__InvoicePeriodType__c}"/>
+						
+						<apex:inputField value="{!TheInvoicingRule.KimbleOne__InvoiceNumberOfPeriods__c}" required="true">
+							<apex:actionSupport event="onchange" action="{!UpdateNarrative}" rerender="NarrativeLabel" />
+						</apex:inputField>
+						
+						<apex:outputField value="{!TheInvoicingRule.KimbleOne__InvoicingOffsetPeriodType__c}"/>
+						
+						<apex:inputField value="{!TheInvoicingRule.KimbleOne__InvoicingOffsetNumberOfPeriods__c}" required="true">
+							<apex:actionSupport event="onchange" action="{!UpdateNarrative}" rerender="NarrativeLabel" />
+						</apex:inputField>
+						
+						<apex:pageBlockSectionItem >
+		 					<apex:outputLabel value="{!$ObjectType.KimbleOne__InvoicingRule__c.Fields.KimbleOne__InvoicingReferenceDateRule__c.Label}"/>
+		 					<apex:selectList value="{!TheInvoicingRule.KimbleOne__InvoicingReferenceDateRule__c}" size="1" required="true">
+								<apex:actionSupport event="onchange" action="{!UpdateNarrative}" rerender="NarrativeLabel" />
+								<apex:selectOptions value="{!InvoicingReferenceDateRules}" />
+							</apex:selectList>
+		 				</apex:pageBlockSectionItem>
+						
+						<apex:inputField value="{!TheInvoicingRule.KimbleOne__InvoicingCanIncludeZeroRevenueItem__c}" />
+												
+					</apex:pageblockSection>
+					
+					<apex:pageblockSection collapsible="false" showheader="true" title="{!$ObjectType.KimbleOne__PeriodReceivable__c.LabelPlural}" columns="2" rendered="{!!InvoicedWith.KimbleOne__InputCheckbox__c && TheDeliveryElement.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUsageGenerated__c && !TheDeliveryElement.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUsageNotional__c}">
+						
+						<apex:inputField value="{!TheInvoicingRule.KimbleOne__EnforceInvoicingDate__c}">
+							<apex:actionSupport event="onchange" action="{!UpdateNarrative}" rerender="NarrativeLabel" />
+						</apex:inputField>
+						
+						&nbsp;
+						
+						<apex:outputField value="{!TheInvoicingRule.KimbleOne__InvoicePeriodType__c}"/>
+						
+						<apex:inputField value="{!TheInvoicingRule.KimbleOne__InvoiceNumberOfPeriods__c}" required="true">
+							<apex:actionSupport event="onchange" action="{!UpdateNarrative}" rerender="NarrativeLabel" />
+						</apex:inputField>
+						
+						<apex:outputField value="{!TheInvoicingRule.KimbleOne__InvoicingOffsetPeriodType__c}"/>
+
+						<apex:inputField value="{!TheInvoicingRule.KimbleOne__InvoicingOffsetNumberOfPeriods__c}" required="true">
+							<apex:actionSupport event="onchange" action="{!UpdateNarrative}" rerender="NarrativeLabel" />
+						</apex:inputField>
+
+						<apex:inputField value="{!TheInvoicingRule.KimbleOne__InvoicingCanIncludeZeroRevenueItem__c}" />
+						
+					</apex:pageblockSection>
+					
+					<br/>
+					
+					<apex:outputPanel id="NarrativePanel" layout="block" style="max-width:650px;" rendered="{!!InvoicedWith.KimbleOne__InputCheckbox__c}">
+						<apex:outputLabel id="NarrativeLabel" styleclass="labelCol" style="white-space: pre-wrap;white-space: -moz-pre-wrap;white-space: -pre-wrap;white-space: -o-pre-wrap;word-wrap: break-word;" value="{!TheNarrative}"/>
+					</apex:outputPanel>
+					
+					<apex:outputPanel layout="none" rendered="{!!InvoicedWith.KimbleOne__InputCheckbox__c && !ISBLANK(ChildElements) && ChildElements.size > 0}">
+					<apex:pageblockSection collapsible="false" showheader="true" columns="1" title="{!$Label.kimbleone__childinvoiceableelementstitle}" ></apex:pageblockSection>
+					<apex:pageBlockTable value="{!ChildElements}" var="child">
+						<apex:column >
+							<apex:facet name="header">
+								<apex:inputCheckbox styleClass="select-all" onclick="selectAllCheckboxes()"/>
+							</apex:facet>
+							
+							<apex:inputField styleClass="row-selector" value="{!child.Selected.KimbleOne__InputCheckbox__c}" rendered="{!child.CanEdit}"/>
+							<apex:outputField value="{!child.Selected.KimbleOne__InputCheckbox__c}" rendered="{!!child.CanEdit}"/>
+						</apex:column>
+						<apex:column value="{!child.TheElement.Name}"/>
+					</apex:pageBlockTable>
+					
+					</apex:outputPanel>
+					</div>
+				</apex:pageBlock>
+				</apex:form>
+				
+				<script>
+			    resetSelectAll();
+			        	
+	        	function resetSelectAll()
+				{
+					jQuery("input.select-all").each(function(){jQuery(this).prop('checked', false);});
+				}
+				
+				function selectAllCheckboxes()
+		  		{
+		  			if(jQuery("input.select-all:visible")[0].checked)
+		  			{
+		            	jQuery("input.row-selector:visible").each(function(){jQuery(this).prop('checked', true);});
+		           	}
+		           	else
+		           	{
+		           		jQuery("input.row-selector:visible").each(function(){jQuery(this).prop('checked', false);});
+					}
+		        }
+		        
+		        var billingContacts = [];
+		        
+		        function populateBillingContacts()
+		        {
+			        if(jQuery('.billing-contacts-container:visible').length)
+			        {
+			        	billingContacts = jQuery.parseJSON($('.TheBillingContacts').val());
+			        	drawBillingContacts();
+		        	}
+	        	}
+				
+				function drawBillingContacts()
+				{
+					var html = '';
+					
+					html += '<table class="billing-contacts-table list" border="0" cellpadding="0" cellspacing="0">';
+					html += '<tr class="header-row headerRow">';
+					html += '<th class="actions-col"></th>';
+					html += '<th class="billing-contact-name-title">' + l['contactname'] + '</th>';
+					html += '<th class="primary-cell">' + l['primaryind'] + '</th>';
+					html += '</tr>';
+					
+					// existing rows
+					for(var billingContactCounter = 0; billingContactCounter < billingContacts.length; billingContactCounter++)
+					{
+						var billingContact = billingContacts[billingContactCounter];
+						
+						html += '<tr class="billing-contact-row" contactId="' + billingContact.ContactId + '">';
+						
+						html += '<td class="remove-billing-contact action-btn" title="' + l['delete'] + '"><i class="fa fa-trash"></i></td>';
+						html += '<td class="billing-contact-name">' + billingContact.ContactName + '</td>';
+						html += '<td class="primary-cell">';
+						html += '<input type="radio" name="primary-billing-contacts" ' + (billingContact.IsPrimary ? ' checked="checked"' : '') + '/>';
+						html += '</td>';
+			
+						html += '</tr>';			
+					}
+					
+					// new row
+					html += '<tr class="billing-contact-row new-billing-contact">';
+					
+					html += '<td class="add-billing-contact action-btn"></td>';
+					html += '<td class="billing-contact-name">';
+					html += '<input type="text" class="find-billing-contact"/>';
+					html += '</td>';
+					html += '<td class="primary-cell">';
+					html += '</td>';
+		
+					html += '</tr>';
+					
+					jQuery('#billing-contacts').html(html);
+		
+					initialiseBillingContactFind();
+				}
+				
+				function initialiseBillingContactFind()
+				{
+					jQuery('.find-billing-contact').select2({
+						//minimumInputLength: 2,
+						multiple: false,
+						placeholder: '<apex:outputText value="{!$Label.kimbleone__defaultnonedropdownentry}"/>',
+						query: function (params) {
+							var find = function() {findBillingContacts(params);};        		
+							find();
+						},
+						initSelection : function (element, callback) {
+						var data = {id: element.val(), text: element.attr('data-name')};
+						callback(data);
+						}
+					});
+					
+					jQuery('.find-billing-contact').on("select2-selecting", function(e) {
+						var asPrimary = jQuery('input:visible[name="primary-billing-contacts"]').length == 0;
+						var newContact = {ContactId: e.object.id, ContactName: e.object.text, IsPrimary: asPrimary};
+						billingContacts.push(newContact);
+						billingContacts.sort(sortByBillingContactName);
+						BillingContactChanges = true;
+						drawBillingContacts();
+					});
+					
+					jQuery(document).off('click', '.remove-billing-contact').on('click', '.remove-billing-contact', removeBillingContact);
+					jQuery(document).off('click', 'input[name="primary-billing-contacts"]').on('click', 'input[name="primary-billing-contacts"]', setPrimaryContact);
+				}
+				
+				function setPrimaryContact()
+				{
+					var contactId = jQuery(this).closest('.billing-contact-row').attr('contactId');
+					
+					for(var billingContactCounter = 0; billingContactCounter < billingContacts.length; billingContactCounter++)
+					{
+						var billingContact = billingContacts[billingContactCounter];
+						billingContact.IsPrimary = (billingContact.ContactId == contactId);
+					}
+				}
+				
+				function removeBillingContact()
+				{
+					var contactId = jQuery(this).closest('.billing-contact-row').attr('contactId');
+					
+					jQuery(this).closest('.billing-contact-row').remove();
+					
+					for(var billingContactCounter = 0; billingContactCounter < billingContacts.length; billingContactCounter++)
+					{
+						var billingContact = billingContacts[billingContactCounter];
+						
+						if(billingContact.ContactId == contactId)
+						{
+							billingContacts.splice(billingContactCounter, 1);
+							break;
+						}
+					}
+					
+					drawBillingContacts();
+				}		  
+				      
+				function processBillingContacts()
+				{
+					if(jQuery('.billing-contacts-container:visible').length == 0) return;
+					
+					var theContacts = [];
+					
+					jQuery('.billing-contacts-container:visible .billing-contact-row:not(.new-billing-contact)').each(function() {
+						var theContact = {ContactId: jQuery(this).attr('contactId'), ContactName: jQuery(this).find('.billing-contact-name').text(), IsPrimary: jQuery(this).find('input:visible[name="primary-billing-contacts"]:checked').length == 1};
+						theContacts.push(theContact);
+					});
+					
+					jQuery('.TheBillingContacts').val(JSON.stringify(theContacts));
+				}				
+				</script>
+				
+			</apex:outputPanel>
+		</div>
+		
+		<apex:outputPanel layout="none" rendered="{!ShowGroupLevelInvoicingDetails}">
+		<div id="DeliveryGroupPopup" style="display: none; min-width:600px;">
+			<apex:outputPanel id="DeliveryGroupDetails">
+				<apex:form id="TheGroupPopupForm">
+				<div id="errors">
+					<apex:pageMessages escape="false" />
+				</div>
+				<apex:inputText styleClass="TheGroupBillingContacts" style="display:none" value="{!TheGroupBillingContactsJson}" id="groupBillingAccountsData"/>
+				<apex:pageBlock >
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton value="{!$Label.kimbleone__save}" styleclass="DisableButtonWhileBusy" onclick="processGroupBillingContacts();" action="{!UpdateDeliveryGroup}" oncomplete="hideModalBoxyWithErrorCheck('#errors')" rerender="TheForm" />
+						<input type="button" onclick="hideModalBoxy()" class="btn" value="{!$Label.Cancel}" />
+					</apex:pageBlockButtons>
+					<div class="popup-body-container">
+
+					<apex:pageBlockSection collapsible="false" columns="2">
+						<apex:pageBlockSectionItem >
+		 					<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__BillingAccount__c.Label}"/>
+							<apex:outputPanel id="groupBillingAccount">
+								<apex:selectList value="{!TheDeliveryGroup.KimbleOne__BillingAccount__c}" id="billingAccount" size="1" rendered="{!!(BillingAccountValidationSetting == 'None')}">
+									<apex:actionSupport event="onchange" action="{!RefreshGroupBillingContacts}" rerender="groupBillingContactSelect,groupBillingContactSelectEnhanced,groupBillingAccountsData" oncomplete="populateGroupBillingContacts();"/>
+									<apex:selectOptions value="{!BillingAccounts}" />
+								</apex:selectList>
+								<apex:inputField id="billingAccountLookup" value="{!TheDeliveryGroup.KimbleOne__BillingAccount__c}" rendered="{!(BillingAccountValidationSetting == 'None')}">
+									<apex:outputText id="groupBillingAccountId" styleClass="billing-account-lookup hidden-item" value="{!TheDeliveryGroup.KimbleOne__BillingAccount__c}"/>
+									<apex:actionSupport event="onchange" action="{!RefreshGroupBillingContacts}" rerender="groupBillingContactSelect,groupBillingContactSelectEnhanced,groupBillingAccountsData,groupBillingAccountId" oncomplete="populateGroupBillingContacts();"/>
+								</apex:inputField>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+		 				<apex:pageBlockSectionItem rendered="{!!ShowMultipleContacts}">
+		 					<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__BillingContact__c.Label}"/>
+							<apex:outputPanel >
+								<apex:selectList id="groupBillingContactSelect" value="{!TheDeliveryGroup.KimbleOne__BillingContact__c}" size="1" rendered="{!!EnhancedContactLookupEnabled}">
+									<apex:selectOptions value="{!GroupBillingContacts}" />
+								</apex:selectList>
+								<apex:inputField rendered="{!EnhancedContactLookupEnabled}" id="groupBillingContactSelectEnhanced" styleclass="kimbleSearch" value="{!TheDeliveryGroup.KimbleOne__BillingContact__c}" html-data-typename="BillingContact" html-data-filter="{!'AccountId:' + IF(!ISBLANK(TheDeliveryGroup.KimbleOne__BillingAccount__c),(TheDeliveryGroup.KimbleOne__BillingAccount__c),(TheDeliveryGroup.KimbleOne__Account__c)) + ';BillingAccount:null;SelectedContact:null'}"/>
+							</apex:outputPanel>
+		 				</apex:pageBlockSectionItem>
+		 				<apex:pageBlockSectionItem rendered="{!ShowMultipleContacts}">
+		 				</apex:pageBlockSectionItem>
+					</apex:pageBlockSection>
+
+					<apex:pageBlockSection collapsible="false" columns="1" rendered="{!ShowMultipleContacts}">
+	 					<apex:outputLabel styleClass="billing-contacts-label" value="{!$ObjectType.KimbleOne__BillingContact__c.LabelPlural}"/>
+		 				<apex:pageBlockSectionItem >
+		 					<apex:outputPanel layout="none" id="groupBillingContactSelect">
+								<div class="group-billing-contacts-container">
+									<div id="group-billing-contacts">
+									</div>
+								</div>			 					
+		 					</apex:outputPanel>
+		 				</apex:pageBlockSectionItem>
+					</apex:pageBlockSection>
+					</div>
+				</apex:pageBlock>
+				</apex:form>
+				
+				<script>	        
+		        var groupBillingContacts = [];
+		        
+		        function populateGroupBillingContacts()
+		        {
+			        if(jQuery('.group-billing-contacts-container:visible').length)
+			        {
+			        	groupBillingContacts = jQuery.parseJSON($('.TheGroupBillingContacts').val());
+			        	drawGroupBillingContacts();
+		        	}
+	        	}
+				
+				function drawGroupBillingContacts()
+				{
+					var html = '';
+					
+					html += '<table class="billing-contacts-table list" border="0" cellpadding="0" cellspacing="0">';
+					html += '<tr class="header-row headerRow">';
+					html += '<th class="actions-col"></th>';
+					html += '<th class="billing-contact-name-title">' + l['contactname'] + '</th>';
+					html += '<th class="primary-cell">' + l['primaryind'] + '</th>';
+					html += '</tr>';
+					
+					// existing rows
+					for(var billingContactCounter = 0; billingContactCounter < groupBillingContacts.length; billingContactCounter++)
+					{
+						var billingContact = groupBillingContacts[billingContactCounter];
+						
+						html += '<tr class="billing-contact-row" contactId="' + billingContact.ContactId + '">';
+						
+						html += '<td class="remove-billing-contact action-btn" title="' + l['delete'] + '"><i class="fa fa-trash"></i></td>';
+						html += '<td class="billing-contact-name">' + billingContact.ContactName + '</td>';
+						html += '<td class="primary-cell">';
+						html += '<input type="radio" name="primary-billing-contacts" ' + (billingContact.IsPrimary ? ' checked="checked"' : '') + '/>';
+						html += '</td>';
+			
+						html += '</tr>';			
+					}
+					
+					// new row
+					html += '<tr class="billing-contact-row new-billing-contact">';
+					
+					html += '<td class="add-billing-contact action-btn"></td>';
+					html += '<td class="billing-contact-name">';
+					html += '<input type="text" class="find-billing-contact"/>';
+					html += '</td>';
+					html += '<td class="primary-cell">';
+					html += '</td>';
+		
+					html += '</tr>';
+					
+					jQuery('#group-billing-contacts').html(html);
+		
+					initialiseGroupBillingContactFind();
+				}
+				
+				function initialiseGroupBillingContactFind()
+				{
+					jQuery('.find-billing-contact').select2({
+						//minimumInputLength: 2,
+						multiple: false,
+						placeholder: '<apex:outputText value="{!$Label.kimbleone__defaultnonedropdownentry}"/>',
+						query: function (params) {
+							var find = function() {findBillingContacts(params);};        		
+							find();
+						},
+						initSelection : function (element, callback) {
+						var data = {id: element.val(), text: element.attr('data-name')};
+						callback(data);
+						}
+					});
+					
+					jQuery('.find-billing-contact').on("select2-selecting", function(e) {
+						var asPrimary = jQuery('input:visible[name="primary-billing-contacts"]').length == 0;
+						var newContact = {ContactId: e.object.id, ContactName: e.object.text, IsPrimary: asPrimary};
+						groupBillingContacts.push(newContact);
+						groupBillingContacts.sort(sortByBillingContactName);
+						BillingContactChanges = true;
+						drawGroupBillingContacts();
+					});
+					
+					jQuery(document).off('click', '.remove-billing-contact').on('click', '.remove-billing-contact', removeGroupBillingContact);
+					jQuery(document).off('click', 'input[name="primary-billing-contacts"]').on('click', 'input[name="primary-billing-contacts"]', setGroupPrimaryContact);
+				}
+
+				function setGroupPrimaryContact()
+				{
+					var contactId = jQuery(this).closest('.billing-contact-row').attr('contactId');
+					
+					for(var billingContactCounter = 0; billingContactCounter < groupBillingContacts.length; billingContactCounter++)
+					{
+						var billingContact = groupBillingContacts[billingContactCounter];
+						billingContact.IsPrimary = (billingContact.ContactId == contactId);
+					}
+				}
+				
+				function removeGroupBillingContact()
+				{
+					var contactId = jQuery(this).closest('.billing-contact-row').attr('contactId');
+					
+					jQuery(this).closest('.billing-contact-row').remove();
+					
+					for(var billingContactCounter = 0; billingContactCounter < groupBillingContacts.length; billingContactCounter++)
+					{
+						var billingContact = groupBillingContacts[billingContactCounter];
+						
+						if(billingContact.ContactId == contactId)
+						{
+							groupBillingContacts.splice(billingContactCounter, 1);
+							break;
+						}
+					}
+					
+					drawGroupBillingContacts();
+				}		  
+				      
+				function processGroupBillingContacts()
+				{
+					if(jQuery('.group-billing-contacts-container:visible').length == 0) return;
+					
+					var theContacts = [];
+					
+					jQuery('.group-billing-contacts-container:visible .billing-contact-row:not(.new-billing-contact)').each(function() {
+						var theContact = {ContactId: jQuery(this).attr('contactId'), ContactName: jQuery(this).find('.billing-contact-name').text(), IsPrimary: jQuery(this).find('input:visible[name="primary-billing-contacts"]:checked').length == 1};
+						theContacts.push(theContact);
+					});
+					
+					jQuery('.TheGroupBillingContacts').val(JSON.stringify(theContacts));
+				}				
+				</script>
+				
+			</apex:outputPanel>
+		</div>
+		</apex:outputPanel>
+	</apex:define>
+
+</apex:composition>
+
+</apex:page>

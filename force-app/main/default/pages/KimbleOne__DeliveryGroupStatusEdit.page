@@ -1,0 +1,304 @@
+<apex:page standardController="KimbleOne__DeliveryGroupStatusSummary__c" extensions="KimbleOne.DeliveryGroupStatusEditController,KimbleOne.TooltipsController" sidebar="false">
+
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+	<c:Menu DefaultHelpPage="StatusReporting.html" MenuContextType="DeliveryGroup" MenuContextId="{!DeliveryGroup.Id}" MenuContextName="{!DeliveryGroup.Name}" />
+
+</apex:define>
+     
+<apex:define name="Content">
+
+	<!-- Kimble Guidance -->
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+	<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/DeliveryGroupStatusesNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+		<apex:outputPanel layout="none" rendered="{!DeliveryGroupStatusesTipOverrideEnabled}">
+			<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+		</apex:outputPanel>
+	</apex:outputPanel>
+
+	<apex:outputPanel id="DeliveryGroupDashboardNarrativePopUpMainPanel" > 
+	
+		<apex:form id="theForm">
+
+	        <div>
+				
+				<div style="position: relative;">
+					
+					<span id="PeriodNameSelector" style="font-weight:bold;position:relative;top:-10px;">{!JSENCODE(timePeriod.Name)}&nbsp;&nbsp;&nbsp;{<apex:outputField value="{!timePeriod.KimbleOne__StartDate__c}"/>&nbsp;-&nbsp;<apex:outputField value="{!timePeriod.KimbleOne__EndDate__c}"/>}</span>
+					&nbsp;&nbsp;&nbsp;&nbsp;
+					<apex:outputLink value="#" onclick="GoPreviousPeriod()" title="{!$Label.kimbleone__previousperiod}">
+						<apex:image url="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'PreviousButtonSquare.png')}" alt="{!$Label.kimbleone__previousperiod}" width="30" height="30" />
+					</apex:outputLink> 
+					<span>
+						<apex:inputText styleClass="datepicker" style="width:0px;border:0px; margin:0px; padding:0px;" value="{!GoDate.KimbleOne__InputDate__c}">
+							<apex:actionSupport event="onchange" action="{!TrackingPeriodChange}" />
+						</apex:inputText>
+						<script>
+							$(window).load(function(){
+								$('.datepicker').datepicker({
+										dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+										showOtherMonths: true,
+										selectOtherMonths: true,
+										buttonText: '{!JSENCODE($Label.OpenTimePeriodDropdownToolTip)}',
+										buttonImageOnly: true,
+										buttonImage: '{!URLFOR($Resource.AssignmentImages, 'CalendarButtonSquare.png')}',
+										showOn: "button",
+										});
+								});
+						</script>
+					</span>
+					<apex:outputLink value="#" onclick="GoNextPeriod()" title="{!$Label.kimbleone__nextperiod}">
+						<apex:image url="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'NextButtonSquare.png')}" alt="{!$Label.kimbleone__nextperiod}" width="30" height="30" />
+					</apex:outputLink>
+						
+				</div>
+         		
+			</div>
+		
+			<apex:actionFunction action="{!GoPreviousPeriod}" name="GoPreviousPeriod" />
+			<apex:actionFunction action="{!GoNextPeriod}" name="GoNextPeriod"/ >
+
+			<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+			<div style="display:none;" kimble-tip="null"></div>
+		
+			<apex:pageBlock > 
+           		 
+           		<div id="DeliveryGroupDashboardNarrativePopUpErrors">
+           			<apex:pageMessages escape="false"/>
+           		</div> 
+            	
+	           	<apex:pageBlockButtons rendered="{!deliverygroup.DeliveryStage__r.KimbleOne__AllowNewStatusSummaries__c}" location="top">
+					<apex:commandButton action="{!SaveSummaryAndDetails}" value="{!$Label.kimbleone__save}"/>
+					<apex:actionRegion >
+						<apex:commandButton action="{!CopyStatusSummary}" value="{!copyLabel}" rendered="{!canCopyStatusSummary}" />
+					</apex:actionRegion>
+					<apex:commandButton action="{!CreateExternalStatusSummary}" value="{!$Label.kimbleone__createexternalstatussummary}" rendered="{!!StatusSummary.KimbleOne__SharedWithCustomer__c && ISBLANK(StatusSummary2) && !ISBLANK(DeliveryGroup.KimbleOne__StatusSummaryTemplateExternal__c)}" />
+					<apex:variable value="{!IF($CurrentPage.parameters.redirect='dashboard', $Page.KimbleOne__DeliveryGroupDashboard, $Page.KimbleOne__DeliveryGroupStatuses)}" var="cancelRedirect"/>
+					<input class="btn" type="button" onclick="safeNavigateToSForceURL('{!cancelRedirect}?id={!JSENCODE($CurrentPage.parameters.deliveryGroupId)}&menuContext={!JSENCODE($CurrentPage.parameters.menuContext)}');" value="{!$Label.Cancel}"/>
+				</apex:pageBlockButtons>
+             	
+             	
+             	<table width="100%">
+             	
+             		<tr>
+             			<td width="75%">
+
+			             	<apex:pageblockSection collapsible="false" showheader="false" columns="2">
+
+            			  		<apex:pageblockSectionItem >
+									<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryGroupStatusSummary__c.Fields.KimbleOne__DeliveryStatus__c.Label}" for="deliveryStatus" />
+									<!-- Cant use rerender because of rich text field, therefore need to post whole form. Therefore select lists made optional and validated on database. -->
+									<apex:selectList id="summaryDeliveryStatus" value="{!StatusSummary.KimbleOne__DeliveryStatus__c}" size="1" >
+										<apex:selectOptions value="{!TheDeliveryStatuses}" />
+									</apex:selectList>              
+								</apex:pageblockSectionItem>
+								
+								<apex:outputField id="SharedWithCustomerOutput" value="{!StatusSummary.KimbleOne__SharedWithCustomer__c}" />
+
+							</apex:pageBlockSection>
+			            
+			             	<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+
+			        			<apex:inputTextarea richtext="true" style="width:300px;height:200px;" value="{!StatusSummary.KimbleOne__Narrative__c}" /> 
+
+							</apex:pageBlockSection>
+
+						</td>
+						
+						<td valign="top" style="padding-top: 38px;">
+
+							<apex:pageBlockTable value="{!statusDetails}" var="dgsd">							
+
+								<apex:column headerValue="{!$ObjectType.KimbleOne__DeliveryGroupStatusDetail__c.Fields.KimbleOne__DeliveryPerspective__c.Label}">
+									<apex:outputField value="{!dgsd.Name}" />
+								</apex:column>
+
+								<apex:column headerValue="{!$ObjectType.KimbleOne__DeliveryGroupStatusDetail__c.Fields.KimbleOne__DeliveryStatus__c.Label}">	
+									<apex:selectList id="detailDeliveryStatus" value="{!dgsd.KimbleOne__DeliveryStatus__c}" size="1"  >
+										<apex:selectOptions value="{!TheDeliveryStatuses}" />
+									</apex:selectList>
+								</apex:column>
+
+								<apex:column headerValue="{!$ObjectType.KimbleOne__DeliveryGroupStatusDetail__c.Fields.KimbleOne__Narrative__c.Label}">	
+									<apex:inputTextarea value="{!dgsd.KimbleOne__Narrative__c}" />
+								</apex:column>
+		
+							</apex:pageBlockTable>
+						
+						</td>
+					
+					</tr>
+					
+				</table>
+			
+				<apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+
+					<apex:repeat value="{!$ObjectType.KimbleOne__DeliveryGroupStatusSummary__c.FieldSets.KimbleOne__DeliveryGroupStatusSummaryFields}" var="f">
+						<apex:pageBlockSectionItem rendered="{!!CONTAINS(f.FieldPath,'.')}" dataStyle="width:91%" labelStyle="width:9%" >
+							<apex:outputText value="{!f.Label}" />
+    						<apex:inputField styleClass="{!CASE(f.Type, 'textarea', 'full-width-field', 'string', 'full-width-field','date',IF($ObjectType.KimbleOne__DeliveryGroupStatusSummary__c.Fields[f].updateable,'kimbleDatePicker',''),'')}" required="{!f.Required}" value="{!StatusSummary[f]}"/>
+						</apex:pageBlockSectionItem>
+						<apex:pageBlockSectionItem rendered="{!CONTAINS(f.FieldPath,'.')}"  dataStyle="width:91%" labelStyle="width:9%" >
+							<apex:outputText value="{!f.Label}"/>
+							<apex:outputField value="{!StatusSummary[f]}"/>
+						</apex:pageBlockSectionItem>
+ 					</apex:repeat>
+
+            	</apex:pageBlockSection>
+
+			</apex:pageBlock>
+
+
+			<apex:pageBlock rendered="{!!ISBLANK(StatusSummary2)}">
+
+              	<table width="100%">
+
+             		<tr>
+
+             			<td width="75%">
+
+			             	<apex:pageblockSection collapsible="false" showheader="false" columns="2">
+
+            			  		<apex:pageblockSectionItem >
+									<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryGroupStatusSummary__c.Fields.KimbleOne__DeliveryStatus__c.Label}" for="deliveryStatus" />
+									<!-- Cant use rerender because of rich text field, therefore need to post whole form. Therefore select lists made optional and validated on database. -->
+									<apex:selectList id="summaryDeliveryStatus" value="{!StatusSummary2.KimbleOne__DeliveryStatus__c}" size="1" >
+										<apex:selectOptions value="{!TheDeliveryStatuses}" />
+									</apex:selectList>
+								</apex:pageblockSectionItem>
+
+								<apex:outputField id="SharedWithCustomerOutput" value="{!StatusSummary2.KimbleOne__SharedWithCustomer__c}" />
+
+							</apex:pageBlockSection>
+
+			             	<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+			        			<apex:inputTextarea richtext="true" style="width:400px;height:200px;" value="{!StatusSummary2.KimbleOne__Narrative__c}" />
+
+							</apex:pageBlockSection>
+
+						</td>
+
+						<td valign="top" style="padding-top: 38px;">
+
+							<apex:pageBlockTable value="{!StatusDetails2}" var="dgsd2">
+
+								<apex:column headerValue="{!$ObjectType.KimbleOne__DeliveryGroupStatusDetail__c.Fields.KimbleOne__DeliveryPerspective__c.Label}">
+									<apex:outputField value="{!dgsd2.Name}" />
+								</apex:column>
+
+								<apex:column headerValue="{!$ObjectType.KimbleOne__DeliveryGroupStatusDetail__c.Fields.KimbleOne__DeliveryStatus__c.Label}">
+									<apex:selectList id="detailDeliveryStatus" value="{!dgsd2.KimbleOne__DeliveryStatus__c}" size="1"  >
+										<apex:selectOptions value="{!TheDeliveryStatuses}" />
+									</apex:selectList>
+								</apex:column>
+
+								<apex:column headerValue="{!$ObjectType.KimbleOne__DeliveryGroupStatusDetail__c.Fields.KimbleOne__Narrative__c.Label}">
+									<apex:inputTextarea value="{!dgsd2.KimbleOne__Narrative__c}" />
+								</apex:column>
+
+							</apex:pageBlockTable>
+
+						</td>
+
+					</tr>
+
+				</table>
+
+				<apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+
+					<apex:repeat value="{!$ObjectType.KimbleOne__DeliveryGroupStatusSummary__c.FieldSets.KimbleOne__DeliveryGroupStatusSummaryFields}" var="f">
+						<apex:pageBlockSectionItem rendered="{!!CONTAINS(f.FieldPath,'.')}" dataStyle="width:91%" labelStyle="width:9%" >
+							<apex:outputText value="{!f.Label}" />
+    						<apex:inputField styleClass="{!CASE(f.Type, 'textarea', 'full-width-field', 'string', 'full-width-field','date',IF($ObjectType.KimbleOne__DeliveryGroupStatusSummary__c.Fields[f].updateable,'kimbleDatePicker',''),'')}" required="{!f.Required}" value="{!StatusSummary2[f]}"/>
+						</apex:pageBlockSectionItem>
+						<apex:pageBlockSectionItem rendered="{!CONTAINS(f.FieldPath,'.')}" dataStyle="width:91%" labelStyle="width:9%" >
+							<apex:outputText value="{!f.Label}"/>
+							<apex:outputField value="{!StatusSummary2[f]}"/>
+						</apex:pageBlockSectionItem>
+ 					</apex:repeat>
+				
+            	</apex:pageBlockSection>						
+
+			</apex:pageBlock>
+
+      	</apex:form>
+
+	</apex:outputPanel>
+	<script>
+	/* Tooltips */
+	$(window).load(function(){
+		initialisePageTips();
+		initialiseItems();
+	});
+	
+	var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+	var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+	var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+	var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+	var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+	var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+
+	function initialisePageTips()
+	{
+		ApplyTipAttributes();
+		initialiseTips();
+	}
+	
+	// add tip attributes to elements
+	function ApplyTipAttributes()
+	{
+		if(enableTips)
+		{
+			jQuery('[id$="PeriodNameSelector"]').attr('kimble-tip','PeriodName');
+			jQuery('[id$="SharedWithCustomerOutput"]').attr('kimble-tip','SharedWithCustomer').attr('kimble-tip-extended-text','SharedWithCustomerExtendedText').attr('kimble-tip-help-link','StatusReportingHelpLink');
+			jQuery('[id$="summaryDeliveryStatus"]').attr('kimble-tip','SummaryStatus').attr('kimble-tip-help-link','StatusReportingHelpLink');
+		}
+	}
+	
+	function updateTipsConfigSetting(newTipSetting)
+	{
+		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+			newTipSetting,
+				function(result, event){
+					if (event.status)
+					{
+						var data = {};
+						data.results = result;
+						loadGuidance();
+					}
+					else
+					{
+						alert(event.message);
+					}
+			},
+			{escape: false, timeout: 60000}
+		);
+	}
+
+	function initialiseItems()
+	{
+	    SetupDatePicker();
+ 	}
+
+	function SetupDatePicker()
+	{
+		//dateFormat: 'yy-mm-dd',
+		jQuery('.kimbleDatePicker').datepicker({
+				dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+				showOtherMonths: true,
+				selectOtherMonths: true,
+				changeMonth: true,
+				changeYear: true});
+	}
+	</script>
+</apex:define>
+
+</apex:composition>
+ 
+</apex:page>

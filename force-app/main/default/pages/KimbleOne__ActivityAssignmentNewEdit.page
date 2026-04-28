@@ -1,0 +1,2174 @@
+<apex:page Controller="KimbleOne.ActivityAssignmentNewEditController" extensions="KimbleOne.ActivityAssignmentRemoteActions,KimbleOne.SecurityController" showHeader="false" sidebar="false">
+	<div id="jobsPanel" style="display:none"></div>
+	<div id="assignmentEditPanel">
+	<apex:outputPanel id="Error-panel" layout="none">
+	<div id="errors"><apex:pageMessages id="MessagesPanel" escape="false" /></div>
+	<div id="assignment-warning" style="display:none"><span><div class="message warningM3"><table border="0" cellpadding="0" cellspacing="0" class="messageTable" style="padding:0px;margin:0px;"><tbody><tr valign="top"><td><img alt="warning" class="msgIcon" src="/s.gif" title="{!$Label.WarningHeading}"/></td><td class="messageCell"><div class="messageText" id="assignment-warning-text"><br/></div></td></tr><tr><td></td><td></td></tr></tbody></table></div></span></div>
+	<div id="assignment-error" style="display:none"><span><div class="message errorM3"><table border="0" cellpadding="0" cellspacing="0" class="messageTable" style="padding:0px;margin:0px;"><tbody><tr valign="top"><td><img alt="error" class="msgIcon" src="/s.gif" title="{!$Label.Error}"/></td><td class="messageCell"><div class="messageText" id="assignment-error-text"><br/></div></td></tr><tr><td></td><td></td></tr></tbody></table></div></span></div>
+	</apex:outputPanel>
+	<apex:form >
+	<div id="edit-assignment-container">
+
+		<div id="edit-assignment-core-details">
+			<div id="assignmentRefreshingContainer" class="loadingIndicator">
+				<div id="loadingIndicatorInnerContainer">
+					<img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+				</div>
+				</div>
+			<apex:pageBlock id="ActivityAssignment" mode="edit">
+		<apex:pageBlockButtons location="bottom" id="ButtonsBlock" styleclass="ButtonsBlock">
+			<apex:outputPanel id="ButtonsPanel">
+				<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.updateable}">
+					<input type="button" id="SaveActivityAssignmentButton" onclick="ActivityAssignmentNewEdit.saveAssignment(false)" class="btn" value="{!$Label.Save}" />
+					<input type="button" id="SaveAndNewActivityAssignmentButton" onclick="ActivityAssignmentNewEdit.saveAssignment(true);" class="btn" value="{!$Label.SaveAndNew}" />
+				</apex:outputPanel>
+				<input type="button" id="CancelActivityAssignmentButton" onclick="ActivityAssignmentNewEdit.cancel();" class="btn" value="{!$Label.Cancel}" />
+					
+			</apex:outputPanel>
+		</apex:pageBlockButtons>
+
+		<apex:pageblockSection collapsible="false" showheader="true" columns="1" title="{!$Label.kimbleone__assignmentdefinitionheading}">
+			
+			<apex:pageBlockSectionItem labelstyle="width:30%" dataStyle="width:70%">
+				<apex:outputLabel for="ActivityList">
+					<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ResourcedActivity__c.Label}" />
+				</apex:outputLabel>
+				<div class="requiredInput" id="owning-activity-row">
+					<div class="requiredBlock"></div>
+					<select id="simple-input-owning-activity" onchange="(jQuery('#num-assignments-row:visible').length == 0 ? ActivityAssignmentNewEdit.newAssignment(jQuery('#simple-input-owning-activity').val()) : ActivityAssignmentNewEdit.newModelAssignment(jQuery('#simple-input-owning-activity').val()));"></select>
+				</div>
+
+			</apex:pageBlockSectionItem>
+			
+			<apex:pageBlockSectionItem labelstyle="width:30%" dataStyle="width:70%">
+				<apex:outputLabel for="ResourceList">
+					<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__Resource__c.Label}" />
+				</apex:outputLabel>
+				<apex:outputPanel layout="none">
+					<div class="requiredInput standard-resource" id="resource-row">
+						<div class="requiredBlock"></div>
+
+						<apex:selectList id="simple-input-resource" value="{!DummyAssignment.KimbleOne__Resource__c}" size="1" onchange="ActivityAssignmentNewEdit.resourceInputChange('Resource');" rendered="{!!UseResourceEnhancedLookup}" >
+							<apex:selectOptions value="{!TheResourceOptions}" />
+						</apex:selectList>
+
+						<apex:actionRegion >
+							<apex:outputPanel id="resource-panel">
+								<apex:inputField id="enhanced-input-resource" value="{!DummyAssignment.KimbleOne__Resource__c}" styleclass="kimbleSearch "  rendered="{!UseResourceEnhancedLookup}">
+									<apex:actionSupport onsubmit="ActivityAssignmentNewEdit.disableButtons();" event="onchange" action="{!ValidateInput}" rerender="resource-panel, Error-panel" oncomplete="ActivityAssignmentNewEdit.resourceInputChange('Resource');"/>
+								</apex:inputField>
+							</apex:outputPanel>
+						</apex:actionRegion>
+
+					</div>
+					<div class="requiredInput model-resource" id="resource-row">
+						<div class="requiredBlock"></div>
+
+						<apex:selectList id="simple-input-model-resource" value="{!DummyAssignment.KimbleOne__Resource__c}" size="1" onchange="ActivityAssignmentNewEdit.resourceInputChange('Resource');" rendered="{!!UseResourceEnhancedLookup}" >
+							<apex:selectOptions value="{!TheModelResourceOptions}" />
+						</apex:selectList>
+
+						<apex:actionRegion >
+							<apex:outputPanel id="model-resource-panel">
+								<apex:inputField id="enhanced-input-model-resource" value="{!DummyAssignment.KimbleOne__Resource__c}" styleclass="kimbleSearch " html-data-typename="LookupObjectModelResource" rendered="{!UseResourceEnhancedLookup}">
+									<apex:actionSupport onsubmit="ActivityAssignmentNewEdit.disableButtons();" event="onchange" action="{!ValidateInput}" rerender="model-resource-panel, Error-panel" oncomplete="ActivityAssignmentNewEdit.resourceInputChange('Resource');"/>
+								</apex:inputField>
+							</apex:outputPanel>
+						</apex:actionRegion>
+
+					</div>
+				</apex:outputPanel>
+			
+			</apex:pageBlockSectionItem>
+			
+			<apex:pageBlockSectionItem >
+				<apex:outputLabel for="WithGroupMembers">
+					<apex:outputText value="{!$Label.kimbleone__resourcegroupchildassignmentslabel}" />
+				</apex:outputLabel>
+				<apex:outputPanel layout="none">
+					<div id="with-group-members-row">
+						<apex:inputField id="with-group-members" onchange="ActivityAssignmentNewEdit.withGroupMembersChange();" value="{!DummyAssignment.KimbleOne__IsUsageProfiled__c}"  />
+					</div>
+				</apex:outputPanel>
+			</apex:pageBlockSectionItem>
+
+			<apex:pageBlockSectionItem >
+				<apex:outputLabel for="NumberOfActivityAssignments">
+					<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__NumberOfActivityAssignments__c.Label}" />
+				</apex:outputLabel>
+				<apex:outputPanel layout="none">
+					<div id="num-assignments-row">
+						<apex:inputField id="num-ftes" value="{!DummyAssignment.KimbleOne__NumberOfActivityAssignments__c}"  />
+					</div>
+				</apex:outputPanel>
+			</apex:pageBlockSectionItem>
+
+			<apex:pageBlockSectionItem >
+				<apex:outputLabel for="IsFrameworkAssignment">
+					<apex:outputText value="{!$Label.kimbleone__isframeworkassignment}" />
+				</apex:outputLabel>
+				<apex:outputPanel layout="none">
+					<div id="is-framework-assignment-row">
+						<apex:inputField id="is-framework-assignment" value="{!DummyAssignment.KimbleOne__IsUsageProfiled__c}"  />
+					</div>
+				</apex:outputPanel>
+			</apex:pageBlockSectionItem>
+
+			<apex:pageBlockSectionItem >
+				<apex:outputLabel for="ActivityRoleList">
+					<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ActivityRole__c.Label}" />
+				</apex:outputLabel>
+				
+				<apex:outputPanel layout="none">
+				<div class="requiredInput" id="role-row">
+					<div class="requiredBlock"></div>
+					<select id="simple-input-role" onchange="ActivityAssignmentNewEdit.resourceInputChange('Role');"></select>
+				</div>	
+				</apex:outputPanel>
+						
+			</apex:pageBlockSectionItem>
+			
+			<apex:pageBlockSectionItem >
+				<apex:outputLabel for="LocationList">
+					<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__Location__c.Label}" />
+				</apex:outputLabel>
+			
+				<apex:outputPanel layout="none">
+					<div class="requiredInput" id="location-row">
+						<div class="requiredBlock"></div>
+				
+						<apex:selectList id="simple-input-location" value="{!DummyAssignment.KimbleOne__Location__c}" size="1" onchange="ActivityAssignmentNewEdit.resourceInputChange('Location');" rendered="{!!UseLocationEnhancedLookup}" >
+							<apex:selectOptions value="{!TheLocationOptions}" />
+						</apex:selectList>
+						
+						<apex:actionRegion >
+						<apex:outputPanel id="location-panel">
+							<apex:inputField id="enhanced-input-location" styleclass="kimbleSearch " value="{!DummyAssignment.KimbleOne__Location__c}" rendered="{!UseLocationEnhancedLookup}">
+								<apex:actionSupport event="onchange" action="{!ValidateInput}" rerender="location-panel, Error-panel" oncomplete="ActivityAssignmentNewEdit.resourceInputChange('Location');"/>
+							</apex:inputField>
+							</apex:outputPanel>
+						</apex:actionRegion>
+					</div>
+				</apex:outputPanel>
+			</apex:pageBlockSectionItem>
+
+			<apex:pageBlockSectionItem id="assignment-code" rendered="{!ShowAssignmentCode}">
+				<apex:outputLabel >{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__Code__c.Label}</apex:outputLabel>
+				<apex:inputField value="{!DummyAssignment.KimbleOne__Code__c}" styleClass="input-assignment-code"/>
+			</apex:pageBlockSectionItem>
+				
+			<apex:pageBlockSectionItem >
+				<apex:outputLabel for="ActivityTimePattern">
+					<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ActivityTimePattern__c.Label}" />
+				</apex:outputLabel>
+				
+				<apex:outputPanel layout="none">
+				<div class="requiredInput" id="time-pattern-row">
+					<div class="requiredBlock"></div>
+					<select id="simple-input-time-pattern" onchange="ActivityAssignmentNewEdit.timePatternInputChange();"></select>
+				</div>	
+				</apex:outputPanel>
+						
+				</apex:pageBlockSectionItem>
+				
+			</apex:pageBlockSection>
+
+			<apex:pageblockSection collapsible="false" showheader="true" columns="1" title="{!$Label.kimbleone__assignmentratesheading}">
+			
+			<apex:pageBlockSectionItem labelstyle="width:30%" dataStyle="width:70%">
+				<apex:outputLabel >{!$ObjectType.ActivityAssignment__c.Fields.TemporalForecastRevenueRate__c.Label} <span id="invoicing-currency"></span></apex:outputLabel>
+				<apex:outputPanel layout="none">
+
+					<div class="requiredInput" id="revenue-row">
+						<div class="requiredBlock"></div>
+						<input type="text" id="revenue-rate" onchange="ActivityAssignmentNewEdit.revenueRateChange();"/>
+					</div>
+					<span style="font-size:70%">{!$Label.PerAbbreviationLabel}<span class="revenue-entry-units"></span></span>
+				</apex:outputPanel>
+			</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem dataStyleClass="cost-section" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__TemporalForecastCostRate__c.Accessible}" labelstyle="width:30%" dataStyle="width:70%">
+					<apex:outputLabel >{!$ObjectType.ActivityAssignment__c.Fields.TemporalForecastCostRate__c.Label} <span id="base-currency"></span></apex:outputLabel>
+					<apex:outputPanel layout="none">
+						<div class="requiredInput" id="cost-row">
+							<div class="requiredBlock"></div>
+							<input type="text" id="cost-rate" onchange="ActivityAssignmentNewEdit.costRateChange()"/>
+						</div>
+						<span style="font-size:70%">{!$Label.PerAbbreviationLabel}<span class="invoicing-units"></span></span>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem dataStyleClass="supplier-cost-section" labelstyle="width:30%" dataStyle="width:70%" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__TemporalForecastCostRate__c.Accessible}">
+					<apex:outputLabel >{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__SupplierInvoicingCurrencyCostRate__c.Label}</apex:outputLabel>
+					<apex:outputPanel layout="none">
+						<div class="requiredInput" id="supplier-cost-row">
+							<div class="requiredBlock"></div>
+							<apex:selectList id="simple-input-supplier-currency" value="{!DummyAssignment.KimbleOne__SupplierInvoicingCurrencyISOCode__c}" size="1" onchange="ActivityAssignmentNewEdit.supplierInvoicingCurrencyInputChange();">
+								<apex:selectOptions value="{!TheCurrencyOptions}" />
+							</apex:selectList>
+							<input type="text" id="supplier-cost-rate" onchange="ActivityAssignmentNewEdit.supplierInvoicingRateInputChange();"/>
+						</div>
+						<span style="font-size:70%">{!$Label.PerAbbreviationLabel}<span class="forecast-rate"></span></span>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem rendered="{!ShowAssignmentMargin && $ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__TemporalForecastCostRate__c.Accessible}" labelstyle="width:30%" dataStyle="width:70%">
+					<apex:outputLabel >{!$Label.kimbleone__marginonremainingusagelabel} (%)</apex:outputLabel>
+					<apex:outputPanel layout="inline"><span id="assignment-margin"></span>
+						<div id="assignment-margin-basis">[<apex:outputText value="{!$Label.kimbleone__revenue}"/><span id="assignment-margin-rev"></span><apex:outputText value="{!$Label.kimbleone__cost}"/><span id="assignment-margin-cost"></span>]</div>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+
+			</apex:pageblockSection>
+
+			<apex:pageblockSection id="schedulePB" collapsible="false" showheader="true" columns="1" title="{!$Label.kimbleone__assignmentscheduleheading}">
+
+			<apex:pageBlockSectionItem >
+				<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__StartDate__c.Label}" />
+				<apex:outputPanel layout="none">
+					<div class="requiredInput" id="start-date-row">
+						<div class="requiredBlock"></div>
+
+						<apex:inputField id="start-date" required="false" value="{!DummyAssignment.KimbleOne__StartDate__c}" styleclass="kimbleDatePicker " />
+					</div>
+				</apex:outputPanel>
+
+			</apex:pageBlockSectionItem>
+
+			<apex:pageBlockSectionItem labelstyle="width:30%" dataStyle="width:70%" >
+				<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__IsUsageProfiled__c.Label}" />
+				<apex:outputPanel layout="none">
+					<div class="requiredInput" id="is-usage-profiled-row">
+						<apex:inputField id="is-usage-profiled" value="{!DummyAssignment.KimbleOne__IsUsageProfiled__c}" onchange="ActivityAssignmentNewEdit.usageProfileChanged()" />
+					</div>
+				</apex:outputPanel>
+			</apex:pageBlockSectionItem>
+
+			<apex:pageBlockSectionItem labelstyle="width:30%" dataStyle="width:70%">
+				<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UsageBehaviourRule__c.Label}" />
+
+				<apex:outputPanel layout="none">
+					<div class="requiredInput" id="usage-behaviour-row">
+						<div class="requiredBlock"></div>
+						<select id="UsageBehaviourRule"></select>
+					</div>
+				</apex:outputPanel>
+
+			</apex:pageBlockSectionItem>
+
+			<!-- TODO Disable when usage adjustments is on -->
+			<apex:pageBlockSectionItem >
+				<apex:outputLabel style="white-space:nowrap;">{!$Label.AssignmentEntryRemainingEffort} (<span class="forecast-units"></span>)</apex:outputLabel>
+				<apex:outputPanel layout="none">
+					<div class="requiredInput" id="remaining-usage-row">
+						<div class="requiredBlock"></div>
+						<apex:inputField id="EntryRemainingUsage" value="{!DummyAssignment.KimbleOne__EntryRemainingUsage__c}" onchange="ActivityAssignmentNewEdit.remainingUsageChange()"/>
+					</div>
+				</apex:outputPanel>
+
+			</apex:pageBlockSectionItem>
+
+			<apex:pageBlockSectionItem labelstyle="width:30%" dataStyle="width:70%">
+				<apex:outputLabel >{!$ObjectType.ActivityAssignment__c.Fields.MaximumUsage__c.Label} (<span id="max-units"></span>) </apex:outputLabel>
+				<apex:outputPanel layout="none">
+
+					<div class="requiredInput" id="max-usage-row">
+						<div class="requiredBlock"></div>
+						<apex:inputField id="MaxUsage" value="{!DummyAssignment.KimbleOne__MaximumUsage__c}" />
+					</div>
+				</apex:outputPanel>
+			</apex:pageBlockSectionItem>
+
+			<apex:pageBlockSectionItem >
+				<apex:outputLabel style="white-space:nowrap;">{!$ObjectType.ActivityAssignment__c.Fields.UnforecastUsage__c.Label} (<span class="unforecast-units"></span>)</apex:outputLabel>
+				<apex:outputPanel layout="none">
+					<div id="unforecast-usage-row">
+						<apex:inputField id="UnforecastUsage" value="{!DummyAssignment.KimbleOne__UnforecastUsage__c}" />
+						<span style="cursor: pointer;font-size: 16px;vertical-align: middle;" class="fa fa-times-circle remove-unforecast-usage" title="{!$Label.Remove} {!$ObjectType.ActivityAssignment__c.Fields.UnforecastUsage__c.Label}"></span>
+					</div>
+				</apex:outputPanel>
+
+			</apex:pageBlockSectionItem>
+
+			<apex:pageBlockSectionItem >
+				<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UtilisationPercentage__c.Label} (%)" />
+				<apex:outputPanel layout="none">
+					<div class="requiredInput" id="utilisation-row">
+						<div class="requiredBlock"></div>
+						<apex:inputField id="EntryUtilisation" value="{!DummyAssignment.KimbleOne__BaselineUtilisationPercentage__c}" />
+					</div>
+				</apex:outputPanel>
+
+			</apex:pageBlockSectionItem>
+
+			<apex:pageBlockSectionItem >
+				<apex:outputText value="{!$Label.kimbleone__endingonlabel}" />
+				<apex:outputPanel layout="none">
+					<div class="requiredInput" id="end-date-row">
+						<div class="requiredBlock"></div>
+
+						<apex:inputField id="EntryEndDate" styleclass="kimbleDatePicker " value="{!DummyAssignment.KimbleOne__ForecastP3EndDate__c}" />
+					</div>
+				</apex:outputPanel>
+
+			</apex:pageBlockSectionItem>
+
+			</apex:pageblockSection>
+
+	</apex:pageBlock>
+		</div>
+		<div id="edit-additional-assignment-fields">
+			<apex:pageBlock mode="edit">
+				<div id="internal-revenue-section">
+					<apex:pageblockSection collapsible="false" showheader="true" columns="1" title="{!$Label.kimbleone__intercompany} {!$Label.kimbleone__assignmentratesheading}">
+						<apex:pageBlockSectionItem labelstyle="width:30%" dataStyle="width:70%">
+							<apex:outputLabel >{!$ObjectType.ActivityAssignment__c.Fields.IntInvCcyForecastInternalRevenueRate__c.Label} <span id="internal-invoicing-currency"></span></apex:outputLabel>
+							<apex:outputPanel layout="none">
+								<div class="requiredInput" id="internal-revenue-row">
+									<div class="requiredBlock"></div>
+									<input type="text" id="internal-revenue-rate" />
+								</div>
+								<span style="font-size:70%">{!$Label.PerAbbreviationLabel}<span class="invoicing-units"></span></span>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__OverrideInternalRate__c.Label}"/>
+							<apex:outputPanel layout="none">
+								<div id="internal-revenue-override-row">
+									<apex:inputField id="internal-revenue-override" value="{!DummyAssignment.KimbleOne__OverrideInternalRate__c}" onchange="ActivityAssignmentNewEdit.isInternalRevenueOverriddenChanged()" />
+								</div>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+					</apex:pageblockSection>
+				</div>
+
+				<apex:pageblockSection rendered="{!ShowAssignmentKeyFields}" collapsible="false" showheader="true" columns="1" title="{!$Label.kimbleone__assignmentkeyfields}">
+					<apex:repeat value="{!TheKeyFields}" var="f" >
+						<apex:inputField styleclass="assignment-key-field {!IF(AND(f.DisplayType == "DATE",$ObjectType.KimbleOne__ActivityAssignment__c.Fields[f.Name].updateable),'kimbleDatePicker','')}" html-data-reference="{!f.RelatedObjectName}" html-data-fld-type="{!f.DisplayType}" html-data-fld-name="{!f.Name}" required="{!f.IsRequired}" value="{!DummyAssignment[f.Name]}" />
+					</apex:repeat>
+				</apex:pageblockSection>
+			</apex:pageBlock>
+		</div>
+	</div>
+
+		<apex:actionRegion >
+			<apex:actionFunction action="{!CancelAssignment}" name="rerenderErrorsAndResources" rerender="simple-input-resource, resource-panel, simple-input-model-resource, model-resource-panel, Error-panel" />
+		</apex:actionRegion>
+	</apex:form>
+	</div>
+
+	<style>
+	.resize-assignment-helper {
+	    border: 1px dotted #4A4A56;
+	    backgrpound-color:whitesmoke;
+	}
+	.assignment-resizing div {visibility: hidden;}
+	.assignment-resizing {border-style: dashed; background-color:#eee;}
+	.assignment-resizing i {
+	    position: absolute;
+    	font-size: 14px;
+    	top: 4px;
+    	right: 5px;
+ 	}
+
+ 	.assignment-moving div {visibility: hidden;}
+	.assignment-moving {position:fixed !important;border-style: dashed; background-color:#eee;z-index:100;}
+	.assignment-moving i {
+	    position: absolute;
+    	font-size: 14px;
+    	top: 4px;
+    	left: 5px;
+ 	}
+
+	.moving-dates {
+		position: absolute;
+		visibility: visible !important;
+		font-size: 12px !important;
+		top: -12px;
+		background-color: #fefefe;
+		left: 42px;
+		border: 1px solid #bbb;
+		padding: 4px 4px 4px 4px;
+		border-radius: 3px;
+		display:none;
+		box-shadow: rgba(31, 31, 31, 0.16) 4px 3px 8px;
+		padding-left:20px
+	}
+
+	.assignment-moving .moving-dates{
+		display:block;
+		height: 13px;
+ 	}
+	.moving-dates::before {content: "\f05d";
+		color:green;
+		font-family: FontAwesome;
+		position: absolute;
+		left: 2px;
+		top: 2px;
+		font-weight: normal;
+		font-size: 16px;}
+
+	.invalid-drop .moving-dates::before {content: "\f05e";
+		color:red;
+		font-family: FontAwesome;
+		position: absolute;
+		left: 2px;
+		top: 2px;
+		font-weight: normal;
+		font-size: 16px;}
+    div#edit-assignment-container>div {
+    	display: inline-block;
+    	vertical-align: top;
+	}
+	div#assignment-margin-basis {
+		font-size: 90%;
+		display: none;
+	}
+
+	span#assignment-margin-rev {
+		padding-left: 4px;
+		padding-right: 4px;
+	}
+
+	span#assignment-margin-cost {
+		padding-left: 4px;
+	}
+
+	span.model-add-info {
+		font-weight: normal;
+		padding-left: 5px;
+ 	}
+
+	/* Used to remove the gap above the section to avoid misalignment with left hand side section header */
+	div#internal-revenue-section {
+		margin-bottom: 15px;
+		border-bottom: 1px solid #fff;
+	}
+
+	div#edit-additional-assignment-fields .pbSubheader:not(.first) {
+		margin-top: initial;
+		border-top: none;
+	}
+	</style>
+
+<script>
+	var showAssignmentMargin = {!ShowAssignmentMargin};
+
+	var ActivityAssignmentNewEdit = new ActivityAssignmentNewEditController();
+
+	var pageLabels = {};
+	pageLabels['NewCostEffectiveFromMessage'] = '{!JSENCODE($Label.NewCostEffectiveFromMessage)}';
+	pageLabels['AssignmentScheduleHeading'] = '{!JSENCODE($Label.AssignmentScheduleHeading)}';
+	pageLabels['ModelAssignmentScheduleHeading'] = '({!JSENCODE($Label.GenericLabel20)})';
+
+	var hasInternalRevenueUpdateAccess = {!$ObjectType.ActivityAssignment__c.fields.IntInvCcyForecastInternalRevenueRate__c.updateable};
+	var hasInternalRevenueReadAccess = {!$ObjectType.ActivityAssignment__c.fields.IntInvCcyForecastInternalRevenueRate__c.accessible};
+
+	var hasSupplierCostUpdateAccess = {!$ObjectType.ActivityAssignment__c.fields.SupplierInvoicingCurrencyCostRate__c.updateable};
+
+	function parseCostSummaryJson (j)
+	{
+		return kimble.parseJSON(j.replace(/"CostRate"/g, '"R"').replace(/"FromDate"/g, '"D"'));
+	};
+
+	function parseRevenueSummaryJson (j)
+	{
+		return kimble.parseJSON(j.replace(/"RevenueRate"/g, '"R"').replace(/"FromDate"/g, '"D"'));
+	};
+
+	function ActivityAssignmentNewEditController()
+	{
+		jQuery('#assignmentRefreshingContainer').hide();
+
+		this.hasPendingJobs = false;
+
+		this.theAssignmentToEditOriginal = null;
+		this.theAssignmentToEdit = null;
+		this.theAssignmentEditBehaviour = null;
+		this.theSelectedResource = null;
+		this.usageBehaviorRuleMap = null;
+
+		jQuery(document).off('click', '.temporal-date');
+		jQuery(document).on('click', '.temporal-date', function (event) {
+			var inp = jQuery(this).find('input');
+
+			inp.datepicker({dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+								maxDate:0,
+								minDate:kimble.formatDate(ActivityAssignmentNewEdit.theAssignmentEditBehaviour.EarliestCostRateChangeDate),
+								showOtherMonths: true,
+								selectOtherMonths: true,
+								onSelect: function(dateText, inst) {
+								    jQuery(this).attr('title', dateText);
+								    inp.trigger('change');
+								    inp.datepicker('destroy');}
+								});
+
+			inp.datepicker('show');
+		});
+
+		jQuery(document).off('change', '.temporal-date input');
+		jQuery(document).on('change', '.temporal-date input', function (event) {
+			ActivityAssignmentNewEdit.theAssignmentToEdit.ForecastCostRateEffectiveDate = kimble.parseDate(jQuery(this).val());
+			ActivityAssignmentNewEdit.rebuildTemporalCosts();
+		});
+
+		jQuery(document).off('click', '.future-cost-change');
+		jQuery(document).on('mouseover', '.future-cost-change', function (event) {
+				var j = jQuery(this);
+
+				var assignment = j.data('assignment');
+				var costs = parseCostSummaryJson(assignment.CostRateSummary);
+
+				var tipHtml = '';
+				var $row = j.closest('tr');
+
+				var usageConversionFactor = assignment.ForecastToInvoiceConversionFactor;
+
+				for(var i=0; i<costs.length;i++)
+				{
+					var formattedMesage = pageLabels['NewCostEffectiveFromMessage'].format(kimble.formatNumber(costs[i].R * usageConversionFactor, '#,##0.00'), kimble.formatDate(costs[i].D));
+					tipHtml += '<div class="cost-change-message">' + formattedMesage + '</div>';
+				}
+
+				//tooltips
+				j.qtip('destroy', true);
+
+				j.qtip({
+					overwrite: true,
+					show: {
+						solo:true,
+						ready: true // Show immediately - important!
+					},
+					style: {
+						classes: 'qtip-light qtip-shadow qtip-rounded'
+					},
+					content: {
+						text: tipHtml,
+						title: 'Costs'
+					},
+					position: { adjust: { method: 'flip flip'
+						},
+						viewport: $(window)
+					}
+				});
+			   });
+
+		this.applyInlineGanttEditBehaviour = function($ganttNode, theAssignment, highlightDay, activeDay, draggable, resizable)
+		{
+			if (!theAssignment.ActivityAllowsNewItems) return;
+
+			if (theAssignment.ParentId != null) return;
+
+			if (theAssignment.AssignmentType == 'AppliedModel' || theAssignment.AssignmentType == 'ActivatedModel') return;
+			$ganttNode.removeClass('can-reassign');
+
+			if (theAssignment.LatestTimeEntryDate == null && theAssignment.HasExpense == false && draggable)
+			{
+				$ganttNode.addClass('can-reassign');
+			}
+
+			// Can extend
+			var context = ActivityAssignmentNewEdit;
+
+			if (theAssignment.UsageBehaviourRule.EntrySpecification != 'DerivedEndDate' && resizable)
+			{
+				//earliest actual or scheduled date
+				$ganttNode.resizable({
+				    //helper: 'resize-assignment-helper',
+				    handles: 'e',
+				    scroll:false,
+				    start: function(event, ui) {
+				      	ui.element.addClass('assignment-resizing');
+
+				      	var assignmentUsage = new ActivityAssignmentUsagePattern(theAssignment.HoursPerDay, theAssignment.StartDate.toDate(), theAssignment.UsagePattern, theAssignment.Utilisation, theAssignment.Utilisation);
+
+						var minDate = theAssignment.StartDate.toDate();
+
+						if (assignmentUsage.latestFirmDate != null) minDate = assignmentUsage.latestFirmDate;
+
+						if (assignmentUsage.latestApprovedTimeDate != null && minDate.valueOf() < assignmentUsage.latestApprovedTimeDate.valueOf()) minDate = assignmentUsage.latestApprovedTimeDate;
+
+						var $minDate = jQuery('[dte="' + minDate.valueOf() + '"]');
+						var minWidth = 0;
+
+						if ($minDate.length > 0)
+						{
+						    minWidth =  jQuery('[dte="' + minDate.valueOf() + '"]').offset().left - ui.element.offset().left;
+      					}
+
+						ui.element.attr('min-width', minWidth);
+        			},
+				    stop: function( event, ui ) {
+				        var dte = activeDay(); //this is the new end date!
+
+				        var onCancel = function(ui) {
+				            // Move the element to its original position.
+							ui.element.css(ui.originalPosition);
+							// Modify the element's width& height to the original value.
+							ui.element.css(ui.originalSize).removeClass('assignment-resizing');
+            			}
+
+				        if (dte == null)
+				        {
+				        	onCancel(ui);
+            			}
+            			else if (dte.toKimbleUTC() == theAssignment.EndDate){
+							 onCancel(ui);
+       					}
+            			else
+            			{
+				        	// Need to replace entire-row with pure placeholder!
+                            var $child = jQuery(handlebarsTemplates['child-row-placeholder-template'].call(this, {
+                                Id:theAssignment.Id, ParentId:ui.element.closest('.parent-container').attr('obj-id'), Name:'{!JSENCODE($Label.Label024)}'.format(matchingResources[theAssignment.ResourceId].Name)
+                            }));
+
+                            $child.find('.gantt-cells').append(handlebarsTemplates['gantt-placeholder-template'].call(this, {
+                                StartDate: theAssignment.StartDate, EndDate:dte.toKimbleUTC()
+                            }));
+
+							// replace child
+							ui.element.closest('.child-container').replaceWith($child);
+
+				        	context.extendAssignment($ganttNode.attr('object-id'),dte.toKimbleUTC(), function(){onCancel(ui)});
+				        }
+				    },
+                	resize: function(event, ui) {
+
+						var minWidth = new Number(ui.element.attr('min-width'));
+
+						if (ui.size.width < minWidth) ui.element.width(minWidth);
+
+						highlightDay(event, ui, 'right');
+                	}
+                });
+   			}
+ 		}
+
+		this.extendAssignment = function(assignmentId, endDate, onCancel) {
+
+		    Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.ExtendAssignment}',
+       		assignmentId, endDate, false,
+      			function(result, event){
+             		if (event.status)
+		            {
+		             	jQuery.publish('kimble.assignmentChanged', {assignmentId:assignmentId});
+		         	}
+		         	else if (event.type === 'exception')
+		         	{
+		             	alert(event.message);
+		             	onCancel();
+		         	}
+		         	else
+		         	{
+		             	alert(event.message);
+		             	onCancel();
+		         	}
+		         },
+		         {escape: false, timeout: 60000});
+  		}
+
+		this.shiftAssignment = function(assignmentId, newStartDate, oncomplete, onCancel) {
+
+		    Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.ShiftAssignment}',
+       		assignmentId, newStartDate, false,
+      			function(result, event){
+             		if (event.status)
+		            {
+		             	oncomplete(assignmentId);
+		         	}
+		         	else if (event.type === 'exception')
+		         	{
+		             	alert(event.message);
+		             	onCancel();
+		         	}
+		         	else
+		         	{
+		             	alert(event.message);
+		             	onCancel();
+		         	}
+		         },
+		         {escape: false, timeout: 60000});
+  		}
+
+		this.quickAssign = function(assignmentId, resourceId, newStartDate, oncomplete, onCancel, onerror) {
+		    var context = ActivityAssignmentNewEdit;
+		    Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.QuickAssignResource}',
+       		assignmentId, resourceId, newStartDate,
+      			function(result, event){
+             		if (event.status)
+		            {
+		             	if (result == true) {
+		             	 	// retry save due to row lock error
+		             	 	var retry = function() {
+		             	 	    context.quickAssign(assignmentId, resourceId, newStartDate, oncomplete, onCancel, onerror);
+                  			};
+							console.log('Retrying quick assign for ' + assignmentId);
+
+                  			//retry save in half a second
+                  			window.setTimeout(retry, 500);
+
+                		} else {
+                			oncomplete(assignmentId);
+                  		}
+		         	}
+		         	else if (event.type === 'exception')
+		         	{
+		             	onerror(event.message);
+		         	}
+		         	else
+		         	{
+		             	onerror(event.message);
+		         	}
+		         },
+		         {escape: false, timeout: 60000});
+  		}
+
+		this.newAssignment = function(resourcedActivityId) {
+			var context = ActivityAssignmentNewEdit;
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.CreateActivityAssignment}',
+	       		resourcedActivityId,
+	      			function(result, event){
+	             		 if (event.status)
+			             {
+			             	context.initialiseAssignment(result);
+			             	showModalBoxy();
+							if(typeof initialisePageTips === "function") initialisePageTips();
+			         	}
+			         	else if (event.type === 'exception')
+			         	{
+			             	alert(event.message);
+			         	}
+			         	else
+			         	{
+			             	alert(event.message);
+			         	}
+	         },
+	         {escape: false, timeout: 60000});
+		}
+
+		this.newModelAssignment = function(resourcedActivityId) {
+			var context = ActivityAssignmentNewEdit;
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.CreateModelActivityAssignment}',
+	       		resourcedActivityId,
+	      			function(result, event){
+	             		 if (event.status)
+			             {
+			             	context.initialiseAssignment(result);
+			             	showModalBoxy();
+							if(typeof initialisePageTips === "function") initialisePageTips();
+			         	}
+			         	else if (event.type === 'exception')
+			         	{
+			             	alert(event.message);
+			         	}
+			         	else
+			         	{
+			             	alert(event.message);
+			         	}
+	         },
+	         {escape: false, timeout: 60000});
+		}
+
+		//Used to Allocate from Framework assignment
+		this.newChildAssignment = function(parentAssignmentId) {
+			var context = ActivityAssignmentNewEdit;
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.CreateChildAssignment}',
+	       		parentAssignmentId,
+	      			function(result, event){
+	             		 if (event.status)
+			             {
+			             	context.initialiseAssignment(result);
+			             	showModalBoxy();
+			             	if(typeof initialisePageTips === "function") initialisePageTips();
+			         	}
+			         	else if (event.type === 'exception')
+			         	{
+			             	alert(event.message);
+			         	}
+			         	else
+			         	{
+			             	alert(event.message);
+			         	}
+	         },
+	         {escape: false, timeout: 60000});
+		}
+
+		this.initialiseAssignment = function (data){
+			jQuery('[id$="SaveActivityAssignmentButton"], [id$="SaveAndNewActivityAssignmentButton"]').prop('disabled', true).addClass('btnDisabled');
+
+			var context = ActivityAssignmentNewEdit;
+
+			context.theAssignmentEditBehaviour = data;
+			context.theAssignmentToEdit = context.theAssignmentEditBehaviour.TheActivityAssignment;
+			context.theAssignmentToEditOriginal = JSON.parse(JSON.stringify(context.theAssignmentToEdit));
+            context.TemporalCostsDisabled = false;
+
+			context.theSelectedResource = context.theAssignmentEditBehaviour.TheSelectedResource;
+
+			if (context.theSelectedResource != null)
+				context.theAssignmentToEditOriginal.ResourceName = context.theSelectedResource.Resource.Name;
+
+			jQuery('.invoicing-units').text(context.theAssignmentEditBehaviour.InvoicingUnits);
+			jQuery('.revenue-entry-units').text(context.theAssignmentEditBehaviour.RevenueEntryUnits);
+			jQuery('.forecast-units, .unforecast-units, #max-units').text(context.theAssignmentEditBehaviour.ForecastingUnits);
+			jQuery('.forecast-rate').text(context.theAssignmentEditBehaviour.ForecastingRateUnits);
+			jQuery('#invoicing-currency').text(context.theAssignmentToEdit.InvoicingCurrency);
+			jQuery('#base-currency').text(context.theAssignmentEditBehaviour.BaseCurrency);
+			jQuery('#supplier-invoicing-currency').text(context.theAssignmentToEdit.SupplierInvoicingCurrency);
+
+			// clear any existing errors or warnings from a previous version of the screen
+			jQuery('#assignment-error-text').text('');
+			jQuery('#assignment-error').hide();
+			jQuery('#assignment-warning-text').text('');
+			jQuery('#assignment-warning').hide();
+			jQuery('#assignmentEditPanel #errors .messageText').text('');
+			jQuery('#assignmentEditPanel #errors').hide();
+			jQuery('#assignmentEditPanel #resource-row:visible .errorMsg').text('');
+			jQuery('#assignmentEditPanel #resource-row:visible .kimbleSearch').removeClass('error');
+
+			var owningActivityRow = jQuery('#owning-activity-row');
+			owningActivityRow.closest('tr').show();
+
+			var owningActivitySelect = owningActivityRow.find('select');
+			owningActivitySelect.empty();
+			jQuery.each(context.theAssignmentEditBehaviour.TheScopingActivities, function(i, opt){
+				jQuery('<option>').val(opt.id).text(opt.text).appendTo(owningActivitySelect);
+			});
+
+			if (context.theAssignmentEditBehaviour.TheScopingActivities.length <= 1)
+			{
+				owningActivityRow.closest('tr').hide();
+			}
+
+			var withGroupMembersRow = jQuery('#with-group-members-row');
+			withGroupMembersRow.closest('tr').hide();
+
+			var asModelFields = jQuery('#num-assignments-row');
+			asModelFields.closest('tr').hide();
+
+			var frameworkAssignmentRow = jQuery('#is-framework-assignment-row');
+
+			frameworkAssignmentRow.closest('tr').show();
+			if (!context.theAssignmentEditBehaviour.ShowFrameworkOption)
+			{
+				frameworkAssignmentRow.closest('tr').hide();
+			}
+
+			var roleRow = jQuery('#role-row');
+			roleRow.closest('tr').show();
+			roleRow.find('.requiredBlock').css('display', context.theAssignmentEditBehaviour.IsRoleMandatory?'':'none');
+
+			if (context.theAssignmentEditBehaviour.TheActivityRoles.length > 1)
+			{
+				var roleSelect = roleRow.find('select');
+				roleSelect.empty();
+				jQuery.each(context.theAssignmentEditBehaviour.TheActivityRoles, function(i, opt){
+					jQuery('<option>').val(opt.id).text(opt.text).appendTo(roleSelect);
+				});
+			}
+			else
+			{
+				roleRow.closest('tr').hide();
+			}
+
+			var timePatternRow = jQuery('#time-pattern-row');
+
+			var timePatternSelect = timePatternRow.find('select');
+			timePatternSelect.empty();
+
+			jQuery.each(Object.keys(context.theAssignmentEditBehaviour.TheActivityTimePatterns), function(i, key){
+				jQuery('<option>').val(context.theAssignmentEditBehaviour.TheActivityTimePatterns[key].Id).text(context.theAssignmentEditBehaviour.TheActivityTimePatterns[key].Name).appendTo(timePatternSelect);
+			});
+
+			timePatternRow.closest('tr').hide();
+
+			var locationRow = jQuery('#location-row');
+			locationRow.closest('tr').show();
+			locationRow.find('.requiredBlock').css('display', context.theAssignmentEditBehaviour.IsLocationMandatory?'':'none');
+
+			if (jQuery('#location-row').find('select').length == 1 && jQuery('#location-row').find('select').find('option').length == 0)
+				locationRow.closest('tr').hide();
+
+			var revenueRow =  jQuery('#revenue-row');
+			revenueRow.closest('tr').show();
+			jQuery('#assignment-margin').closest('tr').show();
+
+			if(!context.theAssignmentEditBehaviour.HasRevenue)
+			{
+				revenueRow.closest('tr').hide();
+				jQuery('#assignment-margin').closest('tr').hide();
+			}
+
+			var internalRevenueSection = jQuery('#internal-revenue-section');
+			internalRevenueSection.hide();
+
+			var internalRevenueRow = jQuery('#internal-revenue-row');
+			internalRevenueRow.closest('tr').hide();
+
+			jQuery('#internal-revenue-override-row').find('input').prop('checked', this.theAssignmentToEdit.IsOverridden == true);
+
+			var internalRevenueOverrideRow = jQuery('#internal-revenue-override-row');
+			internalRevenueOverrideRow.closest('tr').hide();
+
+			var supplierInvoiceRow = jQuery('#supplier-invoice-row');
+			supplierInvoiceRow.closest('tr').show();
+
+			if (jQuery('#supplier-invoice-row').find('select').length == 1 && jQuery('#supplier-invoice-row').find('select').find('option').length == 0)
+				locationRow.closest('tr').hide();
+
+			jQuery('#start-date-row a').css('display', this.theAssignmentToEdit.CanChangeResource?'':'none');
+
+			//Usage Profiled
+			jQuery('#is-usage-profiled-row').closest('tr').css('display', this.theAssignmentToEdit.IsUsageProfiled?'':'none');
+			jQuery('#is-usage-profiled-row').find('input').prop('checked', this.theAssignmentToEdit.IsUsageProfiled == true);
+
+			//Usage behaviour
+			var usageBehaviourRow = jQuery('#usage-behaviour-row');
+			usageBehaviourRow.closest('tr').css('display', !this.theAssignmentToEdit.IsUsageProfiled?'':'none');
+			var usageSelect = usageBehaviourRow.find('select');
+			usageSelect.empty();
+
+			this.usageBehaviorRuleMap = {};
+
+			jQuery.each(context.theAssignmentEditBehaviour.TheUsageBehaviourRules, function(i, opt){
+				jQuery('<option>').val(opt.Id).text(opt.Name).appendTo(usageSelect);
+				context.usageBehaviorRuleMap[opt.Id] = opt;
+			});
+
+			jQuery('#remaining-usage-row').closest('tr').css('display', !this.theAssignmentToEdit.IsUsageProfiled?'':'none');
+			jQuery('#utilisation-row').closest('tr').css('display', !this.theAssignmentToEdit.IsUsageProfiled?'':'none');
+			jQuery('#end-date-row').closest('tr').css('display', !this.theAssignmentToEdit.IsUsageProfiled?'':'none');
+
+			jQuery('#num-assignments-row input').prop('disabled', context.theAssignmentToEdit.IsUsageProfiled);
+
+			context.copyToAssignmentEditUI();
+
+			// copy custom fields
+			jQuery.each(jQuery('.assignment-key-field'), function (i, obj) {
+
+				var fld = jQuery(obj);
+
+				var typ = fld.attr('data-fld-type');
+
+				var val = ActivityAssignmentNewEdit.theAssignmentEditBehaviour.TheAssignmentObject[fld.attr('data-fld-name')];
+
+				if (val != null && val != '')
+				{
+					if (typ == 'REFERENCE')
+					{
+						var ref = fld.attr('data-reference');
+
+						var sObject = sforce.connection.query("SELECT Id, Name FROM " + ref + " WHERE Id = '" + val + "'");
+						fld.val(sObject.records.Name);
+
+						fld.closest('td').find('[id $= "lkid"]').val(val);
+					}
+					else if (typ == 'INTEGER' || typ == 'LONG')
+					{
+						fld.val(kimble.formatNumber(val, '#,###'));
+					}
+					else if (typ == 'DOUBLE' || typ == 'PERCENT')
+					{
+						fld.val(kimble.formatNumber(val, '#,###.####'));
+					}
+					else if (typ == 'DATE')
+					{
+						fld.val(kimble.formatDate((new Date(val)).toKimbleUTC()));
+					}
+					else if (typ == 'BOOLEAN')
+					{
+						fld.prop('checked', val);
+					}
+					else
+					{
+						fld.val(val);
+					}
+				}
+				else
+				{
+				    if (typ == 'BOOLEAN')
+				    	fld.prop('checked', false);
+				    else
+						fld.val('');
+    			}
+			});
+
+			context.enableFields();
+
+			usageSelect.change();
+
+			context.enableButtons();
+
+			jQuery('#edit-additional-assignment-fields').css('min-height', (jQuery('#edit-assignment-core-details').height()-42), 'max-height', (jQuery('#edit-assignment-core-details').height()-42));
+		}
+
+		this.isInternalRevenueOverriddenChanged = function() {
+			var context = ActivityAssignmentNewEdit;
+
+			context.copyToAssignmentObject();
+
+			jQuery('#internal-revenue-row input').prop('disabled', !context.theAssignmentToEdit.IsOverridden);
+
+			if (!context.theAssignmentToEdit.IsOverridden)
+				context.calculateInternalRate();
+
+			context.enableFields();
+		}
+
+		this.usageProfileChanged = function() {
+			var context = ActivityAssignmentNewEdit;
+
+			context.copyToAssignmentObject();
+
+			jQuery('#is-usage-profiled-row').closest('tr').css('display', context.theAssignmentToEdit.IsUsageProfiled?'':'none');
+
+			var usageBehaviourRow = jQuery('#usage-behaviour-row');
+			usageBehaviourRow.closest('tr').css('display', !context.theAssignmentToEdit.IsUsageProfiled?'':'none');
+			jQuery('#remaining-usage-row').closest('tr').css('display', !context.theAssignmentToEdit.IsUsageProfiled?'':'none');
+			jQuery('#utilisation-row').closest('tr').css('display', !context.theAssignmentToEdit.IsUsageProfiled?'':'none');
+			jQuery('#end-date-row').closest('tr').css('display', !context.theAssignmentToEdit.IsUsageProfiled?'':'none');
+
+			jQuery('#num-assignments-row input').prop('disabled', context.theAssignmentToEdit.IsUsageProfiled);
+		}
+
+		this.remainingUsageChange = function(){
+			if (jQuery('#max-usage-row').closest('tr').is(':visible') && (jQuery('#max-usage-row input').val() == '' || jQuery('#max-usage-row input').val() == '0'))
+			{
+				var context = ActivityAssignmentNewEdit;
+
+				var v = context.usageBehaviorRuleMap[jQuery('#usage-behaviour-row select').val()].PreserveUsageMaximumUsagePercentage;
+
+				if (v == null) v = 0;
+
+				var remaining = kimble.parseNumber(jQuery('#remaining-usage-row input').val(),'#,##0.##');
+
+				var mx = remaining + (remaining * v / 100);
+
+				jQuery('#max-usage-row input').val(kimble.formatNumber(mx, '#,##0.##'));
+   			}
+  		}
+
+		this.getChangesString = function () {
+
+			//returns a formatted string of changes
+			var context = ActivityAssignmentNewEdit;
+		}
+
+		this.usageBehaviourRuleChange = function(){
+			var context = ActivityAssignmentNewEdit;
+
+			jQuery('#unforecast-usage-row input').prop('disabled',true);
+			jQuery('#remaining-usage-row input').prop('disabled',true);
+			jQuery('#utilisation-row input').prop('disabled',true);
+			jQuery('#end-date-row input').prop('disabled',true);
+			jQuery('#start-date-row input').prop('disabled',context.theAssignmentToEdit.IsAppliedModelAssignment);
+			jQuery('#max-usage-row').closest('tr').hide();
+
+			if(jQuery('#usage-behaviour-row select').prop('disabled')) return;
+
+			if (context.usageBehaviorRuleMap[jQuery('#usage-behaviour-row select').val()].EntrySpecification == "DerivedEndDate")
+			{
+				jQuery('#remaining-usage-row input').prop('disabled',false);
+				jQuery('#utilisation-row input').prop('disabled',false);
+			}
+			else if (context.usageBehaviorRuleMap[jQuery('#usage-behaviour-row select').val()].EntrySpecification == "DerivedUsage")
+			{
+				jQuery('#utilisation-row input').prop('disabled',false);
+				jQuery('#end-date-row input').prop('disabled',false);
+			}
+			else if (context.usageBehaviorRuleMap[jQuery('#usage-behaviour-row select').val()].EntrySpecification == "DerivedUtilisation")
+			{
+				jQuery('#remaining-usage-row input').prop('disabled',false);
+				jQuery('#end-date-row input').prop('disabled',false);
+			}
+			else if (context.usageBehaviorRuleMap[jQuery('#usage-behaviour-row select').val()].EntrySpecification == "TaskUsage")
+			{
+				jQuery('#start-date-row input').prop('disabled',true);
+				jQuery('#remaining-usage-row input').prop('disabled',true);
+				jQuery('#end-date-row input').prop('disabled',true);
+				jQuery('#utilisation-row input').prop('disabled',true);
+			}
+			else if (context.usageBehaviorRuleMap[jQuery('#usage-behaviour-row select').val()].EntrySpecification == "NoForecast")
+			{
+			    jQuery('#end-date-row input').prop('disabled',false);
+   			}
+
+			if (context.usageBehaviorRuleMap[jQuery('#usage-behaviour-row select').val()].EntrySpecification != "DerivedUsage" && context.usageBehaviorRuleMap[jQuery('#usage-behaviour-row select').val()].FixedUsage && context.theAssignmentToEdit.Id != null)
+				jQuery('#remaining-usage-row input').prop('disabled',true);
+
+			if (context.usageBehaviorRuleMap[jQuery('#usage-behaviour-row select').val()].ShowMaxUsage)
+				jQuery('#max-usage-row').closest('tr').show();
+			else
+				jQuery('#max-usage-row').closest('tr').hide().find('#max-usage-row input').val('');
+
+			var internalRevenueSection = jQuery('#internal-revenue-section');
+			var internalRevenueRow = jQuery('#internal-revenue-row');
+			var internalRevenueOverrideRow = jQuery('#internal-revenue-override-row');
+
+			if (context.theAssignmentToEdit.IsIntercompany && hasInternalRevenueReadAccess)
+			{
+				internalRevenueSection.show();
+				internalRevenueRow.closest('tr').show();
+				if (context.theAssignmentEditBehaviour.CanEditInternalRevenue)
+					internalRevenueOverrideRow.closest('tr').show();
+				else
+					internalRevenueOverrideRow.closest('tr').hide();
+			}
+			else
+			{
+				internalRevenueSection.hide();
+				internalRevenueRow.closest('tr').hide();
+				internalRevenueOverrideRow.closest('tr').hide();
+			}
+
+			context.copyToAssignmentObject();
+
+			if (context.theAssignmentToEdit.TheActivityTimePatternId == null) return;
+
+			recalculateUsage(context.theAssignmentToEdit, context.theSelectedResource, context.usageBehaviorRuleMap, context.theAssignmentEditBehaviour.TheActivityTimePatterns[context.theAssignmentToEdit.TheActivityTimePatternId].HoursPerDay);
+
+			context.calculateTotalCostAndRevenue();
+
+			context.copyToAssignmentEditUI();
+		}
+
+		this.getAssignmentToEdit = function(assignmentId){
+			var context = ActivityAssignmentNewEdit;
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.GetActivityAssignmentToEdit}',
+       			assignmentId,
+      			function(result, event){
+             		 if (event.status)
+		             {
+		             	context.initialiseAssignment(result);
+
+		             	showModalBoxy();
+		             	if(typeof initialisePageTips === "function") initialisePageTips();
+		         	}
+		         	else if (event.type === 'exception')
+		         	{
+		             	alert(event.message);
+		         	}
+		         	else
+		         	{
+		             	alert(event.message);
+		         	}
+	         },
+	         {escape: false, timeout: 60000});
+		}
+
+		this.cancel = function() {
+
+			var context = ActivityAssignmentNewEdit;
+
+			if (context.hasPendingJobs)
+			{
+				jQuery('#jobsPanel').height(jQuery('#assignmentEditPanel').height()).width(jQuery('#assignmentEditPanel').width()).show();
+		        jQuery('#assignmentEditPanel').hide();
+		         loadJobsPopup(jQuery('#jobsPanel'), context.theAssignmentToEdit.TheScopingActivityId, context.saveAssignmentComplete);
+		    }
+		    else
+		    {
+		    	rerenderErrorsAndResources();
+		    	hideModalBoxy();
+		    }
+
+		}
+
+		this.disableButtons = function() {
+			jQuery('[id$="SaveActivityAssignmentButton"], [id$="SaveAndNewActivityAssignmentButton"], [id$="CancelActivityAssignmentButton"]').prop('disabled', true).addClass('btnDisabled');
+		}
+
+		this.enableButtons = function () {
+
+		    var context = ActivityAssignmentNewEdit;
+
+		    if (context.theAssignmentEditBehaviour.CanEditAssignment) {
+		    	var lockAssignmentDetails = context.theAssignmentToEdit.IsAppliedModelAssignment;
+				jQuery('[id$="SaveActivityAssignmentButton"], [id$="SaveAndNewActivityAssignmentButton"]').prop('disabled', lockAssignmentDetails).removeClass('btnDisabled');
+			}
+
+			jQuery('[id$="CancelActivityAssignmentButton"]').prop('disabled', false).removeClass('btnDisabled');
+		}
+
+		this.enableCancel = function () {
+			jQuery('[id$="CancelActivityAssignmentButton"]').prop('disabled', false).removeClass('btnDisabled');
+		}
+
+		this.enableModelFields = function () {
+		    jQuery('#num-assignments-row').closest('tr').show();
+		    jQuery('.model-resource').show();
+		    jQuery('.standard-resource').hide();
+
+			var additionalInfoHtml = '<span class="model-add-info">' + pageLabels['ModelAssignmentScheduleHeading'] + '</span>';
+		    if(jQuery('.model-add-info').length == 0) jQuery('div[id$="schedulePB"] h3').after(additionalInfoHtml);
+		}
+
+		this.hideModelFields = function () {
+		    jQuery('#num-assignments-row').closest('tr').hide();
+		    jQuery('.model-resource').hide();
+		    jQuery('.standard-resource').show();
+
+		    jQuery('.model-add-info').remove();
+		}
+
+		this.saveAssignment = function(andNew) {
+
+			var context = ActivityAssignmentNewEdit;
+
+			context.copyToAssignmentObject();
+
+			if (context.theAssignmentToEdit.ResourceId == null) return alert(kimble.labels['RequiredValue'].format('{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__Resource__c.Label}'));
+			if (context.theAssignmentEditBehaviour.IsRoleMandatory && context.theAssignmentToEdit.ActivityRoleId == null) return alert(kimble.labels['RequiredValue'].format('{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ActivityRole__c.Label}'));
+			if (context.theAssignmentEditBehaviour.IsLocationMandatory && context.theAssignmentToEdit.LocationId == null) return alert(kimble.labels['RequiredValue'].format('{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__Location__c.Label}'));
+			if (context.theAssignmentEditBehaviour.HasRevenue && context.theAssignmentEditBehaviour.CanEditRevenue && jQuery('#revenue-row input').val() == '') return alert(kimble.labels['RequiredValue'].format('{!$ObjectType.ActivityAssignment__c.Fields.TemporalForecastRevenueRate__c.Label}'));
+			if (context.theAssignmentEditBehaviour.HasInterCompanyAccounting && jQuery('#internal-revenue-row input').val() == '') return alert(kimble.labels['RequiredValue'].format('{!$ObjectType.ActivityAssignment__c.Fields.IntInvCcyForecastInternalRevenueRate__c.Label}'));
+
+			if (context.theAssignmentToEdit.StartDate == null) return alert(kimble.labels['RequiredValue'].format('{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__StartDate__c.Label}'));
+			if (context.theAssignmentToEdit.UsageBehaviourRuleId == null) return alert(kimble.labels['RequiredValue'].format('{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UsageBehaviourRule__c.Label}'));
+			if (context.theAssignmentToEdit.Utilisation == null) return alert(kimble.labels['RequiredValue'].format('{!$ObjectType.ActivityAssignment__c.Fields.UtilisationPercentage__c.Label}'));
+			if (context.theAssignmentToEdit.RemainingUsage == null) return alert(kimble.labels['RequiredValue'].format('{!JSENCODE($Label.AssignmentEntryRemainingEffort)}'));
+			if (context.theAssignmentToEdit.EndDate == null) return alert(kimble.labels['RequiredValue'].format('{!JSENCODE($Label.EndingOnLabel)}'));
+			if(jQuery('#max-usage-row').is(':visible') && context.theAssignmentToEdit.MaximumUsage == null) return alert(kimble.labels['RequiredValue'].format('{!$ObjectType.ActivityAssignment__c.Fields.MaximumUsage__c.Label}'));
+            if(jQuery('#max-usage-row').is(':visible') && context.theAssignmentToEdit.MaximumUsage < context.theAssignmentToEdit.RemainingUsage) return alert(kimble.labels['CannotBeGreaterThan'].format('{!JSENCODE($Label.AssignmentEntryRemainingEffort)}', '{!$ObjectType.ActivityAssignment__c.Fields.MaximumUsage__c.Label}'));
+
+			if (context.theAssignmentToEdit.EarliestTimeEntryDate != null && context.theAssignmentToEdit.StartDate.toDate() > context.theAssignmentToEdit.EarliestTimeEntryDate.toDate())
+			{
+				alert(kimble.labels['FirmTimeBeforeStartDateMessage']);
+				return;
+			}
+
+			var customFields = [];
+
+			jQuery.each(jQuery('.assignment-key-field'), function (i, obj) {
+
+				var fld = jQuery(obj);
+
+				var typ = fld.attr('data-fld-type');
+				var fldName = fld.attr('data-fld-name');
+				var val = null;
+
+				if (typ == 'REFERENCE')
+				{
+					val = fld.closest('td').find('[id $= "lkid"]').val();
+				}
+				else if (typ == 'INTEGER' || typ == 'LONG')
+				{
+					val = kimble.parseNumber(fld.val(), '#,###');
+				}
+				else if (typ == 'DOUBLE' || typ == 'PERCENT')
+				{
+					val = kimble.parseNumber(fld.val(),'#,###.####');
+				}
+				else if (typ == 'DATE')
+				{
+					val = kimble.parseDate(fld.val());
+				}
+				else if (typ == 'BOOLEAN')
+				{
+					val = fld.prop('checked');
+				}
+				else
+				{
+					val = fld.val();
+				}
+
+				customFields.push({Name:fldName, DisplayType:typ, Value:val});
+			});
+
+			context.theAssignmentToEdit.CustomFields = customFields;
+
+			context.disableButtons();
+			jQuery('#assignmentRefreshingContainer').show();
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.SaveActivityAssignment}',
+       		context.theAssignmentToEdit,
+      			function(result, event){
+      			    jQuery('#assignmentRefreshingContainer').hide();
+
+             		if (event.status)
+		            {
+		             	jQuery.publish('kimble.assignmentCreated', {assignmentId:result});
+
+		             	if(andNew)
+		             	{
+		             		context.newAssignment(context.theAssignmentToEdit.TheScopingActivityId);
+		             		context.hasPendingJobs = true;
+		             	}
+		             	else
+		             	{
+		             		jQuery('#jobsPanel').height(jQuery('#assignmentEditPanel').height()).width(jQuery('#assignmentEditPanel').width()).show();
+		             		jQuery('#assignmentEditPanel').hide();
+		             		loadJobsPopup(jQuery('#jobsPanel'), context.theAssignmentToEdit.TheScopingActivityId, context.saveAssignmentComplete);
+		             	}
+		         	}
+		         	else if (event.type === 'exception')
+		         	{
+		             	alert(event.message);
+		         	}
+		         	else
+		         	{
+		             	alert(event.message);
+		         	}
+
+		         	context.enableButtons();
+		         },
+		         {escape: false, timeout: 60000});
+			}
+
+		this.copyToAssignmentObject = function() {
+			var context = ActivityAssignmentNewEdit;
+
+			context.theAssignmentToEdit.TheScopingActivityId = kimble.parseId(jQuery('#owning-activity-row select').val());
+
+			var resourceId = kimble.parseId(jQuery('#resource-row:visible input:hidden[id$="lkid"], #resource-row:visible select').val());
+
+			if (resourceId != '000000000000000')
+				context.theAssignmentToEdit.ResourceId = resourceId;
+			else
+				context.theAssignmentToEdit.ResourceId = null;
+
+			context.theAssignmentToEdit.ActivityRoleId = kimble.parseId(jQuery('#role-row select').val());
+			context.theAssignmentToEdit.TheActivityTimePatternId = kimble.parseId(jQuery('#time-pattern-row select').val());
+
+            var locationId = kimble.parseId(jQuery('#location-row input:hidden[id$="lkid"], #location-row select').val());
+            
+			if (locationId != '000000000000000')
+				context.theAssignmentToEdit.LocationId = locationId;
+			else
+				context.theAssignmentToEdit.LocationId = null;
+
+			// this checks field security and if the currency dropdown is shown
+			if (hasSupplierCostUpdateAccess && jQuery('#supplier-cost-row select').length)
+				context.theAssignmentToEdit.SupplierInvoicingCurrency = jQuery('#supplier-cost-row select').val();
+
+			if(jQuery('input.input-assignment-code').length) context.theAssignmentToEdit.Code = jQuery('input.input-assignment-code').val();
+
+			context.theAssignmentToEdit.StartDate = kimble.parseDate(jQuery('#start-date-row input').val());
+			context.theAssignmentToEdit.UsageBehaviourRuleId = kimble.parseId(jQuery('#usage-behaviour-row select').val());
+
+			context.theAssignmentToEdit.IsUsageProfiled = jQuery('#is-usage-profiled-row').find('input').prop('checked');
+
+			context.theAssignmentToEdit.RemainingUsage = kimble.parseNumber(jQuery('#remaining-usage-row input').val(),'#,##0.##');
+
+			if(jQuery('#max-usage-row').is(':visible'))
+				context.theAssignmentToEdit.MaximumUsage = kimble.parseNumber(jQuery('#max-usage-row input').val(),'#,##0.##');
+
+			context.theAssignmentToEdit.Utilisation = kimble.parseNumber(jQuery('#utilisation-row input').val(),'#,##');
+			context.theAssignmentToEdit.EndDate = kimble.parseDate(jQuery('#end-date-row input').val());
+
+			context.theAssignmentToEdit.WithGroupMembers = jQuery('#with-group-members-row').find('input').prop('checked') == true;
+			context.theAssignmentToEdit.NumberOfActivityAssignments = kimble.parseNumber(jQuery('#num-assignments-row input').val(),'#,##0.##');
+			context.theAssignmentToEdit.IsFrameworkAssignment = jQuery('#is-framework-assignment-row').find('input').prop('checked') == true;
+
+			if (context.theAssignmentEditBehaviour.HasInterCompanyAccounting)
+			{
+				var intRev = kimble.parseNumber(jQuery('#internal-revenue-row input').val(),'#,##0.##');
+
+			    context.theAssignmentToEdit.InternalInvoicingCurrencyForecastRevenueRate = intRev / context.theAssignmentToEdit.ForecastToInvoiceConversionFactor;
+
+				if (context.theAssignmentEditBehaviour.CanEditInternalRevenue)
+					context.theAssignmentToEdit.IsOverridden = jQuery('#internal-revenue-override-row').find('input').prop('checked') == true;
+   			}
+		}
+
+		this.saveAssignmentComplete = function(){
+			var context = ActivityAssignmentNewEdit;
+			context.hasPendingJobs = false;
+
+			//raise event assignment changed with new assignment gantt
+		    jQuery.publish('kimble.assignmentChanged', {resourceId:context.theAssignmentToEdit.ResourceId, assignmentId:context.theAssignmentToEdit.Id});
+
+		    hideModalBoxy();
+
+			jQuery('#jobsPanel').hide();
+		    jQuery('#assignmentEditPanel').show();
+
+		}
+
+		this.copyToAssignmentEditUI = function(){
+			var context = ActivityAssignmentNewEdit;
+
+			jQuery('#owning-activity-row select').val(context.theAssignmentToEdit.TheScopingActivityId);
+
+			if (context.theAssignmentToEdit.IsModelAssignment || context.theAssignmentToEdit.IsAppliedModelAssignment || context.theAssignmentToEdit.IsActivatedModelAssignment)
+			{
+				context.enableModelFields();
+				jQuery('#num-assignments-row').find('input').val(kimble.formatNumber((context.theAssignmentToEdit.NumberOfActivityAssignments != undefined && context.theAssignmentToEdit.NumberOfActivityAssignments != null && context.theAssignmentToEdit.NumberOfActivityAssignments != '' ? context.theAssignmentToEdit.NumberOfActivityAssignments : 1),'#,##0.##'));
+			}
+			else
+			{
+				context.hideModelFields();
+			}
+
+			if (context.theSelectedResource != null)
+			{
+				jQuery('#resource-row:visible input:text').val(unescapeHTML(context.theSelectedResource.Resource.Name));
+				jQuery('#resource-row:visible input:hidden[id$="lkid"],#resource-row:visible select').val(context.theAssignmentToEdit.ResourceId);
+
+				// if using select and resource isn't in the list then add it to the select list.
+				if (jQuery('#resource-row:visible select').length == 1 && jQuery('#resource-row:visible select').val() == null) {
+					jQuery('#resource-row:visible select').append('<option selected="true" value="' + context.theAssignmentToEdit.ResourceId + '">' + context.theSelectedResource.Resource.Name + '</option>');
+				}
+
+				if (context.theSelectedResource.AllowGroupMembers)
+				{
+					jQuery('#with-group-members-row').closest('tr').show();
+
+					jQuery('#with-group-members-row').find('input').prop('checked', context.theAssignmentToEdit.WithGroupMembers).prop('disabled', context.theAssignmentToEdit.Id != null);
+				}
+				else
+				{
+					//default to true
+					jQuery('#with-group-members-row').find('input').prop('checked', true);
+					jQuery('#with-group-members-row').closest('tr').hide();
+				}
+			}
+			else
+			{
+				jQuery('#resource-row:visible input:text').val('');
+				jQuery('#resource-row:visible input:hidden[id$="lkid"],#resource-row:visible select').val('');
+
+				jQuery('#with-group-members-row').find('input').prop('checked', true);
+				jQuery('#with-group-members-row').closest('tr').hide();
+			}
+
+			jQuery('#is-framework-assignment-row').find('input').prop('checked', context.theAssignmentToEdit.IsFrameworkAssignment);
+
+			jQuery('#role-row select').val(context.theAssignmentToEdit.ActivityRoleId);
+			jQuery('#time-pattern-row select').val(context.theAssignmentToEdit.TheActivityTimePatternId);
+
+			jQuery('#location-row input:text').val(context.theAssignmentToEdit.LocationName);
+			jQuery('#location-row input:hidden[id$="lkid"],#location-row select').val(context.theAssignmentToEdit.LocationId);
+
+			jQuery('input.input-assignment-code').val((context.theAssignmentToEdit.Code != undefined ? context.theAssignmentToEdit.Code : ''));
+
+			jQuery('#supplier-cost-row select').val(context.theAssignmentToEdit.SupplierInvoicingCurrency);
+
+			this.applySupplierCostRate();
+			this.applyRevenueRate();
+
+			if (context.theAssignmentEditBehaviour.HasInterCompanyAccounting)
+			{
+			    jQuery('#internal-invoicing-currency').text(context.theAssignmentToEdit.InternalInvoicingCurrencyIsoCode);
+
+			    var intRev = context.theAssignmentToEdit.InternalInvoicingCurrencyForecastRevenueRate * context.theAssignmentToEdit.ForecastToInvoiceConversionFactor;
+        		jQuery('#internal-revenue-row input').val(jQuery.formatNumber(intRev, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+
+				jQuery('#internal-revenue-override-row').find('input').prop('checked', context.theAssignmentToEdit.IsOverriden).prop('disabled', !context.theAssignmentEditBehaviour.CanEditInternalRevenue);
+			}
+
+			this.applyCostRate();
+
+			jQuery('#start-date-row input').val(kimble.formatDate(context.theAssignmentToEdit.StartDate));
+
+			if (context.theAssignmentToEdit.UsageBehaviourRuleId != null)
+				jQuery('#usage-behaviour-row select').val(context.theAssignmentToEdit.UsageBehaviourRuleId);
+
+			if (context.theAssignmentToEdit.RemainingUsage != null)
+				jQuery('#remaining-usage-row input').val(kimble.formatNumber(context.theAssignmentToEdit.RemainingUsage,'#,##0.##'));
+			else
+				jQuery('#remaining-usage-row input').val('');
+
+			if (context.theAssignmentToEdit.MaximumUsage != null)
+				jQuery('#max-usage-row input').val(kimble.formatNumber(context.theAssignmentToEdit.MaximumUsage,'#,##0.##'));
+			else
+   				jQuery('#max-usage-row input').val('');
+
+			if (context.theAssignmentToEdit.UnforecastUsage != null && context.theAssignmentToEdit.UnforecastUsage != 0)
+			{
+				jQuery('#unforecast-usage-row').closest('tr').show();
+				jQuery('#unforecast-usage-row input').val(kimble.formatNumber(context.theAssignmentToEdit.UnforecastUsage,'#,##0.##'));
+				jQuery('#remaining-usage-row input').prop('disabled',true);
+			}
+			else
+			{
+				jQuery('#unforecast-usage-row').closest('tr').hide();
+				jQuery('#unforecast-usage-row input').val('');
+			}
+
+			if (context.theAssignmentToEdit.Utilisation != null)
+				jQuery('#utilisation-row input').val(kimble.formatNumber(context.theAssignmentToEdit.Utilisation,'#,##0.##'));
+			else
+				jQuery('#utilisation-row input').val('');
+
+			jQuery('#end-date-row input').val(kimble.formatDate(context.theAssignmentToEdit.EndDate));
+
+			jQuery('.allocatable-usage').remove();
+
+			if (context.theAssignmentToEdit.AllocatableUsage != null)
+            {
+                var $info = jQuery('<span title="Total Remaining usage to be allocated: ' + context.theAssignmentToEdit.AllocatableUsage  + '" class="fa fa-info-circle allocatable-usage"/>');
+                jQuery('#remaining-usage-row input').after($info);
+            }
+		}
+
+		this.calculateTotalCostAndRevenue = function () {
+
+			var context = ActivityAssignmentNewEdit;
+			//TODO:
+			if (showAssignmentMargin)
+            {
+                jQuery('#assignment-margin-basis').hide();
+                if (jQuery('#revenue-rate').length > 0)
+                {
+                	var assignmentUsage = new ActivityAssignmentUsagePattern(context.theAssignmentToEdit.HoursPerDay, context.theAssignmentToEdit.StartDate.toDate(), context.theAssignmentToEdit.UsagePattern, context.theAssignmentToEdit.Utilisation, context.theAssignmentToEdit.Utilisation);
+                	var totalCost = calculateAssignmentTotalCost(context.theAssignmentToEdit, assignmentUsage, context.theAssignmentToEdit.ForecastToHourConversionFactor);
+                	//jQuery('#assignment-total-cost').text('{!JSENCODE($label.Total)} ' + context.theAssignmentEditBehaviour.BaseCurrency + ' ' +  kimble.formatNumber(totalCost, '#,##0.##'));
+
+					var	totalRev = calculateAssignmentTotalRevenue(context.theAssignmentToEdit, assignmentUsage, context.theAssignmentToEdit.ForecastToHourConversionFactor);
+					//jQuery('#assignment-total-revenue').text(kimble.formatNumber(totalRev, '#,##0.##'));
+
+                	var margin = totalRev > 0 ? (totalRev-totalCost) / totalRev * 100 : 0;
+                	jQuery('#assignment-margin').text(kimble.formatNumber(margin, '#,##0.##'));
+                	jQuery('#assignment-margin-basis').show();
+                	jQuery('#assignment-margin-rev').text(context.theAssignmentEditBehaviour.BaseCurrency + ' ' + kimble.formatNumber(totalRev, '#,##0.##'));
+                	jQuery('#assignment-margin-cost').text(context.theAssignmentEditBehaviour.BaseCurrency + ' ' + kimble.formatNumber(totalCost, '#,##0.##'));
+                }
+            }
+  		}
+
+		this.resourceChange = function () {
+			var context = ActivityAssignmentNewEdit;
+			
+			var thefield = '{!$ObjectType.ActivityAssignment__c.fields.ResourceInitials__c.Name}';
+			if (jQuery('[data-fld-name="' + thefield + '"]').length == 1)
+			{
+				var theInitials = context.theAssignmentToEdit.Initials;
+				jQuery('[data-fld-name="' + thefield + '"]').val(theInitials);
+		    }
+		};
+
+		this.costRateChange = function () {
+			var context = ActivityAssignmentNewEdit;
+
+			if (jQuery('#cost-row input').length > 0)
+			{
+				var costRate = kimble.parseNumber(jQuery('#cost-row input').val(),'#,##0.00');
+				var forecastRate = costRate / context.theAssignmentToEdit.ForecastToInvoiceConversionFactor;
+				var rateChanged = forecastRate != context.theAssignmentToEdit.ForecastCostRate;
+
+				if (rateChanged) {
+					context.theAssignmentToEdit.ForecastCostRate = forecastRate
+
+					if (!context.theAssignmentEditBehaviour.HasTemporalCost) return;
+
+					if (context.TemporalCostsDisabled) return;
+
+					if (context.theAssignmentToEdit.Id != null) context.theAssignmentToEdit.ForecastCostRateEffectiveDate = new Date().toKimbleUTC();
+
+					context.rebuildTemporalCosts();
+
+					jQuery('#cost-row .temporal-date').show().click();
+				}
+		    }
+
+			if (context.theAssignmentToEdit.IsIntercompany && rateChanged)
+			{
+				context.calculateInternalRate();
+			}
+
+		    context.calculateTotalCostAndRevenue();
+		};
+
+		this.rebuildTemporalCosts = function () {
+
+			var context = this;
+
+			if(context.theAssignmentToEditOriginal.CostRateSummary == null) context.theAssignmentToEditOriginal.CostRateSummary = '[]';
+
+			if (context.theAssignmentEditBehaviour.CanEditCost) {
+
+				var newCostSummary = [];
+				var latestAdded = false;
+
+				if  (context.theAssignmentToEdit.ForecastCostRateEffectiveDate == null) context.theAssignmentToEdit.ForecastCostRateEffectiveDate = context.theAssignmentToEdit.StartDate;
+
+				var latestCost = {D:context.theAssignmentToEdit.ForecastCostRateEffectiveDate, R:kimble.parseNumber(jQuery('#cost-row input').val(),'#,##0.00') / ActivityAssignmentNewEdit.theAssignmentToEdit.ForecastToInvoiceConversionFactor};
+
+				parseCostSummaryJson(context.theAssignmentToEditOriginal.CostRateSummary).forEach(function(cost) {
+					if (!latestAdded) {
+						if (cost.D.toDate().valueOf() < context.theAssignmentToEdit.ForecastCostRateEffectiveDate.toDate().valueOf()) {
+							newCostSummary.push(cost);
+						}
+						else {
+							latestAdded = true;
+							newCostSummary.push(latestCost);
+						}
+					}
+				});
+
+				if (!latestAdded && (newCostSummary.length == 0 || latestCost.R.toFixed(2) != newCostSummary[newCostSummary.length-1].R.toFixed(2))) newCostSummary.push(latestCost);
+
+				context.theAssignmentToEdit.CostRateSummary = JSON.stringify(newCostSummary);
+			}
+
+			if (context.theAssignmentToEdit.CostRateSummary != null && context.theAssignmentToEdit.CostRateSummary != '') {
+				var summary = JSON.parse(context.theAssignmentToEdit.CostRateSummary);
+
+				jQuery('#cost-row .future-cost-change').remove();
+				if (summary.length > 1)
+				{
+					var $futureCostChange = jQuery('<span class="fa fa-info-circle future-cost-change"/>');
+					$futureCostChange.data('assignment', context.theAssignmentToEdit);
+					jQuery('#cost-row input:last').after($futureCostChange);
+				}
+            }
+  		}
+
+		this.revenueRateChange = function () {
+			var context = ActivityAssignmentNewEdit;
+
+			var invRevRate = kimble.parseNumber(jQuery('#revenue-row input').val(),'#,##0.00') / context.theAssignmentToEdit.ForecastToRevenueConversionFactor;
+			var rateChanged = invRevRate != context.theAssignmentToEdit.InvoicingCurrencyForecastRevenueRate;
+
+			context.theAssignmentToEdit.InvoicingCurrencyForecastRevenueRate = invRevRate;
+
+			context.theAssignmentToEdit.RevenueRateSummary = '[{"D":"' + context.theAssignmentToEdit.StartDate + '","R":' + (context.theAssignmentToEdit.InvoicingCurrencyForecastRevenueRate) + '}]';
+
+		    if (context.theAssignmentEditBehaviour.RevenueChangeEffectiveDate != null && context.theAssignmentEditBehaviour.RevenueChangeEffectiveDate != '')
+		    {
+		    	var $changeApplicableWhen = jQuery('<span class="fa fa-info-circle effective-change" title="Change effective ' + kimble.formatDate(context.theAssignmentEditBehaviour.RevenueChangeEffectiveDate)  + '"/>');
+                jQuery('#revenue-row input').after($changeApplicableWhen);
+
+		    }
+
+			if (context.theAssignmentToEdit.IsIntercompany && rateChanged)
+			{
+				context.calculateInternalRate();
+			}
+
+		    context.calculateTotalCostAndRevenue();
+		};
+
+		this.applyRevenueRate = function () {
+
+			var context = ActivityAssignmentNewEdit;
+
+			jQuery('#revenue-row input').val('');
+
+			var revenueRate = context.theAssignmentToEdit.InvoicingCurrencyForecastRevenueRate * context.theAssignmentToEdit.ForecastToRevenueConversionFactor;
+
+        	jQuery('#revenue-row input').val(jQuery.formatNumber(revenueRate, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+
+		};
+
+		this.applyCostRate = function () {
+			var context = ActivityAssignmentNewEdit;
+
+			jQuery('#cost-row input').val('');
+			jQuery('#cost-row .future-cost-change').remove();
+			jQuery('#cost-row .temporal-date').remove();
+
+			if (context.theAssignmentToEdit.CostRateSummary == null || context.theAssignmentToEdit.CostRateSummary == '') return;
+
+			var costRateSummary = parseCostSummaryJson(context.theAssignmentToEdit.CostRateSummary);
+
+		    if (costRateSummary.length == 0) return;
+
+			var costRate;
+
+			//if costs are editable show latest cost
+			if (context.theAssignmentEditBehaviour.CanEditCost || context.theAssignmentEditBehaviour.CostRateEditable) {
+				costRate = costRateSummary[costRateSummary.length-1].R * context.theAssignmentToEdit.ForecastToInvoiceConversionFactor;
+
+   			} else {
+   			  costRate = costRateSummary[0].R * context.theAssignmentToEdit.ForecastToInvoiceConversionFactor;
+      		}
+
+			jQuery('#cost-row input').val(jQuery.formatNumber(costRate, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+
+			context.rebuildTemporalCosts();
+
+            if (context.theAssignmentEditBehaviour.CanEditCost && context.theAssignmentToEdit.Id != null && context.theAssignmentEditBehaviour.HasTemporalCost) {
+            	jQuery('#cost-row input').after('<span class="fa fa-calendar temporal-date" style="display:none"><input type="text" style="width:0px;border:0px"/></span>');
+            }
+		};
+
+		this.applySupplierCostRate = function () {
+
+			var context = ActivityAssignmentNewEdit;
+
+			jQuery('#supplier-cost-row input').val('');
+
+			var costRate = context.theAssignmentToEdit.SupplierInvoicingCurrencyCostRate;
+
+			jQuery('#supplier-cost-row input').val(jQuery.formatNumber(costRate, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+		};
+
+		this.enableFields = function() {
+			var context = ActivityAssignmentNewEdit;
+
+			var lockAssignmentDetails = (context.theSelectedResource == null || context.theAssignmentToEdit.IsAppliedModelAssignment);
+
+			jQuery('#resource-row:visible input').prop('readonly', !context.theAssignmentToEdit.CanChangeResource);
+			jQuery('#resource-row:visible select').prop('disabled', !context.theAssignmentToEdit.CanChangeResource);
+			jQuery('#resource-row:visible img').css('display', context.theAssignmentToEdit.CanChangeResource?'':'none');
+			jQuery('#time-pattern-row select').prop('readonly',lockAssignmentDetails || !context.theAssignmentEditBehaviour.CanEditRevenue || !context.theAssignmentEditBehaviour.CanEditCost);
+
+			jQuery('#revenue-row input').prop('readonly',lockAssignmentDetails || !context.theAssignmentEditBehaviour.CanEditRevenue);
+			jQuery('#internal-revenue-row input').prop('readonly',lockAssignmentDetails || !context.theAssignmentEditBehaviour.CanEditInternalRevenue || !hasInternalRevenueUpdateAccess || !context.theAssignmentToEdit.IsOverridden || {!!HasPermission['OverrideInternalRevenue']});
+			jQuery('#internal-revenue-override-row input').prop('readonly',lockAssignmentDetails || !context.theAssignmentEditBehaviour.CanEditInternalRevenue || !hasInternalRevenueUpdateAccess || {!!HasPermission['OverrideInternalRevenue']});
+
+			jQuery('#cost-row input').prop('readonly',lockAssignmentDetails || !context.theAssignmentEditBehaviour.CanEditCost);
+
+			jQuery('#start-date-row input').prop('readonly',context.theAssignmentToEdit.IsAppliedModelAssignment);
+			jQuery('#start-date-row input').prop('disabled',context.theAssignmentToEdit.IsAppliedModelAssignment);
+
+			jQuery('#remaining-usage-row input').prop('readonly',lockAssignmentDetails);
+			jQuery('#usage-behaviour-row select').prop('disabled',lockAssignmentDetails);
+			jQuery('#utilisation-row input').prop('readonly',lockAssignmentDetails);
+			jQuery('#end-date-row input').prop('readonly',lockAssignmentDetails);
+
+			jQuery('#role-row select').prop('disabled',context.theAssignmentToEdit.IsAppliedModelAssignment);
+			jQuery('#location-row select').prop('disabled',context.theAssignmentToEdit.IsAppliedModelAssignment);
+			jQuery('#location-row input').prop('readonly',context.theAssignmentToEdit.IsAppliedModelAssignment);
+			if(context.theAssignmentToEdit.IsAppliedModelAssignment) jQuery('#location-row a.kimbleSearch:visible').hide();
+
+			jQuery('#num-assignments-row input').prop('readonly',lockAssignmentDetails);
+
+			jQuery('#is-framework-assignment-row input').prop('disabled',context.theAssignmentToEdit.Id != null);
+
+			if (context.theAssignmentEditBehaviour.ShowSupplierCost == true || context.theAssignmentEditBehaviour.CanEditSupplierCost)
+			{
+			    jQuery('#supplier-cost-row ').closest('tr').show();
+				jQuery('#supplier-cost-row input').prop('readonly',lockAssignmentDetails || !context.theAssignmentEditBehaviour.CanEditSupplierCost);
+				jQuery('#supplier-cost-row select').prop('disabled',lockAssignmentDetails || !context.theAssignmentEditBehaviour.CanEditSupplierCurrency);
+			}
+			else
+			{
+			    jQuery('#supplier-cost-row ').closest('tr').hide();
+   			}
+
+		};
+		
+		this.withGroupMembersChange = function () {
+			var context = ActivityAssignmentNewEdit;
+			
+			context.copyToAssignmentObject();
+		};
+
+		this.removeUnforecastUsage = function() {
+			var context = ActivityAssignmentNewEdit;
+			
+			context.theAssignmentToEdit.UnforecastUsage = 0;
+			
+			context.copyToAssignmentEditUI();
+		}
+		
+		this.resourceInputChange = function(changeContext) {
+
+			var context = ActivityAssignmentNewEdit;
+
+			context.enableButtons();
+
+			context.copyToAssignmentObject();
+		
+			if (context.theAssignmentEditBehaviour.IsRoleMandatory && context.theAssignmentToEdit.ActivityRoleId == null) 
+			{
+				context.enableCancel();
+				return;
+			}
+			
+			if (context.theAssignmentEditBehaviour.IsLocationMandatory && context.theAssignmentToEdit.LocationId == null) 
+			{
+				context.enableCancel();
+				return;
+			}
+
+			if(context.theAssignmentToEdit.ResourceId == null) 
+			{
+				context.enableCancel();
+				return;
+			}
+
+			if(context.theAssignmentToEdit.StartDate == null) 
+			{
+				context.enableCancel();
+				return;
+			}
+			
+			context.disableButtons();
+			
+			if (changeContext == 'Resource')
+				context.theAssignmentToEdit.Initials = null;
+			
+			if(context.theAssignmentToEdit.UpdateCostOnResourceChange && changeContext == 'Resource')
+			{
+				context.theAssignmentToEdit.ForecastCostRate = null;
+				context.theAssignmentToEdit.SupplierInvoicingCurrencyCostRate = null;
+			}
+
+			if(context.theAssignmentToEdit.UpdateCostOnRoleChange && changeContext == 'Role')
+				context.theAssignmentToEdit.ForecastCostRate = null;
+			
+			if(context.theAssignmentToEdit.UpdateCostOnLocationChange && changeContext == 'Location')
+				context.theAssignmentToEdit.ForecastCostRate = null;
+			
+			if(context.theAssignmentToEdit.UpdateRevenueOnResourceChange && changeContext == 'Resource')
+				context.theAssignmentToEdit.InvoicingCurrencyForecastRevenueRate = null;
+			
+			if(context.theAssignmentToEdit.UpdateRevenueOnRoleChange && changeContext == 'Role')
+				context.theAssignmentToEdit.InvoicingCurrencyForecastRevenueRate = null;
+			
+			if(context.theAssignmentToEdit.UpdateRevenueOnLocationChange && changeContext == 'Location')
+				context.theAssignmentToEdit.InvoicingCurrencyForecastRevenueRate = null;
+
+			if (context.theAssignmentToEdit.ForecastCostRate == null) context.TemporalCostsDisabled = true;
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.GetAssignmentDefaults}',
+	       		context.theAssignmentToEdit,
+	      			function(result, event){
+	             		 if (event.status) 
+			             {
+			             	context.theAssignmentEditBehaviour = result;
+			             	context.theAssignmentToEdit = result.TheActivityAssignment;
+							context.theSelectedResource = result.TheSelectedResource;
+
+			             	context.copyToAssignmentEditUI();
+			             	context.enableFields();
+			             	ActivityAssignmentNewEdit.usageBehaviourRuleChange();
+			             	
+							ActivityAssignmentNewEdit.costRateChange();
+							ActivityAssignmentNewEdit.resourceChange();
+
+							if(context.theAssignmentEditBehaviour.CanEditRevenue)
+								ActivityAssignmentNewEdit.revenueRateChange();
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+
+			         	context.enableButtons();
+	         },
+	         {escape: false, timeout: 60000}
+	     );
+		}
+
+		this.supplierInvoicingCurrencyInputChange = function() {
+			var context = ActivityAssignmentNewEdit;
+
+			context.copyToAssignmentObject();
+
+			context.disableButtons();
+			jQuery('#assignmentRefreshingContainer').show();
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.ChangeSupplierInvoicingCurrency}',
+	       		context.theAssignmentToEdit,
+	      			function(result, event){
+	             		 jQuery('#assignmentRefreshingContainer').hide();
+
+	             		 if (event.status)
+			             {
+			             	context.theAssignmentToEdit = result.TheActivityAssignment;
+			             	context.copyToAssignmentEditUI();
+
+			             	context.enableFields();
+
+							ActivityAssignmentNewEdit.costRateChange();
+
+							if (context.theAssignmentToEdit.IsIntercompany)
+							{
+								context.calculateInternalRate();
+							}
+
+							context.calculateTotalCostAndRevenue();
+			         	}
+			         	else if (event.type === 'exception')
+			         	{
+			             	alert(event.message);
+			         	}
+			         	else
+			         	{
+			             	alert(event.message);
+			         	}
+
+			         	context.enableButtons();
+	         },
+	         {escape: false, timeout: 60000}
+	     );
+		}
+
+		this.supplierInvoicingRateInputChange = function() {
+			var context = ActivityAssignmentNewEdit;
+
+			var costRate = kimble.parseNumber(jQuery('#supplier-cost-row input').val(),'#,##0.00');
+
+			context.theAssignmentToEdit.SupplierInvoicingCurrencyCostRate = costRate;
+
+			context.copyToAssignmentObject();
+
+			context.disableButtons();
+			jQuery('#assignmentRefreshingContainer').show();
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.ChangeSupplierInvoicingRate}',
+				context.theAssignmentToEdit,
+					function(result, event){
+						 jQuery('#assignmentRefreshingContainer').hide();
+
+						 if (event.status)
+						 {
+							context.theAssignmentToEdit = result.TheActivityAssignment;
+							context.copyToAssignmentEditUI();
+							context.enableFields();
+
+							ActivityAssignmentNewEdit.costRateChange();
+
+							if (context.theAssignmentToEdit.IsIntercompany)
+							{
+								context.calculateInternalRate();
+							}
+
+							context.calculateTotalCostAndRevenue();
+						}
+						else if (event.type === 'exception')
+						{
+							alert(event.message);
+						}
+						else
+						{
+							alert(event.message);
+						}
+
+						context.enableButtons();
+				},
+				{escape: false, timeout: 60000}
+			);
+		}
+
+		this.calculateInternalRate = function() {
+
+			var context = ActivityAssignmentNewEdit;
+			context.copyToAssignmentObject();
+
+			context.disableButtons();
+
+			jQuery('#assignmentRefreshingContainer').show();
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.CalculateInternalRate}',
+	       		context.theAssignmentToEdit,
+	      			function(result, event){
+	             		 jQuery('#assignmentRefreshingContainer').hide();
+
+	             		 if (event.status)
+			             {
+			             	context.theAssignmentToEdit.InternalInvoicingCurrencyForecastRevenueRate = result.TheActivityAssignment.InternalInvoicingCurrencyForecastRevenueRate;
+
+			             	context.copyToAssignmentEditUI();
+			             	context.enableFields();
+			         	}
+			         	else if (event.type === 'exception')
+			         	{
+			             	alert(event.message);
+			         	}
+			         	else
+			         	{
+			             	alert(event.message);
+			         	}
+
+			         	context.enableButtons();
+	         },
+	         {escape: false, timeout: 60000}
+	     );
+		}
+
+		this.timePatternInputChange = function() {
+			
+			var context = ActivityAssignmentNewEdit;
+			
+			context.copyToAssignmentObject();
+		
+			if (context.theAssignmentEditBehaviour.IsRoleMandatory && context.theAssignmentToEdit.ActivityRoleId == null) return;
+			
+			if (context.theAssignmentEditBehaviour.IsLocationMandatory && context.theAssignmentToEdit.LocationId == null) return;
+			
+			if(context.theAssignmentToEdit.ResourceId == null) return;
+			
+			context.disableButtons();
+			
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.GetResourceAvailabilityAndRates}',
+	       		context.theAssignmentToEdit.ResourceId, context.theAssignmentToEdit.TheOperatedWithActivityId, context.theAssignmentToEdit.TheActivityTimePatternId, context.theAssignmentToEdit.ActivityRoleId, context.theAssignmentToEdit.LocationId,
+	      			function(result, event){
+	             		 if (event.status) 
+			             {
+			             	context.theSelectedResource = result;
+			             	
+			             	context.theAssignmentToEdit.RevenueRateSummary = context.theSelectedResource.DefaultRevenueRate;
+					        context.applyRevenueRate();
+			             	
+			             	context.theAssignmentToEdit.CostRateSummary = context.theSelectedResource.DefaultCostRate;			             	
+			             	context.applyCostRate();
+			             	
+			             	context.enableFields();
+			             	ActivityAssignmentNewEdit.usageBehaviourRuleChange();
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+			         	
+			         	context.enableButtons();
+	         }, 
+	         {escape: false, timeout: 60000}
+	     );
+		}
+	
+		this.resourceAvailability = function(date) 
+		{
+	  		var context = ActivityAssignmentNewEdit;
+	  		
+	  		if (context.theSelectedResource == null) return [false,null];
+	  		
+	  		var earliestOpenDate = context.theAssignmentEditBehaviour.EarliestAssignableDate.toDate();
+
+	  		var availabilityStartDate = context.theSelectedResource.AvailabilityPattern.StartDate.toDate();
+	  		
+	  		var earliestOffsetInDays = Math.round((date.getTime() - earliestOpenDate.getTime()) / (1000*60*60*24));
+	  		
+	  		var availabilityOffsetInDays = Math.round((date.getTime() - availabilityStartDate.getTime()) / (1000*60*60*24));
+	  		
+	  		if (earliestOffsetInDays < 0)
+	  			return [false,"closedperiod","Closed Period"];
+
+	  		if (context.theAssignmentToEdit.AllocatableMinStartDate != null && (date < context.theAssignmentToEdit.AllocatableMinStartDate.toDate() || date > context.theAssignmentToEdit.AllocatableMaxEndDate.toDate()))
+	  			return [false,"closedperiod","Outside allocatable range"];
+
+	  		//Start date cannot be after latest start date
+	  		if (this.id.endsWith('start-date') && context.theAssignmentToEdit.LatestStartDate != null && date > context.theAssignmentToEdit.LatestStartDate.toDate())
+	  			return [false, "closedperiod", "Time Entry Exists"];
+	  		
+	  		//End date cannot be before latest time entry
+	  		if (this.id.endsWith('EntryEndDate') && context.theAssignmentToEdit.EarliestEndDate != null && date < context.theAssignmentToEdit.EarliestEndDate.toDate())
+	  			return [false, "closedperiod", "Time Entry Exists"];
+	  		
+	  		var availabilityChar = context.theSelectedResource.AvailabilityPattern.UsagePattern.substring(availabilityOffsetInDays,availabilityOffsetInDays + 1);
+	  		
+	  		if (availabilityChar == '|')
+	  			return [false,"closedperiod","Closed Period"];
+	  		
+	  		if (availabilityChar == '!')
+	  			return [false,"Unavailable","Unavailable"];
+	  		
+	  		if (availabilityChar == '-')
+	  			return [false,"NonBusDay","Non business day"];
+	  		
+	  		if (availabilityOffsetInDays < 0)
+	  			return [true,"closedperiod","Closed Period"];
+	  		
+	  		var dayUsage = context.theSelectedResource.Resource.AggregatePattern[date.toKimbleUTC()];
+	  		
+	  		if (dayUsage == null) return [true, null];
+	  		
+	  		var prob = dayUsage.p;
+	  		
+	  		if (prob == null) return [true, null];
+	  		
+	  	 	return [true, classificationStyleMap[Object.keys(prob)[0].Cls] + ' no-background'];
+	  		
+	  	}
+	}
+
+	function calculateAssignmentTotalRevenue(assignment, usagePattern, convFactor)
+	{
+	    var exRates = kimble.parseJSON(assignment.RevenueRateExchangeRateSummary.replace(/"Rate"/g, '"R"').replace(/"FromDate"/g, '"D"'));
+
+		var invRevRate = assignment.InvoicingCurrencyForecastRevenueRate;
+
+		var totalRev = 0;
+
+		for (var i=0; i<exRates.length; i++)
+		{
+			var exRate = exRates[i];
+			var fromDate = exRate.D.toDate();
+			var toDate;
+
+			if (exRates.length > i + 1)
+				toDate = exRates[i+1].D.toDate().kimbleAddDays(-1);
+			else
+				toDate = assignment.EndDate.toDate();
+
+			var remainingUsage = usagePattern.getUsageInHoursForDateRange(fromDate, toDate);
+
+			totalRev += remainingUsage / convFactor * invRevRate * exRate.R;
+		}
+
+		return totalRev;
+ 	}
+
+	function calculateAssignmentTotalCost(assignment, usagePattern, convFactor)
+	{
+		var costRates = kimble.parseJSON(assignment.CostRateSummary.replace(/"Rate"/g, '"R"').replace(/"FromDate"/g, '"D"'));
+
+		var totalCost = 0;
+
+		for (var i=0; i<costRates.length; i++)
+		{
+			var rate = costRates[i];
+			var fromDate = rate.D.toDate()
+			var toDate;
+
+			if (costRates.length > i + 1)
+				toDate = costRates[i+1].D.toDate().kimbleAddDays(-1);
+			else
+				toDate = assignment.EndDate.toDate();
+
+			var remainingUsage = usagePattern.getUsageInHoursForDateRange(fromDate, toDate);
+
+			totalCost += remainingUsage / convFactor * rate.R;
+		}
+
+		return totalCost;
+	}
+
+	/*Bulk save assignment usage pattern implementation */
+	function saveAssignmentUsagePatterns(assignments)
+	{
+
+	}
+
+	function saveAssignmentUsagePatternsBatch()
+	{
+
+ 	}
+
+	jQuery(window).load(function(){
+        
+        jQuery('#usage-behaviour-row select').change(ActivityAssignmentNewEdit.usageBehaviourRuleChange);
+		
+		jQuery('#start-date-row input').change(ActivityAssignmentNewEdit.resourceInputChange);
+		
+		jQuery('#remaining-usage-row input').change(ActivityAssignmentNewEdit.usageBehaviourRuleChange);
+
+		jQuery('#max-usage-row input').change(ActivityAssignmentNewEdit.usageBehaviourRuleChange);
+		
+		jQuery('#utilisation-row input').change(ActivityAssignmentNewEdit.usageBehaviourRuleChange);
+		
+		jQuery('#end-date-row input').change(ActivityAssignmentNewEdit.resourceInputChange);
+		
+		jQuery('.remove-unforecast-usage').click(ActivityAssignmentNewEdit.removeUnforecastUsage);
+
+		jQuery('.kimbleDatePicker').datepicker({
+		   	dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+			showOtherMonths: true,
+			selectOtherMonths: true,
+			beforeShowDay: ActivityAssignmentNewEdit.resourceAvailability
+		});
+        
+    });
+    
+    
+</script>
+</apex:page>

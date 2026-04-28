@@ -1,0 +1,1606 @@
+<apex:page controller="KimbleOne.ActivityAssignmentsEditController"  extensions="KimbleOne.ActivityAssignmentRemoteActions" sidebar="false" tabStyle="KimbleOne__ReferenceData__c">
+
+    <apex:composition template="KimbleOne__SiteMaster">
+
+        <apex:define name="Menu">
+
+            <c:Menu DefaultHelpPage="EditAssignments.html" MenuContextType="{!MenuContext}" MenuContextId="{!ThePageContext.Id}" MenuContextName="{!ThePageContext['Name']}" />
+
+        </apex:define>
+
+        <apex:define name="Content">
+
+            <style>
+
+                table.assignments-table tr.dataRow:hover {
+                    background-color: #e3feff;
+                }
+
+                i.fa.fa-pencil {
+                    padding-left: 4px;
+                    cursor: pointer;
+                    visibility: hidden;
+                }
+
+                #EditFieldPopup label {
+                    white-space: nowrap;
+                }
+
+                td.editable:hover i {
+                    visibility: visible;
+                }
+                 .assignments-table h2 {
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        width: 100%;
+                        display: inline-block;
+                    }
+
+
+                .assignment-actions {
+                    font-size: 18px;
+                    cursor: pointer;
+                }
+                i.save-problem {
+                    cursor: pointer;
+                    font-size: 18px;
+                    margin-right: 5px;
+                    color: #8f0000;
+                }
+                .apply-to-section {
+                    margin-left: 12px;
+                }
+
+                .apply-to-section div {
+                    padding-top:2px;
+                    height:22px
+                }
+                .readonly {background-color:#eee};
+                .apply-to-section input {margin-top:0;}
+                div#save-progress {
+                    border: 1px solid #f90;
+                    background-color:#ffc;
+                    border-radius: 3px;
+                    padding: 10px;
+                    margin-left: 16px;
+                    margin-right: 16px;
+                    display:none;
+
+                }
+                div#save-progress i {
+                    font-size:14px;
+                    margin-right:6px;
+                }
+                /* toolbar */
+        a.toolbar-button {
+			display: inline-block;
+			padding: 6px 10px 6px 10px;
+			background-color: white;
+			margin-right: 4px;
+			border: 1px solid #ccc;
+			border-radius: 2px;
+		}
+		a.toolbar-button.active-toolbar-button {
+			color: white;
+			background-color: #888;
+		}
+		.toolbar-container {
+			position: relative;
+		}
+		.toolbar {
+			display: table;
+			width: 100%;
+		}
+		div#toolbar-buttons {
+		    display: table-cell;
+		    position: relative;
+		    padding-bottom: 6px;
+		}
+		span.gantt-display-mode {
+		    position: absolute;
+		    right: 10px;
+		}
+		a.toolbar-button:hover, a.toolbar-button-selected {
+			text-decoration: none;
+			color: white;
+			background-color: #1A9EFF;
+		}
+		a.toolbar-button.button-left {
+			border-top-right-radius: 0px;
+			border-bottom-right-radius: 0px;
+			margin-right: 0px;
+		}
+		a.toolbar-button.button-right {
+			border-top-left-radius: 0px;
+			border-left: 0;
+			border-bottom-left-radius: 0px;
+		}
+		a.toolbar-button .fa {font-size: 14px;}
+		a.toolbar-button.disabled {background-color: #ccc;color: darkgray;}
+		a.toolbar-button.disabled:hover {background-color: #ccc;color: darkgray;}
+                /*
+                    loading panel
+                */
+
+                .loadingIndicator {
+                   top:0;
+                   right:0;
+                   width:100%;
+                   height:100%;
+                   font-weight: bold;
+                   position:absolute;
+                   text-align:center;
+                   /* IE filter */
+                   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+                   -moz-opacity:0.7;    /* Mozilla extension */
+                   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+                   opacity:0.7; /* CSS3 */
+                   z-index:1000;
+                   background-color:white;
+                }
+
+                .loadingIndicator img {
+                    margin-right:9px;
+                }
+
+                #loadingIndicatorInnerContainer {
+                    position:absolute;
+                    top:50%;
+                    height:10em;
+                    margin-top:-2em;
+                    width:100%;
+                }
+                div#AssignmentFilterPopup {
+		    position: absolute;
+		    top: 51px;
+		    padding: 5px;
+		    width: 349px;
+		    height: 386px;
+		    z-index: 999;
+		    border-color: #ddd;
+		    border-style: solid;
+		    border-width: 0px 1px 1px 1px;
+		    background-color: #fff;
+		    box-shadow: rgba(31, 31, 31, 0.16) 4px 3px 8px;
+		    left: 219px;
+		    overflow-y: auto;
+		}
+
+		.assignment-filter-header {
+		    font-weight: bold;
+		    font-size: 14px;
+		    padding: 10px;
+		    background-color: #F5F5F5;
+		    border: 1px solid #DDD;
+		    border-radius: 4px;
+		    margin-left: 2px;
+		    margin-right: 2px;
+		}
+
+		i.filter-collapse-btn.fa.fa-angle-double-up {
+		    color: #BBB;
+		    cursor: pointer;
+		    padding-right: 6px;
+		    position: absolute;
+		    right: 13px;
+		    top: 13px;
+		    font-size: 26px;
+		}
+
+		input#applyFilterButton {
+		    margin-top: 10px;
+		}
+		.assignment-string-filter {
+		    border: 2px solid #e0e0e0;
+		    height: 25px;
+		    padding-right: -14px;
+
+		}
+        .assignment-tools.hide-qtip-border {border: 0px;}
+        .assignment-tools.qtip {min-width:40px !important;}
+        .assignment-tools.hide-qtip-border .qtip-content {padding:0px;background-color:transparent;}
+        .read-only {background-color: #efefef;}
+
+         /*Mutton implementation*/
+            .hover-mutton {
+              display: inline-block;
+              position: relative;
+            }
+            .dd-btn {
+                display: inline-block;
+                background-color: #ffffff;
+                white-space: nowrap;
+                padding-right: 36px !important;
+                padding: 7px 10px 5px 10px;
+                background-color: white;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+                cursor: pointer;
+            }
+            .dd-btn:after {
+              content: '';
+              position: absolute;
+              top: 50%;
+              right: 15px;
+              transform: translateY(-50%);
+              width: 0;
+              height: 0;
+              border-left: 5px solid transparent;
+              border-right: 5px solid transparent;
+              border-top: 5px solid black;
+            }
+            .dd-btn:hover {
+              background-color: #f4f6f9;
+            }
+            .dd-menu {
+              position: absolute;
+              top: 23px;
+              left: 0px;
+              border: 1px solid #ccc;
+              border-radius: 4px;
+              padding: 0;
+              margin: 2px 0 0 0;
+              box-shadow: 0 0 6px 0 rgba(0,0,0,0.1);
+              background-color: #ffffff;
+              list-style-type: none;
+              text-align: left;
+              z-index: 99;
+            }
+            .dd-menu li.disabled {
+                color: lightgray;
+                cursor: default;
+            }
+            .dd-btn > .dd-menu {
+              display: none;
+            }
+            .dd-btn:hover > .dd-menu {
+              display: block;
+            }
+            .dd-menu li {
+              padding: 10px 20px;
+              cursor: pointer;
+              white-space: nowrap;
+              margin-left: 0px;
+            }
+            .dd-menu li:hover {
+              background-color: #f4f6f9;
+            }
+            .dd-menu li a {
+              display: block;
+              margin: -10px -20px;
+              padding: 10px 20px;
+            }
+            /*Mutton end */
+
+            .indent {display: inline-block;width: 8px;height: 8px;margin-right: 2px;}
+
+	        .branch .indent {cursor:pointer;background-image: url({!URLFOR($Resource.TaskGanttIcons, 'arrows.gif')});background-position: -4px, 0px;}
+	        .branch.expanded .indent {background-image: url({!URLFOR($Resource.TaskGanttIcons, 'arrows.gif')});background-position: -22px, 0px;}
+            .candidate {display: none;}
+            .ui-resizable-e {width:12px;}
+            .edit-field {
+                text-overflow: ellipsis;
+                overflow: hidden;
+                white-space: nowrap;
+                position:relative;
+                min-height: 11px;
+            }
+            .edit-field i {
+                position:absolute;
+                right:0px;
+            }
+
+            .requiredInput {
+                display: inline-block;
+                margin-left: 8px;
+            }
+            td.data2Col.first.last {
+                white-space:nowrap;
+            }
+
+            .start-date-offset {display:none;}
+            .select-assignment {
+              margin-left: 9px;
+            }
+            .fa.fa-cog.assignment-actions {
+              margin-left: 6px;
+            }
+            i.fa.fa-cog.assignment-actions.Loading {
+                color: transparent;
+            }
+            .JColResizer {
+              height:28px !important;
+            }
+	        </style>
+            <apex:includeScript value="{!URLFOR($Resource.KimbleOne__ActivityAssignmentUsagePattern)}" />
+            <apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+            <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+            <apex:stylesheet value="{!URLFOR($Page.KimbleOne__GanttViewCss)}"/>
+
+                <apex:outputPanel id="Assignments" layout="block" >
+                    <div id="loadingIndicatorOuterContainer" class="loadingIndicator" style="display:none">
+                        <div id="loadingIndicatorInnerContainer">
+                            <img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+                        </div>
+                    </div>
+                    <apex:pageMessages escape="false" />
+
+                    <apex:pageBlock id="band">
+                        <div class="toolbar-container">
+                            <div class="toolbar">
+                                <div id="toolbar-buttons">
+
+                                        <apex:outputPanel layout="none" rendered="{!TheResourcedActivities.size > 0}">
+                                        <label class="hover-mutton select-btn">
+                                            <div class="dd-btn toolbar-button">{!$Label.Add} {!$ObjectType.ActivityAssignment__c.Label}
+                                                <ul class="dd-menu">
+                                                    <apex:repeat value="{!TheResourcedActivities}" var="activity">
+                                                        <li id="{!JSENCODE(activity.Id)}" onclick="newActivityAssignmentClick('{!JSENCODE(activity.Id)}');"><apex:outputText value="{!activity.Name}"/></li>
+                                                    </apex:repeat>
+                                                </ul>
+                                            </div>
+                                        </label>
+                                        </apex:outputPanel>
+
+                                    <a class="toolbar-button filterAssignmentButton" title="{!$Label.Filter} {!$ObjectType.ActivityAssignment__c.Label}" onclick="jQuery('#AssignmentFilterPopup').show();" href="javascript:void(0);"><i class="fa fa-filter"></i></a>
+                                </div>
+                            </div>
+                        </div>
+                        <table id="assignments-table" class="list assignments-table kimble-enhanced-table " border="0" cellpadding="0" cellspacing="0">
+                            <thead>
+
+                            </thead>
+                            <tbody>
+
+                            </tbody>
+                        </table>
+
+                    </apex:pageBlock>
+
+                </apex:outputPanel>
+
+                <script>
+
+                var classificationStyleMap = kimble.parseJSON("{!JSENCODE(TheJsonClassificationsMap)}");
+                var usageBehaviorRulesMap = kimble.parseJSON("{!JSENCODE(TheUsageBehaviourRulesJson)}");
+
+                var matchOnLabels = kimble.parseJSON("{!JSENCODE(TheMatchOnLabels)}");
+                var showLocation = {!ShowLocation};
+                var showMaxUsage = {!ShowMaxUsage};
+                var startDateOffset = {!GroupStartDateOffset};
+                var dayToRevenueEntryConversionFactor = {!DayToRevenueEntryConversionFactor};
+
+	    jQuery(window).load(function(){
+			 <apex:repeat value="{!TheFilterCriteria}" var="criterion">
+            <apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'REFERENCE'}">
+        		jQuery('[id="criterion-{!criterion.Name}"]').select2({
+	            		minimumInputLength: 1,
+	            		multiple: true,
+	            		query: function (query) {
+	            			var find = function() {lookupCriterion('{!criterion.Criterion}', query);};
+	        				find();
+	            		}
+        			});
+        	</apex:outputPanel>
+
+        	<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'BOOLEAN'}">
+        		if (<apex:outputText value="{!criterion.DefaultValue}"/>)
+        			jQuery('[data-criteria="{!criterion.Criterion}"]').prop('checked', true);
+
+        	</apex:outputPanel>
+            </apex:repeat>
+
+            polyfillArrayIncludes();
+
+            applyAssignmentFilter();
+
+            //startDateOffset
+		});
+
+		function setUpCheckBoxes()
+		{
+			var checkboxGroupName = 'ActivityAssignments';
+			var allCheckboxId = 'AllActivityAssignments';
+			var checkboxClass = '.select-assignment';
+
+			jQuery('#' + allCheckboxId).unbind('change');
+			jQuery('#' + allCheckboxId).change(function(){
+				UncheckOrCheckGroup(jQuery(this),checkboxGroupName);
+			});
+
+			jQuery(checkboxClass).unbind('change');
+			jQuery(checkboxClass).change(function(){
+				UnCheckParent(jQuery(this),allCheckboxId);
+			});
+		}
+
+        function drawAssignmentsComplete()
+        {
+            //do date sorting
+            jQuery.each(jQuery('.apply-date-sort'), function(i, obj){
+                jQuery(obj).attr('data-sort-type','number').attr('data-sort-value',kimble.parseDate(jQuery(obj).text(), true).valueOf());
+            });
+
+            setUpCheckBoxes();
+        }
+
+        var firstLoad = true;
+        var onpopupload;
+
+		function initialisePageAfterLoad()
+		{
+            jQuery(document).off('click','.branch .indent').on('click', '.branch .indent', function (i, obj){
+                jQuery(this).closest('tr').toggleClass('expanded');
+                jQuery('[parent-id="' + jQuery(this).closest('tr').prop('id') + '"]').toggle();
+            });
+
+            jQuery(document).on('click', '.fa-pencil', function () {
+
+                var selectedAssignments = [];
+                var fieldName = jQuery(this).closest('.editable').attr('data-fld-name');
+
+                if (jQuery(this).closest('tr').find('input').is(':checked') == false)
+                    jQuery(this).closest('tr').find('input').prop('checked', true);
+
+                var matchOn = jQuery(this).closest('td').attr('match-on');
+
+                var pos = jQuery(this).closest('td').index();
+
+                var allmatched = true;
+
+                var recordsToUpdate = 0;
+
+                jQuery.each(jQuery('.select-assignment:checked'), function(i, inp){
+
+                    var $matchOn = jQuery(inp).closest('tr').find('td:nth-child(' + (pos + 1) + ')');
+                    if ($matchOn.hasClass('editable'))
+                    {
+                        if ($matchOn.attr('match-on') != matchOn)
+                        {
+                            alert(matchOnLabels[fieldName]);
+                            allmatched = false;
+                            return false;
+                        }
+                        recordsToUpdate++;
+                    }
+                });
+
+                if (allmatched)
+                {
+                    initialiseModalBoxy('#EditFieldPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__ActivityAssignment__c.label}',jQuery('form[id$=\'TheForm\']'));
+
+                    intialiseAssignmentUpdateField(jQuery(this).closest('tr').attr('assignment-id') ,fieldName, recordsToUpdate);
+                }
+            });
+
+            jQuery(document).off('click','.assignment-actions').on('click', '.assignment-actions', function() {
+                var $t = jQuery(this);
+                var $row = $t.closest('tr');
+
+                var assignmentId = $t.closest('tr').attr('assignment-id');
+
+                $t.qtip('destroy', true);
+
+                var content;
+
+                content = '<div class="tool-items" assignment-id="' + assignmentId + '">';
+
+                //edit assignment - not Templated
+                content += '<a href="javascript:void(0);" onclick="editActivityAssignmentClick(\'' + assignmentId + '\')" assignment-id="' + assignmentId + '" class="tool-item assignment-edit-button"  title="{!$Label.Edit}" ><i class="fa fa-pencil-square-o"></i></a>';
+
+                //rates
+                if ($row.attr('ass-type') != 'Framework')
+                {
+                    //Rates edit
+                    content += '<a href="javascript:void(0);" onclick="editAssignmentRatesClick(\'' + assignmentId + '\')"  assignment-id="' + assignmentId + '" class="tool-item assignment-rates-button"  title="{!$ObjectType.ActivityAssignmentRate__c.LabelPlural}" ><i class="fa fa-money"></i></a>';
+
+                    //Calendar
+                    content += '<a href="javascript:void(0);" onclick="editAssignmentCalendarClick(\'' + assignmentId + '\')" assignment-id="' + assignmentId + '" class="tool-item assignment-calendar-button"  title="{!$Label.CalendarLabel}" ><i class="fa fa-calendar"></i></a>';
+
+                    //Delete
+                    var loseAss = ($row.attr('lose-ass') == 'true');
+                    var deleteTooltipText = (loseAss?'{!$Label.Cancel}':'{!$Label.Delete}');
+                    var deleteIconBtnClass = (loseAss?'fa-times':'fa-trash-o');
+
+                    if ({!$ObjectType.ActivityAssignment__c.deletable} && $row.attr('has-tore') == 'false')
+                        content += '<a href="javascript:void(0);" onclick="' + (loseAss ? 'loseAssignmentClick(\'' + assignmentId + '\')': 'deleteActivityAssignmentClick(\'' + assignmentId + '\')') + '" assignment-id="' + assignmentId + '" class="tool-item" title="' + deleteTooltipText + '" class="actionLink"><i class="fa ' + deleteIconBtnClass + '"></i></a>';
+
+                    //Clone
+                    if ($row.attr('has-tore') == 'false')
+                        content += '<a href="javascript:void(0);" onclick="cloneActivityAssignmentClick(\'' + assignmentId + '\')" assignment-id="' + assignmentId + '" class="tool-item" title="{!$Label.CloneAssignmentLabel}" class="actionLink"><i class="fa fa-clone"></i></a>';
+                }
+
+                //Notes
+                content += '<a href="javascript:void(0);" onclick="editAssignmentNotesClick(\'' + assignmentId + '\')" assignment-id="' + assignmentId + '" class="tool-item assignment-notes-button"  title="{!$ObjectType.ActivityAssignment__c.Fields.LongNotes__c.label}" ><i class="fa fa-comment"></i></a>';
+
+                content += '</div>';
+
+                $t.qtip({
+                    content:{
+                        text:  content,
+                    },
+                    position: {
+                        adjust: {
+                            method: 'flip flip'
+                        },
+                        my: 'center left',
+                        at: 'center right',
+                        viewport: $(window)
+                    },
+                    show: {
+                        event: 'click',
+                        solo: true,
+                        ready:true
+                    },
+                    hide: 'unfocus',
+                    style: {classes: 'qtip-light hide-qtip-border assignment-tools'}
+                });
+            });
+
+            jQuery.subscribe('kimble.assignmentCreated', function(e, result) {
+
+                if (jQuery('#assignments-table tr').length == 0)
+                {
+                    applyAssignmentFilter();
+                }
+                else
+                {
+                    refreshAssignmentsById([result.assignmentId]);
+                }
+            });
+
+            jQuery.subscribe('kimble.assignmentChanged', function(e, result) {
+                // redraw assignment
+                if (result.assignmentId == null) return;
+
+                refreshAssignmentsById([result.assignmentId]);
+            });
+
+            jQuery.subscribe('kimble.activityassignmentcalendarchange', function(e, result){
+                refreshAssignmentsById([result.assignmentId]);
+            });
+
+            jQuery.subscribe('kimble.activityassignmentdeleted', function(e, result) {
+
+                jQuery('#' + result.assignmentId).fadeOut(1000, function() {
+                    jQuery(this).remove();
+                });
+
+                jQuery('[parent-id="' + result.assignmentId + '"]').fadeOut(1000, function() {
+                    jQuery(this).remove();
+                });
+            });
+
+            jQuery.subscribe('kimble.assignmentsCloned', function(e, result){
+                applyAssignmentFilter();
+            });
+
+			jQuery('.kimble-enhanced-table').enhancedTable();
+
+            if (firstLoad)
+			{
+			    firstLoad = false;
+
+                jQuery(".assignments-table").colResizable({
+                    liveDrag:true,
+                    gripInnerHtml:"<div class='grip'></div>",
+                    draggingClass:"dragging",
+                    resizeMode:'fit',
+                    disabledColumns: [0]
+                });
+
+			    if (startDateOffset != 0)
+			    {
+			        // only continue if there are any assignments where we can actually edit the start dates
+			        if(jQuery('td.editable[data-fld-name="{!$ObjectType.ActivityAssignment__c.Fields.StartDate__c.Name}"] .fa-pencil').closest('tr').find('input.select-assignment').length)
+			        {
+                        //select all editable start date assignments
+                        jQuery('td.editable[data-fld-name="{!$ObjectType.ActivityAssignment__c.Fields.StartDate__c.Name}"] .fa-pencil').closest('tr').find('input.select-assignment').click();
+
+                        //click the first start date edit
+                        jQuery('td.editable[data-fld-name="{!$ObjectType.ActivityAssignment__c.Fields.StartDate__c.Name}"]:first .fa-pencil').click();
+
+                        //select ShiftStartDateByDays
+                        onpopupload = function(){
+                            jQuery('[id $="action-type"]').val('ShiftStartDateByDays').change();
+                            jQuery('.start-date-offset').val(startDateOffset);
+                            jQuery('#selected-records').click();
+
+                            onpopupload = null;
+                        };
+                    }
+                }
+            }
+		}
+
+        function polyfillArrayIncludes()
+        {
+            // https://tc39.github.io/ecma262/#sec-array.prototype.includes
+            if (!Array.prototype.includes) {
+              Object.defineProperty(Array.prototype, 'includes', {
+                value: function(valueToFind, fromIndex) {
+
+                  if (this == null) {
+                    throw new TypeError('"this" is null or not defined');
+                  }
+
+                  // 1. Let O be ? ToObject(this value).
+                  var o = Object(this);
+
+                  // 2. Let len be ? ToLength(? Get(O, "length")).
+                  var len = o.length >>> 0;
+
+                  // 3. If len is 0, return false.
+                  if (len === 0) {
+                    return false;
+                  }
+
+                  // 4. Let n be ? ToInteger(fromIndex).
+                  //    (If fromIndex is undefined, this step produces the value 0.)
+                  var n = fromIndex | 0;
+
+                  // 5. If n ≥ 0, then
+                  //  a. Let k be n.
+                  // 6. Else n < 0,
+                  //  a. Let k be len + n.
+                  //  b. If k < 0, let k be 0.
+                  var k = Math.max(n >= 0 ? n : len - Math.abs(n), 0);
+
+                  function sameValueZero(x, y) {
+                    return x === y || (typeof x === 'number' && typeof y === 'number' && isNaN(x) && isNaN(y));
+                  }
+
+                  // 7. Repeat, while k < len
+                  while (k < len) {
+                    // a. Let elementK be the result of ? Get(O, ! ToString(k)).
+                    // b. If SameValueZero(valueToFind, elementK) is true, return true.
+                    if (sameValueZero(o[k], valueToFind)) {
+                      return true;
+                    }
+                    // c. Increase k by 1.
+                    k++;
+                  }
+
+                  // 8. Return false
+                  return false;
+                }
+              });
+            }
+        }
+
+        var assignmentsToSave = {};
+        var totalPages = 0;
+
+        function changeOptionsChange()
+        {
+            var action = jQuery('[id$="action-type"').val();
+            var parent = jQuery('[id$="action-type"').closest('td');
+
+            parent.find('input').val('').change();
+
+            if  (action == 'ShiftStartDateByDays')
+            {
+                parent.find('.start-date-offset').show();
+                parent.find('.dateInput').hide();
+            }
+            else
+            {
+                parent.find('.start-date-offset').hide();
+                parent.find('.dateInput').show();
+            }
+        }
+
+        function saveAssignmentUpdates()
+        {
+            if(jQuery('[id$="EditFieldError"] > span')[0].children.length > 0) return;
+
+            jQuery('#loadingIndicatorOuterContainer').show();
+
+            jQuery('.save-problem').qtip('destroy', true);
+            jQuery('.save-problem').remove();
+
+            jQuery('#PopupContents .btn').prop('disabled', true).addClass('btnDisabled');
+
+            assignmentsToSave = {};
+
+            var selectedAssignmentId = jQuery('#PopupContents').attr('assignment-id');
+
+            totalPages = 1;
+            processedPages = 0;
+
+            if (jQuery('#selected-records').is(':checked')) {
+
+                if (jQuery('#' + selectedAssignmentId + ' input').is(':checked') == false)
+                    jQuery('#' + selectedAssignmentId).find('input').prop('checked', true);
+
+                var fldName = jQuery('#PopupContents').attr('data-field-name');
+
+                jQuery.each(jQuery('.select-assignment:checked'), function(i, inp){
+
+                    var $row = jQuery(inp).closest('tr');
+
+                    if ($row.find('[data-fld-name = "' + fldName + '"]').hasClass('editable'))
+                    {
+                        var activityId = $row.attr('activity-id');
+
+                        if (assignmentsToSave[activityId] == null)
+                            assignmentsToSave[activityId] = [[]];
+
+                        var lastActivityArray = assignmentsToSave[activityId][assignmentsToSave[activityId].length-1];
+
+                        //if last array size < 100 then add to it
+                        if (lastActivityArray.length < 50)
+                        {
+                            lastActivityArray.push($row.attr('assignment-id'));
+                        }
+                        else
+                        {
+                            assignmentsToSave[activityId].push([]);
+                            assignmentsToSave[activityId][assignmentsToSave[activityId].length-1].push($row.attr('assignment-id'));
+                            totalPages ++;
+                        }
+                    }
+                });
+            }
+            else
+            {
+                $row = jQuery('#' + selectedAssignmentId);
+
+                assignmentsToSave[$row.attr('activity-id')] = [[selectedAssignmentId]];
+            }
+
+            saveAllSelectedAssignments();
+		}
+
+        function saveAllSelectedAssignments()
+        {
+            if (Object.keys(assignmentsToSave).length == 0)
+            {
+                 jQuery('#PopupContents .btn').prop('disabled', false).removeClass('btnDisabled');
+
+		         jQuery('#loadingIndicatorOuterContainer').hide();
+
+                 hideModalBoxy();
+
+                 if (jQuery('.save-problem').length > 0)
+                    alert('{!JSENCODE($Label.OneOrMoreItemsHaveAnError)}');
+
+                 drawAssignmentsComplete();
+
+		         return;
+            }
+
+            var activityId = Object.keys(assignmentsToSave)[0];
+
+            var selectedAssignments = assignmentsToSave[activityId].shift();
+
+            if (assignmentsToSave[activityId].length == 0) delete assignmentsToSave[activityId];
+
+            saveArrayOfAssignments(selectedAssignments, saveAllSelectedAssignments);
+        }
+
+        var processedPages;
+
+        function saveArrayOfAssignments(selectedAssignments, oncomplete)
+        {
+            var fldName = jQuery('#PopupContents').attr('data-field-name');
+            var fldValue = getUpdateFieldValue();
+
+            var action = jQuery('[id$="action-type"').val();
+
+            if(action == 'ShiftStartDateByDays')
+                fldValue = jQuery('.start-date-offset').val();
+
+
+            if (action == null || action == '') action = 'UpdateValue'
+
+            if (totalPages > 1) jQuery('#save-progress').show().find('span').text('{!JSENCODE($Label.SavingBulkAssignmentsProgress)}'.format(processedPages, totalPages));
+
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentsEditController.SaveAssignments}',
+       		    selectedAssignments, fldName, action, fldValue,
+      			function(result, event){
+             		if (event.status)
+		            {
+		             	//show update problems
+                        jQuery.each(jQuery(result.Problems), function (i, p) {
+
+                            var $row = jQuery('#' + p.Id);
+                            $row.find('td:first').append(jQuery('<i class="fa fa-exclamation-circle save-problem" title="' + p.Message +  '"/>'));
+                        });
+
+                        jQuery('.save-problem').qtip({style: {classes: 'qtip-light hide-qtip-border'}});
+
+                        //replace rows
+                        jQuery.each(jQuery(result.TheAssignments), function(i, a)
+                        {
+                            var $row = jQuery('#' + a.Id);
+
+                            $row.fadeOut(1000, function() {
+                               var $newRow = jQuery(getAssignmentRowHtml(a, true));
+                               if ($row.hasClass('expanded')) $newRow.addClass('expanded');
+                               $newRow.insertAfter(jQuery(this).hide());
+                               jQuery(this).remove();
+                               $newRow.fadeIn(1000);
+                            });
+                        });
+		         	}
+		         	else if (event.type === 'exception')
+		         	{
+		             	alert(event.message);
+		         	}
+		         	else
+		         	{
+		             	alert(event.message);
+		         	}
+
+                    processedPages ++;
+
+                    oncomplete();
+
+		         },
+		         {escape: false, timeout: 60000});
+        }
+
+        function refreshAssignmentsById(assignmentIds)
+        {
+            jQuery('#loadingIndicatorOuterContainer').show();
+
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentsEditController.GetAssignmentsById}',
+       		    assignmentIds,
+      			function(result, event){
+             		if (event.status)
+		            {
+		             	jQuery.each(jQuery(result), function(i, a)
+                        {
+                            var $row = jQuery('#' + a.Id);
+
+                            if ($row.length == 0)
+                            {
+                                var $tbl = jQuery('#assignments-table');
+                                var $newRow = jQuery(getAssignmentRowHtml(a, false));
+                                $tbl.find('tbody').prepend(jQuery($newRow));
+
+                                $newRow.hide().fadeIn(1000);
+                            }
+                            else
+                            {
+                                $row.fadeOut(1000, function() {
+                                   var $newRow = jQuery(getAssignmentRowHtml(a, false));
+                                   if ($row.hasClass('expanded')) $newRow.addClass('expanded');
+                                   $newRow.insertAfter(jQuery(this).hide());
+                                   jQuery(this).remove();
+                                   $newRow.fadeIn(1000);
+                                });
+                             }
+                        });
+		         	}
+		         	else if (event.type === 'exception')
+		         	{
+		             	alert(event.message);
+		         	}
+		         	else
+		         	{
+		             	alert(event.message);
+		         	}
+
+		         	jQuery('#loadingIndicatorOuterContainer').hide();
+		         },
+		         {escape: false, timeout: 60000});
+        }
+
+        function getUpdateFieldValue()
+		{
+		    var $inp = jQuery('.input-value');
+
+            if (jQuery('#PopupContents').attr('data-field-name') == '{!$ObjectType.ActivityAssignment__c.Fields.InvoicingCostRate__c.Name}') {
+
+                var costUpdate = {EffectiveDate: kimble.parseDate(jQuery('.effective-date').val()), Value:kimble.parseNumber($inp.val())};
+
+                return JSON.stringify(costUpdate);
+            }
+
+            if ($inp.is(':checkbox')) return $inp.is(':checked');
+
+            var typ = $inp.attr('data-field-type');
+            var val = null;
+
+            if (typ == 'REFERENCE')
+			{
+			    val = $inp.closest('td').find('[id $= "lkid"]').val();
+			}
+			else if (typ == 'INTEGER' || typ == 'LONG')
+			{
+				val = kimble.parseNumber($inp.val(), '#,###');
+			}
+			else if (typ == 'DOUBLE' || typ == 'PERCENT')
+			{
+				val = kimble.parseNumber($inp.val(),'#,###.####');
+			}
+			else if (typ == 'DATE')
+			{
+				val = kimble.parseDate($inp.val());
+			}
+			else
+			{
+				val = $inp.val();
+			}
+
+           return val;
+        }
+
+        function getAssignments(showLost, filters)
+        {
+            jQuery('#loadingIndicatorOuterContainer').show();
+
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentsEditController.GetAssignments}',
+       		    kimble.parseJSON('{!JSENCODE(FilterIdsJson)}'), showLost || false, filters,
+      			function(result, event){
+             		if (event.status)
+		            {
+		             	initialResult = result;
+		             	customFields = Object.keys(initialResult.TheFieldSets);
+
+		             	drawAssignments(result);
+
+		             	initialisePageAfterLoad();
+		         	}
+		         	else if (event.type === 'exception')
+		         	{
+		             	alert(event.message);
+		         	}
+		         	else
+		         	{
+		             	alert(event.message);
+		         	}
+
+		         	jQuery('#loadingIndicatorOuterContainer').hide();
+		         },
+		         {escape: false, timeout: 60000});
+        }
+
+        var resourceField = '{!$ObjectType.ActivityAssignment__c.fields.Resource__c.RelationshipName}.Name';
+        var resourceIdField = '{!$ObjectType.ActivityAssignment__c.fields.Resource__c.Name}';
+        var activityField = '{!$ObjectType.ActivityAssignment__c.fields.ResourcedActivity__c.RelationshipName}.Name';
+        var activityIdField = '{!$ObjectType.ActivityAssignment__c.fields.ResourcedActivity__c.Name}';
+        var roleField = '{!$ObjectType.ActivityAssignment__c.fields.ActivityRole__c.RelationshipName}.Name';
+        var locationField = '{!$ObjectType.ActivityAssignment__c.fields.Location__c.RelationshipName}.Name';
+        var revenueRateField = '{!$ObjectType.ActivityAssignment__c.fields.InvoicingCurrencyForecastRevenueRate__c.Name}';
+        var invoicingCurrencyCodeField = '{!$ObjectType.ActivityAssignment__c.fields.InvoicingCurrencyIsoCode__c.Name}';
+        var invoiceUnitType = '{!$ObjectType.ActivityAssignment__c.fields.ResourcedActivityOperatedWith__c.RelationshipName}.{!$ObjectType.ResourcedActivity__c.fields.InvoicingUnitType__c.RelationshipName}.{!$ObjectType.UnitType__c.fields.Suffix__c.Name}';
+        var revenueEntryUnitType = '{!$ObjectType.ActivityAssignment__c.fields.ResourcedActivityOperatedWith__c.RelationshipName}.{!$ObjectType.ResourcedActivity__c.fields.RevenueEntryUnitType__c.RelationshipName}.{!$ObjectType.UnitType__c.fields.Name.Name}';
+        var costRateField = '{!$ObjectType.ActivityAssignment__c.fields.InvoicingCostRate__c.Name}';
+        var currencyCodeField = '{!$ObjectType.ActivityAssignment__c.fields.CurrencyIsoCode.Name}';
+        var startDateField = '{!$ObjectType.ActivityAssignment__c.fields.StartDate__c.Name}';
+        var endDateField = '{!$ObjectType.ActivityAssignment__c.fields.ForecastP3EndDate__c.Name}';
+        var usageBehaviourField = '{!$ObjectType.ActivityAssignment__c.fields.UsageBehaviourRule__c.RelationshipName}.Name';
+        var usageBehaviourFieldId = '{!$ObjectType.ActivityAssignment__c.fields.UsageBehaviourRule__c.Name}';
+        var remainingUsageField = '{!$ObjectType.ActivityAssignment__c.fields.EntryRemainingUsage__c.Name}';
+        var forecastUnitTypeField = '{!$ObjectType.ActivityAssignment__c.fields.ResourcedActivityOperatedWith__c.RelationshipName}.{!$ObjectType.ResourcedActivity__c.fields.ForecastUnitType__c.RelationshipName}.{!$ObjectType.UnitType__c.fields.Suffix__c.Name}';
+        var utilisationField = '{!$ObjectType.ActivityAssignment__c.fields.BaselineUtilisationPercentage__c.Name}';
+        var resourcedActivityTypeField = '{!$ObjectType.ActivityAssignment__c.fields.ResourcedActivity__c.RelationshipName}.{!$ObjectType.ResourcedActivity__c.fields.ResourcedActivityType__c.Name}';
+        var assignmentTypeEnumField = '{!$ObjectType.ActivityAssignment__c.fields.ActivityAssignmentType__c.RelationshipName}.{!$ObjectType.ActivityAssignmentType__c.fields.Enum__c.Name}';
+        var timeEntryCountField = '{!$ObjectType.ActivityAssignment__c.fields.TimeEntryCount__c.Name}';
+        var expenseItemDateField = '{!$ObjectType.ActivityAssignment__c.fields.EarliestExpenseItemDate__c.Name}';
+        var probabilityField = '{!$ObjectType.ActivityAssignment__c.fields.ProbabilityCode__c.RelationshipName}.{!$ObjectType.ReferenceData__c.fields.Enum__c.Name}';
+        var resourceInitialsField = '{!$ObjectType.ActivityAssignment__c.fields.ResourceInitials__c.Name}';
+        var activityAssignmentsField = '{!$ObjectType.ActivityAssignment__c.Name}'.replace('__c', 's__r');
+        var parentIdField = '{!$ObjectType.ActivityAssignment__c.Fields.ActivityAssignment__c.Name}';
+        var parentTypeField = '{!$ObjectType.ActivityAssignment__c.fields.ActivityAssignment__c.RelationshipName}.{!$ObjectType.ActivityAssignment__c.fields.ActivityAssignmentType__c.RelationshipName}.{!$ObjectType.ActivityAssignmentType__c.fields.Enum__c.Name}';
+        var maxUsageField = '{!$ObjectType.ActivityAssignment__c.Fields.MaximumUsage__c.Name}';
+        var isProfiledField = '{!$ObjectType.ActivityAssignment__c.Fields.IsUsageProfiled__c.Name}';
+        var canEditCostField = '{!$ObjectType.ActivityAssignment__c.fields.ResourcedActivityOperatedWith__c.RelationshipName}.{!$ObjectType.ResourcedActivity__c.fields.CostBehaviourRule__c.RelationshipName}.{!$ObjectType.CostBehaviourRule__c.fields.CanEditCostRate__c.Name}';
+        var temporalForecastCostRateField = '{!$ObjectType.ActivityAssignment__c.Fields.TemporalForecastCostRate__c.Name}';
+        var invoiceUnitTypeEnumField = '{!$ObjectType.ActivityAssignment__c.fields.ResourcedActivityOperatedWith__c.RelationshipName}.{!$ObjectType.ResourcedActivity__c.fields.InvoicingUnitType__c.RelationshipName}.{!$ObjectType.UnitType__c.fields.Enum__c.Name}';
+        var forecastUnitTypeEnumField = '{!$ObjectType.ActivityAssignment__c.fields.ResourcedActivityOperatedWith__c.RelationshipName}.{!$ObjectType.ResourcedActivity__c.fields.ForecastUnitType__c.RelationshipName}.{!$ObjectType.UnitType__c.fields.Enum__c.Name}';
+        var revenueEntryUnitTypeEnumField = '{!$ObjectType.ActivityAssignment__c.fields.ResourcedActivityOperatedWith__c.RelationshipName}.{!$ObjectType.ResourcedActivity__c.fields.RevenueEntryUnitType__c.RelationshipName}.{!$ObjectType.UnitType__c.fields.Enum__c.Name}';
+
+        var hoursPerDayField = '{!$ObjectType.ActivityAssignment__c.Fields.HoursPerDay__c.Name}';
+
+        function getFieldValue(a, fieldPath)
+        {
+           var flds = fieldPath.split('.');
+
+           var val = a;
+
+           for (var i=0;i<flds.length;i++)
+           {
+               if (val != null) val = val[flds[i]];
+           }
+
+           return val == null ? '' : val;
+        }
+
+        var initialResult;
+        var customFields;
+
+        function drawAssignments(result)
+        {
+            var $tbl = jQuery('#assignments-table');
+            jQuery('.table-filter').remove();
+
+            $tbl.find('thead').empty().append(getTableHeaderHtml());
+            $tbl.find('tbody').empty();
+
+            var html = '';
+
+            for (var i=0;i<result.TheAssignments.length;i++)
+            {
+                var a = result.TheAssignments[i];
+
+                var row = getAssignmentRowHtml(a, false, result.RecordLostReasonAssignments.includes(a.Id));
+
+                $tbl.find('tbody').append(jQuery(row));
+
+                if (a[activityAssignmentsField] != null)
+                {
+                    var candidates = a[activityAssignmentsField];
+
+                    for(var j=0;j<candidates.length;j++)
+                    {
+                        var candidateRow = getAssignmentRowHtml(candidates[j], false, false);
+
+                        $tbl.find('tbody').append(jQuery(candidateRow));
+                    }
+                }
+            }
+
+            drawAssignmentsComplete();
+        }
+
+        function getTableHeaderHtml()
+        {
+            var html = '<tr class="headerRow"><th style="width:35px" class="headerRow"><input type="checkbox" id="AllActivityAssignments" /></th><th style="width:36px" class="headerRow"><h2>{!$Label.ActionLinksHeader}</h2></th>';
+
+            if (initialResult.ShowActivity)
+            {
+                html += ' <th class="headerRow sortable"><h2>{!$ObjectType.ActivityAssignment__c.Fields.ResourcedActivity__c.Label}</h2></th>';
+            }
+
+            html += '<th class="headerRow sortable"><h2>{!$ObjectType.ActivityAssignment__c.Fields.Resource__c.Label}</h2></th>';
+            html += '<th class="headerRow sortable"><h2>{!$ObjectType.ActivityAssignment__c.Fields.ActivityRole__c.Label}</h2></th>';
+
+            if(showLocation)
+            {
+                html += '<th class="headerRow sortable"><h2>{!$ObjectType.ActivityAssignment__c.Fields.Location__c.Label}</h2></th>';
+            }
+
+            html += '<th class="headerRow sortable"><h2>{!$ObjectType.ActivityAssignment__c.Fields.TemporalForecastRevenueRate__c.Label}</h2></th>';
+
+            if ({!$ObjectType.ActivityAssignment__c.fields.TemporalForecastCostRate__c.Updateable})
+            {
+                html += '<th class="headerRow sortable"><h2>{!$ObjectType.ActivityAssignment__c.Fields.TemporalForecastCostRate__c.Label}</h2></th>';
+            }
+
+            html += '<th class="headerRow sortable"><h2>{!$ObjectType.ActivityAssignment__c.Fields.StartDate__c.Label}</h2></th>';
+            html += '<th class="headerRow sortable"><h2>{!$Label.EndDateLabel}</h2></th>';
+            html += '<th class="headerRow sortable"><h2>{!$ObjectType.ActivityAssignment__c.Fields.UsageBehaviourRule__c.Label}</h2></th>';
+            html += '<th class="headerRow sortable"><h2>{!$Label.DeliveryGroupHomeRemaining}</h2></th>';
+            html += '<th class="headerRow sortable"><h2>{!$ObjectType.ActivityAssignment__c.Fields.UtilisationPercentage__c.Label}</h2></th>';
+
+            if(showMaxUsage)
+            {
+                html += '<th class="headerRow sortable"><h2>{!$ObjectType.ActivityAssignment__c.Fields.MaximumUsage__c.Label}</h2></th>';
+            }
+
+            for (var i=0;i<customFields.length;i++)
+            {
+                html += '<th class="headerRow sortable"><h2>' + initialResult.TheFieldSets[customFields[i]].Label +'</h2></th>';
+            }
+
+            html += '</tr>';
+
+            return html;
+        }
+
+        function getAssignmentRowHtml(a, selected, loseAssignment)
+        {
+            var accessObj = initialResult.ActivityAccessMap[getFieldValue(a, activityIdField)];
+
+            var parentId = getFieldValue(a, parentIdField);
+
+            if (parentId == '') parentId = null;
+
+            var noParent = (parentId == null);
+            var supportedAssignment = (noParent || getFieldValue(a, parentTypeField) == 'AppliedModel');
+
+            var hasAccess = false;
+
+            var assignmentType = getFieldValue(a, assignmentTypeEnumField);
+
+            if (accessObj != null)
+            {
+                if (accessObj.HasEditAccess && getFieldValue(a, probabilityField) != 'P0' && assignmentType != 'AppliedModel' && assignmentType != 'ActivatedModel')
+                    hasAccess = true;
+            }
+            else
+            {
+                // is this a new
+                hasAccess = jQuery('#' + getFieldValue(a, activityIdField)).length > 0;
+            }
+
+            if (hasAccess) {
+                hasAccess = initialResult.ResourceAccessMap[getFieldValue(a, resourceIdField)];
+            }
+
+            var hasTorE = (getFieldValue(a, timeEntryCountField) > 0 || getFieldValue(a, expenseItemDateField) != '' )
+            var isProfiled = getFieldValue(a, isProfiledField);
+            var isModelAssigment = (assignmentType == 'Model' || assignmentType == 'AppliedModel' || assignmentType == 'ActivatedModel');
+
+            var row = '<tr ' + (parentId != null?'parent-id="' + parentId  + '"':'') + ' class="dataRow ' + (a[activityAssignmentsField] != null?' branch ':'') + (!supportedAssignment?' candidate sortable-child-row ':'') + (!hasAccess?'read-only':'') + '" assignment-id="' + a.Id + '" id="' + a.Id + '" activity-id="' + getFieldValue(a, activityIdField) + '" ass-type="' + getFieldValue(a, assignmentTypeEnumField) + '" lose-ass="' + loseAssignment + '" + has-tore="' + hasTorE + '">';
+
+            //checbox
+            row += '<td>';
+
+            if (hasAccess) row += '<input class="select-assignment" ' + (selected ? 'checked="true" ':'') + ' name="ActivityAssignments" type="checkbox"/>';
+
+            row += '</td>';
+
+            //cog
+            row += '<td>' + (hasAccess && supportedAssignment?'<i class="fa fa-cog assignment-actions"/>':'') + '</td>';
+
+            //activity
+            if (initialResult.ShowActivity)
+            {
+                row += '<td>' + getFieldValue(a, activityField) + '</td>';
+            }
+
+            //resource
+            row += '<td class="' + (hasAccess && supportedAssignment && !isModelAssigment ?'editable':'readonly') + '" data-fld-name="{!$ObjectType.ActivityAssignment__c.Fields.Resource__c.Name}"><div class="edit-field"><span class="indent"/>' + getFieldValue(a, resourceField) + '<i class="fa fa-pencil"/></div></td>';
+
+            //role
+
+            if (supportedAssignment)
+                row += '<td class="' + (hasAccess?'editable':'readonly') + '" match-on="' + getFieldValue(a, resourcedActivityTypeField) + '" data-fld-name="{!$ObjectType.ActivityAssignment__c.Fields.ActivityRole__c.Name}"><div class="edit-field">' + getFieldValue(a, roleField) + '<i class="fa fa-pencil"/></div></td>';
+            else
+                row += '<td class="">{!JSENCODE($Label.ProposedCandidate)}</td>';
+
+            //location
+            if (showLocation)
+            {
+                if (supportedAssignment)
+                    row += '<td class="' + (hasAccess && supportedAssignment?'editable':'readonly') + '" data-fld-name="{!$ObjectType.ActivityAssignment__c.Fields.Location__c.Name}"><div class="edit-field">' + getFieldValue(a, locationField) + '<i class="fa fa-pencil"/></div></td>';
+                else
+                    row += '<td class="">-</td>';
+            }
+
+            //revenue rate
+            if (supportedAssignment)
+            {
+                var revUnits = getFieldValue(a, revenueEntryUnitType);
+                if (revUnits == '') revUnits = getFieldValue(a, invoiceUnitType);
+
+                var fEnum = getFieldValue(a, forecastUnitTypeEnumField);
+                var rEnum = getFieldValue(a, revenueEntryUnitTypeEnumField);
+                if (rEnum == '') rEnum = getFieldValue(a, invoiceUnitTypeEnumField);
+
+                var rateFactor = 1;
+
+                if (rEnum == 'Month') {
+                    // need to convert day/hour to month
+                     if (fEnum == 'Day')
+                        rateFactor = dayToRevenueEntryConversionFactor;
+                     else
+                        rateFactor = dayToRevenueEntryConversionFactor *  getFieldValue(a, hoursPerDayField);
+                }
+                else {
+                    if  (rEnum != fEnum) {
+                         if (fEnum == 'Day')
+                            rateFactor = 1 / getFieldValue(a, hoursPerDayField);
+                        else
+                            rateFactor = getFieldValue(a, hoursPerDayField);
+                    }
+                }
+
+                var revRate = getFieldValue(a, revenueRateField) * rateFactor;
+
+                row += '<td class="' + (hasAccess?'editable':'readonly') + '" match-on="' + getFieldValue(a, invoicingCurrencyCodeField) + revUnits + '" data-fld-name="{!$ObjectType.ActivityAssignment__c.Fields.InvoicingCurrencyForecastRevenueRate__c.Name}" data-sort-type="number" data-sort-value="' + revRate + '"><div class="edit-field">' + getFieldValue(a, invoicingCurrencyCodeField) + '&nbsp;' + kimble.formatNumber(revRate, '#,##0.00') + '&nbsp;/&nbsp;' + revUnits + '<i class="fa fa-pencil"/></div></td>';
+            }
+            else
+                row += '<td>-</td>';
+
+            //cost rate
+            if ({!$ObjectType.ActivityAssignment__c.fields.TemporalForecastCostRate__c.Updateable})
+            {
+                var temporalCost = getFieldValue(a, temporalForecastCostRateField);
+
+                if (temporalCost != '') {
+                    var costs = parseCostSummaryJson(temporalCost);
+
+                    //Need to convert from Forecast Unit Type To Invoice unit type!
+                    var fEnum = getFieldValue(a, forecastUnitTypeEnumField);
+                    var iEnum = getFieldValue(a, invoiceUnitTypeEnumField);
+
+                    var costVal = costs[costs.length-1].R;
+
+                    if (fEnum != iEnum) {
+                        if (fEnum == 'Day')
+                            costVal = costVal / getFieldValue(a, hoursPerDayField);
+                        else
+                            costVal = costVal * getFieldValue(a, hoursPerDayField);
+                    }
+
+                    row += '<td class="' + (getFieldValue(a, canEditCostField) == true && hasAccess && supportedAssignment?'editable':'readonly') + '" match-on="' + getFieldValue(a, currencyCodeField) + getFieldValue(a, invoiceUnitType) + '" data-fld-name="{!$ObjectType.ActivityAssignment__c.Fields.InvoicingCostRate__c.Name}" data-sort-type="number" data-sort-value="' + costVal + '"><div class="edit-field">' + getFieldValue(a, currencyCodeField) + '&nbsp;' + kimble.formatNumber(costVal, '#,##0.00') + '&nbsp;/&nbsp;' + getFieldValue(a, invoiceUnitType) + '<i class="fa fa-pencil"/></div></td>';
+                }
+                else {
+                    row += '<td></td>';
+                }
+            }
+
+            var entrySpec = usageBehaviorRulesMap[getFieldValue(a, usageBehaviourFieldId)].EntrySpecification;
+
+            //start date
+            row += '<td class="' + (hasAccess && entrySpec != 'TaskUsage'?'editable':'readonly') + ' apply-date-sort" data-fld-name="{!$ObjectType.ActivityAssignment__c.Fields.StartDate__c.Name}"><div class="edit-field">' + kimble.formatDate(kimble.UTCStringFromMilliseconds(getFieldValue(a, startDateField))) + '<i class="fa fa-pencil"/></div></td>';
+
+            //end date
+            row += '<td class="' + (hasAccess && !isProfiled && entrySpec != 'DerivedEndDate' && entrySpec != 'TaskUsage'?'editable':'readonly') + ' apply-date-sort" data-fld-name="{!$ObjectType.ActivityAssignment__c.Fields.ForecastP3EndDate__c.Name}"><div class="edit-field">' + kimble.formatDate(kimble.UTCStringFromMilliseconds(getFieldValue(a, endDateField))) + '<i class="fa fa-pencil"/></div></td>';
+
+            //usage behaviour
+            row += '<td class="' + (hasAccess && !isProfiled?'editable':'readonly') + '" match-on="' + getFieldValue(a, activityIdField) + '"  data-fld-name="{!$ObjectType.ActivityAssignment__c.Fields.UsageBehaviourRule__c.Name}"><div class="edit-field">' + getFieldValue(a, usageBehaviourField) + '<i class="fa fa-pencil"/></div></td>';
+
+            //remaining usage
+            row += '<td class="' + (hasAccess && !isProfiled && entrySpec != 'DerivedUsage' && entrySpec != 'TaskUsage' && entrySpec != 'NoForecast'?'editable':'readonly') + '" match-on="' + getFieldValue(a, forecastUnitTypeField) + '" data-fld-name="{!$ObjectType.ActivityAssignment__c.Fields.EntryRemainingUsage__c.Name}" data-sort-type="number" data-sort-value="' + getFieldValue(a, remainingUsageField) + '"><div class="edit-field">' + kimble.formatNumber(getFieldValue(a, remainingUsageField),'#,##0.##') + '&nbsp;' + getFieldValue(a, forecastUnitTypeField) + '<i class="fa fa-pencil"/></div></td>';
+
+            //utilisation
+            row += '<td class="' + (hasAccess && !isProfiled && entrySpec != 'DerivedUtilisation' && entrySpec != 'TaskUsage' && entrySpec != 'NoForecast'?'editable':'readonly') + '" data-fld-name="{!$ObjectType.ActivityAssignment__c.Fields.BaselineUtilisationPercentage__c.Name}"  data-sort-type="number" data-sort-value="' + getFieldValue(a, utilisationField) + '"><div class="edit-field">' + kimble.formatNumber(getFieldValue(a, utilisationField),'#,##0') + '%<i class="fa fa-pencil"/></div></td>';
+
+            if(showMaxUsage)
+            {
+                var mx = usageBehaviorRulesMap[getFieldValue(a, usageBehaviourFieldId)].ShowMaxUsage;
+                var v = '-';
+
+                if (mx && getFieldValue(a, maxUsageField) != '') v = kimble.formatNumber(getFieldValue(a, maxUsageField),'#,##0.##') + '&nbsp;' + getFieldValue(a, forecastUnitTypeField);
+
+                row += '<td class="' + (hasAccess && !isProfiled && mx?'editable':'readonly') + '" match-on="' + getFieldValue(a, forecastUnitTypeField) + '" data-fld-name="{!$ObjectType.ActivityAssignment__c.Fields.MaximumUsage__c.Name}"><div class="edit-field">' + v + '<i class="fa fa-pencil"/></div></td>';
+            }
+
+            //field sets
+            for (var j=0;j<customFields.length;j++)
+            {
+               var fldVal = getFieldValue(a, customFields[j]);
+
+               var fldType = initialResult.TheFieldSets[customFields[j]].DisplayType;
+
+               var val;
+               var isNumeric = false;
+               if (fldVal == '')
+               {
+                   val = '';
+               }
+               else if (fldType == 'INTEGER' || fldType == 'LONG')
+			   {
+					val = kimble.formatNumber(fldVal, '#,###');
+					isNumeric = true;
+			   }
+               else if (fldType == 'DOUBLE' || fldType == 'PERCENT')
+               {
+                    val = kimble.formatNumber(fldVal, '#,###.####');
+                    isNumeric = true;
+               }
+               else if (fldType == 'DATE')
+               {
+                    val = kimble.formatDate(kimble.UTCStringFromMilliseconds(fldVal));
+               }
+               else
+               {
+                    val = fldVal;
+               }
+
+               var sortHtml = '';
+
+               if (isNumeric) sortHtml = 'data-sort-type="number" data-sort-value="' + fldVal + '"';
+
+               row += '<td class="' + (hasAccess && initialResult.TheFieldSets[customFields[j]].IsEditable?'editable':'readonly') + '" data-fld-name="' + initialResult.TheFieldSets[customFields[j]].FieldName + '" ' + sortHtml + ' ><div class="edit-field">' + val + '<i class="fa fa-pencil"/></div></td>';
+
+            }
+
+           row += '</tr>';
+
+            return row;
+        }
+
+        function parseCostSummaryJson (j)
+        {
+            return kimble.parseJSON(j.replace(/"CostRate"/g, '"R"').replace(/"FromDate"/g, '"D"'));
+        }
+
+        function newActivityAssignmentClick(activityId)
+        {
+            initialiseModalBoxy('#ActivityAssignmentNewEdit', '{!JSENCODE($Label.New)} {!$ObjectType.ActivityAssignment__c.label}');
+            ActivityAssignmentNewEdit.newAssignment(activityId);
+        }
+
+        function editActivityAssignmentClick(assignmentId)
+        {
+            jQuery('.assignment-tools').qtip('destroy', true);
+            initialiseModalBoxy('#ActivityAssignmentNewEdit', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__ActivityAssignment__c.label}');
+            ActivityAssignmentNewEdit.getAssignmentToEdit(assignmentId);
+        }
+
+        function editAssignmentRatesClick(assignmentId)
+        {
+            jQuery('.assignment-tools').qtip('destroy', true);
+            initialiseModalBoxy('#ActivityAssignmentRates', '{!$ObjectType.ActivityAssignmentRate__c.labelPlural}', jQuery('form[id$=\'TheForm\']'));
+		    ActivityAssignmentRates.getAssignmentRates(assignmentId);
+        }
+
+	    function editAssignmentCalendarClick(assignmentId)
+	    {
+	        jQuery('.assignment-tools').qtip('destroy', true);
+	        openAssignmentCalendar(assignmentId);
+	    }
+
+	    function editAssignmentNotesClick(assignmentId)
+	    {
+	        jQuery('.assignment-tools').qtip('destroy', true);
+	        initialiseModalBoxy('#NotesPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__ActivityAssignment__c.label} {!$ObjectType.ActivityAssignment__c.Fields.LongNotes__c.label}');
+		    loadAssignmentNotes(assignmentId);
+        }
+
+        function loseAssignmentClick(assignmentId)
+        {
+            jQuery('.assignment-tools').qtip('destroy', true);
+            initialiseModalBoxy('#LostAssignmentPopup', '{!JSENCODE($Label.Cancel)} {!$ObjectType.ActivityAssignment__c.label}');
+		    loadActivityAssignmentToLose(assignmentId);
+        }
+
+        function deleteActivityAssignmentClick(assignmentId)
+        {
+            jQuery('.assignment-tools').qtip('destroy', true);
+
+            var del = false;
+
+            del = confirmDelete();
+
+            if (del)
+            {
+                jQuery('#' + assignmentId + ' .assignment-actions').addClass('Loading');
+
+                deleteTheActivityAssignment(assignmentId, function(){
+                     jQuery('#' + assignmentId + ' .assignment-actions').removeClass('Loading');
+                });
+            }
+        }
+
+        function cloneActivityAssignmentClick(assignmentId)
+        {
+            jQuery('.assignment-tools').qtip('destroy', true);
+            initialiseModalBoxy('#CloneAssignmentPopup', '{!$ObjectType.ActivityAssignment__c.label}');
+		    initialiseClone(assignmentId);
+        }
+
+        function showEditPopup()
+        {
+            jQuery('[id$="action-type"]')[0].selectedIndex = 0;
+            showModalBoxy();
+            if(onpopupload != null) onpopupload();
+        }
+
+</script>
+            <apex:form id="TheForm">
+
+                <apex:actionRegion >
+                    <apex:actionFunction action="{!InitialiseAssignmentUpdateField}" name="intialiseAssignmentUpdateField" rerender="EditFieldPanel" oncomplete="showEditPopup(); initialiseDatePicker(); jQuery('input.SearchResources').prop('readonly', true);">
+                        <apex:param name="assignmentId" value="" />
+                        <apex:param name="fieldName" value="" />
+                        <apex:param name="count" value="" />
+                    </apex:actionFunction>
+                </apex:actionRegion>
+
+                <div id="EditFieldPopup" style="display:none" >
+                    <apex:outputPanel layout="block" id="EditFieldPanel">
+                    <div id="EditFieldPopupErrors">
+                        <apex:outputPanel layout="block" id="EditFieldError"><apex:pageMessages escape="false"/></apex:outputPanel>
+                    </div>
+                    <div id="PopupContents" data-field-name="{!TheFieldName}" assignment-id="{!TheClickedRecordId}">
+                    <apex:pageBlock id="ActivityAssignment" mode="edit" rendered="{!!ISBLANK(TheAssignmentToUpdate)}">
+                        <apex:pageBlockButtons location="bottom" id="ButtonsBlock" styleclass="ButtonsBlock">
+                            <input type="button" onclick="saveAssignmentUpdates()" class="btn" value="{!$Label.Save}" />
+                            <input type="button"  onclick="hideModalBoxy();" class="btn" value="{!$Label.Cancel}" />
+                        </apex:pageBlockButtons>
+
+                    <apex:pageblockSection collapsible="false" showheader="false" columns="1" title="{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__ActivityAssignment__c.label}">
+
+                        <apex:pageBlockSectionItem >
+                            <apex:outputLabel value="{!TheFieldLabel}"/>
+                            <apex:outputPanel layout="none">
+
+                                <apex:selectList id="action-type" size="1" rendered="{!TheChangeOptions.size > 1}" onchange="changeOptionsChange()">
+                                    <apex:selectOptions value="{!TheChangeOptions}" />
+                                </apex:selectList>
+
+                                <apex:selectList styleclass="input-value" value="{!TheAssignmentToUpdate[TheFieldName]}" size="1" rendered="{!TheFieldOptions.Size > 0}" >
+                                    <apex:selectOptions value="{!TheFieldOptions}" />
+                                </apex:selectList>
+
+                                <apex:inputField id="editpanelInputField" required="false" styleclass="input-value {!ClassNames}" html-data-field-type="{!FieldType}" value="{!TheAssignmentToUpdate[TheFieldName]}" rendered="{!TheFieldOptions.Size == 0}">
+                                    <apex:actionSupport event="onchange" rerender="EditFieldError"/>
+                                </apex:inputField>
+
+                                <apex:inputField required="false" styleclass="start-date-offset" value="{!StartDateOffset.KimbleOne__InputInteger__c}" rendered="{!!ISBLANK(StartDateOffset)}">
+                                    <apex:actionSupport event="onchange" rerender="EditFieldError"/>
+                                </apex:inputField>
+
+                            </apex:outputPanel>
+                        </apex:pageBlockSectionItem>
+
+                        <apex:pageBlockSectionItem rendered="{!ShowEffectiveDateField}">
+                            <apex:outputLabel value="{! $ObjectType.ActivityAssignment__c.Fields.ForecastCostRateEffectiveDate__c.Label}"/>
+                            <apex:inputField value="{!StartDateOffset.KimbleOne__InputDate__c}" styleclass="effective-date kimbleDatePicker" html-data-min-date="{!EarliestOpenPeriodDate}"/>
+                        </apex:pageBlockSectionItem>
+
+                    </apex:pageblockSection>
+                        <script>
+                        function initialiseDatePicker()
+                        {
+                            //Check if field is of type DATE
+                            if('{!FieldType}' == 'DATE')
+                            {   jQuery('[id$="editpanelInputField"]').addClass('kimbleDatePicker');
+                                jQuery('[id$="editpanelInputField"]').datepicker({
+                                    dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+                                    showOtherMonths: true,
+                                    selectOtherMonths: true,
+                                    changeMonth: true,
+                                    changeYear: true});
+                                    jQuery('[id$="editpanelInputField"]').focus();
+                            }
+
+                            jQuery('.effective-date').datepicker({
+                                    dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+                                    showOtherMonths: true,
+                                    minDate:jQuery('.effective-date').data('minDate').toDate(),
+                                    maxDate:new Date(),
+                                    selectOtherMonths: true,
+                                    changeMonth: true,
+                                    changeYear: true});
+
+                        }
+                    </script>
+                    <apex:outputPanel layout="none" rendered="{!NumberOfSelectedRecords > 1}">
+                        <apex:pageblockSection collapsible="false" showheader="true" columns="1" title="{!$Label.kimbleone__applychangesto}"></apex:pageblockSection>
+                        <div class="apply-to-section">
+                            <div><input id="the-record-clicked" type="radio" checked="checked" name="apply-changes-group" value="single"/><label for="the-record-clicked">{!$Label.TheRecordClicked}</label></div>
+                            <div><input id="selected-records" type="radio" name="apply-changes-group" value="all"/><label for="selected-records">{!$Label.All}&nbsp;<b><apex:outputText value="{!NumberOfSelectedRecords}"/></b>&nbsp;selected records</label></div>
+                        </div>
+
+                        <div id="save-progress"><i class="fa fa-spin fa-circle-o-notch"></i><span></span></div>
+
+                    </apex:outputPanel>
+
+
+                    </apex:pageBlock>
+                    </div>
+                    </apex:outputPanel>
+                </div>
+                <div id="AssignmentFilterPopup" style="display:none;">
+                    <!-- var assignmentFilter = []; function refreshActivities() -->
+                    <div id="AssignmentFilters">
+                        <div class="assignment-filter-header">{!$Label.AssignmentsFilter}<i onclick="jQuery('#AssignmentFilterPopup').hide();" class="filter-collapse-btn fa fa-angle-double-up" title="{!$Label.Close}"></i></div>
+
+                        <apex:outputPanel layout="none" rendered="{!EnableLostAssignmentsFilter}">
+                            <div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!$Label.kimbleone__showcancelledassignments}
+                                <apex:inputField id="showLostAssignmentsCheckbox" value="{!ShowLostAssignments.KimbleOne__InputCheckbox__c}" style="margin-bottom: 0px; vertical-align: bottom;" /></div>
+                        </apex:outputPanel>
+
+                        <apex:repeat value="{!TheFilterCriteria}" var="criterion">
+
+                            <apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'REFERENCE'}">
+                                <div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!criterion.Name}</div>
+                                <input class="assignment-filter assignment-lookup-filter" data-criteria="{!criterion.Criterion}" type="hidden" id="criterion-{!criterion.Name}" style="width:100%"/>
+                            </apex:outputPanel>
+
+                            <apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'STRING'}">
+                                <div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!criterion.Name}</div>
+                                <input class="assignment-filter assignment-string-filter" data-criteria="{!criterion.Criterion}" type="text" id="criterion-{!criterion.Name}" style="width:99%"/>
+                            </apex:outputPanel>
+
+                            <apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'BOOLEAN'}">
+                                <div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!criterion.Name}<input data-criteria="{!criterion.Criterion}" style="margin-bottom: 0px; vertical-align: bottom;" type="checkbox" class="assignment-filter assignment-boolean-filter"/></div>
+                            </apex:outputPanel>
+
+                            <!-- NUMERIC / DATES -->
+
+                        </apex:repeat>
+
+                        <input class="btn" id="applyFilterButton" onclick="applyAssignmentFilter();" type="Button" value="{!$Label.GoButton}"/>
+
+                        <input class="btn" id="clearFilterButton" onclick="clearAssignmentFilter();" type="Button" value="{!$Label.ClearAllLabel}"/>
+
+                    </div>
+                    <script>
+
+    	function clearAssignmentFilter()
+    	{
+    		jQuery('#AssignmentFilterPopup').hide();
+
+    		assignmentFilter = [];
+
+    		jQuery.each(jQuery('.assignment-filter'), function(i, obj) {
+
+    			var $obj = jQuery(obj);
+
+    			if($obj.hasClass('assignment-lookup-filter') && $obj.val() != '')
+    				$obj.select2('val', '');
+
+    			if($obj.hasClass('assignment-string-filter') && $obj.val() != '')
+    				$obj.val('');
+
+    			if($obj.hasClass('assignment-boolean-filter') && $obj.prop('checked'))
+    				$obj.prop('checked', false);
+    		});
+
+    		jQuery('[id$="showLostAssignmentsCheckbox"]').prop('checked', false);
+
+    		jQuery('.filterAssignmentButton').removeClass('toolbar-button-selected');
+
+    		getAssignments(false, []);
+    	}
+
+    	function applyAssignmentFilter()
+    	{
+    		jQuery('#AssignmentFilterPopup').hide();
+
+    		var assignmentFilter = [];
+
+    		jQuery.each(jQuery('.assignment-filter'), function(i, obj) {
+
+    			var $obj = jQuery(obj);
+
+    			if($obj.hasClass('assignment-lookup-filter') && $obj.val() != '')
+    				assignmentFilter.push({Criterion:$obj.attr('data-criteria'), Values:$obj.val().split(',')});
+
+    			if($obj.hasClass('assignment-string-filter') && $obj.val() != '')
+    				assignmentFilter.push({Criterion:$obj.attr('data-criteria'), SearchTerm:$obj.val()});
+
+    			if($obj.hasClass('assignment-boolean-filter') && $obj.prop('checked'))
+    				assignmentFilter.push({Criterion:$obj.attr('data-criteria'), BooleanValue:true});
+    		});
+
+    		if (assignmentFilter.length == 0)
+    			jQuery('.filterAssignmentButton').removeClass('toolbar-button-selected');
+    		else
+    			jQuery('.filterAssignmentButton').addClass('toolbar-button-selected');
+
+    		getAssignments(jQuery('[id$="showLostAssignmentsCheckbox"]').prop('checked'), assignmentFilter);
+    	}
+
+    	function lookupCriterion(criterion, query)
+        {
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentsEditController.FindCriterionValues}',
+                criterion, query.term, kimble.parseJSON('{!JSENCODE(FilterIdsJson)}'),
+                    function(result, event){
+                         if (event.status)
+                         {
+                            var data = {};
+
+                            data.results = result;
+                            query.callback(data);
+                        }
+                        else if (event.type === 'exception')
+                        {
+                            alert(event.message);
+                        }
+                        else
+                        {
+                            alert(event.message);
+                        }
+                },
+                {escape: false, timeout: 60000}
+            );
+        }
+
+    	</script>
+                </div>
+            </apex:form>
+            <div id="ActivityAssignmentNewEdit" style="display:none"><apex:include pageName="{!$Page.ActivityAssignmentNewEdit}"/></div>
+            <div id="ActivityAssignmentRates" style="display:none"><apex:include pageName="{!$Page.ActivityAssignmentRatesEdit}"/></div>
+            <div id="ActivityAssignmentCalendar"><apex:include pageName="{!$Page.ActivityAssignmentCalendar}"/></div>
+            <div id="ActivityAssignmentDelete"><apex:include pageName="{!$Page.ActivityAssignmentDelete}"/></div>
+            <div id="ActivityAssignmentNotesEdit"><apex:include pageName="{!$Page.ActivityAssignmentNotesEdit}"/></div>
+            <div id="ActivityAssignmentClone"><apex:include pageName="{!$Page.ActivityAssignmentClone}"/></div>
+            <div><apex:include pageName="{!$Page.ActivityAssignmentUsageAdjustments}"/></div>
+
+        </apex:define>
+
+    </apex:composition>
+
+</apex:page>

@@ -1,0 +1,236 @@
+<apex:page standardcontroller="KimbleOne__Resource__c" extensions="KimbleOne.ResourceToilSummaryController" tabStyle="KimbleOne__ReferenceData__c" sidebar="false" >
+
+    <apex:composition template="KimbleOne__SiteMaster">
+
+        <apex:define name="Menu">
+            <c:Menu Rendered="{!!ISBLANK($CurrentPage.parameters.id)}" DefaultHelpPage="MaintainResource.html" MenuContextType="Resource" MenuContextId="{!TheResource.Id}" MenuContextName="{!TheResource.Name}"/>
+        </apex:define>
+
+        <apex:define name="Content">
+            <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+            <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+            <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'InsightStyle.css')}"/>
+            <apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleJS, 'Charm.js')}"/>
+
+            <!-- Kimble Guidance -->
+            <apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+            <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+            <apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+                <apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/ResourceToilSummaryNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+                <apex:outputPanel layout="none" rendered="{!ResourceToilSummaryTipOverrideEnabled}">
+                    <apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+                </apex:outputPanel>
+            </apex:outputPanel>
+            
+            <style>
+		.tool-tip-info {
+			color: #428BCA;
+		}
+		.tool-tip-inline-icon {
+			font-size: 15px;
+			display: inline-block;
+		    vertical-align: bottom;
+		    margin-left: 3px;
+		}
+		div#resource-container {
+            margin: 8px;
+        }
+
+		.card-title {
+		    font-size: 26px;
+		    font-weight: bold;
+        	display: block;
+		}
+		div.assignment-forecast-chart-container {
+		    height: 100px;
+		}
+		.assignment-details-container {
+		    vertical-align: top;
+		    padding: 2px 6px 2px 6px;
+		    border-radius: 4px;
+	        margin-bottom: 10px;
+	        text-align: center;
+		}
+		.inner-card {
+		    display: inline-block;
+		    vertical-align: top;
+		    margin-right: 8px;
+		    min-width: 300px;
+		    min-height:250px;
+		}
+		span.card-field-label {
+		    display: block;
+		}
+		.adjustment-ind {
+		    position: absolute;
+		    top: 100px;
+		    left: 181px;
+		    font-size: 16px;
+		    color: #428BCA;
+		}
+		.periods-list {
+		    width: 100%;
+		    margin-top: 10px;
+		}
+		.periods-list caption {
+		    font-weight: bold;
+		    text-align: left;
+		    padding: 5px;
+		    background-color: #1988ff;
+		    color: white;
+		}
+        .assignment-usage-container {
+    text-align: center;
+}
+
+.assignment-usage-details-container label {
+    font-size: 13px;
+    font-weight: bold;
+    text-align: right;
+    width: 173px;
+    display: inline-block;
+    margin-right: 6px;
+    margin-top: 8px;
+}
+
+.assignment-usage-details-container span {
+    display: inline-block;
+    font-size: 12px;
+}
+
+.assignment-usage-details-container {
+    margin-top: 10px;
+}
+
+.periods-list td,  .periods-list th{
+    text-align: center;
+}
+.assignment-periods {
+    max-height: 200px;
+    overflow-y: auto;
+}
+        .decimal-val {
+        	display: none;
+        }
+    </style>
+
+            <div id="resource-container" >
+                <div class="inner-card">
+                <div class="inner-card-body">
+                    <div class="assignment-details-container">
+                        <span class="card-field-value card-title"><apex:outputText value="{!$Label.kimbleone__toilsummary}"/></span>
+                    </div>
+
+                    <div class="assignment-usage-container">
+                        <apex:form >
+                        <apex:selectList value="{!TheSelectedAssignmentId}" size="1">
+                            <apex:selectOptions value="{!TheAssignmentOptions}" />
+                            <apex:actionSupport event="onchange" action="{!SelectedAssignmentChanged}" reRender="SelectedAssignmentPanel" oncomplete="initialiseDecimals()"/>
+                        </apex:selectList>
+                        </apex:form>
+                    </div>
+
+                    <apex:outputPanel id="SelectedAssignmentPanel">
+                        <div class="assignment-usage-details-container">
+                            <div id="BaselineOutput">
+                                <apex:outputLabel value="{!$Label.kimbleone__toilbaselineusage}"/>
+                                <apex:outputText value="{!BaselineUsage}" styleclass="decimal-val"/>&nbsp;<apex:outputText value="({!Units})"/>
+                            </div>
+                            <apex:outputPanel layout="none" rendered="{!AdjustedUsage != 0}">
+                            <div id="AdjustmentsOutput">
+                                <apex:outputLabel value="{!$Label.kimbleone__toiladjustmentusage}"/>
+                                <apex:outputText value="{!AdjustedUsage}" styleclass="decimal-val"/>&nbsp;<apex:outputText value="({!Units})"/>
+                            </div>
+                            </apex:outputPanel>
+                            <div id="RemainingOutput">
+                                <apex:outputLabel value="{!$Label.kimbleone__toilremainingusage}"/>
+                                <apex:outputText value="{!RemainingUsage}" styleclass="decimal-val"/>&nbsp;<apex:outputText value="({!Units})"/>
+                            </div>
+                        </div>
+                        <div class="assignment-periods">
+                            <apex:dataTable value="{!TheResourcePeriods}" var="Period" styleClass="list periods-list">
+                                <apex:facet name="caption"><apex:outputText value="{!$Label.kimbleone__toildetails}"/></apex:facet>
+                                <apex:column >
+                                    <apex:facet name="header"><apex:outputText id="TimePeriodColumn" value="{!$ObjectType.KimbleOne__ResourcePeriod__c.Fields.KimbleOne__TimePeriod__c.Label}"/></apex:facet>
+                                    <apex:outputText value="{!Period.Name}"/>
+                                </apex:column>
+                                <apex:column >
+                                    <apex:facet name="header"><apex:outputText id="AccruedColumn" value="{!$ObjectType.KimbleOne__ResourcePeriod__c.Fields.KimbleOne__AccruedToilUsage__c.Label} ({!Units})"/></apex:facet>
+                                    <apex:outputText value="{!Period.Accrued}" styleclass="decimal-val"/>
+                                </apex:column>
+                                <apex:column >
+                                    <apex:facet name="header"><apex:outputText id="ActualColumn" value="{!$Label.kimbleone__toilactualusage} ({!Units})"/></apex:facet>
+                                    <apex:outputText value="{!Period.Actual}" styleclass="decimal-val"/>
+                                </apex:column>
+                                <apex:column >
+                                    <apex:facet name="header"><apex:outputText id="NetUsageColumn" value="{!$ObjectType.KimbleOne__ResourcePeriod__c.Fields.KimbleOne__ToilNetUsage__c.Label} ({!Units})"/></apex:facet>
+                                    <apex:outputText value="{!Period.Net}" styleclass="decimal-val"/>
+                                </apex:column>
+                            </apex:dataTable>
+                        </div>
+
+                    </apex:outputPanel>
+                </div>
+                </div>
+            </div>
+
+            <apex:form >
+                <apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+                <apex:actionFunction action="{!UpdateToolTipSetting}" name="updateTipsConfigSetting" rerender="kimbleTooltipsResource" oncomplete="loadGuidance();">
+                    <apex:param name="newValue" value="" />
+                </apex:actionFunction>
+            </apex:form>
+            <div style="display:none;" kimble-tip="null"></div>
+            
+            <script>
+		jQuery(window).load(function() {
+			initialiseDecimals();
+			initialisePageTips();
+		});
+
+		function initialiseDecimals()
+		{
+		    jQuery('.decimal-val').each(function() {
+				jQuery(this).text(kimble.formatNumber(jQuery(this).text(), '#,##0.###'))
+			});
+
+			jQuery('.decimal-val').show();
+  }
+  
+        /* Tooltips */
+        var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+        var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+        var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+        var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+		var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+		var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+        
+        function initialisePageTips()
+        {
+            ApplyTipAttributes();
+            initialiseTips();
+        }
+        
+        // add tip attributes to elements
+        function ApplyTipAttributes()
+        {
+            if(enableTips)
+            {
+                jQuery('[id$="AccruedColumn"]').attr('kimble-tip','Accrued').attr('kimble-tip-extended-text','AccruedExtendedText');
+                jQuery('[id$="ActualColumn"]').attr('kimble-tip','Actual');
+                jQuery('[id$="AdjustmentsOutput"]').attr('kimble-tip','Adjustments');
+                jQuery('[id$="BaselineOutput"]').attr('kimble-tip','Baseline');
+                jQuery('[id$="NetUsageColumn"]').attr('kimble-tip','NetUsage').attr('kimble-tip-extended-text','NetUsageExtendedText');
+                jQuery('[id$="RemainingOutput"]').attr('kimble-tip','Remaining');
+                jQuery('[id$="TimePeriodColumn"]').attr('kimble-tip','TimePeriod');
+            }
+        }
+
+    </script>
+
+        </apex:define>
+
+    </apex:composition>
+
+</apex:page>

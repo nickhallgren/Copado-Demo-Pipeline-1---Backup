@@ -1,0 +1,165 @@
+<apex:page id="ConfigurationIndexEdit" standardController="KimbleOne__ConfigurationIndex__c" extensions="KimbleOne.ConfigurationIndexEditController,KimbleOne.TooltipsController">
+    <apex:composition template="KimbleOne__SiteMaster">
+
+        <apex:define name="Menu">
+            <c:Menu MenuContextName="{!TheCI.Name}"/>
+        </apex:define>
+
+        <apex:define name="Content">
+            <apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+            <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+
+            <apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+                <apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/ConfigIndexEditNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+                <apex:outputPanel layout="none" rendered="{!ConfigIndexEditTipOverrideEnabled}">
+                    <apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+                </apex:outputPanel>
+            </apex:outputPanel>
+
+            <div style="display:none;" kimble-tip="null"></div>
+
+            <apex:form id="TheForm">
+                <style>
+                    input.name-fld {
+                        width: 300px;
+                    }
+                    textarea.text-fld {
+                        width: 300px;
+                        height: 80px;
+                    }
+                </style>
+
+                <apex:outputPanel id="pageErrors">
+                    <apex:pageMessages escape="False" />
+                </apex:outputPanel>
+
+                <apex:pageBlock >
+                    <apex:pageBlockButtons location="bottom">
+                        <apex:commandButton action="{!SaveCI}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__save}" rerender="TheForm"/>
+                        <apex:commandButton action="{!SaveCloneCI}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__saveandclone}" rerender="TheForm"/>
+                        <apex:commandButton action="{!SaveNewCI}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__saveandnew}" rerender="TheForm"/>
+                        <apex:commandButton action="{!CloneCI}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__clonelabel}" rendered="{!!ISBLANK(TheCI.Id)}" rerender="TheForm"/>
+                        <apex:commandButton action="{!DeleteCI}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__deletebutton}" rendered="{!!ISBLANK(TheCI.Id)}" rerender="TheForm"/>
+                        <apex:commandButton action="{!Cancel}" value="{!$Label.kimbleone__cancel}"/>
+                    </apex:pageBlockButtons>
+
+                    <apex:pageblockSection collapsible="false" showheader="false" columns="2" >
+
+                        <apex:inputField id="indexName" styleClass="name-fld" value="{!TheCI.Name}" required="true"/>
+
+                        <apex:pageBlockSectionItem >
+                            <apex:outputLabel value="{!$ObjectType.KimbleOne__ConfigurationIndex__c.fields.KimbleOne__ConfigurationIndexType__c.label}" />
+                            <apex:outputPanel layout="none">
+                                <div class="requiredInput">
+                                    <apex:outputPanel layout="none"><div class="requiredBlock" /></apex:outputPanel>
+                                    <apex:actionRegion >
+                                        <apex:selectList id="indexType" value="{!TheCI.KimbleOne__ConfigurationIndexType__c}" size="1">
+                                            <apex:selectOptions value="{!TheTypes}" />
+                                            <apex:actionSupport event="onchange" action="{!ChangeType}" rerender="fieldsPanel,pageErrors" onComplete="initialisePageTips();"/>
+                                        </apex:selectList>
+                                    </apex:actionRegion>
+                                </div>
+                            </apex:outputPanel>
+                        </apex:pageBlockSectionItem>
+
+                    </apex:pageblockSection>
+
+                    <apex:outputPanel id="fieldsPanel">
+                    <apex:pageBlockSection collapsible="false" showheader="false" columns="2" rendered="{!!ISBLANK(TheCI.KimbleOne__ConfigurationIndexType__c)}">
+
+                        <apex:pageBlockSectionItem ></apex:pageBlockSectionItem>
+
+                        <apex:inputField id="isRestricted" value="{!TheCI.KimbleOne__IsRestricted__c}" rendered="{!UserIsAdmin}"/>
+
+                        <apex:inputField id="indexDescr" styleClass="text-fld" value="{!TheCI.KimbleOne__Description__c}"/>
+                        <apex:inputField id="indexKeyw" styleClass="text-fld" value="{!TheCI.KimbleOne__Keywords__c}"/>
+
+                        <apex:inputField id="target" styleClass="text-fld" value="{!TheCI.KimbleOne__Target__c}" rendered="{!ShowTarget && !ShowTargetOptions}"/>
+
+                        <apex:pageBlockSectionItem rendered="{!ShowTarget && ShowTargetOptions}">
+                            <apex:outputLabel value="{!$ObjectType.KimbleOne__ConfigurationIndex__c.fields.KimbleOne__Target__c.label}" />
+                            <apex:outputPanel layout="none">
+                                <div class="requiredInput">
+                                    <div class="requiredBlock"></div>
+                                    <apex:selectList id="targetSelect" value="{!TheCI.KimbleOne__Target__c}" size="1" required="true">
+                                        <apex:selectOptions value="{!Targets}" />
+                                    </apex:selectList>
+                                </div>
+                            </apex:outputPanel>
+                        </apex:pageBlockSectionItem>
+
+                        <apex:pageBlockSectionItem rendered="{!!ShowTarget}"></apex:pageBlockSectionItem>
+
+                        <apex:inputField id="param" styleClass="text-fld" value="{!TheCI.KimbleOne__Parameter__c}" rendered="{!ShowParam}"/>
+                        <apex:pageBlockSectionItem rendered="{!!ShowParam}"></apex:pageBlockSectionItem>
+
+                    </apex:pageblockSection>
+                    </apex:outputPanel>
+
+                </apex:pageBlock>
+
+                <apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+
+            </apex:form>
+
+            <script>
+                jQuery(document).ready(function(){
+                    initialisePageTips();
+                });
+
+                /* Tooltips */
+                var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+                var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+                var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+                var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+                var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+                var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+
+                // add tip attributes to elements in components
+                function initialisePageTips()
+                {
+                    ApplyTipAttributes();
+                    initialiseTips();
+                }
+
+                // add tip attributes to elements
+                function ApplyTipAttributes()
+                {
+                    if(enableTips)
+                    {
+                        // base page tips
+                        jQuery('[id$="indexType"]').parent().attr('kimble-tip','CI_Type').attr('kimble-tip-extended-text','CI_TypeExtendedText');
+                        jQuery('[id$="isRestricted"]').parent().attr('kimble-tip','CI_AdminOnly');
+                        jQuery('[id$="indexName"]').parent().attr('kimble-tip','CI_Name');
+                        jQuery('[id$="indexDescr"]').parent().attr('kimble-tip','CI_Descr');
+                        jQuery('[id$="indexKeyw"]').parent().attr('kimble-tip','CI_Keyw');
+                        jQuery('[id$="targetSelect"]').parent().attr('kimble-tip','CI_TargetS');
+                        jQuery('[id$="target"]').parent().attr('kimble-tip','CI_Target').attr('kimble-tip-extended-text','CI_TargetExtendedText');
+                        jQuery('[id$="param"]').parent().attr('kimble-tip','CI_Param').attr('kimble-tip-extended-text','CI_ParamExtendedText');
+                    }
+                }
+
+                function updateTipsConfigSetting(newTipSetting)
+                {
+                    Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+                        newTipSetting,
+                            function(result, event){
+                                if (event.status)
+                                {
+                                    var data = {};
+                                    data.results = result;
+                                    loadGuidance();
+                                }
+                                else
+                                {
+                                    alert(event.message);
+                                }
+                        },
+                        {escape: false, timeout: 60000}
+                    );
+                }
+                </script>
+        </apex:define>
+    </apex:composition>
+</apex:page>

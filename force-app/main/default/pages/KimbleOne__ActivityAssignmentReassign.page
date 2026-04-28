@@ -1,0 +1,509 @@
+<apex:page controller="KimbleOne.ActivityAssignmentRemoteActions" showHeader="false" sidebar="false">
+
+	<style>
+	.assign-popup-scheduled-time-slots-container {
+	    display: none;
+	}
+	.status-ind.fa.fa-clock-o {
+	    font-size: 16px;
+	}
+	.assign-popup-scheduled-time-slots-container .sched-start-time, .assign-popup-scheduled-time-slots-container .sched-end-time {
+	    display: inline;
+	    font-size: 12px;
+	}
+	.assign-popup-scheduled-time-slots-container .sched-time-container {
+		margin: 0 auto;
+	}
+
+	div#edit-fulfilment-mode {
+    	position: relative;
+    	top: -26px;
+    	left: 10px;
+	}
+</style>
+
+	<div id="assignment-assign" style="display:none">
+		<div id="assig-warning" style="display:none">
+			<span>
+				<div class="message warningM3">
+					<table border="0" cellpadding="0" cellspacing="0" class="messageTable" style="padding:0px;margin:0px;">
+						<tbody><tr valign="top">
+							<td><img alt="warning" class="msgIcon" src="/s.gif" title="{!$Label.WarningHeading}"/></td>
+							<td class="messageCell"><div class="messageText" id="assign-warning-text"><br/></div></td>
+							</tr>
+							<tr><td></td><td></td></tr></tbody>
+					</table>
+				</div>
+			</span>
+		</div>
+		<div id="error-panel" style="display:none">
+			<apex:pageMessage summary="{!$Label.kimbleone__error}" severity="error" strength="2">
+				<ul style=" margin:0px ;padding:0"><li style="margin-left: 10px;padding-left: 0;list-style: none;" id="error-assign"></li></ul>
+			</apex:pageMessage>
+		</div>
+		<apex:pageBlock id="reassign-title" title="{!$Label.kimbleone__assignmentheading}" mode="edit">
+			<div id="edit-fulfilment-mode" style="display:none">
+                {!JSENCODE($Label.CandidateDragText)} <input type="radio" name="selectFulfilmentMode" id="radio-candidate" />
+                {!JSENCODE($Label.ReplaceDragText)}<input type="radio" name="selectFulfilmentMode" id="radio-replacement" />
+				<span id="fulfilment-mode-ispreference-container"></span>
+			</div>
+			<apex:pageBlockButtons location="bottom">
+				<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityAssignmentDemand__c.updateable}">
+					<input class="btn save-assignment-button" onclick="saveAssignment(this)" type="button" value="{!$Label.Save}" style="width:60px;"/>
+				</apex:outputPanel>
+				<input class="btn" onclick="cancelAssignment()" type="button" value="{!$Label.Cancel}" style="width:60px;"/>
+			</apex:pageBlockButtons>
+
+			<div id="preference-change-info-container" style="display:none">
+				<apex:pageMessage id="preference-change-info" severity="info" strength="1" summary=""/>
+			</div>
+
+			<apex:pageblockSection collapsible="false" showheader="false" columns="2" >
+
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__Resource__c.Label}" />
+					<span id="Resource-assign"></span>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ActivityRole__c.Label}" />
+					<span id="ActivityRole-assign"></span>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UsageBehaviourRule__c.Label}" />
+					<span id="UsageBehaviourRule-assign"></span>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__TemporalForecastCostRate__c.accessible}">
+					<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__TemporalForecastCostRate__c.Label}" />
+					<span id="Cost-assign"></span>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__StartDate__c.Label}" />
+					<span id="StartDate-assign"></span>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$Label.kimbleone__endingonlabel}" />
+					<span id="EndDate-assign"></span>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UtilisationPercentage__c.Label}" />
+					<span id="Utilisation-assign"></span>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$Label.kimbleone__assignmententryremainingeffort}" />
+					<div id="RemainingUsage-assign" actual=""></div>
+				</apex:pageBlockSectionItem>
+
+			</apex:pageblockSection>
+
+			<div class="assign-popup-scheduled-time-slots-container">
+				<apex:pageblockSection collapsible="false" showheader="true" columns="1" title="{!$Label.kimbleone__scheduleddayslabel}">
+					<div class="time-slots-container"></div>
+				</apex:pageblockSection>
+			</div>
+
+		</apex:pageBlock>
+
+		<script>
+		var theResourceToAssign = '';
+		var reassignAssignmentStart = '';
+		var reassignAssignmentId = '';
+		var reassignAssignmentDemandId = '';
+		var assignedCandidates = [];
+
+		var dragElement;
+		var asCandidate;
+		var isPreferred = false;
+
+		var date_sort_asc = function (date1, date2) {
+		  if (date1 > date2) return 1;
+		  if (date1 < date2) return -1;
+		  return 0;
+		};
+
+		function handleModeChange()
+		{
+		    if(jQuery('#radio-candidate').prop('checked'))
+		    {
+		    	jQuery('#is-preferred-container').removeClass('hidden');
+      		}
+      		else
+      		{
+      		    jQuery('#is-preferred-container').addClass('hidden');
+        	}
+  		}
+
+  		function generateIsPreferenceInput(allowEditFulfilment)
+  		{
+  		    jQuery('#is-preferred-container').remove();
+
+  		    var theLabel = jQuery('<label />',{'for': 'is-preferred-candidate','text': '{!$ObjectType.ActivityAssignment__c.Fields.CandidateIsPreferred__c.Label}'});
+			var theInput = jQuery('<input />',{'type': 'checkbox', id:'is-preferred-candidate'});
+			var container = jQuery('<span />',{id: 'is-preferred-container','class':'hidden'});
+
+			jQuery(theLabel).appendTo(container);
+			jQuery(theInput).appendTo(container);
+
+			container.css({
+			'right' : '25px',
+			'position' : 'absolute',
+			});
+
+			if(allowEditFulfilment)
+			{
+				jQuery(container).appendTo('#fulfilment-mode-ispreference-container');
+   			}
+   			else
+   			{
+				var target = jQuery('[id$="reassign-title"]').find('td').eq(1);
+				jQuery(container).appendTo(target);
+			}
+    	}
+
+		function assign(assignment, resourceId, starting, dragObj, isCandidate, allowEditFulfilmentMode, candidates)
+		{
+		    jQuery('#assig-warning').hide();
+			jQuery('#preference-change-info-container').hide();
+		    assignedCandidates = candidates ? candidates : [];
+
+			jQuery('#error-panel').hide();
+			asCandidate = isCandidate || false;
+
+			starting = (starting != null ? starting : assignment.StartDate.toDate());
+
+			generateIsPreferenceInput(allowEditFulfilmentMode);
+
+			var priorPreferred = null;
+
+			if(candidates)
+			{
+				priorPreferred = candidates.find(i => i.IsPreferred);
+			}
+
+			if(priorPreferred)
+			{
+				if(priorPreferred.ResourceId == resourceId)
+				{
+					jQuery('#is-preferred-candidate').prop('checked',true);
+				}
+				else
+				{
+					var messageText = '{!$Label.PreferredCandidateReplaceWarning}'.replace('{0}',priorPreferred.ResourceName);
+					jQuery('[id$="preference-change-info"] .messageText').text(messageText);
+
+					jQuery('#is-preferred-candidate').on('click',function(){
+						if(jQuery(this).prop('checked'))
+						{
+							jQuery('#preference-change-info-container').show();
+						}
+						else
+						{
+							jQuery('#preference-change-info-container').hide();
+						}
+					});
+				}
+			}
+
+
+			dragElement = dragObj;
+			
+			jQuery('.save-assignment-button').addClass('btnDisabled').prop('disabled','disabled');
+			
+			var title;
+
+			if (allowEditFulfilmentMode)
+			{
+			    if (asCandidate)
+			    {
+					jQuery('#radio-candidate').prop('checked', true);
+					jQuery('#is-preferred-container').removeClass('hidden');
+				}
+				else if (asCandidate == false)
+				{
+					jQuery('#radio-replacement').prop('checked', true);
+					jQuery('is-preferred-container').addClass('hidden');
+				}
+
+			    jQuery('#edit-fulfilment-mode').show();
+			    jQuery('[id$="reassign-title"]').find('.mainTitle').hide();
+
+			    jQuery('#edit-fulfilment-mode :input').on('click', function()
+			    {
+			    	handleModeChange();
+			    });
+   			}
+   			else
+   			{
+				if (asCandidate)
+				{
+					title = '{!JSENCODE($Label.CandidateDragText)}';
+					jQuery('#is-preferred-container').show();
+				}
+
+				else
+				{
+					title = '{!JSENCODE($Label.ReplaceDragText)}';
+				}
+
+				jQuery('#edit-fulfilment-mode').hide();
+				jQuery('[id$="reassign-title"]').find('.mainTitle').show().text(title);
+			}
+			
+			theResourceToAssign = matchingResources[resourceId];
+			reassignAssignmentId = assignment.Id;
+			reassignAssignmentDemandId = assignment.AssignmentDemandId;
+			reassignAssignmentStart = starting;
+			
+			jQuery('#Resource-assign').html(theResourceToAssign.Name);
+
+			
+			jQuery('#ActivityRole-assign').html(assignment.Role);
+
+			if (assignment.UsageBehaviourRule != null)
+				jQuery('#UsageBehaviourRule-assign').text(assignment.UsageBehaviourRule.Name);
+			
+			jQuery('#StartDate-assign').text(jQuery.datepicker.formatDate(kimble.regional.dateFormat, starting));
+			
+			jQuery('#Cost-assign').text('');
+			jQuery('#EndDate-assign').text('');
+			jQuery('#Utilisation-assign').text('');
+			jQuery('#RemainingUsage-assign').text('');
+
+			if(assignment.TheTimeSlots != undefined && Object.keys(assignment.TheTimeSlots).length > 0)
+			{
+				var scheduledDaysHtml = '';
+
+				scheduledDaysHtml += '<div class="sched-time-container">';
+				
+				// sort by date (thekey)
+
+				var sortedDtes = [];
+				var slotArrayLength = Object.keys(assignment.TheTimeSlots).length;
+				for(var slotArrayCounter = 0; slotArrayCounter < slotArrayLength ; slotArrayCounter++)
+				{
+					var dteVal = Object.keys(assignment.TheTimeSlots)[slotArrayCounter];
+					var dteValAsDate = kimble.parseDate(kimble.formatDate(dteVal), true);
+					var dteValWithoutTime = new Date(dteValAsDate.getFullYear(), dteValAsDate.getMonth(), dteValAsDate.getDate(), 0, 0, 0, 0);
+
+					sortedDtes.push(dteValWithoutTime);
+				}
+
+				sortedDtes.sort(date_sort_asc);
+
+				var dayArrayLength = sortedDtes.length;
+				for(var dayArrayCounter = 0; dayArrayCounter < dayArrayLength ; dayArrayCounter++)
+				{
+					var dteVal = sortedDtes[dayArrayCounter].toKimbleUTC();
+
+					var theSchedules = assignment.TheTimeSlots[dteVal];
+
+					var theSchedulesLength = theSchedules.length;
+					for(var scheduleCounter = 0; scheduleCounter < theSchedulesLength ; scheduleCounter++)
+					{
+						var theSchedule = theSchedules[scheduleCounter];
+
+						scheduledDaysHtml += '<div class="sched-time-entry">';
+							scheduledDaysHtml += '<div class="sched-time-entry-details">';
+								scheduledDaysHtml += '<div class="status-ind fa fa-clock-o"></div>';
+								scheduledDaysHtml += '<div class="sched-activity-name">' + kimble.formatDate(dteVal) + '</div>';
+							scheduledDaysHtml += '</div>';
+							scheduledDaysHtml += '<div class="sched-time-entry-times">';
+								scheduledDaysHtml += '<div class="sched-start-time">' + theSchedule.StartTime + '</div>';
+							if (theSchedule.EndTime != null) scheduledDaysHtml += '<div class="sched-end-time">' + theSchedule.EndTime + '</div>';
+							if (theSchedule.TimeZone != null && theSchedule.TimeZone != '') scheduledDaysHtml += '<div class="sched-time-zone">' + theSchedule.TimeZone + '</div>';
+							scheduledDaysHtml += '</div>';
+						scheduledDaysHtml += '</div>';
+					}
+				}
+				scheduledDaysHtml += '</div>';
+
+				jQuery('.time-slots-container').html(scheduledDaysHtml);
+				jQuery('.assign-popup-scheduled-time-slots-container').show();
+			}
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.GetAssignResourceDefaults}',
+    						assignment.Id, assignment.ResourceId, resourceId, starting.toKimbleUTC(),
+		      			function(result, event){
+		             		if (event.status)
+				            {
+				             	//Fields to update
+				             	if (starting.valueOf() != assignment.StartDate.toDate().valueOf())
+								{
+									jQuery('#StartDate-assign').effect('highlight',2000).attr('title','{!JSENCODE($Label.OriginalLabel)}: ' + jQuery.datepicker.formatDate(kimble.regional.dateFormat, new Date(assignment.StartDate.toDate())));
+								}
+
+				             	jQuery('#EndDate-assign').text(jQuery.datepicker.formatDate(kimble.regional.dateFormat, result.TheActivityAssignment.EndDate.toDate()));
+				             	if (assignment.EndDate.toDate().valueOf() != result.TheActivityAssignment.EndDate.toDate().valueOf())
+								{
+									jQuery('#EndDate-assign').effect('highlight',2000).attr('title','{!JSENCODE($Label.OriginalLabel)}: ' + jQuery.datepicker.formatDate(kimble.regional.dateFormat, assignment.EndDate.toDate()));
+								}
+
+				             	jQuery('#Utilisation-assign').text(jQuery.formatNumber(result.TheActivityAssignment.Utilisation, {format: "#,##0.##", locale:kimble.locale, isFullLocale:false}) + '%');
+
+				             	jQuery('#RemainingUsage-assign').text(jQuery.formatNumber(result.TheActivityAssignment.RemainingUsage, {format: "#.##", locale:kimble.locale, isFullLocale:false}) + ' (' + assignment.ForecastUnits + ')');
+				             	if (result.TheActivityAssignment.RemainingUsage != assignment.RemainingUsage)
+				             	{
+				             		jQuery('#RemainingUsage-assign').effect('highlight',2000).attr('title','{!JSENCODE($Label.OriginalLabel)}: ' + assignment.RemainingUsage + ' (' + assignment.ForecastUnits + ')');
+				             	}
+
+				             	//CostRate
+								if(jQuery('#Cost-assign').length)
+								{
+					             	jQuery('.future-cost-change').remove();
+
+									var costRateSummary = parseCostSummaryJson(result.TheActivityAssignment.CostRateSummary);
+
+								    var costRate = costRateSummary[0].R * result.TheActivityAssignment.ForecastToInvoiceConversionFactor;
+
+									jQuery('#Cost-assign').text(result.BaseCurrency + ' ' + jQuery.formatNumber(costRate, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+
+									if (costRateSummary.length > 1)
+						            {
+						                var $futureCostChange = jQuery('<span class="fa fa-info-circle future-cost-change"/>');
+						                $futureCostChange.data('assignment', result.TheActivityAssignment);
+						                jQuery('#Cost-assign').after($futureCostChange);
+						            }
+
+					             	if (costRateSummary != assignment.CostRates)
+					             	{
+					             		var origCostRateSummary = assignment.CostRates;
+
+					             		jQuery('#Cost-assign').effect('highlight',2000).attr('title','{!JSENCODE($Label.OriginalLabel)}: ' + result.BaseCurrency + ' ' + jQuery.formatNumber(origCostRateSummary[0].R, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+					             	}
+								}
+
+				             	var warningText = new Array();
+
+				             	jQuery('.save-assignment-button').removeClass('btnDisabled').prop('disabled','');
+
+				             	if (result.TheSelectedResource.Resource.StartDate != null && result.TheSelectedResource.Resource.StartDate.toDate() > starting)
+									warningText[warningText.length] = kimble.labels['ResourceAssignedBeforeTheirStartDate'];
+
+								if (result.TheSelectedResource.Resource.EndDate != null && result.TheSelectedResource.Resource.EndDate.toDate() < new Date(result.TheActivityAssignment.EndDate.toDate()))
+									warningText[warningText.length] = kimble.labels['ResourceAssignedAfterTheirEndDate'];
+
+								displayWarnings(warningText);
+				         	}
+				         	else
+				         	{
+				             	alert(event.message);
+				             	var warningText = new Array();
+				             	warningText[warningText.length] = event.message;
+				             	displayWarnings(warningText);
+				         	}
+		         }, 
+		         {escape: false, timeout: 60000});					
+		}
+
+		function displayWarnings(warningText)
+		{
+			if (warningText.length > 0)
+			{
+				jQuery('#assig-warning').show();
+				var combinedWarning = '';
+				for(var i=0;i<warningText.length;i++)
+				{
+					combinedWarning += '<div>' + warningText[i] + '</div>';
+				}
+				jQuery('#assign-warning-text').empty();
+				jQuery(combinedWarning).appendTo(jQuery('#assign-warning-text'));
+			}
+  		}
+		
+		function parseCostSummaryJson (j)
+		{
+			return kimble.parseJSON(j.replace(/"CostRate"/g, '"R"').replace(/"FromDate"/g, '"D"'));
+		};
+		
+		function parseRevenueSummaryJson (j)
+		{
+			return kimble.parseJSON(j.replace(/"RevenueRate"/g, '"R"').replace(/"FromDate"/g, '"D"'));
+		};
+		
+		function cancelAssignment()
+		{
+			//close modal
+			hideModalBoxy();
+			
+			//Clean up dropped assignment
+			dragElement.remove();
+			
+			jQuery('.drag-active-day').removeClass('drag-active-day');
+			jQuery('.drag-active-resource').removeClass('drag-active-resource');
+		}
+		
+		function saveAssignment(btn)
+		{
+			jQuery('.save-assignment-button').addClass('btnDisabled').prop('disabled','disabled');
+			jQuery('#preference-change-info-container').hide();
+			var forDePreference = '';
+
+			if (jQuery('#edit-fulfilment-mode').is(':visible'))
+			{
+			    asCandidate = jQuery('#radio-candidate').prop('checked');
+   			}
+
+   			if(asCandidate)
+   			{
+
+   			    isPreferred = jQuery('#is-preferred-candidate').prop('checked');
+
+   			    if(isPreferred)
+   			    {
+   			        var forDePreferenceArray = [];
+
+   			        for(var i = 0; i < assignedCandidates.length; i++)
+   			        {
+   			            if(assignedCandidates[i].resourceId != theResourceToAssign.Id &&
+   			            	assignedCandidates[i].IsPreferred)
+   			            {
+   			                forDePreferenceArray.push(assignedCandidates[i].AssignmentId);
+   			            }
+              		}
+              		forDePreference = forDePreferenceArray.length > 0 ? forDePreferenceArray.join(',') : '';
+          		}
+      		}
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.AssignResource}',
+    						reassignAssignmentId, theResourceToAssign.Id, reassignAssignmentStart.toKimbleUTC(), asCandidate, ganttViewStartDate, ganttViewEndDate, isPreferred, forDePreference,
+		      			function(result, event){          
+		             		
+		             		cancelAssignment();
+		             		
+		             		if (event.status) 
+				            {
+								result[1].ResourceName = theResourceToAssign.Name;
+								result[1].IsPreferred = isPreferred;
+								result[1].AssignmentDemandId = reassignAssignmentDemandId;
+
+				             	jQuery.publish('kimble.assignResourceCompleted', {result:result});
+
+				             	jQuery.each(result, function(i,r){
+				             		jQuery.publish('kimble.assignmentReassigned', r);
+				             	});
+				             	
+				             	jQuery('.save-assignment-button').removeClass('btnDisabled').prop('disabled','');
+				             									             	
+				         	} 
+				         	else if (event.type === 'exception') 
+				         	{
+				             	alert(event.message);
+				         	} 
+				         	else 
+				         	{
+				             	alert(event.message);
+				         	}
+		         }, 
+		         {escape: true, timeout: 60000});
+		}
+	
+	</script>
+	</div>
+
+</apex:page>

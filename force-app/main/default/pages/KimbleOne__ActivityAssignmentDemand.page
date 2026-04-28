@@ -1,0 +1,2446 @@
+<apex:page standardController="KimbleOne__ActivityAssignmentDemand__c" extensions="KimbleOne.ActivityAssignmentDemandController,KimbleOne.ActivityAssignmentRemoteActions,KimbleOne.CapabilitySearchRemoteAction" showHeader="true" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+      	<div id="filterContainer" style="width:203px;float:left;height:auto;margin-right:10px;">
+		
+		<div class="handlebarContainer k-handlebar" id="handlebarContainer">
+			<div class="indicator" id="pinIndicator"></div>
+			<div class="indicator" id="pinIndicator2"></div>
+			<div class="pinBox" id="handle">&nbsp;</div>
+		</div>
+		<!--  -->
+		<div id="sidebarDiv"  class="fixed">
+				<div style="position:relative;" class="sidebarModuleHeader"><h2>{!$Label.ResourceFilter}&nbsp;<a  id="goBtn" style="color: white;position: absolute;right: 8px;" href="javascript:void(0);" onclick="findResources('{!JSINHTMLENCODE(TheDemandAssignment.Id)}')">{!$Label.GoButton}</a><i class="search-working go-spinner fa fa-spin fa-circle-o-notch"></i></h2></div>
+				<br/>
+				<apex:repeat value="{!criteria}" var="criterion">
+					<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'dropdown'}">
+						<div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!JSINHTMLENCODE(criterion.Label)}</div>
+						<select id="{!JSENCODE(criterion.Id)}-filter"  multiple="true" style="width:100%">
+							<apex:repeat value="{!criterion.TheOptions}" var="opt">
+								<option value="{!JSINHTMLENCODE(opt.id)}"><apex:outputText value="{!opt.Text}"/></option>
+							</apex:repeat>
+						</select>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'text' || criterion.DisplayType == 'lookup'}">
+						<div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!JSINHTMLENCODE(criterion.Label)}</div>						
+						<input type="hidden" id="{!JSINHTMLENCODE(criterion.Id)}-filter" style="width:100%"/>
+					</apex:outputPanel>
+					
+					<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'date' || criterion.DisplayType == 'numeric'}">
+						<div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!JSINHTMLENCODE(criterion.Label)}</div>
+						<table border="0" cellpadding="0" cellspacing="0" style="font-size: 11px;color: #4a4a56;">
+							<tr>
+								<td><span style="margin-left: 4px;">{!$Label.LessThanLabel}</span></td>
+								<td><span style="margin-left: 4px;">{!$Label.EqualToLabel}</span></td>
+								<td><span style="margin-left: 4px;">{!$Label.GreaterThanLabel}</span></td>
+							</tr>
+							<tr>
+								<td style="padding-right: 2px;">
+									<div style="border: 2px solid #E0E0E0;height: 25px;width: 57px;padding-left: 4px;vertical-align: middle;display: table-cell;">
+										<input id="{!JSINHTMLENCODE(criterion.Id)}-lt-filter" type="text" style="width: 57px;font-size: 11px;border: 0;outline: 0;"/>
+									</div>
+								</td>
+								<td style="padding-right: 2px;">
+									<div style="border: 2px solid #E0E0E0;height: 25px;width: 57px;padding-left: 4px;vertical-align: middle;display: table-cell;">
+										<input id="{!JSINHTMLENCODE(criterion.Id)}-eq-filter" type="text" style="width: 57px;font-size: 11px;border: 0;outline: 0;"/>
+									</div>
+								</td>
+								<td style="padding-right: 2px;">
+									<div style="border: 2px solid #E0E0E0;height: 25px;width: 57px;padding-left: 4px;vertical-align: middle;display: table-cell;">
+										<input id="{!JSINHTMLENCODE(criterion.Id)}-gt-filter" type="text" style="width: 57px;font-size: 11px;border: 0;outline: 0;"/>
+									</div>
+								</td>
+								
+							</tr>
+						</table>
+					</apex:outputPanel>
+					
+				</apex:repeat>
+				
+				<div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;display: inline-block;">{!$ObjectType.KimbleOne__RequiredCapability__c.LabelPlural}</div><span class="fa fa-pencil-square-o edit-req-cap-btn" title="{!$Label.Edit}"/>
+
+				<table class="required-capabilities-summary">
+	    			<thead>
+<!-- 	    				<th><apex:outputText value="{!$ObjectType.KimbleOne__RequiredCapability__c.Fields.KimbleOne__CapabilityType__c.Label}"/></th> -->
+						<th></th>
+	    				<th class="min-rating-col hide-until-caps"><apex:outputText value="{!$ObjectType.KimbleOne__RequiredCapability__c.Fields.KimbleOne__MinimumNumericRating__c.Label}"/></th>
+	    			</thead>
+	    			<tbody class="required-capability-rows">
+						<apex:repeat value="{!RequiredCapabilities}" var="cap" >
+   							<tr>
+   								<td class="req-cap-name" title="{!JSENCODE(IF(cap.IsMandatory == true, $ObjectType.RequiredCapability__c.Fields.IsMandatory__c.Label,''))}">
+   									<div class="req-cap-item {!JSENCODE(IF(cap.IsMandatory == true, 'mandatory',''))}" req-cap-id="{!JSENCODE(cap.Id)}" cap-rating-type="{!JSENCODE(cap.RatingType)}" cap-rating="{!cap.MinimumNumericRating}" cap-type-id="{!JSENCODE(cap.TypeId)}">
+   										<apex:outputText styleClass="req-cap-item-name" value="{!cap.TypeName}"/>
+   										<div class="remove-req-cap-item-btn" title="{!$Label.kimbleone__remove}"/>
+ 									</div>
+ 								</td>
+								<td class="req-cap-min-rating">
+									<apex:outputText styleClass="req-cap-item-rating-val" value="{!IF(!ISBLANK(cap.MinimumNumericRatingText), cap.MinimumNumericRatingText, cap.MinimumNumericRating)}"/>
+								</td>
+							</tr>
+						</apex:repeat>
+					</tbody>
+				</table>
+				
+				<apex:outputPanel layout="none" rendered="{!EnableAvailabilityScoring}">
+					<div class="availability-scoring-heading" style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!JSENCODE($Label.IncludeAvailabilityScore)}</div>
+					<div class="availability-scoring-toggle">
+					<div class='availability-scoring-toggle-labels off'>{!JSENCODE($Label.OffLabel)}</div><i class='k-tgl fa fa-toggle-on availability-scoring-toggle-on'></i>
+					<i class='k-tgl fa fa-toggle-off availability-scoring-toggle-off hidden-item'></i><div class='availability-scoring-toggle-labels on'>{!JSENCODE($Label.On)}</div>
+					</div>
+
+					<div id="availability-score-min">
+					<div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!JSENCODE($Label.MinimumAvailabilityScore)}</div>
+					<table border="0" cellpadding="0" cellspacing="0" style="font-size: 11px;color: #4a4a56;width: 100%;">
+						<tr>
+							<td style="padding-right: 2px; padding-left: 134px;">
+								<div style="border: 2px solid #E0E0E0;height: 25px;width: 57px;padding-left: 4px;vertical-align: middle;display: table-cell;">
+									<input id="min-avail-score" type="text" class="centre-align-int" style="width: 57px;font-size: 11px;border: 0;outline: 0;" value="{!MinimumAvailabilityScore}"/>
+								</div>
+							</td>
+						</tr>
+					</table>
+					</div>					
+				
+					<div id="availability-score-filter">
+						<div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!JSENCODE($Label.AvailabilityScoreClasses)}</div>						
+						<input type="hidden" id="{!$ObjectType.ActivityAssignmentClass__c.Fields.IncludeInAvailabilityScorePercentage__c.Label}-filter" style="width:100%"/> 
+					</div>				
+				</apex:outputPanel>
+				<apex:outputPanel layout="none" rendered="{!EnableIntegratedCandidateResources}">
+					<div class="candidate-resources-heading" style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!JSENCODE($Label.IncludeCandidateResources)}</div>
+					<div class="candidate-resources-toggle">
+						<div class='candidate-resources-toggle-labels off'>{!JSENCODE($Label.OffLabel)}</div>
+							<i class='k-tgl fa fa-toggle-on candidate-resources-toggle-on hidden-item'></i>
+							<i class='k-tgl fa fa-toggle-off candidate-resources-toggle-off'></i>
+							<div class='candidate-resources-toggle-labels on'>{!JSENCODE($Label.On)}</div>
+					
+					</div>
+				</apex:outputPanel>
+		</div><!-- sidebarDiv End -->
+	</div><!-- filterContainer End -->
+	
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__GanttView)}" />
+	<apex:includeScript value="{!URLFOR($Page.KimbleOne__GanttViewJs)}" />
+	<apex:stylesheet value="{!URLFOR($Page.KimbleOne__GanttViewCss)}"/>
+
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+	
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__ActivityAssignmentUsagePattern)}" />
+		
+	<script>
+		var fulfilmentMode = '<apex:outputText value="{!KimbleOne__ActivityAssignmentDemand__c.FulfilmentMode__r.KimbleOne__Enum__c}"/>';
+		
+		var ganttViewStartDate = '{!YEAR(GanttViewProperties.StartDate)}-{!MONTH(GanttViewProperties.StartDate)}-{!DAY(GanttViewProperties.StartDate)}';
+		var ganttViewEndDate = '{!YEAR(GanttViewProperties.EndDate)}-{!MONTH(GanttViewProperties.EndDate)}-{!DAY(GanttViewProperties.EndDate)}';
+
+		var defaultView = '<apex:outputText value="{!GanttViewProperties.DefaultView}"/>';
+								
+		var theGlobalNonBusinessDays = new Object();
+	    <apex:outputText value="theGlobalNonBusinessDays={!GanttViewProperties.GlobalNonBusDaysJson};" rendered="{!!ISBLANK(GanttViewProperties.GlobalNonBusDaysJson)}"/>
+		
+		var theCalendarNonBusinessDays = new Object();
+	    <apex:outputText value="theCalendarNonBusinessDays={!GanttViewProperties.CalendarNonBusDaysJson};" rendered="{!!ISBLANK(GanttViewProperties.CalendarNonBusDaysJson)}"/>
+		
+		var zoomLevel = <apex:outputText value="{!GanttViewProperties.ZoomLevel}"/>;
+		var showAccountInSummary = <apex:outputText value="{!GanttViewProperties.ShowAccountInSummary}"/>;
+		var showNonBusDays = <apex:outputText value="{!GanttViewProperties.ShowNonBusDays}"/>; 
+		var classificationStyleMap = {!GanttViewProperties.TheJsonClassificationsMap};
+		
+		var candidateResources = new Object();
+		<apex:outputText value="candidateResources={!CandidateResourcesJson};" rendered="{!!ISBLANK(CandidateResourcesJson)}"/>
+		
+		var matchingCandidates = new Array();
+		<apex:outputText value="matchingCandidates={!MatchingResourcesJson};" rendered="{!!ISBLANK(MatchingResourcesJson)}"/>
+
+		var priorityName = '<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignmentClass__c.Fields.KimbleOne__Priority__c.Name}"/>';
+		var includeAvailabilityScoreName = '<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignmentClass__c.Fields.KimbleOne__IncludeInAvailabilityScorePercentage__c.Name}"/>';
+		var activityAssignmentIdName =  '<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignmentClass__c.Fields.Id.Name}"/>'
+		var activityAssignmentName =  '<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignmentClass__c.Fields.Name.Name}"/>'
+		
+		var maxRecords = {!GanttViewProperties.MaxRecords};
+		var loadAllResourceHtml = {!IF(GanttViewProperties.LoadAllResourceHtml, 'true','false')};
+
+	  	/* Capability Management */
+	  	// js copy of the RequiredCapabilities that can be edited in UI and doesn't change underlying demand config
+	    var theCurrentRequiredCapabilities = kimble.parseJSON("{!JSENCODE(RequiredCapabilitiesJson)}"); 
+	    
+		kimble.labels['CapMeetsRequirement'] = '{!JSENCODE($Label.MeetsRequirementLabel)}';
+		kimble.labels['CapMeetsOrExceedsRequirement'] = '{!JSENCODE($Label.MeetsOrExceedsRequirementLabel)}';
+		kimble.labels['CapMissingMandatoryRequirement'] = '{!JSENCODE($Label.MissingMandatoryRequirementLabel)}';
+		kimble.labels['CapMissingRequirement'] = '{!JSENCODE($Label.MissingRequirementLabel)}';
+		kimble.labels['CapFallsShortOfRequirement'] = '{!JSENCODE($Label.FallsShortOfRequirementLabel)}';
+		kimble.labels['CapExceedsRequirement'] = '{!JSENCODE($Label.ExceedsRequirementLabel)}';
+		kimble.labels['CapExpiryDate'] = '{!$ObjectType.ResourceCapability__c.fields.ExpiryDate__c.label}';
+		kimble.labels['CapExpired'] = '{!JSENCODE($Label.ExpiredCapabilityLabel)}';
+		kimble.labels['CapExpiring'] = '{!JSENCODE($Label.ExpiredCapabilityLabel)}';
+		
+		kimble.labels['CannotMeetScheduledDay'] = '{!JSENCODE($Label.CannotMeetScheduledDayLabel)}';
+		kimble.labels['ResourceHasScheduledDays'] = '{!JSENCODE($Label.ResourceHasScheduledDays)}';
+		kimble.labels['ResourceHasOverlappingAssignments'] = '{!JSENCODE($Label.ResourceHasOverlappingAssignments)}';
+
+		var enableAutoMatchResourcing = <apex:outputText value="{!EnableAutoMatchResourcing}"/>;
+    	var enableExpressInterest = <apex:outputText value="{!EnableExpressInterest}"/>;
+	</script>
+
+	<script>
+			
+		jQuery(document).ready(function() {
+			
+			jQuery('#handlebarContainer').click(function(){
+				jQuery(this).parent().toggleClass('sidebarCollapsed');
+				jQuery('#layout-container').layout().resizeAll();
+			})
+			.mouseenter(function(){jQuery(this).toggleClass('hover');})
+			.mouseleave(function(){jQuery(this).toggleClass('hover');});
+			
+			<apex:repeat value="{!criteria}" var="criterion">
+						
+				<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'dropdown'}">
+					jQuery('[id="{!JSENCODE(criterion.Id)}-filter"]').select2();
+					jQuery('[id="{!JSENCODE(criterion.Id)}-filter"]').select2('data',  kimble.parseJSON("{!JSENCODE(criterion.ValuesJson)}") );
+				</apex:outputPanel>
+				
+				<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'lookup'}">
+					jQuery('[id="{!JSENCODE(criterion.Id)}-filter"]').select2({
+	            		minimumInputLength: 2,
+	            		multiple: true,
+	            		query: function (query) {
+	            		
+	            			var find = function() {findLookupValues('{!JSINHTMLENCODE(criterion.ReferenceTo)}', '{!JSINHTMLENCODE(criterion.DataSource)}', '{!JSINHTMLENCODE(criterion.FieldPath)}', query, '{!JSINHTMLENCODE(criterion.criteria)}');};        		
+	        				//jQuery.debounce( 100, find);
+	        				find();
+	            		}
+        			});
+        			jQuery('[id="{!JSENCODE(criterion.Id)}-filter"]').select2('data',  kimble.parseJSON("{!JSENCODE(criterion.ValuesJson)}")  );
+        		</apex:outputPanel>
+        		
+				<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'numeric'}">
+					
+					var n =  kimble.parseJSON("{!JSENCODE(criterion.ValuesJson)}") ;
+					
+					if (n != null && n['LessThan'] != null) jQuery('#{!JSENCODE(criterion.Id)}-lt-filter').val(n['LessThan'][0].text);
+					 
+					if (n != null && n['Equals'] != null) jQuery('#{!JSENCODE(criterion.Id)}-eq-filter').val(n['Equals'][0].text);
+					
+					if (n != null && n['GreaterThan'] != null) jQuery('#{!JSENCODE(criterion.Id)}-gt-filter').val(n['GreaterThan'][0].text);
+										
+				</apex:outputPanel>
+        		
+        		<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'text'}">
+					jQuery('[id="{!JSENCODE(criterion.Id)}-filter"]').select2({maximumSelectionSize: 1,tags:[],tokenSeparators: [",", " "]});
+					jQuery('[id="{!JSENCODE(criterion.Id)}-filter"]').select2('data',  kimble.parseJSON("{!JSENCODE(criterion.ValuesJson)}") );
+				</apex:outputPanel>
+				
+			</apex:repeat>
+			
+			<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheDemandAssignment.KimbleOne__ActivityRole__c)}">
+			jQuery('[id="{!$ObjectType.KimbleOne__ResourceActivityRole__c.Name}{!$ObjectType.KimbleOne__ResourceActivityRole__c.Fields.KimbleOne__ActivityRole__c.Name}-filter"]').select2('data',  kimble.parseJSON("[{\"text\":\"{!JSINHTMLENCODE(TheDemandAssignment.ActivityRole__r.Name)}\",\"id\":\"{!JSINHTMLENCODE(TheDemandAssignment.KimbleOne__ActivityRole__c)}\"}]"));
+			</apex:outputPanel>
+			
+			<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheDemandAssignment.KimbleOne__Location__c)}">
+			jQuery('[id="{!$ObjectType.KimbleOne__Resource__c.Name}{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__Location__c.Name}-filter"]').select2('data',  kimble.parseJSON("[{\"text\":\"{!JSINHTMLENCODE(TheDemandAssignment.Location__r.Name)}\",\"id\":\"{!JSINHTMLENCODE(TheDemandAssignment.KimbleOne__Location__c)}\"}]"));
+			</apex:outputPanel>
+			
+			<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheDemandAssignment.Resource__r.KimbleOne__BusinessUnit__c)}">
+			jQuery('[id="{!$ObjectType.KimbleOne__Resource__c.Name}{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__BusinessUnit__c.Name}-filter"]').select2('data',  kimble.parseJSON("[{\"text\":\"{!JSINHTMLENCODE(TheDemandAssignment.Resource__r.BusinessUnit__r.Name)}\",\"id\":\"{!JSINHTMLENCODE(TheDemandAssignment.Resource__r.KimbleOne__BusinessUnit__c)}\"}]"));
+			</apex:outputPanel>
+			
+			<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheDemandAssignment.Resource__r.KimbleOne__Grade__c)}">
+			jQuery('[id="{!$ObjectType.KimbleOne__Resource__c.Name}{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__Grade__c.Name}-filter"]').select2('data',  kimble.parseJSON("[{\"text\":\"{!JSINHTMLENCODE(TheDemandAssignment.Resource__r.Grade__r.Name)}\",\"id\":\"{!JSINHTMLENCODE(TheDemandAssignment.Resource__r.KimbleOne__Grade__c)}\"}]"));
+			</apex:outputPanel>
+			
+   			jQuery(document).off('click', '.edit-req-cap-btn, .required-capabilities-summary').on('click', '.edit-req-cap-btn, .required-capabilities-summary', function(){
+				initialiseModalBoxy('#AssignmentRequiredCapabilities', '{!$ObjectType.ActivityAssignmentDemand__c.label} {!$Label.Profile}');
+				loadAssignmentProfile('{!JSINHTMLENCODE(TheDemandAssignment.Id)}', false);
+			});
+			
+			jQuery(document).off('click', '.required-capability-rows').on('click', '.required-capability-rows', function(e) { e.stopPropagation();});
+			
+			jQuery('.demand-action').html(getDemandIconAndActionHtml());
+		    if(jQuery('.demand-action .toolbar-icons:empty').length > 0) jQuery('.demand-action').hide();
+
+			jQuery('#goBtn').focus();
+			
+			jQuery(document).off('click', '.score-cell.capability-score').on('click', '.score-cell.capability-score', jumpToCapabilityScoringView);
+   			
+			jQuery(document).off('click', '.remove-req-cap-item-btn').on('click', '.remove-req-cap-item-btn', function(){
+				var typeId = jQuery(this).closest('div[cap-type-id]').attr('cap-type-id');
+				for(var requiredCapabilityCounter = 0; requiredCapabilityCounter < theCurrentRequiredCapabilities.length; requiredCapabilityCounter++)
+				{
+				    var capability = theCurrentRequiredCapabilities[requiredCapabilityCounter];
+				    
+				    if(capability.TypeId == typeId)
+				    {
+				    	theCurrentRequiredCapabilities.splice(requiredCapabilityCounter, 1 );
+				    	break;
+			    	}
+				}
+				redrawRequiredCapabilitySummary();
+			});
+			
+			if(availabilityScoringEnabled) {
+				var unformattedActivityAssignmentClasses = new Array();
+				<apex:outputText value="unformattedActivityAssignmentClasses={!GanttViewProperties.TheActivityAssignmentClassesJson};" rendered="{!!ISBLANK(GanttViewProperties.TheActivityAssignmentClassesJson)}"/>
+			
+				jQuery('[id="{!$ObjectType.ActivityAssignmentClass__c.Fields.IncludeInAvailabilityScorePercentage__c.Label}-filter"]').select2({
+	           		multiple: true,
+	           		data: function(x) {
+	           			var d = [];
+			           	for(var i = 0; i < unformattedActivityAssignmentClasses.length; i++) {
+	         				d[i] = {id: unformattedActivityAssignmentClasses[i][activityAssignmentIdName], text: unformattedActivityAssignmentClasses[i][activityAssignmentName]};
+	           			}
+	           			return {'results': d};
+	           		}
+	      		});
+
+	      		jQuery('[id="{!$ObjectType.ActivityAssignmentClass__c.Fields.IncludeInAvailabilityScorePercentage__c.Label}-filter"]').val(function() {
+	      			var selected = [];
+	      			for(var i = 0; i < unformattedActivityAssignmentClasses.length; i++) {
+	         			if(unformattedActivityAssignmentClasses[i][includeAvailabilityScoreName]) selected.push(unformattedActivityAssignmentClasses[i][activityAssignmentIdName]);
+	           		}
+	           		return selected;
+	      		}).trigger('change');
+	      		
+	      		
+	      		jQuery('[id="{!$ObjectType.ActivityAssignmentClass__c.Fields.IncludeInAvailabilityScorePercentage__c.Label}-filter"]').on('change', function (e) {
+	      			var selected = jQuery(this).val().split(",");
+	      			for(var i = 0; i < unformattedActivityAssignmentClasses.length; i++) {
+	         			if(selected.includes(unformattedActivityAssignmentClasses[i][activityAssignmentIdName])) availabilityScoringClassMap[unformattedActivityAssignmentClasses[i][priorityName]] = true;
+	         			else availabilityScoringClassMap[unformattedActivityAssignmentClasses[i][priorityName]] = false;
+	           		}
+	      		});
+
+				var allowedKeys = ['0','1','2','3','4','5','6','7','8','9'];
+				var allowedKeyCodes = [8,9,37,39]; //backspace, tab, left and right arrows
+				jQuery('#min-avail-score').on('keydown', function(e) {if(!allowedKeyCodes.includes(e.keyCode ? e.keyCode : e.which) && !allowedKeys.includes(e.key)) e.preventDefault(); });
+				jQuery('#min-avail-score').on('focusout', function(e) { if(e.target.value > 100) e.target.value = 100; });
+      		}
+			
+			jQuery('.availability-scoring-toggle-on').on('click', {includeOn: false},toggleAvailabilityScoring);
+			jQuery('.availability-scoring-toggle-off').on('click', {includeOn: true}, toggleAvailabilityScoring);
+			jQuery('.availability-scoring-toggle-labels.off').on('click', {includeOn: false}, toggleAvailabilityScoring);
+			jQuery('.availability-scoring-toggle-labels.on').on('click', {includeOn: true}, toggleAvailabilityScoring);	
+			
+			jQuery('.candidate-resources-toggle-on').on('click', {includeOn: false}, togglesCandidateResources);
+			jQuery('.candidate-resources-toggle-off').on('click', {includeOn: true}, togglesCandidateResources);
+			jQuery('.candidate-resources-toggle-labels.off').on('click', {includeOn: false}, togglesCandidateResources);
+			jQuery('.candidate-resources-toggle-labels.on').on('click', {includeOn: true}, togglesCandidateResources);	
+			
+			if(jQuery('.required-capability-rows td.req-cap-name').length) jQuery('.hide-until-caps').removeClass('hide-until-caps');
+
+			<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheDemandAssignment.KimbleOne__ModelActivityAssignment__c)}">
+
+			jQuery.subscribe('kimble.modelpopulated', function(e){
+				jQuery('.modelled-demand-ind').qtip({
+				    content:{
+				        button: 'Close',
+				        text: function(event, api) {
+						return jQuery('#assignment-model-details').html();
+					}},
+					position: { adjust: { method: 'flip flip'
+						},
+						viewport: $(window)
+					},
+					show: { solo: true, ready: true },
+					hide: 'unfocus',
+					style: {classes: 'qtip-light qtip-shadow qtip-rounded model-details-tip'}});
+			});
+
+			jQuery(document).on('click', '.modelled-demand-ind', function() {
+				var j = jQuery(this);
+
+				//destroy all first
+				jQuery('.modelled-demand-ind').qtip('destroy', true);
+
+				getModelAssignmentDetails('{!JSENCODE(TheDemandAssignment.ModelActivityAssignment__c)}', '{!JSENCODE(TheDemandAssignment.Id)}');
+			});
+
+			</apex:outputPanel>
+
+			jQuery.subscribe('kimble.activityassignmentcandidatestatuschange', function(e, accepted){
+			    // action depends on whether we've accepted or rejected a candidate
+			    if(accepted)
+			    	redirectAfterAction();
+				else
+			    	window.location.reload();
+			});
+		});
+		
+		jQuery(window).load(function() {
+			<apex:repeat value="{!criteria}" var="criterion">
+        		<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'date'}">
+					
+					var d = kimble.parseJSON("{!JSENCODE(criterion.ValuesJson)}") ;
+					
+					jQuery('#{!JSENCODE(criterion.Id)}-lt-filter').datepicker({
+					   	dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+						showOtherMonths: true,
+						selectOtherMonths: true
+					});
+					
+					if (d != null && d['LessThan'] != null) jQuery('#{!JSENCODE(criterion.Id)}-lt-filter').datepicker("setDate", d['LessThan'][0].text.toDate()); 
+					
+					jQuery('#{!JSENCODE(criterion.Id)}-eq-filter').datepicker({
+					   	dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+						showOtherMonths: true,
+						selectOtherMonths: true
+					});
+					
+					if (d != null && d['Equals'] != null) jQuery('#{!JSENCODE(criterion.Id)}-eq-filter').datepicker("setDate", d['Equals'][0].text.toDate()); 
+					
+					jQuery('#{!JSENCODE(criterion.Id)}-gt-filter').datepicker({
+					   	dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+						showOtherMonths: true,
+						selectOtherMonths: true
+					});
+					
+					if (d != null && d['GreaterThan'] != null) jQuery('#{!JSENCODE(criterion.Id)}-gt-filter').datepicker("setDate", d['GreaterThan'][0].text.toDate()); 
+										
+				</apex:outputPanel>
+			</apex:repeat>
+
+			jQuery('.demand-status').html(getDemandStatusHtml());
+		});
+		
+		function toggleAvailabilityScoring(e) {
+			if(e.data.includeOn != availabilityScoringEnabled) {
+				availabilityScoringEnabled = e.data.includeOn;
+				jQuery('.availability-scoring-toggle-on').toggleClass('hidden-item');
+				jQuery('.availability-scoring-toggle-off').toggleClass('hidden-item');
+				jQuery('#availability-score-filter').toggleClass('hidden-item');
+				jQuery('#availability-score-min').toggleClass('hidden-item');
+			}
+		}
+				
+		function togglesCandidateResources(e) {
+			if(e.data.includeOn != candidateResourcesDisplayed) {
+				candidateResourcesDisplayed = e.data.includeOn;
+				jQuery('.candidate-resources-toggle-on').toggleClass('hidden-item');
+				jQuery('.candidate-resources-toggle-off').toggleClass('hidden-item');
+			}
+		}
+		
+		function findLookupValues(reference, dataSourceQuery, fieldName, query, criteria)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentDemandController.FindLookupValues}',
+	       		reference, unescapeXML(dataSourceQuery), fieldName, query.term, unescapeXML(criteria),
+	      			function(result, event){          
+	             		 if (event.status) 
+			             {
+			             	var data = {};
+			             	data.results = result;
+			             	query.callback(data);
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+	         	}, 
+	         	{escape: true, timeout: 60000}
+	     	);
+		}
+		
+		function showDetailsView()
+		{
+			jQuery('#footer').hide();
+			jQuery('#gantt-view').hide();
+			jQuery('#chatter-view').hide();
+			jQuery('#demand-view').show();			
+			jQuery('#scoring-view').hide();
+			
+			jQuery('div.qtip:visible').qtip('hide');
+		}
+		
+		function showCapabilityScoringView()
+		{
+			drawCapabilityScoringView();
+		
+			// temporarily hide any existing assignment rows
+			jQuery('tr.resource-assignment').addClass('hide-while-scoring');
+			jQuery('div.dragging-scroll').addClass('hide-while-scoring');
+			jQuery('a.resource-link').addClass('disable-white-scoring');
+			jQuery('#footer').hide();
+			jQuery('#gantt-view').hide();
+			jQuery('#chatter-view').hide();
+			jQuery('#demand-view').hide();
+			jQuery('#scoring-view').show();
+			
+			//align scoring view with resource view
+			jQuery('#cap-score-resource-rows-container').scrollTo(jQuery('#gantt-vertical-scroll-container').scrollTop());
+			
+			jQuery('div.qtip:visible').qtip('hide');
+		}
+		
+		function showGanttView()
+		{
+			jQuery('tr.resource-assignment').removeClass('hide-while-scoring');
+			jQuery('div.dragging-scroll').removeClass('hide-while-scoring');
+			jQuery('a.resource-link').removeClass('disable-white-scoring');
+			jQuery('#chatter-view').hide();
+			jQuery('#demand-view').hide();
+			jQuery('#gantt-view').show();
+			jQuery('#footer').show();																
+			jQuery('#scoring-view').hide();
+			
+			jQuery(window).resize();
+			
+		}
+	
+		function showChatterView()
+		{
+			jQuery('#footer').hide();
+			jQuery('#demand-view').hide();
+			jQuery('#gantt-view').hide();
+			jQuery('#chatter-view').show();									
+			jQuery('#scoring-view').hide();
+			
+			jQuery('div.qtip:visible').qtip('hide');
+		}
+		
+		function getResourceIconOverlay(resource)
+		{
+			if (candidateResources[resource.Id] == null) return '';
+			
+			if (candidateResources[resource.Id].Status == "Declined") 
+				return '<i class="fa fa-circle fa-stack-1x resource-status-circle rejected"></i><i class="fa fa-times fa-stack-1x resource-status-rejected"></i>';
+			
+			if (candidateResources[resource.Id].Status == "Accepted")
+				return  '<i class="fa fa-circle fa-stack-1x resource-status-circle accepted"></i><i class="fa fa-check fa-stack-1x resource-status-accepted"></i>';
+				
+			if (candidateResources[resource.Id].Status == "Proposed")
+				return  '<i class="fa fa-circle fa-stack-1x resource-status-circle pending"></i><i class="fa fa-ellipsis-h fa-stack-1x resource-status-pending"></i>';
+			
+			return '';
+		}
+		
+		function getResourceActionsHtml(resource)
+		{
+			if (candidateResources[resource.Id] == null || candidateResources[resource.Id].Status == "Accepted")
+	   		{
+	   		 	return '';
+	   		}
+	   		else if (candidateResources[resource.Id].Status == "Declined")
+	   		{
+	   		 	return '<a style="actionLink" href="javascript:void(0)" onclick="deleteCandidate(\'' + resource.Id + '\', this)" title="' + '{!JSENCODE($Label.DeleteButton)}' + '"><i class="fa fa-trash-o"></i></a>'; 	
+	   		}
+	   		
+	   		var actionHtml = '<a style="actionLink" href="javascript:void(0)" onclick="acceptCandidate(\'' + resource.Id + '\', this)" title="' + '{!JSENCODE($Label.AcceptLabel)}' + '"><i class="fa fa-thumbs-o-up"></i></a>';
+			actionHtml += '<a style="actionLink" href="javascript:void(0)" onclick="rejectCandidate(\'' + resource.Id + '\', this)" title="' + '{!JSENCODE($Label.RejectLabel)}' + '"><i class="fa fa-thumbs-o-down"></i></a>';
+			actionHtml += '<a style="actionLink" href="javascript:void(0)" onclick="deleteCandidate(\'' + resource.Id + '\', this)" title="' + '{!JSENCODE($Label.DeleteButton)}' + '"><i class="fa fa-trash-o"></i></a>';
+			 	
+			return actionHtml	 		   		
+		}
+
+		var demandStatus = '{!JSENCODE(TheDemand.Status__r.Enum__c)}';
+		var amStatus = '{!JSENCODE(AutoMatchStatus)}';
+		var demandIsPublished = {!ExpIntPublished};
+		var amRes = {!ResourceIsAutoMatch};
+		var hasExpIntCand = {!HasExpIntCandidates};
+
+		function getDemandActionsHtml()
+		{
+	   		var actionHtml = '';
+
+			if(Object.keys(candidateResources).length > 0) actionHtml += '<a style="actionLink" href="javascript:void(0)" class="ad-cand-rev-btn" onclick="showCandidateReview();" title="' + '{!JSENCODE($Label.ReviewCandidates)}' + '"><i class="fa fa-thumbs-o-up"></i><i class="fa fa-thumbs-o-down"></i></a>';
+			if(enableAutoMatchResourcing && demandStatus != "Fulfilled" && amRes) actionHtml += '<a href="javascript:void(0);" class="demand-auto-match-button" onclick="autoMatchDemandAssignment();" title="{!$Label.SubmitDemandForAutoMatching}" ><i class="fa fa-puzzle-piece"></i></a>';
+			if(enableExpressInterest && demandStatus != "Fulfilled" && amStatus != "Pending") actionHtml += '<a href="javascript:void(0);" class="' + (demandIsPublished != true ? ' demand-publish-button' : ' demand-published') + '" onclick="' + (demandIsPublished != true ? 'publishDemandAssignment();' : '') + '" title="' + (demandIsPublished != true ? '{!$Label.PublishDemandForExpressInterest}' : '{!$Label.PublishedDemandForExpressInterest}') + '" ><i class="fa fa-bullhorn"></i></a>';
+
+			return actionHtml
+		}
+		
+		function getDemandIconAndActionHtml()
+		{
+		    var actionHtml = '';
+
+		    // only render the cog if there are applicable actions
+		    if(Object.keys(candidateResources).length > 0 || enableAutoMatchResourcing || enableExpressInterest)
+		    {
+				actionHtml += '<a class="action-icon" title="' + kimble.labels['ClickForActionsMessage'] + '" actionId="{!ActivityAssignmentDemand__c}"><i class="fa fa-cog"></i></a>';
+
+				actionHtml += '<div id="action-options-{!ActivityAssignmentDemand__c}" class="toolbar-icons" style="display: none;">';
+				actionHtml += getDemandActionsHtml();
+				actionHtml += '</div>'
+			}
+
+			return actionHtml;
+		}
+
+		function getDemandStatusHtml()
+		{
+		    var statusHtml = '';
+
+			if(enableAutoMatchResourcing && amStatus != null && amStatus != '') statusHtml += '<i class="fa fa-puzzle-piece ass-match-ind ' + amStatus + '" title="{!$ObjectType.ActivityAssignmentDemand__c.Fields.AutoMatchStatus__c.label}: ' + kimble.encodeHTML(amStatus) + '"></i>';
+			if(enableExpressInterest && demandStatus != "Fulfilled" && demandIsPublished) statusHtml += '<i class="fa fa-bullhorn exp-int-ind' + (hasExpIntCand ? ' HasCandidates' : '') + '" title="' + (hasExpIntCand ? '{!$Label.ExpressInterestCandidatesExist}' : '{!$Label.PublishedDemandForExpressInterest}') + '"></i>';
+
+			return statusHtml;
+		}
+
+		var fulfilmentMode = '{!JSINHTMLENCODE(FulfilmentMode)}';
+		var droppingActivity = false;
+
+		function resourcingUserChanged()
+		{
+			updateTheResourcingManager();
+		}
+
+		function SetupDatePicker()
+		{
+			//dateFormat: 'yy-mm-dd',
+			jQuery('.kimbleDatePicker').datepicker({
+					dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true,
+					selectOtherMonths: true,
+					changeMonth: true,
+					changeYear: true});
+		}
+
+	</script>
+    </apex:define>
+
+    <apex:define name="Content">
+    		<c:PageHeader id="demandPageHeader" PageTitle="{!$Label.kimbleone__activityassignmentrequestsheading}" PageSubtitle="{!KimbleOne__ActivityAssignmentDemand__c.ActivityAssignment__r.ResourcedActivity__r.KimbleOne__FullName__c} ({!StatusLabel})" DefaultHelpPage="ManagingAssignmentDemand.html"/>
+
+			<apex:outputField value="{!KimbleOne__ActivityAssignmentDemand__c.Status__r.KimbleOne__Enum__c}" rendered="false"></apex:outputField>
+			<apex:pageMessages id="messages" escape="false"/>
+			<apex:pageBlock >
+    		<apex:pageBlockButtons location="top" >
+    		    
+    		</apex:pageBlockButtons>   		
+    		<div style="position:relative;">
+    			<div id="assignment-view-mode" class="assignment-view-toggle" style="position: absolute;right: 19px;top: -37px;" selected-mode="gantt">
+					<span class="clickable selected left"><a href="javascript:void(0);" class="toggleLink" onclick="if (jQuery(this).parent().hasClass('selected')) return; jQuery('#assignment-view-mode').find('.selected').removeClass('selected');jQuery(this).parent().addClass('selected');jQuery('#assignment-view-mode').attr('selected-mode','gantt');jQuery('#container').toggleClass('daily-view', false);showGanttView();" ><span class="toggleIcon ganttIcon"></span><span class="linkText">{!$Label.GanttViewButton}</span></a></span><span class="clickable middle"><a href="javascript:void(0);" class="toggleLink" id="showDailyButton" onclick="if (jQuery(this).parent().hasClass('selected')) return; jQuery('#assignment-view-mode').find('.selected').removeClass('selected');jQuery(this).parent().addClass('selected');jQuery('#assignment-view-mode').attr('selected-mode','daily');jQuery('#container').toggleClass('daily-view', true);showGanttView();"><span class="toggleIcon monthlyIcon"></span><span class="linkText">{!$Label.UsageViewButton}</span></a></span><span class="clickable scoring-btn hide-until-caps middle"><a href="javascript:void(0);" class="toggleLink" onclick="if (jQuery(this).parent().hasClass('selected')) return; jQuery('#assignment-view-mode').find('.selected').removeClass('selected');jQuery(this).parent().addClass('selected');jQuery('#assignment-view-mode').attr('selected-mode','scoring');showCapabilityScoringView();"><span class="toggleIcon monthlyIcon"></span><span class="linkText">{!$Label.CapabilityScoringButton}</span></a></span><span class="clickable middle"><a href="javascript:void(0);" class="toggleLink" onclick="if (jQuery(this).parent().hasClass('selected')) return; jQuery('#assignment-view-mode').find('.selected').removeClass('selected');jQuery(this).parent().addClass('selected');jQuery('#assignment-view-mode').attr('selected-mode','details');showDetailsView();"><span class="toggleIcon monthlyIcon"></span><span class="linkText">{!$Label.DetailsViewButton}</span></a></span><span class="clickable right"><a href="javascript:void(0);" id="showChatterButton" class="toggleLink" onclick="if (jQuery(this).parent().hasClass('selected')) return;jQuery('#assignment-view-mode').find('.selected').removeClass('selected');jQuery(this).parent().addClass('selected');jQuery('#assignment-view-mode').attr('selected-mode','chatter');showChatterView();"><span class="toggleIcon chatterIcon"></span><span class="linkText">{!$Label.FeedViewButton}</span></a></span>
+				</div>
+    			<apex:form id="TheForm">
+					<div style="position: absolute;top: -38px;display:table-row" class="demand-toolbar">
+						<div style="display:table-cell" id="fulfilment-mode">
+						<apex:actionRegion >
+							<apex:outputPanel id="fulfilmentModePanel">
+
+							<apex:outputPanel rendered="{!CanChangeFulfilmentMode && $ObjectType.KimbleOne__ActivityAssignmentDemand__c.updateable && KimbleOne__ActivityAssignmentDemand__c.ActivityAssignment__r.ResourcedActivity__r.KimbleOne__AllowNewRevenueCostItems__c}" id="fulfilment-radio-buttons" styleclass="IgnoreButtonWhileDisabling">
+
+									<span  style="font-size: 11px;font-weight: bold;display: inline-block;height: 25px;vertical-align: middle;line-height: 25px;"><apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignmentDemand__c.fields.KimbleOne__FulfilmentMode__c.Label}"/></span>
+									<apex:selectRadio id="fulfilment-mode" value="{!KimbleOne__ActivityAssignmentDemand__c.KimbleOne__FulfilmentMode__c}" style="display: inline-block;vertical-align: top;">
+										<apex:actionSupport event="onchange" action="{!UpdateFulfilmentMode}" rerender="fulfilmentModePanel" onsubmit="fulfilmentMode='';resetDraggable();" oncomplete="resetDraggable();resetDroppable();"/>
+										<apex:selectOptions value="{!FulfilmentModes}"/>
+									</apex:selectRadio>
+									<script>
+										fulfilmentMode = '{!JSINHTMLENCODE(FulfilmentMode)}';
+
+									</script>
+
+							</apex:outputPanel>
+
+							<apex:commandButton id="proposeCandidatesBtn" style="margin-left:6px" action="{!ProposeCandidates}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__proposecandidates}" reRender="TheForm, messages" rendered="{!FulfilmentMode = 'Candidate' && IsOpen && KimbleOne__ActivityAssignmentDemand__c.ActivityAssignment__r.ResourcedActivity__r.KimbleOne__AllowNewRevenueCostItems__c}"/>
+
+							</apex:outputPanel>
+						</apex:actionRegion>
+
+						</div>
+
+						<div style="display:table-cell" id="resourcing-details">
+							<apex:actionRegion >
+								<apex:outputPanel id="resourcingDetailsPanel">
+
+									<apex:outputPanel rendered="{!CanChangeResourcingStatus && !CanChangeResourcingMgr && !CanChangeResourcingAdditionalDetails}" styleClass="resourcing-status-panel">
+										<apex:outputPanel rendered="{!TheResourcingStatuses.size > 1 && $ObjectType.KimbleOne__ActivityAssignmentDemand__c.updateable && KimbleOne__ActivityAssignmentDemand__c.ActivityAssignment__r.ResourcedActivity__r.KimbleOne__AllowNewRevenueCostItems__c}" id="resourcing-status-select" styleclass="IgnoreButtonWhileDisabling">
+											<apex:outputText styleClass="res-details-label" value="{!$ObjectType.KimbleOne__ActivityAssignmentDemand__c.fields.KimbleOne__ResourcingStatus__c.Label}"/>
+											<apex:selectList id="ResourcingStatusList" value="{!TheDemand.KimbleOne__ResourcingStatus__c}"  size="1" >
+												<apex:actionSupport event="onchange" action="{!UpdateResourcingStatus}" rerender="TheForm, demand-details-view"/>
+												<apex:selectOptions value="{!TheResourcingStatuses}" />
+											</apex:selectList>
+										</apex:outputPanel>
+
+										<apex:outputPanel rendered="{!TheResourcingStatuses.size <= 1 && $ObjectType.KimbleOne__ActivityAssignmentDemand__c.updateable && KimbleOne__ActivityAssignmentDemand__c.ActivityAssignment__r.ResourcedActivity__r.KimbleOne__AllowNewRevenueCostItems__c}" id="resourcing-status-display">
+											<apex:outputText styleClass="res-details-label" value="{!$ObjectType.KimbleOne__ActivityAssignmentDemand__c.fields.KimbleOne__ResourcingStatus__c.Label}"/>
+											<apex:outputText styleClass="res-status-val" value="{!TheDemand.ResourcingStatus__r.Name}" rendered="{!!ISBLANK(TheDemand.KimbleOne__ResourcingStatus__c)}"/>
+											<apex:outputText styleClass="res-status-val" value="{!$Label.kimbleone__none}" rendered="{!ISBLANK(TheDemand.KimbleOne__ResourcingStatus__c)}"/>
+										</apex:outputPanel>
+									</apex:outputPanel>
+
+									<apex:outputPanel rendered="{!CanChangeResourcingMgr && ShowResourcingManagerDropdown && !CanChangeResourcingStatus && !CanChangeResourcingAdditionalDetails}" styleClass="resourcing-mgr-panel">
+										<apex:outputText styleClass="res-details-label" value="{!$ObjectType.KimbleOne__ActivityAssignmentDemand__c.fields.KimbleOne__ResourcingUser__c.Label}"/>
+										<apex:selectList id="ResourcingMgrList" value="{!TheDemand.KimbleOne__ResourcingUser__c}"  size="1" >
+											<apex:actionSupport event="onchange" action="{!UpdateResourcingManager}" rerender="TheForm, demand-details-view"/>
+											<apex:selectOptions value="{!TheResourcingManagers}" />
+										</apex:selectList>
+									</apex:outputPanel>
+
+									<apex:outputPanel rendered="{!(CanChangeResourcingMgr && CanChangeResourcingStatus) || (CanChangeResourcingMgr && !ShowResourcingManagerDropdown) || CanChangeResourcingAdditionalDetails}" styleClass="resourcing-details-panel">
+										<apex:variable value="{!IF(!ISBLANK(TheDemand.KimbleOne__ResourcingStatus__c), $ObjectType.KimbleOne__ActivityAssignmentDemand__c.fields.KimbleOne__ResourcingStatus__c.Label + ': ' + TheDemand.ResourcingStatus__r.Name, '')}{!IF(AND(!ISBLANK(TheDemand.KimbleOne__ResourcingStatus__c), !ISBLANK(TheDemand.KimbleOne__ResourcingUser__c)),', ','')}{!IF(!ISBLANK(TheDemand.KimbleOne__ResourcingUser__c), $ObjectType.KimbleOne__ActivityAssignmentDemand__c.fields.KimbleOne__ResourcingUser__c.Label + ': ' + TheDemand.ResourcingUser__r.Name, '')}" var="resourcingDetailSummary"/>
+										<apex:commandButton id="editResourcingDetails" style="margin-left:50px" onclick="editResourcingDetailsClick();" title="{!JSENCODE(resourcingDetailSummary)}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__genericlabel03}" reRender="TheForm, messages" /><i class="fa fa-users edit-resourcing-details-icon"></i>
+									</apex:outputPanel>
+
+								</apex:outputPanel>
+							</apex:actionRegion>
+
+						</div>
+					</div>
+					<apex:actionFunction action="{!UpdateResourcingManager}" name="updateTheResourcingManager" rerender="TheForm, demand-details-view"></apex:actionFunction>
+					<apex:actionFunction action="{!RefreshFulfilmentMode}" name="refreshFulfilmentModePanel" reRender="demandPageHeader, TheForm"></apex:actionFunction>
+					<apex:actionFunction action="{!RedirectBack}" name="redirectAfterAction"></apex:actionFunction>
+				  </apex:form>
+		          
+		          <div id="ActivityAssignmentNewEdit" style="display:none">
+    				<apex:include pageName="{!$Page.ActivityAssignmentNewEdit}"/>     
+    			  </div>
+
+		    </div>
+    		<div id="container" class="zoom-level-1">
+    		<div id="loadingIndicatorOuterContainer" class="loadingIndicator" style="display:none">
+				<div id="loadingIndicatorInnerContainer">
+					<img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+				</div>
+			</div>
+    		<div id="layout-container"  style="margin-right:18px;">
+    		<div class="ui-layout-west" style="overflow-y: hidden;">
+				<div id="grid-header-container" style="display: inline-block;">
+						<table class="list resizable results-grid-table" border="0" cellpadding="0" cellspacing="0">
+							<colgroup>
+								<col style="width: 27px;"/><!-- Action cog -->
+								<col style="width: 188px;"/><!-- Name and Role -->
+								<col style="width: 102px;"/><!-- Revenue Rate (in activity usage unit type -- need to consolidate these to day / hour?) May be NULL or 0 (Fixed Price Bid Team Assignment)-->
+								<col style="width: 76px;"/><!-- Start Date -->
+								<col style="width: 70px;"/><!-- End Date -->
+
+								<col style="width: 68px;"/><!-- Remaining Usage in activity Forecast Units need to consolidate?-->
+
+								<col style="width: 110px;"/><!-- Forecast Revenue -->
+
+								<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.fields.KimbleOne__ForecastCost__c.Accessible}"><!-- Forecast Cost -->
+									<col style="width: 110px;"/>
+								</apex:outputPanel>
+
+							</colgroup>
+							<thead>
+							<tr class="headerRow" style="height: 26px;">
+								<th colspan="2" class="headerRow demand-status-cell"><div class="demand-status"></div></th>
+								<th colspan="3" class="headerRow"><h2></h2></th>
+								<th colspan="1" class="headerRow" style="text-align: center;"><h2>{!$Label.UsageLabel} ({!JSENCODE(DisplayForecastingUnitType.Suffix__c)})</h2></th>
+								<th colspan="{!IF($ObjectType.ActivityAssignment__c.fields.ForecastCost__c.Accessible, 2, 1 )}" class="headerRow"><h2></h2></th>
+							</tr>
+							<tr class="headerRow" style="height: 26px;">
+								<th class="headerRow">
+									<span class="columnLabel"><apex:outputPanel layout="none" rendered="{!!ISBLANK(TheDemandAssignment.KimbleOne__ModelActivityAssignment__c)}"><i class="modelled-demand-ind fa fa-list-alt"></i></apex:outputPanel></span>
+				                </th>
+
+								<th class="headerRow ui-resizable" style="min-width:60px;">
+				                    <span class="columnLabel"><h2>{!$ObjectType.KimbleOne__Resource__c.Label}</h2></span>
+				                </th>
+
+				                <th class="headerRow ui-resizable">
+									<span class="columnLabel"><h2>{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__TemporalForecastRevenueRate__c.Label} ({!JSENCODE(DisplayRevenueEntryUnitType.Name)})</h2></span>
+					             </th>
+								<th class="headerRow ui-resizable">
+									<span class="columnLabel"><h2>{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__StartDate__c.Label}</h2></span>
+				              	</th>
+
+								<th class="headerRow ui-resizable">
+									<span class="columnLabel"><h2>{!$Label.kimbleone__enddatelabel}</h2></span>
+				              	</th>
+
+								<th class="headerRow ui-resizable">
+									<span class="columnLabel"><h2>{!$Label.kimbleone__deliverygrouphomeremaining}</h2></span>
+				              	</th>
+
+
+								<th class="headerRow ui-resizable">
+									<span class="columnLabel"><h2>{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ForecastRevenue__c.Label}</h2></span>
+					            </th>
+
+				              	<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.fields.KimbleOne__ForecastCost__c.Accessible}">
+									<th class="headerRow ui-resizable">
+										<span class="columnLabel"><h2>{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ForecastCost__c.Label}</h2></span>
+					              	</th>
+								</apex:outputPanel>
+							</tr>
+
+							</thead>
+							<tbody>
+								<apex:variable value="{!TheDemandAssignment}" var="assignment"/>
+
+								<tr class="dataRow" resourcedActivityId="{!JSENCODE(assignment.ResourcedActivity__c)}" assignmentId="{!JSENCODE(assignment.Id)}">
+									<td style="padding-left: 0px; padding-right: 0px;" class="demand-action-cell">
+										<div class="demand-action"></div>
+									</td>
+									<td class="dataCell">
+										<apex:outputLink value="{!$Page.KimbleOne__ActivityAssignmentsDelivery}?filterid={!TheDemandAssignment.KimbleOne__ResourcedActivity__c}&id={!TheDemandAssignment.ResourcedActivity__r.DeliveryElement__r.KimbleOne__DeliveryGroup__c}" rendered="{!!ISBLANK(TheDemandAssignment.ResourcedActivity__r.KimbleOne__DeliveryElement__c)}"><apex:outputText value="{!assignment.Resource__r.Name}"/></apex:outputLink>
+										<apex:outputLink value="{!$Page.KimbleOne__BidTeamAssignments}?id={!TheDemandAssignment.KimbleOne__ResourcedActivity__c}" rendered="{!!ISBLANK(TheDemandAssignment.ResourcedActivity__r.KimbleOne__Proposal__c)}"><apex:outputText value="{!assignment.Resource__r.Name}"/></apex:outputLink>
+									</td>
+
+									<td class="dataCell rightAlignDataCell">
+										 <apex:outputText html-data-currency="{!TheDemandAssignment.KimbleOne__InvoicingCurrencyIsoCode__c}" value="{!InvoicingCurrencyDisplayRevenueRate}" styleclass="kimble-format-currency"/>
+									</td>
+
+									<td class="dataCell">
+										<apex:outputField value="{!assignment.KimbleOne__StartDate__c}"/>
+									</td>
+									<td class="dataCell">
+										<apex:outputField value="{!assignment.KimbleOne__ForecastP3EndDate__c}"/>
+									</td>
+
+									<td class="dataCell rightAlignDataCell"><apex:outputField value="{!assignment.KimbleOne__EntryRemainingUsage__c}"/></td>
+
+
+									<td class="dataCell rightAlignDataCell">
+										<apex:outputField value="{!assignment.KimbleOne__ForecastRevenue__c}"/>
+									</td>
+
+									<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.fields.KimbleOne__ForecastCost__c.Accessible}">
+										<td class="dataCell rightAlignDataCell">
+											<apex:outputField value="{!assignment.KimbleOne__ForecastCost__c}"/>
+										</td>
+									</apex:outputPanel>
+								</tr>
+
+							</tbody>
+						</table>
+						<table id="matching-resources-table-head" class="resource-grid-table" border="0" cellpadding="0" cellspacing="0">
+							<colgroup>
+								<col style="width: 215px;"/><!-- Name -->
+								<apex:repeat value="{!ResultFields}" var="field">
+									<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__Resource__c.fields[field.Name].Accessible}">
+										<col style="width: 150px;"/>
+									</apex:outputPanel>
+								</apex:repeat>
+								<!-- Placeholder for capabilities -->
+
+							</colgroup>
+							<thead>
+							<tr class="headerRow" style="height: 26px;background-color: #1797C0;color:white;">
+								<th class="headerRow"><h2 style="padding-left: 31px;">{!$ObjectType.Resource__c.Label}</h2></th>
+								<apex:repeat value="{!ResultFields}" var="field">
+									<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__Resource__c.fields[field.Name].Accessible}">
+										<th class="headerRow" style="border-left: 2px solid white;"><h2 style="padding-left: 4px;">{!JSENCODE(field.Label)}</h2></th>
+									</apex:outputPanel>
+								</apex:repeat>
+								<!--  Placeholder for capabilities -->
+							</tr>
+							</thead>
+
+						</table>
+				</div>
+				<div id="matching-resources-container" style="overflow-y:hidden; display: inline-block;">
+						<table id="matching-resources-table-body" class="resource-grid-table" border="0" cellpadding="0" cellspacing="0">
+							<colgroup>
+								<col style="width: 27px;"/><!-- Action cog -->
+								<col style="width: 188px;"/><!-- Name -->
+								<apex:repeat value="{!ResultFields}" var="field">
+									<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__Resource__c.fields[field.Name].Accessible}">
+										<col style="width: 150px;"/>
+									</apex:outputPanel>
+								</apex:repeat>
+								<!-- Placeholder for capabilities -->
+
+							</colgroup>
+							<tbody></tbody>
+
+						</table>
+				</div>
+			</div>
+
+    		<div id="activity-gantt-layout" class="ui-layout-center" style="overflow: hidden;">
+
+    			<div id="gantt-view" style="overflow-y: hidden;height: 100%;">
+    				<div id="period-header-container"></div>
+
+					<div id="demand-gantt-container" style="height:54px;"></div>
+
+					<div id="matching-gantt-container" style="display: inline-block;overflow-y:hidden;position:relative;">
+						<div id="matching-gantt-lines"></div>
+
+					</div>
+    			</div>
+    			<div class="dragging-scroll scroll-bottom" style="left: 30px;right: 30px;bottom: 16px;height: 26px; "></div>
+				<div class="dragging-scroll scroll-left" style="left: 0px; bottom: 42px;top: 82px;width: 30px;"></div>
+				<div class="dragging-scroll scroll-top" style="left: 30px;right: 30px;height: 30px; top: 52px;"></div>
+				<div class="dragging-scroll scroll-right" style="right: 0px;bottom: 42px;top: 82px;width: 30px;"></div>
+
+    			<div id="scoring-view" style="display:none;overflow-y: hidden;height: 100%;">
+					<div id="cap-score-item-container" style="height:105px;"></div>
+
+					<div id="cap-score-resource-rows-container" style="display: inline-block;overflow-y:hidden;position:relative;"></div>
+    			</div>
+
+    			<div id="demand-view" style="display:none;overflow-y:auto;">
+    				<apex:pageblock id="demand-details-view">
+
+    					<apex:pageblockSection collapsible="false" showheader="true" columns="2" title="{!$Label.kimbleone__detailsheading}">
+						<apex:outputField value="{!TheDemandAssignment.KimbleOne__Resource__c}"/>
+						<apex:outputField value="{!TheDemandAssignment.KimbleOne__ActivityRole__c}"/>
+						<apex:outputField value="{!TheDemandAssignment.KimbleOne__Location__c}"/>
+
+						<apex:pageBlockSectionItem ><span></span></apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem >
+							<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__DeliveryGroup__c.Label}" />
+							<apex:outputLink value="{!$Page.KimbleOne__ActivityAssignmentsDelivery}?id={!TheDemandAssignment.ResourcedActivity__r.DeliveryElement__r.KimbleOne__DeliveryGroup__c}" rendered="{!!ISBLANK(TheDemandAssignment.ResourcedActivity__r.DeliveryElement__r)}"><apex:outputText value="{!TheDemandAssignment.ResourcedActivity__r.DeliveryElement__r.DeliveryGroup__r.Name}"/></apex:outputLink>
+						</apex:pageBlockSectionItem>
+
+						<apex:outputField value="{!TheDemandAssignment.ResourcedActivity__r.DeliveryElement__r.DeliveryGroup__r.KimbleOne__Account__c}" rendered="{!!ISBLANK(TheDemandAssignment.ResourcedActivity__r.DeliveryElement__r)}"/>
+
+						<apex:outputField value="{!TheDemandAssignment.ResourcedActivity__r.KimbleOne__Proposal__c}" rendered="{!!ISBLANK(TheDemandAssignment.ResourcedActivity__r.KimbleOne__Proposal__c)}"/>
+
+						<apex:outputField value="{!TheDemandAssignment.ResourcedActivity__r.Proposal__r.KimbleOne__Account__c}" rendered="{!!ISBLANK(TheDemandAssignment.ResourcedActivity__r.KimbleOne__Proposal__c)}"/>
+
+						<!-- Revenue And Cost -->
+						<apex:pageBlockSectionItem >
+							<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__TemporalForecastRevenueRate__c.Label}" />
+							<apex:outputPanel layout="none">
+								<apex:outputText html-data-currency="{!TheDemandAssignment.KimbleOne__InvoicingCurrencyIsoCode__c}" value="{!InvoicingCurrencyDisplayRevenueRate}" styleclass="kimble-format-currency"/>
+								<apex:outputText value=" ({!DisplayRevenueEntryUnitType.Name})"/>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__TemporalForecastCostRate__c.accessible}" >
+							<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__TemporalForecastCostRate__c.Label}" />
+							<apex:outputPanel layout="none">
+								<apex:outputText value="{!TheDemandAssignment.CurrencyISOCode}" styleclass="kimbleCurrencyCode"/>
+								<span class="demand-cost-rate" data-cost-rate="{!JSENCODE(TheDemandAssignment.KimbleOne__TemporalForecastCostRate__c)}"/>
+								<apex:outputText value=" ({!DisplayInvoicingUnitType.KimbleOne__Suffix__c})"/>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+
+						<apex:outputField value="{!TheDemandAssignment.KimbleOne__StartDate__c}"/>
+
+						<apex:pageBlockSectionItem >
+							<apex:outputText value="{!$Label.kimbleone__endingonlabel}" />
+							<apex:outputField value="{!TheDemandAssignment.KimbleOne__ForecastP3EndDate__c}"/>
+						</apex:pageBlockSectionItem>
+
+						<apex:outputField value="{!TheDemandAssignment.KimbleOne__UsageBehaviourRule__c}"/>
+						&nbsp;
+
+						<apex:pageBlockSectionItem >
+							<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UtilisationPercentage__c.Label}" />
+							<apex:outputPanel layout="none">
+								<apex:outputText value="{!ROUND(TheDemandAssignment.KimbleOne__UtilisationPercentage__c,0)}"/>%
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem >
+							<apex:outputText value="{!$Label.kimbleone__assignmententryremainingeffort}" />
+							<apex:outputPanel layout="none">
+								<apex:outputField value="{!TheDemandAssignment.KimbleOne__EntryRemainingUsage__c}"/>
+								<apex:outputText value=" ({!TheDemandAssignment.ResourcedActivityOperatedWith__r.ForecastUnitType__r.KimbleOne__Suffix__c})"/>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+
+						<apex:outputField value="{!TheDemandAssignment.KimbleOne__LongNotes__c}"/>
+
+						<apex:pageBlockSectionItem ><span></span></apex:pageBlockSectionItem>
+
+						</apex:pageblockSection>
+
+						<apex:pageBlockSection columns="2" collapsible="false" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.FieldSets.KimbleOne__ActivityAssignmentDetails.Size > 0 || $ObjectType.KimbleOne__ActivityAssignmentDemand__c.FieldSets.KimbleOne__ActivityAssignmentDemandDetails.Size > 0}" title="{!$Label.kimbleone__additionaldetailsheading}">
+							<apex:repeat value="{!$ObjectType.KimbleOne__ActivityAssignmentDemand__c.FieldSets.KimbleOne__ActivityAssignmentDemandDetails}" var="f" rendered="{!$ObjectType.KimbleOne__ActivityAssignmentDemand__c.FieldSets.KimbleOne__ActivityAssignmentDemandDetails.Size > 0}">
+								<apex:outputField value="{!TheDemand[f]}"/>
+							</apex:repeat>
+
+							<apex:repeat value="{!$ObjectType.KimbleOne__ActivityAssignment__c.FieldSets.KimbleOne__ActivityAssignmentDetails}" var="f" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.FieldSets.KimbleOne__ActivityAssignmentDetails.Size > 0}">
+								<apex:outputField value="{!TheDemandAssignment[f]}"/>
+							</apex:repeat>
+						</apex:pageBlockSection>
+
+						<apex:pageBlockSection columns="2" collapsible="false" rendered="{!CanChangeResourcingStatus || CanChangeResourcingMgr || CanChangeResourcingAdditionalDetails}" title="{!$Label.kimbleone__genericlabel03}">
+							<apex:outputText value="{!TheDemand.ResourcingStatus__r.Name}" label="{!$ObjectType.KimbleOne__ActivityAssignmentDemand__c.Fields.KimbleOne__ResourcingStatus__c.Label}" rendered="{!CanChangeResourcingStatus}"/>
+							<apex:outputField value="{!TheDemand.KimbleOne__ResourcingUser__c}" rendered="{!CanChangeResourcingMgr}"/>
+							<apex:repeat value="{!$ObjectType.KimbleOne__ActivityAssignmentDemand__c.FieldSets.KimbleOne__ActivityAssignmentDemandResourcingDetail}" var="f" rendered="{!CanChangeResourcingAdditionalDetails}">
+								<apex:outputField value="{!TheDemand[f]}" rendered="{!CanChangeResourcingAdditionalDetails}"/>
+							</apex:repeat>
+						</apex:pageBlockSection>
+
+						<!-- Capabilities -->
+						<apex:pageblockSection collapsible="false" showheader="true" columns="2" title="{!$ObjectType.KimbleOne__RequiredCapability__c.LabelPlural}" rendered="{!RequiredCapabilities.size > 0}">
+
+						<apex:pageblockTable value="{!RequiredCapabilities}" var="cap">
+							<apex:column value="{!cap.TypeName}">
+								<apex:facet name="header">{!$ObjectType.KimbleOne__RequiredCapability__c.Fields.KimbleOne__CapabilityType__c.Label}</apex:facet>
+							</apex:column>
+							<apex:column value="{!cap.MinimumNumericRatingText}">
+								<apex:facet name="header">{!$ObjectType.KimbleOne__RequiredCapability__c.Fields.KimbleOne__MinimumNumericRating__c.Label}</apex:facet>
+							</apex:column>
+
+						</apex:pageblockTable>
+
+						</apex:pageblockSection>
+
+						<!-- Scheduled Time Slots -->
+						<apex:pageblockSection collapsible="false" showheader="true" columns="2" title="{!$Label.kimbleone__scheduleddayslabel}" rendered="{!TheDemandAssignment.ForecastTimeEntries__r.size > 0}">
+
+						<apex:pageblockTable value="{!TheDemandAssignment.ForecastTimeEntries__r}" var="forecastTimeEntry">
+							<apex:column value="{!forecastTimeEntry.TimePeriod__r.KimbleOne__StartDate__c}">
+							</apex:column>
+							<apex:column value="{!forecastTimeEntry.KimbleOne__StartTime__c}">
+							</apex:column>
+							<apex:column value="{!forecastTimeEntry.KimbleOne__EndTime__c}">
+							</apex:column>
+							<apex:column value="{!forecastTimeEntry.KimbleOne__TimeZoneSidKey__c}" rendered="{!ShowTimeZone}">
+							</apex:column>
+						</apex:pageblockTable>
+
+						</apex:pageblockSection>
+
+						<script>
+							if (typeof initialiseDetailCurrencies !== 'undefined') initialiseDetailCurrencies();
+						</script>
+
+    				</apex:pageblock>
+    			</div>
+
+    			<iframe id="chatter-view" border="0" src="{!$Page.Chatter}?id={!ActivityAssignmentDemand__c.Id}" style="border:0;width:100%;height:100%;display:none" frameborder="0" scrolling="auto"/>
+
+			</div>
+
+			</div><!-- layout-container -->
+
+			<div id="gantt-vertical-scroll-container">
+					<div id="verticalScroll" style="width:100px;display:none;"></div>
+			</div>
+				<div id="footer" >
+					<a class="layer-select fa fa-circle" onclick="jQuery('#layer-menu').fadeToggle();jQuery(this).toggleClass('layer-select-on');">
+						<i class="fa fa-list-ul layer-select-icon"></i>
+					</a>
+					<div id="layer-menu" style="position: absolute;bottom: 40px; right: 14px;">
+						<ul>
+							<li class="assignment-class-0">
+								<div class="layer-menu-item"><apex:outputText value="{!$Label.kimbleone__available}"/></div>
+							</li>
+							<apex:repeat value="{!GanttViewProperties.TheActivityAssignmentClasses}" var="classification">
+								<li id="aggregate-menu-item{!classification.Priority__c}" class="{!classification.StyleClass__c}" onclick="toggleAggregate({!classification.Priority__c})">
+									<div class="layer-menu-item"><apex:outputText value="{!classification.Name}"/></div>
+								</li>
+							</apex:repeat>
+						</ul>
+					</div>
+					<a class="zoom-out fa fa-minus-circle" onclick="zoomOut()" onmouseover="jQuery('#zoom-level').fadeIn();" onmouseout="jQuery('#zoom-level').fadeOut('slow');"></a>
+					<span id="zoom-level" class="zoom-level-1"></span>
+					<a class="zoom-in fa fa-plus-circle" onclick="zoomIn()" onmouseover="jQuery('#zoom-level').fadeIn();;" onmouseout="jQuery('#zoom-level').fadeOut('slow');"></a>
+				</div>
+
+			</div><!-- Container -->
+			</apex:pageBlock>
+
+			<apex:include pageName="{!$Page.ActivityAssignmentReassign}"/>
+
+			<div id="ActivityAssignmentCalendar">
+				<apex:include pageName="{!$Page.ActivityAssignmentCalendar}"/>
+			</div>
+
+			<div><apex:include pageName="{!$Page.ActivityAssignmentSnip}" rendered="{!EnableSnipSetting}"/></div>
+
+			<apex:include pageName="{!$Page.ModelActivityAssignmentDetails}" rendered="{!!ISBLANK(TheDemandAssignment.KimbleOne__ModelActivityAssignment__c)}"/>
+
+			<apex:outputPanel rendered="{!(CanChangeResourcingMgr && CanChangeResourcingStatus) || (CanChangeResourcingMgr && !ShowResourcingManagerDropdown) || CanChangeResourcingAdditionalDetails}">
+				<apex:include pageName="{!$Page.ActivityAssignmentResourcingDetails}"/>
+			</apex:outputPanel>
+
+    		<div id="CandidateRejectionPopup" style="display:none">
+    			<apex:form >
+    			<apex:pageBlock mode="edit">
+						<apex:pageBlockButtons location="bottom">
+							<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.updateable}">
+								<input class="btn" id="btnRejectCandidateWithReason" onclick="saveRejectCandidatePopup()" type="button" value="{!$Label.RejectLabel}" style="width:60px;"/>
+							</apex:outputPanel>
+							<input class="btn" id="btnCancelRejectCandidate" onclick="hideModalBoxy()" type="button" value="{!$Label.Cancel}" style="width:60px;"/>
+						</apex:pageBlockButtons>
+						<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityAssignment__c.fields.KimbleOne__CandidateRejectionReason__c.label}" for="candidateRejectionReason"/>
+								<apex:selectList id="candidateRejectionReason" value="{!TheCandidateRejectionReason}" size="1" required="true">
+									<apex:selectOptions value="{!TheCandidateRejectionReasons}" />
+								</apex:selectList>
+							</apex:pageBlockSectionItem>
+
+						</apex:pageblockSection>
+				</apex:pageBlock>
+				</apex:form>
+    		</div>
+
+    		<script>
+
+	isUpdateable = {!$ObjectType.KimbleOne__ActivityAssignment__c.updateable};
+    var theAssignment = <apex:outputText value="{!AssignmentJson}"/>;
+
+    var availabilityScoringEnabled = <apex:outputText value="{!EnableAvailabilityScoring}"/>;
+	var candidateResourcesDisplayed = false;
+    var enableDragDrop = {!$ObjectType.KimbleOne__ActivityAssignment__c.updateable};
+    var EnableDragDropSetting =  <apex:outputText value="{!EnableDragDropSetting}"/>;
+    var autoGo =  <apex:outputText value="{!AssignmentDemandAutoGo}"/>;
+
+    var excludedResources = {};
+
+    jQuery(window).load(function(){
+
+    	jQuery('#layout-container').height(jQuery(window).height() - salesforceHeaderFooterHeight);
+	   	jQuery('#layout-container').layout({maskIframesOnResize: true, west__size: (availabilityScoringEnabled ? 276 : 266)});
+
+    	jQuery('#period-header-container').paintPeriodsHeader(ganttViewStartDate.toDate(), ganttViewEndDate.toDate(), showNonBusDays);
+
+      	initialiseDetailCurrencies();
+
+      	jQuery('#demand-gantt-container').append(getAssignmentHtml(theAssignment, null, true, null, {firmOnly:false}));
+      	jQuery('#demand-gantt-container').find('.activity-assignment-gantt').prop('id', 'draggable');
+
+      	maxGanttSectionHeight = jQuery('#layout-container').height() - jQuery('#period-header-container').height() - jQuery('#demand-gantt-container').height() - scrollbarWidth;
+    	jQuery('#matching-gantt-container, #gantt-vertical-scroll-container, #matching-resources-container, #cap-score-resource-rows-container').css('max-height', maxGanttSectionHeight);
+
+    	jQuery(window).resize(function() {
+    		jQuery('#layout-container, #demand-view').height(jQuery(window).height() - salesforceHeaderFooterHeight);
+    		maxGanttSectionHeight = jQuery('#layout-container').height() - jQuery('#period-header-container').height() - jQuery('#demand-gantt-container').height() - scrollbarWidth;
+    		jQuery('#matching-gantt-container, #gantt-vertical-scroll-container, #matching-resources-container, #cap-score-resource-rows-container').css('max-height', maxGanttSectionHeight);
+
+    		jQuery('#demand-gantt-container').empty().append(getAssignmentHtml(theAssignment, null, true, null, {firmOnly:false}));
+      		jQuery('#demand-gantt-container').find('.activity-assignment-gantt').prop('id', 'draggable');
+
+      		jQuery('#matching-gantt-container').scrollTo(jQuery('#gantt-vertical-scroll-container').scrollTop());
+  			jQuery('#matching-resources-container').scrollTo(jQuery('#gantt-vertical-scroll-container').scrollTop());
+  			jQuery('#cap-score-resource-rows-container').scrollTo(jQuery('#gantt-vertical-scroll-container').scrollTop());
+
+      		resetDraggable();
+      		refreshViewport(true);
+
+    	});
+
+    	jQuery(window).resize();
+
+    	jQuery('#gantt-vertical-scroll-container').scroll(function() {
+
+  			jQuery('#matching-gantt-container').scrollTo(jQuery('#gantt-vertical-scroll-container').scrollTop());
+  			jQuery('#matching-resources-container').scrollTo(jQuery('#gantt-vertical-scroll-container').scrollTop());
+  			jQuery('#cap-score-resource-rows-container').scrollTo(jQuery('#gantt-vertical-scroll-container').scrollTop());
+
+  			clearTimeout(jQuery.data(this, "scrollTimer"));
+
+  			jQuery.data(this, "scrollTimer", setTimeout(function() {
+        			refreshViewport();
+    			}, 250));
+  		});
+
+      	zoomTo(zoomLevel);
+
+        if (defaultView == 'Usage') jQuery('#showDailyButton').click();
+        else if (defaultView == 'Chatter') jQuery('#showChatterButton').click();
+
+      	jQuery('.dragging-scroll').hide();
+
+  		jQuery('.dragging-scroll').hover(
+		    function(){
+
+		        if (jQuery('.ui-draggable-dragging').length == 0) return;
+
+		        var scroller;
+
+		        if ($(this).hasClass('scroll-bottom'))
+		        	scroller = setInterval( scrollDown, 30 );
+		        if ($(this).hasClass('scroll-top'))
+		        	scroller = setInterval( scrollUp, 30 );
+		        if ($(this).hasClass('scroll-left'))
+		        	scroller = setInterval( scrollLeft, 30 );
+		        if ($(this).hasClass('scroll-right'))
+		        	scroller = setInterval( scrollRight, 30 );
+
+		        $(this).data('scroller', scroller);
+		    },
+		    function(){
+		        var scroller = $(this).data('scroller');
+		        clearInterval( scroller );
+		    }
+		);
+
+		resetDraggable();
+
+		if (matchingCandidates.length > 0)
+			repaintResources(matchingCandidates);
+
+		//ON ZOOM HANDLE
+		jQuery.subscribe('kimble.zoom', function(e){
+			resetDraggable();
+		});
+
+		//ON MATCHING RESOURCES GANTT REDRAWN HANDLE
+		jQuery.subscribe('kimble.ganttViewUpdated', function(e){
+
+			setScrollHeight();
+
+			if (EnableDragDropSetting && jQuery('.ui-draggable-dragging').length == 0)
+			{
+				jQuery(".ui-draggable .assignment-draggable").draggable("destroy");
+
+				jQuery('.assignment-draggable').draggable({
+							start: function( event, ui ) {
+								//show dragging-scroll
+								jQuery(this).css('visibility', 'hidden');
+								jQuery('.dragging-scroll').show();
+							},
+							stop: function( event, ui ) {
+								//hide dragging-scroll
+								jQuery('.dragging-scroll').hide();
+								jQuery(this).css('visibility', 'visible');
+								jQuery('.drag-active-day').removeClass('drag-active-day');
+							},
+							drag: function (event, ui) {
+								jQuery('.drag-active-day').removeClass('drag-active-day');
+								var d = jQuery(document.elementFromPoint(Math.ceil(ui.helper.offset().left), Math.ceil(jQuery('#days-header').offset().top) - jQuery(window).scrollTop()));
+								if (d.hasClass('day-head'))
+									d.toggleClass('drag-active-day');
+							},
+							revert:"invalid",
+							helper:'clone',
+							scroll:false,
+							appendTo: '#gantt-view'});
+			}
+			else jQuery('.assignment-draggable').css('cursor', 'default');
+
+			applyIndicatorTitles();
+
+			resetDroppable();
+
+		});
+
+		jQuery.subscribe('kimble.activityassignmentcalendarchange', function(e, data) {
+			refreshResource(data.resourceId);
+		});
+
+		jQuery.subscribe('kimble.activityassignmenteditchange', function(e, data) {
+			refreshResource(data.resourceId);
+		});
+
+		jQuery.subscribe('kimble.assignmentReassigned', function(e, theResource){
+			if (fulfilmentMode == 'Replace' && !droppingActivity)
+			{
+				redirectAfterAction();
+			}
+			else if (!droppingActivity)
+			{
+				$('[id$="fulfilment-radio-buttons"]').hide();
+
+				if(theResource.IsPreferred != undefined)
+				{
+					candidateResources[theResource.ResourceId] = {Status:'Proposed', ResourceId:theResource.ResourceId, ResourceName:theResource.ResourceName, AssignmentId:theResource.AssignmentId, IsPreferred:theResource.IsPreferred};
+
+					if(candidateResources && theResource.IsPreferred)
+					{
+						Object.keys(candidateResources).forEach((k,i) =>
+						{
+							if(candidateResources[k].ResourceId != theResource.ResourceId)
+							{
+								candidateResources[k].IsPreferred = false;
+							}
+						});
+					}
+				}
+				redrawResource(theResource.ResourceGantt);
+			}
+			else {
+				redrawResource(theResource.ResourceGantt);
+			}
+		});
+
+		jQuery.subscribe('kimble.assignmentEndDated', function(e, d){
+			redrawResource(d.TheResource);
+		});
+
+		jQuery.subscribe('kimble.assignmentChanged', function(e, data) {
+			refreshResource(data.resourceId);
+		});
+
+		if(!detectIE()) jQuery('.headerRow.ui-resizable').resizable({handles: 'e'});
+
+		jQuery(document).off('mouseover', 'a.resource-link[resource-photo-url]').on('mouseover', 'a.resource-link[resource-photo-url]', showResourcePhoto);
+		jQuery(document).off('change', 'input[id$="SelectUserInlineId"]').on('change', 'input[id$="SelectUserInlineId"]', resourcingUserChanged);
+
+		if(availabilityScoringEnabled) initialiseAvailabilityScoring();
+
+		if(autoGo) jQuery('#goBtn').click();
+		else if(jQuery('.demand-action').html().length > 0)	refreshToolbars();
+	});
+
+	function showCandidateReview()
+	{
+		initialiseModalBoxy('#AssignmentDemandCandReviewDetails', '{!JSENCODE($Label.ReviewCandidates)}');
+		loadDemandDetails('{!ActivityAssignmentDemand__c}');
+ 	}
+
+<apex:outputPanel layout="none" rendered="{!EnableAutoMatchResourcing}">
+		function autoMatchDemandAssignment()
+		{
+		    jQuery('.demand-action a').addClass('Loading');
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.AutoMatchDemandAssignment}',
+					'{!ActivityAssignmentDemand__c}',
+						function(result, event){
+							if (event.status)
+							{
+								window.location.reload();
+							}
+							else if (event.type === 'exception')
+							{
+								alert(event.message);
+							}
+							else
+							{
+								alert(event.message);
+							}
+
+							jQuery('.demand-action a').removeClass('Loading');
+					},
+					{escape: true, timeout: 60000}
+				);
+		}
+	</apex:outputPanel>
+
+	<apex:outputPanel layout="none" rendered="{!EnableExpressInterest}">
+		function publishDemandAssignment()
+		{
+			jQuery('.demand-action a').addClass('Loading');
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.PublishAssigmentDemand}',
+					'{!ActivityAssignmentDemand__c}',
+						function(result, event){
+							if (event.status)
+							{
+								window.location.reload();
+							}
+							else if (event.type === 'exception')
+							{
+								alert(event.message);
+							}
+							else
+							{
+								alert(event.message);
+							}
+					},
+					{escape: true, timeout: 60000}
+				);
+		}
+	</apex:outputPanel>
+
+	function initialiseDetailCurrencies()
+	{
+	    kimble.formatCurrencies();
+
+      	jQuery.each(jQuery('.demand-cost-rate'), function (i, obj) {
+      			var j = jQuery(obj);
+      			var costRateSummary = parseCostSummaryJson(j.attr('data-cost-rate'));
+		    	var costRate = costRateSummary[0].R / {!JSENCODE(TEXT(ForecastToInvoiceConversionFactor))};
+
+				j.text(jQuery.formatNumber(costRate, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+
+				if (costRateSummary.length > 1)
+            	{
+                	var $futureCostChange = jQuery('<span class="fa fa-map-marker future-cost-change"/>');
+                	$futureCostChange.data('costs', costRateSummary);
+                	j.after($futureCostChange);
+            	}
+      	});
+ 	}
+
+	function detectIE() {
+	  	var ua = window.navigator.userAgent;
+	  	if (ua.indexOf('MSIE ') > 0 || ua.indexOf('Trident/') > 0 || ua.indexOf('Edge/') > 0) return true;
+		return false;
+	}
+
+   	function showResourcePhoto()
+   	{
+   		jQuery(this).qtip('destroy', true).qtip({content:{text: function(event, api) {
+									return generateResourcePhotoTipHtml(jQuery(this).attr('resource-photo-url'));
+								}},
+								position: { adjust: { method: 'flip flip'
+									},
+									viewport: $(window)
+								},
+								show: { solo: true, ready: true },
+								hide: 'unfocus',
+								style: {classes: 'qtip-light qtip-shadow qtip-rounded resource-photo-tool-tip'}});
+   	}
+
+   	function generateResourcePhotoTipHtml(photoUrl)
+   	{
+   		return '<img class="resource-photo-img" src="' + photoUrl + '"/>';
+   	}
+
+	function editResourcingDetailsClick()
+	{
+		initialiseModalBoxy('#ResourcingDetailsPopup', '{!JSENCODE($Label.Edit)} {!JSENCODE($Label.GenericLabel03)}');
+		var assignmentId = '{!JSENCODE(ActivityAssignmentDemand__c.ActivityAssignment__c)}';
+		loadResourcingDetails(assignmentId);
+	}
+   	
+   	function resetDroppable()
+   	{
+   		jQuery(".ui-droppable").droppable("destroy");
+			
+		// mode 
+		var assignMode = (fulfilmentMode == 'Candidate'?'can-assign-as-candidate':'can-assign');
+			
+		jQuery(".can-assign, ." + assignMode + ":not(.candidate)" ).droppable({
+			      hoverClass: "drag-active-resource",
+			      accept: function(draggable) {
+			      	if(draggable.attr('id') == "draggable") return true;
+			      	if (draggable.closest('.resource-gantt-row').length == 0) return false;
+			      	return draggable.closest('.resource-gantt-row').prop('id') != jQuery(this).prop('id');
+			      }, 
+			      drop: function(event, ui ) {
+			         var dayCell = jQuery('.day-head.drag-active-day');
+		        
+		        	// drag/drop not supported where day can't be verified
+		        	if (zoomLevel > 2) return false;
+		        	
+		        	// default to the start date of the demand (protects against dropping offscreen
+		        	var starting = theAssignment.StartDate.toDate()
+		        	if (dayCell.length != 0) starting = new Date(new Number(dayCell.parent().prop('id').substring(3)));
+
+		       		initialiseModalBoxy('#assignment-assign', '{!JSENCODE($Label.Assign)}');
+				        
+				    var obj = ui.draggable.clone();
+				    
+		       		if(ui.draggable[0].id == "draggable") {
+				        
+				        droppingActivity = false;			
+				        
+				        obj.show().css('position','absolute').css('left', ui.position.left).insertBefore(jQuery(this));
+						
+						jQuery('div.qtip:visible').qtip('hide');
+						
+				        assign(theAssignment, jQuery(this).prop('id'), starting, obj, (fulfilmentMode == 'Candidate'), false, Object.values(candidateResources));
+		       		}
+		       		else if (EnableDragDropSetting){
+		       		
+		       			droppingActivity = true;
+		       			
+				        obj.show().css('position','absolute').css('visibility','').css('left', ui.helper.position().left).css('top', ui.helper.position().top).appendTo(ui.helper.parent());
+				        
+				        assign(assignmentMap[ui.draggable.attr('assignment-id')], jQuery(this).prop('id'), starting, obj, false, false, Object.values(candidateResources));
+					}
+					showModalBoxy();
+					
+			      },
+			      over: function(event, ui) {
+		      		jQuery('#' + this.id + '.resource-grid-row').addClass('drag-active-resource');
+		      	  },
+		      	  out: function(event, ui) {
+		      		var gridRow = jQuery('#' + this.id + '.resource-grid-row').removeClass('drag-active-resource');
+		      	 }
+		});	
+   	}
+   	
+   	function resetDraggable()
+   	{
+		jQuery('#draggable.ui-draggable').draggable("destroy");
+		
+		if ('{!JSINHTMLENCODE(ActivityAssignmentDemand__c.Status__r.Enum__c)}' == 'Fulfilled') return;
+			
+		if ('{!JSENCODE(IF(ActivityAssignmentDemand__c.ActivityAssignment__r.ResourcedActivity__r.AllowNewRevenueCostItems__c,"true","false"))}' == 'false') return;
+
+		if (zoomLevel > 2) return; //draggable not supported 
+
+		if(fulfilmentMode == '') return;
+
+		var draggableParams = {
+			start: function( event, ui ) {if (fulfilmentMode == 'Replace') jQuery(this).hide();}, 
+			stop: function( event, ui ) {if (fulfilmentMode == 'Replace') jQuery(this).show();jQuery('.drag-active-day').removeClass('drag-active-day');}, 
+			drag: function (event, ui) {
+				jQuery('.drag-active-day').removeClass('drag-active-day');
+				var d = jQuery(document.elementFromPoint(Math.ceil(ui.helper.offset().left), Math.ceil(jQuery('#days-header').offset().top) - jQuery(window).scrollTop()));
+				if (d.hasClass('day-head')) 
+					d.toggleClass('drag-active-day');
+				
+			},
+			revert:'invalid', 
+			helper: 'clone',
+			scroll:false, 
+			appendTo: '#gantt-view'};
+
+		// TODO126: this should prevent the user dragging the bar on the x axis as their are scheduled time slots and they wouldn't match up
+		// however this setting is causing the bar to snap to the left of the gantt
+		//if(theAssignment.TheDateTimeSlotMap != undefined && Object.keys(theAssignment.TheDateTimeSlotMap).length > 0) draggableParams.axis = "y";
+
+		jQuery('#draggable').draggable(draggableParams);
+   	}
+   	
+   	var availabilityScoringClassMap = {};
+   	function initialiseAvailabilityScoring()
+   	{
+   		var json = new Array();
+		<apex:outputText value="json={!GanttViewProperties.TheActivityAssignmentClassesJson};" rendered="{!!ISBLANK(GanttViewProperties.TheActivityAssignmentClassesJson)}"/>
+		availabilityScoringClassMap = {};
+
+		for(var i = 0; i < json.length; i++) {
+			availabilityScoringClassMap[json[i][priorityName]] = json[i][includeAvailabilityScoreName];
+		}
+   	}
+   	   	
+   	function includeClassInAvailabilityScore(priority)
+   	{
+   		return ((priority in availabilityScoringClassMap) && availabilityScoringClassMap[priority]);
+   	}
+   	
+   	var requiredScheduledDays = {};
+   	
+   	function getRequiredUsageDetails()
+   	{
+   		var requiredUsageDetails = {};
+   		requiredUsageDetails.UnitType = 'Hour';
+		requiredUsageDetails.UsageMap = {};
+
+   		if (theAssignment.UsagePattern == null) return requiredUsageDetails;
+
+   		var usageMap = {};
+		requiredScheduledDays = {};
+		
+      	var assignmentUsage = new ActivityAssignmentUsagePattern(theAssignment.HoursPerDay, theAssignment.StartDate.toDate(), theAssignment.UsagePattern, theAssignment.Utilisation, theAssignment.Utilisation);
+
+      	if (assignmentUsage == null) return usageMap;
+
+		for (var i=0;i<=days_between(theAssignment.StartDate.toDate(), theAssignment.EndDate.toDate());i++)
+		{
+			var contextDate = new Date(theAssignment.StartDate.toDate().getFullYear(), theAssignment.StartDate.toDate().getMonth(), theAssignment.StartDate.toDate().getDate() + i, 0, 0, 0, 0);
+
+			var dayUsage = assignmentUsage.getUsagePatternOnDate(contextDate);
+			var usageOnDay = 0;
+ 			var dte = contextDate.toKimbleUTC();
+ 			
+  	 		if (dayUsage != '')
+	 		{
+	 			var forecast = dayUsage.split(':')[0];
+	 			if (forecast != undefined && forecast != NONFORECASTDAY && forecast != CLOSEDDAY)
+	 			{
+	 				var usageOnDay = KeyToHoursUsagePatternMap[forecast];
+	 				
+	 				if (usageOnDay == null) // percentage usage
+					{
+						// this is a percentage forecast day as no match was made to scheduled letters
+	 					usageOnDay = (forecast / 100 * theAssignment.HoursPerDay);
+ 					}
+ 					else
+ 					{
+ 						// this is a scheduled day
+ 						requiredScheduledDays[dte] = true;
+ 					}
+	 			}
+	  			usageMap[dte] = usageOnDay;
+			}
+		}
+		
+		requiredUsageDetails.UsageMap = usageMap;
+		
+		return requiredUsageDetails;
+   	}
+   	
+   	function findResources(assignmentId)
+   	{
+   		jQuery('#loadingIndicatorOuterContainer').show();
+   		
+   		jQuery('#goBtn').addClass('search-working');
+   		jQuery('.go-spinner').removeClass('search-working');
+   		
+   		jQuery('#matching-gantt-lines').empty();
+   		excludedResources = {};
+   		
+   		jQuery('#matching-resources-table-body>tbody').empty();
+   		
+   		var caps = new Array();
+   		jQuery.each(jQuery('.required-capability-rows div[cap-type-id]'), function (i, obj){
+   			caps[caps.length] = jQuery(obj).attr('cap-type-id');
+   		});
+   		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentDemandController.FindResources}',
+	       		assignmentId, caps, getFilterCriteria(), candidateResourcesDisplayed,
+	      			function(result, event){          
+	             		
+	             		jQuery('#loadingIndicatorOuterContainer').hide();
+	             		jQuery('#goBtn').removeClass('search-working');
+				   		jQuery('.go-spinner').addClass('search-working');
+				   		
+	             		if (event.status) 
+			            {
+			             	if (result.TotalRecords == 0) 
+			             	{
+			             		alert(kimble.labels['NoResourcesFound']);
+			             		if(autoGo && jQuery('.demand-action').html().length > 0) refreshToolbars();
+			             		return;
+			             	}
+			             	
+			             	if (result.TheResources.length < result.TotalRecords)
+			             	{
+			             		if(caps.length > 0)
+			             		{
+			             			alert(kimble.labels['TooManyResourcesFoundForCapabilitySearch'].format(result.TheResources.length, result.TotalRecords));
+		             			}
+		             			else
+		             			{
+		             				alert(kimble.labels['TooManyResourcesFound'].format(result.TheResources.length, result.TotalRecords));
+		             			}
+			             	}
+			             	resourceScoringMap = {};
+			             	
+			             	var scoring = (caps.length > 0 || availabilityScoringEnabled);
+
+		             		if(scoring)
+		             		{
+		             			initialiseScoringColumn();
+	             			}
+	             			else
+	             			{
+	             				jQuery('.scoring-column').remove();
+	             				if(jQuery('#scoring-view:visible').length > 0) showGanttView();
+	             			}
+			             	
+			             	if(caps.length > 0)
+			             	{
+			             		calculateCapabilityScores(result.TheResources);
+			             		jQuery('.hide-until-caps').removeClass('hide-until-caps');
+		             		}
+		             		else
+		             		{
+		             			jQuery('.scoring-btn').addClass('hide-until-caps');
+		             			jQuery('.min-rating-col').addClass('hide-until-caps');
+		             			
+		             			if(jQuery('#scoring-view:visible').length > 0) showGanttView();
+		             		}
+		             		
+		             		if(availabilityScoringEnabled)
+		             		{
+		             			var minAvailScore = (jQuery('#min-avail-score').val() != undefined && jQuery('#min-avail-score').val() != '' ? jQuery('#min-avail-score').val() : 0);
+		             			calculateAvailabilityScores(result.TheResources, minAvailScore);
+	             			}					
+							
+							jQuery('#gantt-vertical-scroll-container').scrollTo(0);
+							
+		             		if(scoring) result.TheResources.sort(sortByScore);
+		             		else result.TheResources.sort(sortByName);
+							
+			             	repaintResources(result.TheResources);
+			             	
+			             	// if the capability scoring page is open, repaint it
+			             	if(jQuery('#scoring-view:visible').length > 0) showCapabilityScoringView();
+			             				             	
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+	         	}, 
+	         	{escape: true, timeout: 60000}
+	     	);
+   	}
+   	
+   	function applyIndicatorTitles()
+   	{
+		jQuery('.capability-score-ind.meets-or-exceeds-summary-ind').prop('title', kimble.labels['CapMeetsOrExceedsRequirement']);
+		jQuery('.capability-score-ind.falls-short-summary-ind').prop('title', kimble.labels['CapFallsShortOfRequirement']);
+		jQuery('.capability-score-ind.missing-mandatory-summary-ind').prop('title', kimble.labels['CapMissingMandatoryRequirement']);
+		jQuery('.capability-score-ind.missing-some-summary-ind').prop('title', kimble.labels['CapMissingRequirement']);
+
+		jQuery('.capability-score-ind.fa-circle-o').prop('title', function() {return jQuery(this).prop('title') + ' (' + kimble.labels['CapExpiring'] + ')';});
+
+		if(availabilityScoringEnabled)
+		{
+			jQuery('.availability-score-ind.missing-sched-days-ind').prop('title', kimble.labels['CannotMeetScheduledDay']);
+			jQuery('.availability-score-ind.has-sched-days-ind').prop('title', kimble.labels['ResourceHasScheduledDays']);
+			jQuery('.availability-score-ind.resource-overlap-ind').prop('title', kimble.labels['ResourceHasOverlappingAssignments']);
+		}   	
+   	}
+   	
+   	function getFilterCriteria()
+   	{
+   		var criteria = new Array();
+   		
+   		<apex:repeat value="{!criteria}" var="criterion">
+   			// {!JSENCODE(criterion.DisplayType)}
+   			// {!JSENCODE(criterion.FieldName)}
+   			<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'date'}">
+   				if ( jQuery('#{!JSENCODE(criterion.Id)}-lt-filter').val() != '')
+   					criteria[criteria.length] = {ObjectName : '{!JSINHTMLENCODE(criterion.ObjectName)}', FieldPath : '{!JSINHTMLENCODE(criterion.FieldPath)}', DisplayType : '{!JSINHTMLENCODE(criterion.DisplayType)}', Operator : '{!JSINHTMLENCODE(OperatorMap['LessThan'])}', Values : [{text:jQuery('#{!JSENCODE(criterion.Id)}-lt-filter').datepicker("getDate").toKimbleUTC()}]};
+   				
+   				if ( jQuery('#{!JSENCODE(criterion.Id)}-eq-filter').val() != '')
+   					criteria[criteria.length] = {ObjectName : '{!JSINHTMLENCODE(criterion.ObjectName)}', FieldPath : '{!JSINHTMLENCODE(criterion.FieldPath)}', DisplayType : '{!JSINHTMLENCODE(criterion.DisplayType)}', Operator : '{!JSINHTMLENCODE(OperatorMap['Equals'])}', Values : [{text:jQuery('#{!JSENCODE(criterion.Id)}-eq-filter').datepicker("getDate").toKimbleUTC()}]};
+   				
+   				if ( jQuery('#{!JSENCODE(criterion.Id)}-gt-filter').val() != '')
+   					criteria[criteria.length] = {ObjectName : '{!JSINHTMLENCODE(criterion.ObjectName)}', FieldPath : '{!JSINHTMLENCODE(criterion.FieldPath)}', DisplayType : '{!JSINHTMLENCODE(criterion.DisplayType)}', Operator : '{!JSINHTMLENCODE(OperatorMap['GreaterThan'])}', Values : [{text:jQuery('#{!JSENCODE(criterion.Id)}-gt-filter').datepicker("getDate").toKimbleUTC()}]};
+   				
+   			</apex:outputPanel>
+   			
+   			<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'numeric'}">
+   				if ( jQuery('#{!JSENCODE(criterion.Id)}-lt-filter').val() != '')
+   					criteria[criteria.length] = {ObjectName : '{!JSINHTMLENCODE(criterion.ObjectName)}', FieldPath : '{!JSINHTMLENCODE(criterion.FieldPath)}', DisplayType : '{!JSINHTMLENCODE(criterion.DisplayType)}', Operator : '{!JSINHTMLENCODE(OperatorMap['LessThan'])}', Values : [{text:jQuery('#{!JSENCODE(criterion.Id)}-lt-filter').val()}]};
+   				
+   				if ( jQuery('#{!JSENCODE(criterion.Id)}-eq-filter').val() != '')
+   					criteria[criteria.length] = {ObjectName : '{!JSINHTMLENCODE(criterion.ObjectName)}', FieldPath : '{!JSINHTMLENCODE(criterion.FieldPath)}', DisplayType : '{!JSINHTMLENCODE(criterion.DisplayType)}', Operator : '{!JSINHTMLENCODE(OperatorMap['Equals'])}', Values : [{text:jQuery('#{!JSENCODE(criterion.Id)}-eq-filter').val()}]};
+   				
+   				if ( jQuery('#{!JSENCODE(criterion.Id)}-gt-filter').val() != '')
+   					criteria[criteria.length] = {ObjectName : '{!JSINHTMLENCODE(criterion.ObjectName)}', FieldPath : '{!JSINHTMLENCODE(criterion.FieldPath)}', DisplayType : '{!JSINHTMLENCODE(criterion.DisplayType)}', Operator : '{!JSINHTMLENCODE(OperatorMap['GreaterThan'])}', Values : [{text:jQuery('#{!JSENCODE(criterion.Id)}-gt-filter').val()}]};
+   				
+   			</apex:outputPanel>
+   			<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'lookup' || criterion.DisplayType == 'dropdown' || criterion.DisplayType == 'text' }">
+   			
+   			if (jQuery('[id="{!JSENCODE(criterion.Id)}-filter"]').select2('data').length > 0)
+   			{
+   				var o = {ObjectName : '{!JSINHTMLENCODE(criterion.ObjectName)}', FieldPath : '{!JSINHTMLENCODE(criterion.FieldPath)}', DisplayType : '{!JSINHTMLENCODE(criterion.DisplayType)}', Operator : '{!JSINHTMLENCODE(OperatorMap['IsIn'])}', Values : new Array(), Criteria:'{!JSINHTMLENCODE(criterion.SearchCriteria)}'};
+   				
+   				jQuery.each(jQuery('[id="{!JSENCODE(criterion.Id)}-filter"]').select2('data'), function (i, obj){
+   					var val = new Object();
+   					val.id = obj.id;
+   					val.text = obj.text;
+   					o.Values[o.Values.length] = val;
+   				});
+   				
+   				criteria[criteria.length] = o;
+   			}
+   			</apex:outputPanel>
+
+   		</apex:repeat>
+   		
+   		return criteria;
+   	}
+   	   		
+   	function acceptCandidate(resourceId)
+   	{
+   		var assignmentId = candidateResources[resourceId].AssignmentId;
+   		
+   		jQuery('tr#' + resourceId + '>td:first>a').hide().parent().addClass('Loading');
+   		
+   		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.AcceptCandidate}',
+	       		assignmentId,
+	      			function(result, event){          
+	             		if (event.status) 
+			            {
+			            	redirectAfterAction();
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+	         	}, 
+	         	{escape: true, timeout: 60000}
+	     	);
+   	}
+   	
+   	function deleteCandidate(resourceId, obj)
+   	{
+   		var assignmentId = candidateResources[resourceId].AssignmentId;
+   		
+   		// hide toolbar button
+   		jQuery(obj).parent().parent().remove();
+   		jQuery('tr#' + resourceId + '>td:first>a').hide().parent().addClass('Loading');
+   		
+   		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.DeleteAssignment}',
+	       		assignmentId,
+	      			function(result, event){          
+	             		
+	             		if (event.status) 
+			            {
+			            	// delete resource rows
+			            	jQuery('#' + resourceId + '.resource-grid-row').remove();
+			            	jQuery('#' + resourceId + '.resource-gantt-row').remove();
+			            	
+			            	//delete assignment rows
+			            	jQuery('[parent-id="' + resourceId + '"]').remove();
+							jQuery('#' + resourceId + '>div.resource-assignments').remove();
+			            	
+			            	delete candidateResources[resourceId];
+
+			            	if(Object.keys(candidateResources).length == 0) refreshFulfilmentModePanel();
+
+			            	refreshToolbars();
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+	         	}, 
+	         	{escape: true, timeout: 60000}
+	     	);
+   	}
+   	
+   	function rejectCandidate(resourceId, obj)
+   	{
+  		var assignmentId = candidateResources[resourceId].AssignmentId;
+  		jQuery(obj).parent().parent().hide();
+   		
+       if ('{!JSENCODE(Text(TheCandidateRejectionReasons.size))}' > 1)
+   		{
+   			//show modal popup to enter rejection reason
+   			initialiseModalBoxy('#CandidateRejectionPopup', '{!JSENCODE($Label.RejectLabel)} {!$ObjectType.ActivityAssignment__c.label}');
+   			var rejectReason = $('select[id*="candidateRejectionReason"]');
+   			rejectReason.attr('resourceId', resourceId);
+   			rejectReason.attr('assignmentId', assignmentId);
+   			rejectReason.val('');
+   			
+   			showModalBoxy();		
+   		}
+   		else
+  		{
+  			saveRejectCandidate(resourceId, assignmentId, '')
+  		}
+   	}
+  	
+  	function saveRejectCandidatePopup()
+  	{
+  		var rejectReason = $('select[id*="candidateRejectionReason"]'); 
+  		
+  		if (rejectReason.val() == null || rejectReason.val() == '')
+  		{
+  			alert(kimble.labels['RequiredValue'].format('<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.fields.KimbleOne__CandidateRejectionReason__c.label}"/>'));
+  			return;
+  		}
+  		
+  		hideModalBoxy();
+  		
+  		saveRejectCandidate(rejectReason.attr('resourceId'), rejectReason.attr('assignmentId'), rejectReason.val());
+  	}
+  	
+  	function saveRejectCandidate(resourceId, assignmentId, reason)
+  	{
+  		jQuery('tr#' + resourceId + '>td:first>a').hide().parent().addClass('Loading');
+   		
+   		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.RejectCandidate}',
+	       		assignmentId, reason, ganttViewStartDate, ganttViewEndDate,
+	      			function(result, event){          
+	             		if (event.status)
+			            {
+			            	window.location.reload();
+			         	}
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);	
+			         	}
+	         	}, 
+	         	{escape: true, timeout: 60000}
+	     	);
+  	}
+  
+	
+    </script>
+    
+	<style>
+		/* Lightning overrides body:not(.Custom299Tab) excludes classic */
+		body:not(.Custom299Tab) .sidebarCollapsed #handlebarContainer.k-handlebar {
+			left: 0px;
+		}
+		.search-working {
+			display: none;
+		}
+		td.demand-action-cell {
+			position: relative;
+			min-width: 26px;
+		}
+		.demand-action {
+			position: absolute;
+			width: 24px;
+			height: 24px;
+            top: 2px;
+            left: 1px;
+            text-align: center;
+		}
+		.demand-action .action-icon {
+    		font-size: 20px;
+    		color: black !important;
+		}
+		.demand-action .action-icon i.fa {
+			padding-top: 2px;
+		}
+		a.action-icon.Loading .fa {
+			opacity: 0;
+		}
+		th.demand-status-cell {
+			position: relative;
+		}
+		.demand-status {
+			position: absolute;
+			top: 2px;
+			left: 4px;
+		}
+		.demand-status .fa {
+			font-size: 16px;
+			padding: 2px 3px;
+		}
+        a.demand-published {
+            cursor: initial;
+        }
+        a.demand-published:hover {
+            background-color: white !important;
+        }
+		a.demand-published:hover .fa {
+            color: #8e8e8e !important;
+        }
+		a.demand-published .fa,
+        i.exp-int-ind {
+            color: #8e8e8e;
+        }
+        i.exp-int-c-ind,
+        i.auto-match-c-ind,
+        i.search-c-ind {
+            cursor: pointer;
+            position: absolute;
+            left: -21px;
+            top: -2px;
+            padding: 2px;
+            border-radius: 2px;
+        }
+        i.auto-match-c-ind {
+            background-color: #E58E1A;
+            color: white;
+        }
+        i.search-c-ind {
+            background-color: #333435;
+            color: white;
+        }
+        i.search-c-ind.pref-c {
+            background-color: green;
+        }
+        i.exp-int-c-ind.IdealRole {
+            background-color: gold;
+            color: black;
+        }
+        i.exp-int-c-ind.Consider {
+            color: #428bca;
+            background-color: #428bca;
+            color: white;
+        }
+        i.ass-match-ind.Pending {
+            background-image: none;
+            color: #333;
+        }
+        i.ass-match-ind.NoMatches {
+            color: #B42E34;
+        }
+        i.ass-match-ind.ResourceReplaced {
+            color: #008852;
+        }
+        i.exp-int-ind.HasCandidates {
+            color: #428BCA;
+        }
+        i.ass-match-ind.CandidatesProposed {
+	        color: #E58E1A;
+        }
+        .ad-cand-rev-btn. {
+            position: relative;
+        }
+        .ad-cand-rev-btn .fa-thumbs-o-up {
+            position: absolute;
+            left: 6px;
+        }
+        .ad-cand-rev-btn .fa-thumbs-o-down {
+            position: absolute;
+            right: 6px;
+        }
+		i.go-spinner {
+			position: absolute;
+			right: 6px;
+			font-size: 18px;
+			top: 3px;
+		}		
+		/* Required Capability Summary */
+		.scoring-btn {
+			border-right-style: solid;
+		    border-right-width: 1px;
+		    border-right-color: #b5b5b5;
+		}
+		.edit-req-cap-btn {
+			display: inline-block;
+		}
+		table.required-capabilities-summary {
+			border: 2px solid #e0e0e0;
+			padding: 2px;
+			cursor: text;
+			min-height: 26px;
+	  			display: block;
+		}
+		span.req-cap-item-rating-val {
+		    border-radius: 4px;
+		    display: inline-block;
+			padding: 1px;
+		    background: #f2f3f3;
+		    color: #1797c0;
+		    font-weight: bold;
+		}
+		th.min-rating-col {
+		    width: 10px;
+		    white-space: normal;
+		    text-align: center;
+		}
+		
+		td.req-cap-min-rating {
+		    text-align: center;
+		    font-size: 14px;
+		}
+		
+		table.required-capabilities-summary th {
+		    padding-bottom: 5px;
+		}
+		
+		.req-cap-item {
+		    border: 1px solid #aaaaaa;
+		    border-radius: 4px;
+		    padding: 5px 20px 5px 5px;
+		    background-color: #e4e4e4;
+		    color: #333;
+		    cursor: default;
+		    position: relative;
+		}
+		td.req-cap-name {
+		    width: 144px;
+		}
+		.remove-req-cap-item-btn {
+		    background-image:  url({!URLFOR($Resource.AssignmentImages, 'assignmentSprite.png')});
+		    background-position: -2px -29px;
+		    background-repeat: no-repeat;
+		    right: 6px;
+		    height: 13px;
+		    width: 13px;
+		    position: absolute;
+		    top: 5px;
+		}
+		
+		.remove-req-cap-item-btn:hover {
+		    background-position: -2px -1px;
+		    cursor: pointer;
+		}
+		
+		span.fa.fa-pencil-square-o.edit-req-cap-btn {
+		    cursor: pointer;
+		    font-size: 16px;
+		    display: inline-block;
+		    margin-left: 7px;
+		}
+		.req-cap-item.mandatory {
+		    border-left: 5px solid #f00;
+		}
+		/* Availability Scoring */
+		.availability-scoring-heading {
+			margin-top: 10px;
+			border-top: 2px dashed #e0e0e0;
+			padding-top: 8px;
+		}
+		th.headerRow.availability-scoring-column {
+		    text-align: center;
+		    border-left: 2px solid white;
+		}
+		td.availability-score-cell {
+		    font-size: 14px;
+		}		
+		i.availability-score-ind {
+		    font-size: 12px;
+	        width: 8px;
+		}	
+		.availability-scoring-toggle, .candidate-resources-toggle {
+			text-align: right;
+    		margin-right: 5px;
+   		}
+		.availability-scoring-toggle-off, .availability-scoring-toggle-on, .candidate-resources-toggle-off, .candidate-resources-toggle-on {
+			zoom: 1.6;
+			vertical-align: middle;
+			padding-left: 4px;
+			cursor: pointer;
+		}	
+		.availability-scoring-toggle-labels, .candidate-resources-toggle-labels {
+			display: inline-block;
+			font-size: 14px;
+			padding-left: 4px;
+			padding-top: 3px;
+			cursor: pointer;
+		}
+		.centre-align-int {
+		    text-align: center;
+		}		
+		/* Scoring Summary */
+		th.headerRow.scoring-column {
+		    text-align: center;
+		    border-left: 2px solid white;
+		}
+		td.score-cell.capability-score {
+		    font-size: 14px;
+		    cursor: pointer;
+		}
+		td.score-cell div {
+		    display: inline-block;
+		    width: 30px;
+		    text-align: center;
+		}		
+		i.capability-score-ind {
+		    font-size: 12px;
+	        width: 8px;
+		}
+		.meets-or-exceeds-summary-ind {
+		    color: green;
+		}
+		.falls-short-summary-ind,
+		.has-sched-days-ind {
+		    color: orange;
+		}
+		.missing-some-summary-ind {
+		    color: pink;
+		}
+		.resource-overlap-ind {
+			font-size: 14px;
+			color: orange;
+		}
+		.missing-mandatory-summary-ind,
+		.missing-sched-days-ind {
+		    color: red;
+		}
+		tr.hide-while-scoring.resource-assignment,  div.dragging-scroll.hide-while-scoring {
+		    display: none;
+		}
+		.disable-white-scoring {
+			pointer-events: none;
+		}
+		.hide-until-caps {
+			display: none !important;
+		}
+		.cap-score-min-rating {
+		    display: table-cell;
+		}
+		.cap-score-mand-item-ind {
+			display: inline;
+			margin-left: 2px;
+			color: red;
+			font-size: 10px;
+		}
+		.cap-score-item {
+		    display: table-cell;
+		    width: 100px;
+		    min-width: 100px;
+	        vertical-align: middle;
+	        position: relative;
+		}
+		.cap-score-item-name {
+		    text-align: center;
+		    display: -webkit-box;
+    		-webkit-line-clamp: 4;
+    		-webkit-box-orient: vertical;
+    		overflow: hidden;
+		}
+		div#cap-score-item-container {
+		    display: table;
+	        background-color: #f2f3f3;
+    		border-bottom: 2px solid #fff;
+		}
+		.cap-score-item, .cap-score-min-rating, .cap-res-score-item {
+		    border-right: 2px solid #fff;
+		}
+		.cap-score-items-row {
+		    display: table-row;
+	        height: 81px;
+		}
+		.cap-score-min-ratings-row {
+		    display: table-row;
+		    height: 25px;
+		    border-bottom: 2px solid #fff;
+		}
+		.cap-score-min-rating-val {
+		    color: #1797c0;
+		    font-weight: bold;
+		    text-align: center;
+		    font-size: 16px;
+		}
+		.cap-res-score-item {
+		    display: table-cell;
+		    width: 100px;
+		    min-width: 100px;
+		    text-align: center;
+		    vertical-align: middle;
+	        position: relative;
+		}
+		.cap-score-resource-row-container {
+		    display: table;
+		    height: 25px;
+		    background-color: #eee;
+		    border-bottom: 2px solid #fff;
+		}
+		.cap-res-score-rating-val {
+		    font-size: 14px;
+		}
+		.cap-res-score-bool-rating-val {
+		    font-size: 14px;
+		}
+		.cap-score-resource-row-container i {
+		    font-size: 20px;
+		    margin-left: 2px;
+		}
+		i.cap-missing-ind {
+		    color: #f44336;
+		}
+		i.mand-cap-missing-ind {
+		    color: red;
+		}
+		i.meets-cap-ind {
+		    color: green;
+		}
+		i.below-cap-ind {
+			color: orange;
+		}
+		i.expiry-cap-ind {
+			color: orange;
+		}
+		.exceeds-cap-ind {
+			color: green;
+		}
+		i.expiry-cap-ind.expired {
+		    color: #f00 !important;
+		}		
+		.rating-ind {
+			position: absolute;
+			right: 4px;
+			top: 3px;
+		}
+		.rating-warn-ind {
+			position: absolute;
+			left: 4px;
+			top: 3px;
+		}
+		.has-bool-ind {
+		    font-size: 16px !important
+		}
+		.cap-missing {
+		    background-color: pink !important;
+		}
+			/*####################FROM ActivityAssignmentsComponent########################*/   			
+			/*
+			assignment table styles
+		*/
+	
+		.capability-column {
+			width: 100px;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			text-align: center;
+		}
+		
+		.rightAlignDataCell {
+			text-align: right;
+			padding-right: 5px;
+		}
+		
+		.rightAlignCell {
+			text-align: right;
+		}
+		
+		.centerAlignDataCell {
+			text-align: center;
+		}
+		
+		.resource-row-collapsed {
+			height: 11px;
+			width: 11px;
+			background: transparent url('/img/alohaSkin/twisty_sprite.png') 0px 0px
+				no-repeat;
+			margin-left: 3px;
+			margin-right: 12px;
+			background-position: 1px -1px;
+		}
+		
+		.resource-row-expanded {
+			height: 11px;
+			width: 11px;
+			background: transparent url('/img/alohaSkin/twisty_sprite.png') 0px 0px
+				no-repeat;
+			margin-left: 3px;
+			margin-right: 12px;
+			background-position: 1px -12px;
+		}
+		
+		.parentAssignmentDataRow:hover {
+			cursor: pointer;
+		}
+		
+		.parentAssignmentDataRowTwisterCollapsed {
+			height: 11px;
+			width: 11px;
+			background: transparent url('/img/alohaSkin/twisty_sprite.png') 0px 0px
+				no-repeat;
+			margin-left: 3px;
+			margin-right: 12px;
+			background-position: 1px -1px;
+		}
+		
+		.parentAssignmentDataRowTwisterExpanded {
+			height: 11px;
+			width: 11px;
+			background: transparent url('/img/alohaSkin/twisty_sprite.png') 0px 0px
+				no-repeat;
+			margin-left: 3px;
+			margin-right: 12px;
+			background-position: 1px -12px;
+		}
+		
+		.dataRow:hover {
+		    background-color: #e7f4f8;
+		}
+		
+		
+		.selectedRow, .selectedRow:hover {
+			background-color: #d0eaf2;
+		}
+		
+		.resource-photo-tool-tip {
+			border-radius: 5%;
+		}
+		
+		.resource-photo-img {
+			border-radius: 5%;
+		    width: 120px;
+		}
+		
+		/*
+			sortable columns
+		*/
+		
+		th.sortable {
+			cursor: pointer;
+		}
+		
+		th.sortable:hover {
+			background-color: #E6EAEA !important;
+		}
+		
+		#sortedASC {
+			background-image: url('/img/alohaSkin/sortArrows_sprite.png');
+			background-position: 100% -9px;
+			background-repeat: no-repeat;
+		}
+		
+		#sortedDESC {
+			background-image: url('/img/alohaSkin/sortArrows_sprite.png');
+			background-position: 100% 7px;
+			background-repeat: no-repeat;
+		}
+		
+		/*
+			layout control
+		*/
+		
+		.ui-layout-center,.ui-layout-east {
+			padding: 0;
+		}
+		
+		.ui-layout-content {
+			padding: 0px;
+		}
+		
+		/*
+			resizable columns
+		*/
+		
+		.results-grid-table {
+			width: auto;
+			/*table-layout: fixed;*/
+		    border-collapse: collapse;
+		    width: 0; /* otherwise Chrome will not increase table size */
+		}
+		
+		.results-grid-table th, .results-grid-table td { 
+		     overflow: hidden;
+		     white-space: nowrap;
+		} 
+		
+		.columnLabel {
+		    display: inline-block;
+		    width: 100%;
+		}
+	
+		/* PAGE OVERRIDDES */
+		.gantt-container
+		{
+			padding-bottom: 1px;
+			border-bottom: 1px solid #eee;
+			width:100%
+		}
+		.ui-state-active
+		{
+			border:0px;
+		}
+		/* scheduled time */
+		.schd-dte-container, .res-schd-dte-container {
+		    position: absolute;
+		    font-size: 14px;
+		    cursor: pointer;
+		    z-index: 999;
+		    color: #696969;
+		}
+		.resource-gantt-row {
+		    position: relative;
+		}
+		.fa.fa-thumbs-o-up {
+			color: #2ba60d;
+		}
+		.fa.fa-thumbs-o-down {
+			color: #8f0000;
+		}
+
+		/* resourcing status */
+		span.res-details-label {
+			user-select: none;
+			font-family: Arial,Helvetica,sans-serif;
+			color: #000;
+			font-size: 11px;
+			font-weight: bold;
+			display: inline-block;
+			height: 25px;
+			vertical-align: middle;
+			line-height: 25px;
+			padding: 0px 5px 0px 16px;
+		}
+		div#resourcing-details select {
+			max-width: 140px;
+		}
+		.resourcing-details-panel input {
+			padding-right: 26px !important;
+		}
+		.resourcing-details-panel {
+			position: relative;
+		}
+		i.edit-resourcing-details-icon {
+			position: absolute;
+			top: 1px;
+			right: 8px;
+			color: #333;
+		}
+		.readonly {background-color:#eee};
+	</style>
+
+	<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheDemandAssignment.KimbleOne__ModelActivityAssignment__c)}">
+	<style>
+		i.modelled-demand-ind {
+			font-size: 16px;
+			cursor: pointer;
+			color: #0070d2;
+		}
+	</style>
+	</apex:outputPanel>
+
+	<div id="ActivityAssignmentRequiredCapabilities"><apex:include pageName="{!$Page.AssignmentRequiredCapabilities}"/></div>
+	<div id="AssignmentDemandCandidateReview"><apex:include pageName="{!$Page.AssignmentDemandCandidateReview}"/></div>
+
+    <script src="https://maps.googleapis.com/maps/api/js?key={!GanttViewProperties.GoogleMapsApiKey}"></script>
+    </apex:define>
+    
+</apex:composition>
+</apex:page>

@@ -1,0 +1,115 @@
+<apex:page standardController="KimbleOne__Credit__c" extensions="KimbleOne.CreditEditController"  sidebar="false" action="{!CheckStatus}">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+	<c:Menu DefaultHelpPage="Finance.html" MenuContextType="{!MenuContextType}" MenuContextId="{!MenuContextId}" MenuContextName="{!MenuContextName}" />
+</apex:define>  
+   
+<apex:define name="Content">
+
+	<!-- Hidden fields for use in controller -->
+	<apex:outputField value="{!KimbleOne__Credit__c.KimbleOne__DeliveryElement__c}" rendered="False"/>
+	<apex:outputField value="{!KimbleOne__Credit__c.DeliveryElement__r.KimbleOne__DeliveryGroup__c}" rendered="False"/>
+	<apex:outputField value="{!KimbleOne__Credit__c.DeliveryElement__r.DeliveryGroup__r.Name}" rendered="False"/>
+	<apex:outputField value="{!KimbleOne__Credit__c.Account__r.Name}" rendered="False"/>
+	
+	<apex:pageMessages escape="false"/>
+
+    <apex:form >
+		<apex:outputPanel id="CreditEditPanel" >
+				
+		    	<apex:pageBlock id="CreditEditBlock" title="{!$ObjectType.KimbleOne__Credit__c.Label}">    
+
+           			<div id="CreditEditErrors">
+           				<apex:pageMessages escape="false"/>
+           			</div>
+           			           		
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton styleclass="DisableButtonWhileBusy" action="{!save}" value="{!$Label.kimbleone__save}" reRender="CreditEditPanel"/>						
+						<apex:commandButton value="{!$Label.kimbleone__cancel}" oncomplete="window.history.back();" reRender=""/>
+					</apex:pageBlockButtons>
+					
+		            <apex:pageblockSection collapsible="false" showheader="false"  columns="2">
+             		    <apex:inputfield value="{!Credit.Name}" required="true"/> 
+             		    <apex:outputfield value="{!Credit.KimbleOne__Status__c}" /> 
+						<apex:inputfield value="{!Credit.KimbleOne__CreditDate__c}" styleClass="kimbleDatePicker" required="true"/>
+             		    <apex:inputfield value="{!Credit.KimbleOne__ExpiryDate__c}" styleClass="kimbleDatePicker" />
+					</apex:pageblockSection>
+
+					<apex:pageBlockSection rendered="{!ISBLANK(DeliveryElement)}">
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel >{!$Label.kimbleone__hascreditunitslabel}</apex:outputLabel>
+							<apex:actionRegion >
+								<apex:inputCheckbox value="{!HasCreditUnits}">
+									<apex:actionSupport event="onclick" rerender="creditUnitsSection"/>
+								</apex:inputCheckbox>
+							</apex:actionRegion>
+						</apex:pageBlockSectionItem>
+					</apex:pageBlockSection>
+
+					<apex:outputPanel layout="none" id="creditUnitsSection">
+                        <apex:pageblockSection collapsible="false" showheader="false" columns="2" rendered="{!HasCreditUnits}">
+                            <apex:pageBlockSectionItem >
+                                <apex:outputLabel >{!$ObjectType.KimbleOne__Credit__c.Fields.KimbleOne__CreditUnits__c.Label}</apex:outputLabel>
+                                <apex:actionRegion >
+                                    <apex:inputfield value="{!Credit.KimbleOne__CreditUnits__c}" required="true" >
+                                        <apex:actionSupport event="onchange" action="{!RecalculateCreditValue}" rerender="CreditValue" />
+                                    </apex:inputfield>
+                                </apex:actionRegion>
+                            </apex:pageBlockSectionItem>
+                            <apex:pageBlockSectionItem >
+                                <apex:outputLabel >{!$ObjectType.KimbleOne__Credit__c.Fields.KimbleOne__UnitValue__c.Label} {!JSINHTMLENCODE(Credit.CurrencyIsoCode)}</apex:outputLabel>
+                                <apex:actionRegion >
+                                    <apex:inputfield value="{!Credit.KimbleOne__UnitValue__c}" required="true">
+                                        <apex:actionSupport event="onchange" action="{!RecalculateCreditValue}" rerender="CreditValue" />
+                                    </apex:inputfield>
+                                </apex:actionRegion>
+                            </apex:pageBlockSectionItem>
+                            <apex:outputField id="CreditValue" value="{!Credit.KimbleOne__CreditValue__c}" />
+                        </apex:pageblockSection>
+                        
+                        <apex:pageBlockSection rendered="{!!HasCreditUnits}">
+                            <apex:pageBlockSectionItem >
+                                <apex:outputLabel >{!$ObjectType.KimbleOne__Credit__c.Fields.KimbleOne__CreditValue__c.Label} {!JSINHTMLENCODE(Credit.CurrencyIsoCode)}</apex:outputLabel>
+                                <apex:inputField id="inputCreditValue" styleclass="MilestoneValueTextEdit" value="{!Credit.KimbleOne__CreditValue__c}" required="true"/>
+                            </apex:pageBlockSectionItem>
+                        </apex:pageBlockSection>
+					</apex:outputPanel>
+                    
+		            <apex:pageBlockSection rendered="{!!ISBLANK(Credit.KimbleOne__DeliveryElement__c)}">						
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel >{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__InvoicingCurrencyCreditRevenue__c.Label} {!JSINHTMLENCODE(DeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c)}</apex:outputLabel>
+							<apex:inputField styleclass="MilestoneValueTextEdit" value="{!DeliveryElement.KimbleOne__InvoicingCurrencyCreditRevenue__c}" required="true"/>
+						</apex:pageBlockSectionItem>
+		            </apex:pageBlockSection>						
+   										
+		    	</apex:pageBlock>
+		</apex:outputPanel>
+    
+    </apex:form>
+
+	<script>
+		jQuery(window).load(function(){
+			initialiseItems();
+		});
+		function initialiseItems()
+		{
+			SetupDatePicker();
+		}
+		function SetupDatePicker()
+		{
+			//dateFormat: 'yy-mm-dd',
+			jQuery('.kimbleDatePicker').datepicker({
+					dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true,
+					selectOtherMonths: true,
+					changeMonth: true,
+					changeYear: true});
+		}
+	</script>
+    
+    </apex:define>
+    </apex:composition>
+
+</apex:page>

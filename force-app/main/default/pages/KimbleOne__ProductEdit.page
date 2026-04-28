@@ -1,0 +1,263 @@
+<apex:page standardController="KimbleOne__Product__c" extensions="KimbleOne.ProductEditController" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">
+  
+<apex:define name="Menu">
+	
+		<c:Menu MenuContextType="ProductDefinition" MenuContextId="{!KimbleOne__Product__c.Id}" MenuContextName="{!KimbleOne__Product__c.Name}" rendered="{!!ISBLANK(KimbleOne__Product__c.Id)}" />
+
+</apex:define>
+    
+<apex:define name="Content">
+
+	<apex:form >
+		<apex:outputPanel layout="none" rendered="{!AND(ISBLANK(productType), isEnablePreSalesAssignmentTemplates)}">
+			<apex:pageBlock >
+				<apex:pageBlockButtons location="bottom">
+					<apex:commandButton action="{!NewProduct}" value="{!$Label.kimbleone__gobutton}"/>						
+				</apex:pageBlockButtons>
+				<apex:pageblockSection collapsible="false" title="{!$Label.kimbleone__producteditdetails}" columns="1">
+					<apex:pageBlockSectionItem >
+						<apex:outputText value="{!$ObjectType.KimbleOne__Product__c.Fields.KimbleOne__ProductType__c.Label}" />
+						<apex:selectList id="resourceType" value="{!KimbleOne__Product__c.KimbleOne__ProductType__c}" required="true" size="1">
+							<apex:selectOptions value="{!productTypes}"/> 
+						</apex:selectList> 
+					</apex:pageBlockSectionItem>
+				</apex:pageblockSection>
+			</apex:pageBlock>
+		</apex:outputPanel>
+		
+		<apex:outputPanel id="ProductEditMainPanel" rendered="{!NOT(ISBLANK(productType))}">
+			
+			<apex:pageMessages escape="false" id="messagesMain"/>
+			
+			<apex:pageBlock id="ProductEditMainPanelNoMessage">		
+				<apex:pageBlockButtons location="bottom">
+					<apex:commandButton action="{!save}" value="{!$Label.kimbleone__save}"/>						
+				</apex:pageBlockButtons>
+	
+				<apex:pageBlockSection collapsible="false" title="{!$Label.kimbleone__producteditdetails}" rendered="{!IsDelivery}">		
+					
+					<apex:inputField id="productName" value="{!KimbleOne__Product__c.Name}" required="true"/>
+					<apex:outputField value="{!KimbleOne__Product__c.KimbleOne__ProductType__c}" />
+					<apex:pageBlockSectionItem rendered="{!IsDelivery}">
+				 		<apex:outputText value="{!$ObjectType.KimbleOne__Product__c.Fields.KimbleOne__BusinessUnit__c.Label}"/>
+				 		<apex:selectList id="productBusinessUnit" value="{!KimbleOne__Product__c.KimbleOne__BusinessUnit__c}" size="1" >
+							<apex:selectOptions value="{!TheOperatingEntities}" />
+						</apex:selectList>
+					</apex:pageBlockSectionItem>
+					
+					<apex:pageBlockSectionItem rendered="{!canEditDomain && !KimbleOne__Product__c.KimbleOne__IsAbstract__c && IsDelivery}">
+						<apex:outputText value="{!$ObjectType.KimbleOne__Product__c.Fields.KimbleOne__ProductDomain__c.Label}"/>
+						<apex:outputPanel >
+							<apex:selectList value="{!KimbleOne__Product__c.KimbleOne__ProductDomain__c}" size="1" id="productDomain" onchange="refresh()">
+								<apex:selectOptions value="{!DomainList}" />
+							</apex:selectList>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+
+					<apex:outputField value="{!KimbleOne__Product__c.KimbleOne__ProductDomain__c}" rendered="{!!canEditDomain && !KimbleOne__Product__c.KimbleOne__IsAbstract__c && IsDelivery}"/>
+					<apex:pageBlockSectionItem rendered="{!!KimbleOne__Product__c.KimbleOne__IsAbstract__c}"/>
+					
+					<apex:inputField id="productCurrency" value="{!KimbleOne__Product__c.CurrencyIsoCode}"/>
+					
+					<apex:inputField id="productDescription" value="{!KimbleOne__Product__c.KimbleOne__DefaultDescription__c}" style="width:152px;"/>		
+
+					<apex:inputField id="productIsActive" value="{!KimbleOne__Product__c.KimbleOne__IsActive__c}" />
+
+					<apex:inputField id="productIsRestricted" value="{!KimbleOne__Product__c.KimbleOne__IsRestricted__c}" rendered="{!IsDelivery}"/>
+
+					<apex:inputField id="productIsAbstract" value="{!KimbleOne__Product__c.KimbleOne__IsAbstract__c}" rendered="{!!hasDomain && IsDelivery}" onchange="refreshAbstractionDetailPanel()"/>
+
+					<apex:pageBlockSectionItem id="abstractionTypeSpacer" rendered="{!!hasDomain && KimbleOne__Product__c.KimbleOne__IsAbstract__c && IsDelivery}" />
+
+					<apex:pageBlockSectionItem id="abstractionTypeField" rendered="{!!hasDomain && KimbleOne__Product__c.KimbleOne__IsAbstract__c && IsDelivery}"  >
+						<apex:outputText value="{!$ObjectType.KimbleOne__Product__c.Fields.KimbleOne__AbstractionType__c.Label}"/>
+						<apex:outputPanel >
+							<apex:selectList value="{!KimbleOne__Product__c.KimbleOne__AbstractionType__c}" size="1" id="abstractionType">
+								<apex:selectOptions value="{!AbstractionTypeOptions}" />
+							</apex:selectList>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+					<apex:pageBlockSectionItem rendered="{!hasDomain && IsDelivery}" />
+					
+					<apex:pageBlockSectionItem rendered="{!IsDelivery}">
+						<apex:outputText value="{!$ObjectType.KimbleOne__Product__c.Fields.KimbleOne__MilestoneTemplateBehaviourRule__c.Label}"/>
+						<apex:outputPanel >
+							<apex:selectList value="{!KimbleOne__Product__c.KimbleOne__MilestoneTemplateBehaviourRule__c}" size="1" id="milestoneBehaviourRule">
+								<apex:selectOptions value="{!productTemplateBehaviourRuleOptions}" />
+							</apex:selectList>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+					<apex:pageBlockSectionItem />
+					
+					<apex:pageBlockSectionItem >
+						<apex:outputText value="{!$ObjectType.KimbleOne__Product__c.Fields.KimbleOne__UsageTemplateBehaviourRule__c.Label}"/>
+						<apex:outputPanel >
+							<apex:selectList value="{!KimbleOne__Product__c.KimbleOne__UsageTemplateBehaviourRule__c}" size="1" id="usageBehaviourRule">
+								<apex:selectOptions value="{!productTemplateBehaviourRuleOptions}" />
+							</apex:selectList>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+					<apex:pageBlockSectionItem />
+					
+					<apex:pageBlockSectionItem />
+					
+					<apex:pageBlockSectionItem rendered="{!isPlanned && IsDelivery}">
+						<apex:outputText value="{!$ObjectType.KimbleOne__Product__c.Fields.KimbleOne__TaskTemplateBehaviourRule__c.Label}"/>
+						<apex:outputPanel >
+							<apex:selectList value="{!KimbleOne__Product__c.KimbleOne__TaskTemplateBehaviourRule__c}" size="1" id="taskBehaviourRule">
+								<apex:selectOptions value="{!productTemplateBehaviourRuleOptions}" />
+							</apex:selectList>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+
+					<apex:pageBlockSectionItem rendered="{!IsDelivery}">
+						<apex:outputText value="{!$ObjectType.KimbleOne__Product__c.Fields.KimbleOne__AnnuityTemplateBehaviourRule__c.Label}"/>
+						<apex:outputPanel >
+							<apex:selectList value="{!KimbleOne__Product__c.KimbleOne__AnnuityTemplateBehaviourRule__c}" size="1" id="annuityBehaviourRule">
+								<apex:selectOptions value="{!productTemplateBehaviourRuleOptions}" />
+							</apex:selectList>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+					<apex:pageBlockSectionItem rendered="{!KimbleOne__Product__c.ProductDomain__r.KimbleOne__IsResourced__c && IsDelivery}"/>
+
+					<apex:pageBlockSectionItem rendered="{!KimbleOne__Product__c.ProductDomain__r.KimbleOne__IsResourced__c && IsDelivery}">
+						<apex:outputText value="{!$ObjectType.KimbleOne__Product__c.Fields.KimbleOne__ExpenseCategoryProfileTmpltBehaviourRule__c.Label}"/>
+						<apex:outputPanel >
+							<apex:selectList value="{!KimbleOne__Product__c.KimbleOne__ExpenseCategoryProfileTmpltBehaviourRule__c}" size="1" id="expenseProfileBehaviourRule">
+								<apex:selectOptions value="{!productTemplateBehaviourRuleOptions}" />
+							</apex:selectList>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+					<apex:pageBlockSectionItem />
+					
+					<apex:pageBlockSectionItem >
+						<apex:outputText value="{!$ObjectType.KimbleOne__Product__c.Fields.KimbleOne__CreditTemplateBehaviourRule__c.Label}"/>
+						<apex:outputPanel >
+							<apex:selectList value="{!KimbleOne__Product__c.KimbleOne__CreditTemplateBehaviourRule__c}" size="1" id="creditBehaviourRule">
+								<apex:selectOptions value="{!productTemplateBehaviourRuleOptions}" />
+							</apex:selectList>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+					<apex:pageBlockSectionItem />
+				
+					<apex:pageBlockSectionItem rendered="{!interCompanyInvoicingEnabled}">
+						<apex:outputText value="{!$ObjectType.KimbleOne__Product__c.Fields.KimbleOne__InternalRevenueBehaviourRule__c.Label}"/>
+						<apex:outputPanel >
+							<apex:selectList value="{!KimbleOne__Product__c.KimbleOne__InternalRevenueBehaviourRule__c}" size="1" id="internalRevenueBehaviourRule">
+								<apex:selectOptions value="{!TheInternalRevenueBehaviourRules}" />
+							</apex:selectList>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+					<apex:pageBlockSectionItem />
+
+					<apex:pageBlockSectionItem rendered="{!isPlanned && IsDelivery}">
+						<apex:outputText value="{!$Label.kimbleone__plannedwithproduct}"/>
+						<apex:outputPanel >
+							<apex:selectList value="{!PlannedWithProduct}" size="1" id="plannedWithProduct">
+								<apex:selectOptions value="{!PlannedWithOptions}" />
+							</apex:selectList>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+					
+					<apex:pageBlockSectionItem rendered="{!hasDomain && IsDelivery}">
+						<apex:outputText value="{!$Label.kimbleone__alternativesgroup}"/>
+						<apex:outputPanel >
+							<apex:selectList value="{!alternativesGroup}" size="1" id="alternativesGroup">
+								<apex:selectOptions value="{!alternativeGroupOptions}" />
+							</apex:selectList>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+
+					<apex:pageBlockSectionItem rendered="{!hasDomain && IsDelivery}">
+						<apex:outputText value="{!$Label.kimbleone__extensionproduct}"/>
+						<apex:outputPanel >
+							<apex:selectList value="{!extensionProduct}" size="1" id="extensionProduct">
+								<apex:selectOptions value="{!extensionProductOptions}" />
+							</apex:selectList>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+					
+					<apex:pageBlockSectionItem rendered="{!hasDomain && IsDelivery}">
+						<apex:outputText value="{!$Label.kimbleone__planningalternativesproduct}"/>
+						<apex:outputPanel >
+							<apex:selectList value="{!planAlternativesGroup}" size="1" id="planAlternativesGroup">
+								<apex:selectOptions value="{!planAlternativeGroupOptions}" />
+							</apex:selectList>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>					
+
+					<apex:pageBlockSectionItem rendered="{!hasDomain && IsDelivery}">
+						<apex:outputText value="{!$Label.kimbleone__planningextensionproduct}"/>
+						<apex:outputPanel >
+							<apex:selectList value="{!planExtensionProduct}" size="1" id="planExtensionProduct">
+								<apex:selectOptions value="{!planExtensionProductOptions}" />
+							</apex:selectList>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+					
+				</apex:pageBlockSection>
+					
+				<apex:pageBlockSection collapsible="false" rendered="{!$ObjectType.KimbleOne__Product__c.FieldSets.KimbleOne__ProductDetails.Size > 0 && IsDelivery}">
+	
+					<apex:repeat value="{!$ObjectType.KimbleOne__Product__c.FieldSets.KimbleOne__ProductDetails}" var="f" >
+			  			<apex:inputField value="{!KimbleOne__Product__c[f]}" rendered="{!!CONTAINS(f.FieldPath,'.')}" required="{!f.Required}" styleClass="{!IF(AND($ObjectType.KimbleOne__Product__c.Fields[f].type == 'date',$ObjectType.KimbleOne__Product__c.Fields[f].updateable),'kimbleDatePicker','')}" />
+						<apex:outputField value="{!KimbleOne__Product__c[f]}" rendered="{!CONTAINS(f.FieldPath,'.')}"/>
+					</apex:repeat>
+			
+				</apex:pageBlockSection>
+				
+				<apex:pageBlockSection collapsible="false" title="{!$Label.kimbleone__producteditdetails}" rendered="{!IsProposal}">
+					<apex:inputField value="{!KimbleOne__Product__c.Name}"/>
+					<apex:outputField value="{!KimbleOne__Product__c.KimbleOne__ProductType__c}" />
+					<apex:inputField id="productDescription" value="{!KimbleOne__Product__c.KimbleOne__DefaultDescription__c}" style="width:152px;"/>
+					<apex:inputField id="productCurrency" value="{!KimbleOne__Product__c.CurrencyIsoCode}"/>
+					<apex:inputField id="productIsActive" value="{!KimbleOne__Product__c.KimbleOne__IsActive__c}" />
+					<apex:inputField id="isRestricted" value="{!KimbleOne__Product__c.KimbleOne__IsRestricted__c}" />
+					<apex:pageBlockSectionItem >
+						<apex:outputText value="{!$ObjectType.KimbleOne__Product__c.Fields.KimbleOne__UsageTemplateBehaviourRule__c.Label}"/>
+						<apex:outputPanel >
+							<apex:selectList value="{!KimbleOne__Product__c.KimbleOne__UsageTemplateBehaviourRule__c}" size="1" id="usageBehaviourRule">
+								<apex:selectOptions value="{!productTemplateBehaviourRuleOptions}" />
+							</apex:selectList>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+				</apex:pageBlockSection>
+				
+			</apex:pageBlock>
+			
+			<apex:actionFunction name="refresh" action="{!refresh}" rerender="ProductEditMainPanel" />
+			<apex:actionFunction name="refreshAbstractionDetailPanel" action="{!RefreshAbstractionDetails}" rerender="ProductEditMainPanel"/>
+		</apex:outputPanel>
+		
+	</apex:form>
+
+
+	<script>
+
+		jQuery(window).load(function(){
+			initialiseItems();
+  		});
+
+		function initialiseItems()
+		{
+		    SetupDatePicker();
+  		}
+
+		function SetupDatePicker()
+		{
+			//dateFormat: 'yy-mm-dd',
+			jQuery('.kimbleDatePicker').datepicker({
+					dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true,
+					selectOtherMonths: true,
+					changeMonth: true,
+					changeYear: true});
+		}
+	</script>
+
+</apex:define>
+</apex:composition>
+
+</apex:page>

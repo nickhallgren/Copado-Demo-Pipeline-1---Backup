@@ -1,0 +1,258 @@
+<apex:page standardcontroller="KimbleOne__BusinessUnit__c" extensions="KimbleOne.BusinessUnitEditController,KimbleOne.SecurityController">
+
+<apex:composition template="KimbleOne__SiteMaster">
+  
+<apex:define name="Content">
+
+	<style>
+		table.bu-active-panel {
+		    width: 100%;
+		}	
+	</style>
+  
+	<apex:form >
+	
+		<apex:outputPanel id="BusinessUnitEditPanel" >
+								 		    	
+				<apex:pagemessages escape="false"/>
+
+		    	<apex:pageBlock id="BusinessUnitEditBlock" title="{!$ObjectType.KimbleOne__BusinessUnit__c.Label}">    
+
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton action="{!upsertBusinessUnit}" value="{!$Label.kimbleone__save}"/>						
+						<apex:commandButton action="{!cancel}" value="{!$Label.kimbleone__cancel}"/>
+					</apex:pageBlockButtons>
+					
+					<apex:pageblockSection collapsible="false" showheader="false"  columns="2"> 
+               			<apex:inputfield id="businessUnitName" value="{!aBusinessUnit.Name}" required="true" />
+						<apex:inputfield id="businessUnitCurrency" value="{!aBusinessUnit.CurrencyIsoCode}"  />
+
+						<apex:pageBlockSectionItem ></apex:pageBlockSectionItem>
+						
+						<apex:outputPanel layout="none" rendered="{!!IsActiveIsOperatedAndHasChildRecords}">
+							<apex:pageBlockSectionItem >
+								<apex:panelGrid styleClass="bu-active-panel" columns="2" columnClasses="labelCol, dataCol" >
+									<apex:outputLabel value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__IsActive__c.Label}"/>
+									<apex:inputfield id="businessUnitActive" value="{!aBusinessUnit.KimbleOne__IsActive__c}"  />
+								</apex:panelGrid>
+							</apex:pageBlockSectionItem>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!IsActiveIsOperatedAndHasChildRecords}">
+							<apex:pageBlockSectionItem >
+								<apex:panelGrid styleClass="bu-active-panel" columns="2" columnClasses="labelCol, dataCol" title="{!$ObjectType.KimbleOne__BusinessUnit__c.Label} {!$Label.kimbleone__owns} {!$ObjectType.KimbleOne__Product__c.LabelPlural} {!$Label.kimbleone__andor} {!$ObjectType.KimbleOne__Resource__c.LabelPlural}" >
+			 						<apex:outputLabel value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__IsActive__c.Label}"/>
+									<apex:outputPanel >
+										<apex:outputfield id="businessUnitActiveRO" value="{!aBusinessUnit.KimbleOne__IsActive__c}"  />
+										<apex:outputLink value="{!$Page.KimbleOne__BusinessUnitTransfer}?Id={!aBusinessUnit.Id}&mode=deactivate" rendered="{!IsDisplayDeactivateBU && $ObjectType.KimbleOne__BusinessUnitGroup__c.Updateable}"> {!$Label.kimbleone__deactivate}</apex:outputLink>
+									</apex:outputPanel>
+								</apex:panelGrid>
+							</apex:pageBlockSectionItem>
+						</apex:outputPanel>
+					</apex:pageblockSection>
+					
+					<apex:pageblockSection id="operatingDetails" collapsible="false" title="{!$Label.kimbleone__businessunitoperatingdetails}" showheader="true"  columns="2">
+						
+ 							<apex:pageblockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__IsOperatingEntity__c.Label}"/>
+           						<apex:outputPanel layout="none">
+	           						<apex:outputfield value="{!aBusinessUnit.KimbleOne__IsOperatingEntity__c}" rendered="{!HasProducts}" />
+	           						<apex:actionRegion rendered="{!!HasProducts}">
+				 						<apex:inputfield id="isOperatingEntity" value="{!aBusinessUnit.KimbleOne__IsOperatingEntity__c}" >
+											<apex:actionSupport event="onchange" action="{!IsOperatingEntityChanged}" rerender="operatingDetails,organisationalDetails" oncomplete="getReferenceData();" />
+										</apex:inputfield>
+									</apex:actionRegion>
+								</apex:outputPanel>
+							</apex:pageblockSectionItem>
+							<apex:pageblockSectionItem />
+<!-- 							&nbsp;	 -->
+
+							<apex:pageBlockSectionItem rendered="{!!IsActiveAndHasChildRecords}" >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__BusinessUnitGroup__c.Label}"/>
+								<apex:inputText id="businessUnitGroup" value="{!aBusinessUnit.KimbleOne__BusinessUnitGroup__c}" styleclass="kimblecustomlookup GetBusinessUnitGroups null {!aBusinessUnit.KimbleOne__IsOperatingEntity__c} true" required="{!aBusinessUnit.KimbleOne__IsOperatingEntity__c}" />
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!IsActiveAndHasChildRecords}" >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__BusinessUnitGroup__c.Label}"/>
+								<apex:outputPanel >
+									<apex:outputField value="{!aBusinessUnit.KimbleOne__BusinessUnitGroup__c}" rendered="{!aBusinessUnit.Id!=null}"/>&nbsp;&nbsp;
+									<apex:outputLink value="{!$Page.KimbleOne__BusinessUnitTransfer}?Id={!aBusinessUnit.Id}" rendered="{!IsDisplayTransferBUGroup && HasPermission['Permission04']}"> {!$Label.kimbleone__transfer}</apex:outputLink>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem >
+		 						<apex:outputLabel value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__Calendar__c.Label}"/>
+		 						<apex:inputText id="businessUnitCalendar" value="{!aBusinessUnit.KimbleOne__Calendar__c}" styleclass="kimblecustomlookup GetCalendars null {!aBusinessUnit.KimbleOne__IsOperatingEntity__c} true"  required="{!aBusinessUnit.KimbleOne__IsOperatingEntity__c}" />
+		 					</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__TimePatternVariant__c.Label}" />
+								<apex:selectList value="{!aBusinessUnit.KimbleOne__TimePatternVariant__c}" size="1" required="true">
+									<apex:selectOptions value="{!AllTimePatternVariants}" />
+								</apex:selectList>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem >
+		 						<apex:outputLabel value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__TimePatternRule__c.Label}"/>
+						        <apex:inputText value="{!aBusinessUnit.KimbleOne__TimePatternRule__c}" size="1" styleclass="kimblecustomlookup GetTimePatternRules null {!aBusinessUnit.KimbleOne__IsOperatingEntity__c} true"  required="{!aBusinessUnit.KimbleOne__IsOperatingEntity__c}" />		 					
+        					</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__AllowanceScheme__c.Label}" />
+								<apex:selectList id="resourceAllowanceScheme" value="{!aBusinessUnit.KimbleOne__AllowanceScheme__c}" size="1">
+									<apex:selectOptions value="{!TheAllowanceSchemes}" />
+								</apex:selectList>
+        					</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__SupplierPurchaseOrderRule__c.Label}" />
+								<apex:selectList id="resourceAllowanceScheme" value="{!aBusinessUnit.KimbleOne__SupplierPurchaseOrderRule__c}" size="1">
+									<apex:selectOptions value="{!TheSupplierPurchaseOrderRules}" />
+								</apex:selectList>
+        					</apex:pageBlockSectionItem>
+							
+							<apex:inputfield id="expenseItemSubmissionDays" value="{!aBusinessUnit.KimbleOne__ExpenseItemSubmissionDays__c}" required="{!aBusinessUnit.KimbleOne__IsOperatingEntity__c}" />
+							<apex:inputfield value="{!aBusinessUnit.KimbleOne__ExpenseItemExchangeRateTolerancePct__c}" />
+							
+							<apex:pageBlockSectionItem />
+             		</apex:pageblockSection>
+               		<apex:actionRegion >
+               			
+               		<apex:pageblockSection id="organisationalDetails" collapsible="false" title="{!$Label.kimbleone__businessunitorganisationaldetails}" showheader="true"  columns="2">
+						
+						<apex:inputfield value="{!aBusinessUnit.KimbleOne__IsPrimaryOrganisationalEntity__c}" rendered="{! !aBusinessUnit.IsOperatingEntity__c}">
+							<apex:actionSupport event="onchange" action="{!IsPrimaryOrSecOrganisationalEntityChanged}" rerender="operatingDetails,organisationalDetails" oncomplete="getReferenceData();" />
+						</apex:inputfield>
+						
+						<apex:outputfield value="{!aBusinessUnit.KimbleOne__IsPrimaryOrganisationalEntity__c}" rendered="{!aBusinessUnit.KimbleOne__IsOperatingEntity__c}"  />
+					
+						<apex:inputfield value="{!aBusinessUnit.KimbleOne__IsSecondaryOrganisationalEntity__c}" rendered="{! !aBusinessUnit.IsPrimaryOrganisationalEntity__c}">
+							<apex:actionSupport event="onchange" action="{!IsPrimaryOrSecOrganisationalEntityChanged}" rerender="operatingDetails,organisationalDetails" oncomplete="getReferenceData();" />
+						</apex:inputfield>
+						<apex:outputfield value="{!aBusinessUnit.KimbleOne__IsSecondaryOrganisationalEntity__c}" rendered="{!  aBusinessUnit.IsPrimaryOrganisationalEntity__c }"  />
+						<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__BusinessUnit__c.Label}" />
+								<apex:selectList value="{!aBusinessUnit.KimbleOne__BusinessUnit__c}" size="1">
+									<apex:selectOptions value="{!TheBusinessUnits}" />
+								</apex:selectList>
+        				</apex:pageBlockSectionItem>
+					
+					</apex:pageblockSection>
+
+               		</apex:actionRegion>
+
+            		<apex:pageblockSection collapsible="false" title="{!$Label.kimbleone__businessunitintercompanydetails}" showheader="true"  columns="2" rendered="{!IsIntercompanyEnabled}">
+						<apex:inputfield value="{!aBusinessUnit.KimbleOne__InternalAccount__c}" />
+						<apex:pageBlockSectionItem >
+							<apex:outputText value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__IntercompanyGroup__c.Label}" />
+							<apex:selectList value="{!aBusinessUnit.KimbleOne__IntercompanyGroup__c}" size="1">
+								<apex:selectOptions value="{!TheIntercompanyGroups}" />
+							</apex:selectList>
+        				</apex:pageBlockSectionItem>
+						<apex:pageBlockSectionItem >
+               				<apex:outputLabel value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__InternalInvoiceSequenceBehaviour__c.Label}"/>
+							<apex:selectList value="{!aBusinessUnit.KimbleOne__InternalInvoiceSequenceBehaviour__c}" size="1">
+								<apex:selectOptions value="{!TheInternalInvoiceSequenceBehaviourOptions}" />
+							</apex:selectList>
+						</apex:pageBlockSectionItem>
+
+             		</apex:pageblockSection>
+
+               		<apex:pageblockSection collapsible="false" title="{!$Label.kimbleone__businessunittradingdetails}" showheader="true"  columns="2"> 
+
+               			<apex:inputfield id="isTradingEntity" value="{!aBusinessUnit.KimbleOne__IsTradingEntity__c}"  />
+						&nbsp;
+						
+						<apex:inputfield id="tradingName" value="{!aBusinessUnit.KimbleOne__InvoicingBusinessUnitName__c}"  />
+						<apex:pageBlockSectionItem > 
+							<apex:outputLabel value="{!$Label.kimbleone__businessunitaddress}"/>
+							<c:AddressDetailsField addressObject="{!aBusinessUnit}" 
+								addressFieldPrefix="Invoicing" refreshList="BusinessUnitEditPanel" />
+						</apex:pageBlockSectionItem>	
+						
+						<apex:inputfield value="{!aBusinessUnit.KimbleOne__LogoDocumentName__c}"  />
+						&nbsp;
+
+						<apex:pageBlockSectionItem >
+		 					<apex:outputLabel value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__TaxCode__c.Label}"/>
+		 					<apex:inputText id="taxCode" value="{!aBusinessUnit.KimbleOne__TaxCode__c}" styleclass="kimblecustomlookup GetTaxCodeList null false true"/>
+		 				</apex:pageBlockSectionItem>
+						<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__ExpensesTaxCodeRule__c.Label}" />
+								<apex:selectList id="expensesTaxCodeRule" value="{!aBusinessUnit.KimbleOne__ExpensesTaxCodeRule__c}" size="1">
+									<apex:selectOptions value="{!TheExpensesTaxCodeRules}" />
+								</apex:selectList>
+        				</apex:pageBlockSectionItem>
+
+						<apex:inputfield id="taxReference" value="{!aBusinessUnit.KimbleOne__TaxCodeReference__c}"  />
+						&nbsp;
+						
+						<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__PurchaseOrderRule__c.Label}" />
+								<apex:inputText id="poRule" value="{!aBusinessUnit.KimbleOne__PurchaseOrderRule__c}" styleclass="kimblecustomlookup GetPurchaseOrderRules null true false"/> 
+						</apex:pageBlockSectionItem>
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel />
+						</apex:pageBlockSectionItem>
+						
+						<apex:pageBlockSectionItem >
+		 					<apex:outputLabel value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__InvoicingCurrencyIsoCode__c.Label}"/>
+		 					<apex:inputText id="invoicingCurrency" value="{!aBusinessUnit.KimbleOne__InvoicingCurrencyIsoCode__c}" styleclass="kimblecustomlookup GetActiveCurrencyTypes null false true"/>
+		 				</apex:pageBlockSectionItem>
+						<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__InvoiceBankAccount__c.Label}" />
+								<apex:inputText id="invoicingBankAccount" value="{!aBusinessUnit.KimbleOne__InvoiceBankAccount__c}" styleclass="kimblecustomlookup GetBankAccountList null false true"/> 
+						</apex:pageBlockSectionItem>
+						
+						<apex:inputfield id="invoicePaymentTermDays" value="{!aBusinessUnit.KimbleOne__InvoicePaymentTermDays__c}"  />
+						&nbsp;
+						<apex:inputfield id="invoiceTaxCalcOffSystem" value="{!aBusinessUnit.KimbleOne__InvoiceTaxCalcOffSystem__c}"  rendered="{!TaxCalcOffSystem}"/>
+						
+						<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__DefaultInvoiceTemplate__c.Label}" />
+								<apex:inputText id="defaultInvoiceTemplate" value="{!aBusinessUnit.KimbleOne__DefaultInvoiceTemplate__c}" styleclass="kimblecustomlookup GetCommercialDocumentTemplateList Invoice true false"/> 
+						</apex:pageBlockSectionItem>
+						<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__DefaultCreditNoteTemplate__c.Label}" />
+								<apex:inputText id="defaultCreditNoteTemplate" value="{!aBusinessUnit.KimbleOne__DefaultCreditNoteTemplate__c}" styleclass="kimblecustomlookup GetCommercialDocumentTemplateList CreditNote true false"/> 
+						</apex:pageBlockSectionItem>
+						<apex:inputfield value="{!aBusinessUnit.KimbleOne__InvoiceFooter__c}"  />
+						<apex:inputfield value="{!aBusinessUnit.KimbleOne__CreditNoteFooter__c}"  />
+						
+					</apex:pageBlockSection>					
+									
+					<apex:pageblockSection collapsible="false" title="{!$Label.kimbleone__otherdetailslabel}" showheader="true"  columns="2" rendered="{!$ObjectType.KimbleOne__BusinessUnit__c.FieldSets.KimbleOne__BusinessUnitDetails.size>0}">
+						<apex:repeat value="{!$ObjectType.KimbleOne__BusinessUnit__c.FieldSets.KimbleOne__BusinessUnitDetails}" var="f">
+							<apex:inputField rendered="{!!CONTAINS(f.fieldPath,'.')}" value="{!aBusinessUnit[f.fieldPath]}"  required="{!OR(f.required, f.dbrequired)}" styleClass="{!IF(AND($ObjectType.KimbleOne__BusinessUnit__c.Fields[f].type == 'date',$ObjectType.KimbleOne__BusinessUnit__c.Fields[f].updateable),'kimbleDatePicker','')}"/>
+							<apex:outputFIeld rendered="{!CONTAINS(f.fieldPath,'.')}" value="{!aBusinessUnit[f.fieldPath]}"/>
+              			</apex:repeat>
+         			</apex:pageBlockSection>	
+		    	</apex:pageBlock>
+		    	
+		</apex:outputPanel>  
+		          
+    </apex:form>
+	<script>
+		jQuery(window).load(function(){
+			initialiseItems();
+		});
+		function initialiseItems()
+		{
+		    SetupDatePicker();
+  		}
+		function SetupDatePicker()
+		{
+			//dateFormat: 'yy-mm-dd',
+			jQuery('.kimbleDatePicker').datepicker({
+					dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true,
+					selectOtherMonths: true,
+					changeMonth: true,
+					changeYear: true});
+		}
+	</script>
+    
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

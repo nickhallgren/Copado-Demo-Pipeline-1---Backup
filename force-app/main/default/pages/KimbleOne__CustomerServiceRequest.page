@@ -1,0 +1,114 @@
+<apex:page standardcontroller="KimbleOne__CustomerServiceRequest__c" extensions="KimbleOne.CustomerServiceRequestController" sidebar="false" >
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+	<c:Menu DefaultHelpPage="DeliveryEngagements.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__CustomerServiceRequest__c.CustomerDeliveryGroup__r.KimbleOne__DeliveryGroup__c}" MenuContextName="{!KimbleOne__CustomerServiceRequest__c.CustomerDeliveryGroup__r.DeliveryGroup__r.Name}" CurrentPage="{!$Page.KimbleOne__CustomerServiceRequests}" ChildName="{!KimbleOne__CustomerServiceRequest__c.Name}"/>
+
+</apex:define>
+
+<apex:define name="Content">
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__GanttView)}" />
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__ActivityAssignmentUsagePattern)}" />
+	<apex:outputPanel id="ThePageContents">
+	<chatter:feedWithFollowers entityId="{!KimbleOne__CustomerServiceRequest__c.id}" />
+	
+	<apex:pageMessages />
+	<apex:pageBlock title="{!$ObjectType.KimbleOne__CustomerServiceRequest__c.Label}">
+		<apex:pageblockbuttons location="top">
+			<apex:outputPanel layout="none" rendered="{!KimbleOne__CustomerServiceRequest__c.KimbleOne__Status__c != CancelledId}">
+				<input class="btn DisableButtonWhileBusy" type="button" rendered="{!$ObjectType.CustomerServiceRequest__c.updateable}" onclick="if(confirmDelete()) cancelRequest('{!CustomerServiceRequest__c.Id}');" value="{!$Label.Cancel}"/>
+			</apex:outputPanel>
+		</apex:pageblockbuttons>
+		<apex:pageBlockSection columns="2">
+			<apex:outputField value="{!KimbleOne__CustomerServiceRequest__c.Name}"/>
+			<apex:outputField value="{!KimbleOne__CustomerServiceRequest__c.KimbleOne__Status__c}"/>
+			
+			<apex:outputField value="{!KimbleOne__CustomerServiceRequest__c.KimbleOne__StartDate__c}"/>
+			<apex:outputField value="{!KimbleOne__CustomerServiceRequest__c.KimbleOne__StartTime__c}"/>
+			
+			<apex:pageBlockSectionItem rendered="{!!ISBLANK(TimezoneDescription)}">
+				<apex:outputLabel value="{!$ObjectType.KimbleOne__CustomerServiceRequest__c.Fields.KimbleOne__TimeZoneSidKey__c.Label}"/>
+				<apex:outputText value="{!TimezoneDescription}"/>
+			</apex:pageBlockSectionItem>
+			
+			<apex:outputField value="{!KimbleOne__CustomerServiceRequest__c.KimbleOne__RequiredUsage__c}"/>
+			<apex:outputField value="{!KimbleOne__CustomerServiceRequest__c.KimbleOne__Notes__c}"/>
+			
+			<apex:outputField value="{!KimbleOne__CustomerServiceRequest__c.CreatedDate}"/>
+			<apex:outputField value="{!KimbleOne__CustomerServiceRequest__c.CreatedById}"/>
+			
+		</apex:pageBlockSection>
+	</apex:pageBlock>
+	
+	<apex:pageBlock title="{!$Label.kimbleone__frameworkassignment}">
+		<apex:pageblockbuttons location="top">
+			
+			<input class="btn" type="button" rendered="{!$ObjectType.ActivityAssignment__c.updateable}" onclick="openAssignmentToEdit('{!TheParentAssignment.Id}');" value="Edit"/>
+			
+			<input class="btn" type="button" rendered="{!$ObjectType.ActivityAssignment__c.updateable}" onclick="openAssignmentUsageAdjustments('{!TheParentAssignment.Id}');" value="Adjustments"/>
+			
+		</apex:pageblockbuttons>
+		<apex:pageBlockSection columns="2">
+			<apex:outputField value="{!TheParentAssignment.KimbleOne__StartDate__c}"/>
+			<apex:outputField value="{!TheParentAssignment.ActivityRole__r.Name}"/>
+			
+			<apex:pageBlockSectionItem >
+				<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__AllocatedUsage__c.Label}"/>
+				<apex:outputPanel layout="none"><apex:outputField value="{!TheParentAssignment.KimbleOne__AllocatedUsage__c}"/><span>&nbsp;(<apex:outputText value="{!TheParentAssignment.ResourcedActivityOperatedWith__r.ForecastUnitType__r.Name}"/>)</span></apex:outputPanel>
+			</apex:pageBlockSectionItem>
+			
+			<apex:pageBlockSectionItem >
+				<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__EntryRemainingUsage__c.Label}"/>
+				<apex:outputPanel layout="none"><apex:outputField value="{!TheParentAssignment.KimbleOne__EntryRemainingUsage__c}"/><span>&nbsp;(<apex:outputText value="{!TheParentAssignment.ResourcedActivityOperatedWith__r.ForecastUnitType__r.Name}"/>)</span></apex:outputPanel>
+			</apex:pageBlockSectionItem>
+			
+		</apex:pageBlockSection>
+	</apex:pageBlock>
+	
+	<apex:pageBlock title="{!$Label.kimbleone__frameworkassignmentchild}" rendered="{!!ISBLANK(TheChildAssignment)}">
+		<apex:pageBlockSection columns="2">
+			<apex:outputField value="{!TheChildAssignment.KimbleOne__StartDate__c}"/>
+			<apex:outputField value="{!TheChildAssignment.KimbleOne__Resource__c}"/>
+			
+			<apex:outputField value="{!TheChildAssignment.KimbleOne__ActivityAssignmentDemand__c}" rendered="{!!ISBLANK(TheChildAssignment.KimbleOne__ActivityAssignmentDemand__c)}"/>
+			
+			<apex:pageBlockSectionItem >
+				<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__EntryRemainingUsage__c.Label}"/>
+				<apex:outputPanel layout="none"><apex:outputField value="{!TheChildAssignment.KimbleOne__EntryRemainingUsage__c}"/><span>&nbsp;(<apex:outputText value="{!TheParentAssignment.ResourcedActivityOperatedWith__r.ForecastUnitType__r.Name}"/>)</span></apex:outputPanel>
+			</apex:pageBlockSectionItem>
+		</apex:pageBlockSection>
+		
+	</apex:pageBlock>
+	</apex:outputPanel>
+	
+	<div>
+		<apex:include pageName="{!$Page.ActivityAssignmentUsageAdjustments}"/>
+	</div>
+	
+	<div id="ActivityAssignmentNewEdit" style="display:none">
+		<apex:include pageName="{!$Page.ActivityAssignmentNewEdit}"/>
+	</div>
+	
+	<script>
+	
+	function openAssignmentToEdit(assignmentId)
+	{
+		initialiseModalBoxy('#ActivityAssignmentNewEdit', '{!JSENCODE($Label.Edit)} {!$ObjectType.ActivityAssignment__c.label}');
+		ActivityAssignmentNewEdit.getAssignmentToEdit(assignmentId);
+	}
+	</script>
+	
+	<apex:form >
+		<apex:actionRegion >
+		<apex:actionFunction action="{!CancelRequest}" rerender="ThePageContents" name="cancelRequest">
+		</apex:actionFunction>
+		</apex:actionRegion>
+	</apex:form>
+	
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

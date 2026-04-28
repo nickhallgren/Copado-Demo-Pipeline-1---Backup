@@ -1,0 +1,1486 @@
+<apex:page controller="KimbleOne.MilestonesEditController" extensions="KimbleOne.SecurityController" sidebar="false" tabStyle="KimbleOne__ReferenceData__c">
+
+    <apex:composition template="KimbleOne__SiteMaster">
+
+        <apex:define name="Menu">
+
+            <c:Menu DefaultHelpPage="Milestones.html" MenuContextType="{!MenuContext}" MenuContextId="{!ThePageContext.Id}" MenuContextName="{!ThePageContext['Name']}" />
+
+        </apex:define>
+
+        <apex:define name="Content">
+
+            <style>
+
+                table.milestones-table tr.dataRow:hover {
+                    background-color: #e3feff;
+                }                
+                a.toolbar-button.bulkDeleteButton:hover, a.toolbar-button-selected {
+                    text-decoration: none;
+                    color: red;
+                    background-color: #f4f6f9;
+                }
+
+                i.fa.fa-pencil {
+                    padding-left: 4px;
+                    cursor: pointer;
+                    float: right;
+                    visibility: hidden;
+                }
+                i.fa-times.milestone-name-cancel {
+                    padding-left: 3px;
+                    cursor: pointer;
+                }
+                i.fa-save.milestone-name-save {
+                    padding-right: 3px;
+                    padding-left: 4px;
+                    cursor: pointer;
+                }
+                i.fa-save.milestone-name-save:hover, i.fa-times.milestone-name-cancel:hover, i.fa.fa-pencil:hover {
+                    color: #1A9EFF;
+                }
+                input.milestone-name-input {
+                    width: calc(100% - 38px);
+                }
+                #EditFieldPopup label {
+                    white-space: nowrap;
+                }
+
+                td.editable:hover i {
+                    visibility: visible;
+                }
+                 .milestones-table h2 {
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        width: 100%;
+                        display: inline-block;
+                    }
+
+
+                .milestone-actions {
+                    font-size: 18px;
+                    cursor: pointer;
+                }
+                i.save-problem {
+                    cursor: pointer;
+                    font-size: 18px;
+                    margin-right: 5px;
+                    color: #8f0000;
+                }
+                .apply-to-section {
+                    margin-left: 12px;
+                }
+
+                .apply-to-section div {
+                    padding-top:2px;
+                    height:22px
+                }
+                .readonly {background-color:#eee};
+                .apply-to-section input {margin-top:0;}
+                div#save-progress {
+                    border: 1px solid #f90;
+                    background-color:#ffc;
+                    border-radius: 3px;
+                    padding: 10px;
+                    margin-left: 16px;
+                    margin-right: 16px;
+                    display:none;
+
+                }
+                div#save-progress i {
+                    font-size:14px;
+                    margin-right:6px;
+                }
+                /* toolbar */
+        a.toolbar-button {
+			display: inline-block;
+			padding: 6px 10px 6px 10px;
+			background-color: white;
+			margin-right: 4px;
+			border: 1px solid #ccc;
+			border-radius: 2px;
+		}
+		a.toolbar-button.active-toolbar-button {
+			color: white;
+			background-color: #888;
+		}
+		.toolbar-container {
+			position: relative;
+		}
+		.toolbar {
+			display: table;
+			width: 100%;
+		}
+		div#toolbar-buttons {
+		    display: table-cell;
+		    position: relative;
+		    padding-bottom: 6px;
+		}
+		span.gantt-display-mode {
+		    position: absolute;
+		    right: 10px;
+		}
+		a.toolbar-button.filterMilestoneButton:hover, a.toolbar-button-selected {
+			text-decoration: none;
+			color: white;
+			background-color: #1A9EFF;
+		}
+		a.toolbar-button.button-left {
+			border-top-right-radius: 0px;
+			border-bottom-right-radius: 0px;
+			margin-right: 0px;
+		}
+		a.toolbar-button.button-right {
+			border-top-left-radius: 0px;
+			border-left: 0;
+			border-bottom-left-radius: 0px;
+		}
+		a.toolbar-button .fa {font-size: 14px;}
+		a.toolbar-button.disabled {
+		    background-color: #ccc;color: darkgray;
+		    cursor: default !important;
+        }
+		a.toolbar-button.disabled:hover {background-color: #ccc;color: darkgray;}
+                /*
+                    loading panel
+                */
+
+                .loadingIndicator {
+                   top:0;
+                   right:0;
+                   width:100%;
+                   height:100%;
+                   font-weight: bold;
+                   position:absolute;
+                   text-align:center;
+                   /* IE filter */
+                   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+                   -moz-opacity:0.7;    /* Mozilla extension */
+                   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+                   opacity:0.7; /* CSS3 */
+                   z-index:1000;
+                   background-color:white;
+                }
+
+                .loadingIndicator img {
+                    margin-right:9px;
+                }
+
+                #loadingIndicatorInnerContainer {
+                    position:absolute;
+                    top:50%;
+                    height:10em;
+                    margin-top:-2em;
+                    width:100%;
+                }
+                div#MilestoneFilterPopup {
+		    position: absolute;
+		    top: 51px;
+		    padding: 5px;
+            width: auto;
+            max-width: 500px;
+            min-width: 350px;
+		    height: auto;
+		    z-index: 999;
+		    border-color: #ddd;
+		    border-style: solid;
+		    border-width: 0px 1px 1px 1px;
+		    background-color: #fff;
+		    box-shadow: rgba(31, 31, 31, 0.16) 4px 3px 8px;
+		    left: 219px;
+		    overflow-y: auto;
+		}
+		.milestone-filter-header {
+		    font-weight: bold;
+		    font-size: 14px;
+		    padding: 10px;
+		    background-color: #F5F5F5;
+		    border: 1px solid #DDD;
+		    border-radius: 4px;
+		    margin-left: 2px;
+		    margin-right: 2px;
+		}
+
+		i.filter-collapse-btn.fa.fa-angle-double-up {
+		    color: #BBB;
+		    cursor: pointer;
+		    padding-right: 6px;
+		    position: absolute;
+		    right: 13px;
+		    top: 13px;
+		    font-size: 26px;
+		}
+
+		input#applyFilterButton {
+		    margin-top: 10px;
+		}
+		.milestone-string-filter {
+		    border: 2px solid #e0e0e0;
+		    height: 25px;
+		    padding-right: -14px;
+
+		}
+        .milestone-tools.hide-qtip-border {border: 0px;}
+        .milestone-tools.qtip {min-width:40px !important;}
+        .milestone-tools.hide-qtip-border .qtip-content {padding:0px;background-color:transparent;}
+        .read-only {background-color: #efefef;}
+
+         /*Mutton implementation*/
+            .hover-mutton {
+              display: inline-block;
+              position: relative;
+            }
+            .dd-btn {
+                display: inline-block;
+                background-color: #ffffff;
+                white-space: nowrap;
+                padding-right: 36px !important;
+                padding: 7px 10px 5px 10px;
+                background-color: white;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+                cursor: pointer;
+            }
+            .dd-btn:after {
+              content: '';
+              position: absolute;
+              top: 50%;
+              right: 15px;
+              transform: translateY(-50%);
+              width: 0;
+              height: 0;
+              border-left: 5px solid transparent;
+              border-right: 5px solid transparent;
+              border-top: 5px solid black;
+            }
+            .dd-btn:hover {
+              background-color: #f4f6f9;
+            }
+            .dd-menu {
+              position: absolute;
+              top: 23px;
+              left: 0px;
+              border: 1px solid #ccc;
+              border-radius: 4px;
+              padding: 0;
+              margin: 2px 0 0 0;
+              box-shadow: 0 0 6px 0 rgba(0,0,0,0.1);
+              background-color: #ffffff;
+              list-style-type: none;
+              text-align: left;
+              z-index: 99;
+            }
+            .dd-menu li.disabled {
+                color: lightgray;
+                cursor: default;
+            }
+            .dd-btn > .dd-menu {
+              display: none;
+            }
+            .dd-btn:hover > .dd-menu {
+              display: block;
+            }
+            .dd-menu li {
+              padding: 10px 20px;
+              cursor: pointer;
+              white-space: nowrap;
+              margin-left: 0px;
+            }
+            .dd-menu li:hover {
+              background-color: #f4f6f9;
+            }
+            .dd-menu li a {
+              display: block;
+              margin: -10px -20px;
+              padding: 10px 20px;
+            }
+            /*Mutton end */
+
+            .indent {display: inline-block;width: 8px;height: 8px;margin-right: 2px;}
+
+	        .branch .indent {cursor:pointer;background-image: url({!URLFOR($Resource.KimbleOne__TaskGanttIcons, 'arrows.gif')});background-position: -4px, 0px;}
+	        .branch.expanded .indent {background-image: url({!URLFOR($Resource.KimbleOne__TaskGanttIcons, 'arrows.gif')});background-position: -22px, 0px;}
+            .candidate {display: none;}
+            .ui-resizable-e {width:12px;}
+            .edit-field {
+                text-overflow: ellipsis;
+                overflow: hidden;
+                white-space: nowrap;
+                position:relative;
+                min-height: 11px;
+            }
+            .edit-field i {
+                position:absolute;
+                right:0px;
+            }
+
+            .requiredInput {
+                display: inline-block;
+                margin-left: 8px;
+            }
+            td.data2Col.first.last {
+                white-space:nowrap;
+            }
+
+            .milestone-date-offset {display:none;}
+            .select-milestone {
+              margin-left: 9px;
+            }
+            .fa.fa-cog.milestone-actions {
+              margin-left: 6px;
+            }
+            .JColResizer {
+              height:28px !important;
+            }
+            
+            .action-cog-column {
+                width: 50px;
+            }
+            /* SELECT 2 STYLING */
+			.select2-results li {margin-left:0px;}
+			.select2-container-multi .select2-choices
+			{
+				border: 2px solid rgb(224,224,224);
+				background-image:none;
+			}
+			.select2-container-multi .select2-choices .select2-search-choice {
+				border: 1px solid #aaaaaa;
+				border-radius: 4px;
+				padding: 5px 20px 5px 5px;
+				background-image:none;
+			}
+			
+			.select2-container-multi .select2-search-choice-close {
+				background-image:  url({!URLFOR($Resource.KimbleOne__AssignmentImages, 'assignmentSprite.png')});
+				background-position: -2px -29px;
+				background-repeat: no-repeat;
+				left:auto;
+			}
+			
+			.select2-container-multi .select2-choices .select2-search-choice .select2-search-choice-close:hover {
+				background-position: -2px -1px;
+			}
+			.select2-container.select2-container-multi {
+			    width: auto !important;
+			    min-width: 301px;
+    			display: block;
+			    max-width: 400px;
+   			}
+            .filter-row-category {
+                margin-bottom: 0px;
+            }
+            .filter-row {
+                margin-top:8px;
+                margin-left:8px;
+                font-size: 1em;
+                font-weight: bold;
+                color: #4a4a56;
+                margin-bottom: 3px;
+            }
+            .edit-field-popup {
+                display:none; 
+                min-width: 250px;
+            }
+            .status-checkbox {
+                font-size:16px;
+            }
+            .open.can-complete {
+                cursor:pointer;
+            }
+            .open.can-complete {
+                cursor:pointer;
+            }
+            
+            .open.cannot-complete {
+                background-color: #ddd
+            }
+            .completed-unapproved {
+                color: #aaa;
+            }
+            .centerAlignDataCell {
+                text-align: center;
+            }
+	        </style>
+            <apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+            <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+            <apex:stylesheet value="{!URLFOR($Page.KimbleOne__GanttViewCss)}"/>
+
+            <apex:form id="TheForm">
+                
+            <apex:outputPanel id="Milestones" layout="block" >
+                <div id="loadingIndicatorOuterContainer" class="loadingIndicator" style="display:none">
+                    <div id="loadingIndicatorInnerContainer">
+                        <img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+                    </div>
+                </div>
+                <apex:pageMessages escape="false" />
+
+                <apex:pageBlock id="milestones-table-block">
+                    
+                    <apex:actionStatus id="MilestoneListLoadingStatus">
+                        <apex:facet name="start">
+                            <div id="loadingIndicatorOuterContainer" class="loadingIndicator">
+                                <div id="loadingIndicatorInnerContainer">
+                                    <img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+                                </div>
+                            </div>
+                        </apex:facet>
+                    </apex:actionStatus>
+                    
+                    <div class="toolbar-container">
+                        <div class="toolbar">
+                            <div id="toolbar-buttons">
+
+                                <apex:outputPanel layout="none" rendered="{!TheDeliveryElements.size > 0 && CanCreateMilestone}">
+                                    <label class="hover-mutton select-btn">
+                                        <div class="dd-btn toolbar-button">{!$Label.kimbleone__add} {!$ObjectType.KimbleOne__Milestone__c.Label}
+                                            <ul class="dd-menu">
+                                                <apex:repeat value="{!TheDeliveryElements}" var="element" rendered="{!$ObjectType.KimbleOne__Milestone__c.createable}">
+                                                    <li id="{!JSENCODE(element.Id)}" onclick="newMilestone('{!JSENCODE(element.Id)}');"><apex:outputText value="{!element.Name}"/></li>
+                                                </apex:repeat>
+                                            </ul>
+                                        </div>
+                                    </label>
+                                </apex:outputPanel>
+
+                                <a class="toolbar-button filterMilestoneButton" title="{!$Label.Filter} {!$ObjectType.Milestone__c.Label}" onclick="hideMilestoneNameEdit();jQuery('#MilestoneFilterPopup').show();" href="javascript:void(0);"><i class="fa fa-filter"></i></a>
+                                <a class="toolbar-button bulkDeleteButton disabled" title="{!$Label.DeleteSelectedLabel} {!$ObjectType.Milestone__c.Labelplural}" onclick="bulkDeleteButtonClick();" href="javascript:void(0);"><i class="fa fa-trash"></i></a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <table id="milestones-table" class="list milestones-table milestones-grid kimble-enhanced-table " border="0" cellpadding="0" cellspacing="0">
+                        <thead>
+                            <span style="display:none"></span>
+                        </thead>
+                        <tbody>
+
+                        </tbody>
+                    </table>
+                    
+                </apex:pageBlock>
+            </apex:outputPanel>
+
+                <apex:actionRegion >
+                    
+                    <apex:actionFunction action="{!NewMilestone}" name="newMilestoneFunction" rerender="MilestonePopupPanelContainer" oncomplete="showModalBoxy();SetupDatePicker();">
+                        <apex:param name="deliveryElementId" value="" />
+                    </apex:actionFunction>
+
+                    <apex:actionFunction action="{!EditMilestone}" name="editMilestoneFunction" rerender="MilestonePopupPanelContainer" oncomplete="showModalBoxy();SetupDatePicker();">
+                        <apex:param name="milestoneId" value="" />
+                    </apex:actionFunction>
+
+                    <apex:actionFunction action="{!CloneMilestone}" name="cloneMilestoneFunction" rerender="clone-milestone-entry" oncomplete="showModalBoxy();SetupDatePicker();">
+                        <apex:param name="milestoneId" value="" />
+                    </apex:actionFunction>
+
+                    <apex:actionFunction action="{!DeleteMilestone}" name="deleteMilestoneFunction" status="MilestoneListLoadingStatus" oncomplete="getMilestones();">
+                        <apex:param name="milestoneId" value="" />
+                    </apex:actionFunction>
+
+                    <apex:actionFunction action="{!InitialiseMilestoneUpdateField}" name="initialiseMilestoneUpdateFieldFunction" rerender="EditFieldPanelContainer" oncomplete="showModalBoxy();SetupDatePicker();jQuery(':focus').blur();changeOptionsChange();">
+                        <apex:param name="milestoneId" value="" />
+                        <apex:param name="fieldName" value="" />
+                        <apex:param name="count" value="" />
+                    </apex:actionFunction>
+                </apex:actionRegion>
+
+                <div id="MilestoneFilterPopup" style="display:none;">
+                    <div id="MilestoneFilters">
+                        <div class="milestone-filter-header">{!$Label.Filter} {!$ObjectType.Milestone__c.Label}<i onclick="jQuery('#MilestoneFilterPopup').hide();" class="filter-collapse-btn fa fa-angle-double-up" title="{!$Label.Close}"></i></div>
+
+                        <div style="height: 5px;"/>
+
+                        <div class="filter-row">
+                            <apex:outputPanel rendered="{!!ISBLANK(TheFilterElements)}">
+                                <apex:outputLabel styleClass="filter-row-category" value="{!$ObjectType.KimbleOne__Milestone__c.fields.KimbleOne__DeliveryElement__c.Label}"/>
+                                <apex:selectList styleClass="element-filter-dropdown milestone-filter" value="{!TheFilterElementIds}" multiselect="true">
+                                    <apex:selectOptions value="{!TheFilterElements}"/>
+                                </apex:selectList>
+                            </apex:outputPanel>
+                        </div>
+
+                        <div class="filter-row">
+                            <apex:outputPanel >
+                                <apex:outputLabel styleClass="filter-row-category" value="{!$ObjectType.KimbleOne__Milestone__c.fields.KimbleOne__MilestoneStatus__c.Label}"/>
+                                <apex:selectList styleClass="status-filter-dropdown milestone-filter" value="{!TheFilterStatusIds}" multiselect="true">
+                                    <apex:selectOptions value="{!TheFilterStatuses}"/>
+                                </apex:selectList>
+                            </apex:outputPanel>
+                        </div>
+
+                        <div class="filter-row">
+                            <apex:outputPanel >
+                                <apex:outputLabel styleClass="filter-row-category" value="{!$ObjectType.KimbleOne__Milestone__c.fields.KimbleOne__MilestoneType__c.Label}"/>
+                                <apex:selectList styleClass="type-filter-dropdown milestone-filter" value="{!TheFilterTypeIds}" multiselect="true">
+                                    <apex:selectOptions value="{!TheFilterTypes}"/>
+                                </apex:selectList>
+                            </apex:outputPanel>
+                        </div>
+
+                        <div class="filter-row">
+                            <input class="btn" id="applyFilterButton" onclick="applyMilestonesFilter();" type="Button" value="{!$Label.kimbleone__gobutton}"/>
+                            <input class="btn" id="clearFilterButton" onclick="clearMilestonesFilter();" type="Button" value="{!$Label.kimbleone__clearalllabel}"/>
+                        </div>
+                    </div>
+                </div>
+
+            </apex:form>
+
+            <apex:form id="milestonePopupForm">
+                <div id="MilestonePopup" style="display:none">
+                    <apex:outputPanel id="MilestonePopupPanelContainer">
+                        <apex:outputPanel id="MilestonePopupPanel" rendered="{!!ISBLANK(TheMilestone)}">
+    
+                            <div id="milestoneNewErrors">
+                                <apex:pageMessages escape="false"/>
+                            </div>
+    
+                            <apex:pageBlock >
+    
+                                <apex:pageBlockButtons location="bottom">
+                                    <apex:commandButton styleclass="DisableButtonWhileBusy" action="{!saveNewMilestone}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#milestoneNewErrors');getMilestones();" rerender="MilestonePopupPanel"/>
+                                    <input type="button"  onclick="hideModalBoxy();" class="btn" value="{!$Label.Cancel}" />
+                                </apex:pageBlockButtons>
+    
+                                <apex:pageBlockSection collapsible="false" showheader="false" columns="1">
+                                    <apex:pageBlockSectionItem >
+                                        <apex:outputLabel value="{!$ObjectType.KimbleOne__Milestone__c.fields.KimbleOne__DeliveryElement__c.label}"/>
+                                        <apex:outputField value="{!TheDeliveryElement.Name}"/>
+                                    </apex:pageBlockSectionItem>
+                                    <apex:pageBlockSectionItem >
+                                        <apex:outputLabel value="{!$ObjectType.KimbleOne__Milestone__c.fields.KimbleOne__MilestoneType__c.label}"/>
+                                        <apex:outputPanel layout="none">
+                                            <apex:outputField value="{!TheMilestone.KimbleOne__MilestoneType__c}" rendered="{!MilestoneTypeOptions.size == 0 || !ISBLANK(TheMilestone.Id)}"/>
+                                            <apex:selectList id="milestone-type-select" value="{!TheMilestone.KimbleOne__MilestoneType__c}" size="1" rendered="{!MilestoneTypeOptions.size == 2 && ISBLANK(TheMilestone.Id)}">
+                                                <apex:selectOptions value="{!MilestoneTypeOptions}" />
+                                                <apex:actionSupport event="onchange" rerender="MilestonePopupPanel" action="{!MilestoneTypeChanged}" onComplete="SetupDatePicker();"/>
+                                            </apex:selectList>
+                                        </apex:outputPanel>
+                                    </apex:pageBlockSectionItem>
+                                    <apex:pageBlockSectionItem >
+                                        <apex:outputLabel value="{!$ObjectType.KimbleOne__Milestone__c.fields.Name.label}"/>
+                                        <apex:inputField value="{!TheMilestone.Name}"/>
+                                    </apex:pageBlockSectionItem>
+                                    <apex:pageBlockSectionItem >
+                                        <apex:outputLabel value="{!$ObjectType.KimbleOne__Milestone__c.fields.KimbleOne__MilestoneDate__c.label}"/>
+                                        <apex:inputField value="{!TheMilestone.KimbleOne__MilestoneDate__c}" required="true" styleClass="kimbleDatePicker"/>
+                                    </apex:pageBlockSectionItem>
+    
+                                    <!-- Revenue Milestone fields -->
+                                    <apex:pageBlockSectionItem rendered="{!TheMilestone.KimbleOne__MilestoneType__c = RevenueMilestoneId && TheDeliveryElement.RevenueForecastMode__r.KimbleOne__Enum__c == 'DeliveryElement'}" >
+                                        <apex:outputLabel >{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestonePercentage__c.Label}</apex:outputLabel>
+                                        <apex:inputField id="milestonePercentage" value="{!TheMilestone.KimbleOne__MilestonePercentage__c}" required="true"/>
+                                    </apex:pageBlockSectionItem>
+                                    <apex:pageBlockSectionItem rendered="{!TheMilestone.KimbleOne__MilestoneType__c = RevenueMilestoneId && !TheDeliveryElement.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUnitGenerated__c && TheDeliveryElement.RevenueForecastMode__r.KimbleOne__Enum__c == 'RevenueItem'}" >
+                                        <apex:outputLabel >{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneValue__c.Label} {!JSINHTMLENCODE(TheMilestone.KimbleOne__InvoicingCurrencyIsoCode__c)}</apex:outputLabel>
+                                        <apex:inputField id="milestoneValue" value="{!TheMilestone.KimbleOne__InvoicingCurrencyMilestoneValue__c}" required="true">
+                                            <apex:actionSupport event="onchange" status="milestoneValueCalcStatus" action="{!CalculateInternalValues}" reRender="internalInvCcyMilestoneValueField" rendered="{!TheMilestone.KimbleOne__IsIntercompany__c}"/>
+                                        </apex:inputField>
+                                    </apex:pageBlockSectionItem>
+                                    <apex:pageBlockSectionItem rendered="{!TheMilestone.KimbleOne__MilestoneType__c = RevenueMilestoneId && !TheDeliveryElement.InternalRevenueBehaviourRule__r.RevenueGenerationModel__r.KimbleOne__IsUnitGenerated__c && TheDeliveryElement.RevenueForecastMode__r.KimbleOne__Enum__c == 'RevenueItem' && isElementInterCompanyInvoiceable}" >
+                                        <apex:outputLabel >{!$Label.kimbleone__intercompany} {!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneValue__c.Label} {!JSINHTMLENCODE(TheMilestone.KimbleOne__InternalInvoicingCurrencyIsoCode__c)}</apex:outputLabel>
+                                        <apex:outputPanel layout="none">
+                                            <div class="requiredInput">
+                                                <apex:outputPanel layout="none" rendered="{!TheDeliveryElement.InternalRevenueBehaviourRule__r.KimbleOne__CanEditInternalRevenue__c && HasPermission['OverrideInternalRevenue']}"><div class="requiredBlock"></div></apex:outputPanel>
+                                                <apex:actionStatus id="milestoneValueCalcStatus">
+                                                    <apex:facet name="start">
+                                                        <span style="font-weight: bold;color: #4A4A56;font-size: 91%;"><img src="{!URLFOR($Resource.LoadingImage)}" />{!$Label.Loading}</span>
+                                                    </apex:facet>
+                                                    <apex:facet name="stop">
+                                                        <apex:outputPanel id="internalInvCcyMilestoneValueField" layout="none">
+                                                            <apex:inputField value="{!TheMilestone.KimbleOne__InternalInvoicingCurrencyMilestoneValue__c}" rendered="{!TheDeliveryElement.InternalRevenueBehaviourRule__r.KimbleOne__CanEditInternalRevenue__c && HasPermission['OverrideInternalRevenue']}"/>
+                                                            <apex:outputField value="{!TheMilestone.KimbleOne__InternalInvoicingCurrencyMilestoneValue__c}" rendered="{!!TheDeliveryElement.InternalRevenueBehaviourRule__r.KimbleOne__CanEditInternalRevenue__c || !HasPermission['OverrideInternalRevenue']}"/>
+                                                        </apex:outputPanel>
+                                                    </apex:facet>
+                                                </apex:actionStatus>
+                                            </div>
+                                        </apex:outputPanel>
+                                    </apex:pageBlockSectionItem>
+                                    <apex:pageBlockSectionItem rendered="{!TheMilestone.KimbleOne__MilestoneType__c = RevenueMilestoneId && TheDeliveryElement.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUnitGenerated__c}" >
+                                        <apex:outputLabel >{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__InvoicingCurrencyUnitValue__c.Label} {!JSINHTMLENCODE(TheMilestone.KimbleOne__InvoicingCurrencyIsoCode__c)}</apex:outputLabel>
+                                        <apex:actionRegion >
+                                            <apex:inputField id="unitValue" value="{!TheMilestone.KimbleOne__InvoicingCurrencyUnitValue__c}" required="true">
+                                                <apex:actionSupport event="onchange" status="unitCalcStatus" action="{!CalculateInternalValues}" reRender="internalInvCcyUnitValueField" rendered="{!TheMilestone.KimbleOne__IsIntercompany__c}"/>
+                                            </apex:inputField>
+                                        </apex:actionRegion>
+                                    </apex:pageBlockSectionItem>
+                                    <apex:pageBlockSectionItem rendered="{!TheMilestone.KimbleOne__MilestoneType__c = RevenueMilestoneId && TheDeliveryElement.InternalRevenueBehaviourRule__r.RevenueGenerationModel__r.KimbleOne__IsUnitGenerated__c && TheMilestone.KimbleOne__IsIntercompany__c}" >
+                                        <apex:outputLabel >{!$Label.kimbleone__intercompany} {!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__InvoicingCurrencyUnitValue__c.Label} {!JSINHTMLENCODE(TheMilestone.KimbleOne__InternalInvoicingCurrencyIsoCode__c)}</apex:outputLabel>
+                                        <apex:outputPanel layout="none">
+                                            <div class="requiredInput">
+                                                <apex:outputPanel layout="none" rendered="{!TheDeliveryElement.InternalRevenueBehaviourRule__r.KimbleOne__CanEditInternalRevenue__c && HasPermission['OverrideInternalRevenue']}"><div class="requiredBlock"></div></apex:outputPanel>
+                                                <apex:actionStatus id="unitCalcStatus">
+                                                    <apex:facet name="start">
+                                                        <span style="font-weight: bold;color: #4A4A56;font-size: 91%;"><img src="{!URLFOR($Resource.LoadingImage)}" />{!$Label.Loading}</span>
+                                                    </apex:facet>
+                                                    <apex:facet name="stop">
+                                                        <apex:outputPanel id="internalInvCcyMilestoneValueField" layout="none">
+                                                            <apex:inputField value="{!TheMilestone.KimbleOne__InternalInvoicingCurrencyUnitValue__c}" rendered="{!TheDeliveryElement.InternalRevenueBehaviourRule__r.KimbleOne__CanEditInternalRevenue__c && HasPermission['OverrideInternalRevenue']}"/>
+                                                            <apex:outputField value="{!TheMilestone.KimbleOne__InternalInvoicingCurrencyUnitValue__c}" rendered="{!!TheDeliveryElement.InternalRevenueBehaviourRule__r.KimbleOne__CanEditInternalRevenue__c || !HasPermission['OverrideInternalRevenue']}"/>
+                                                        </apex:outputPanel>
+                                                    </apex:facet>
+                                                </apex:actionStatus>
+                                            </div>
+                                        </apex:outputPanel>
+                                    </apex:pageBlockSectionItem>
+                                    <apex:pageBlockSectionItem rendered="{!TheMilestone.KimbleOne__MilestoneType__c = RevenueMilestoneId && TheDeliveryElement.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUnitGenerated__c}" >
+                                        <apex:outputLabel >{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneUnits__c.Label}</apex:outputLabel>
+                                        <apex:inputField id="milestoneUnits" value="{!TheMilestone.KimbleOne__MilestoneUnits__c}" required="true"/>
+                                    </apex:pageBlockSectionItem>
+    
+                                    <!-- Cost Milestone fields -->
+                                    <!-- SHOULDNT BE ABLE TO EDIT AMOUNTS IF SUPPLIER REQUISITIONED -->
+                                    <apex:pageBlockSectionItem rendered="{!TheMilestone.KimbleOne__MilestoneType__c = CostMilestoneId && TheDeliveryElement.CostForecastMode__r.KimbleOne__Enum__c == 'DeliveryElement' && ShowCosts}" >
+                                        <apex:outputLabel >{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestonePercentage__c.Label}</apex:outputLabel>
+                                        <apex:inputField id="milestonePercentage" value="{!TheMilestone.KimbleOne__MilestonePercentage__c}" required="true"/>
+                                    </apex:pageBlockSectionItem>
+                                    <apex:pageBlockSectionItem rendered="{!TheMilestone.KimbleOne__MilestoneType__c = CostMilestoneId && !TheDeliveryElement.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsUnitGenerated__c && TheDeliveryElement.CostForecastMode__r.KimbleOne__Enum__c == 'CostItem' && ShowCosts}" >
+                                        <apex:outputLabel >{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneValue__c.Label} {!TheMilestone.KimbleOne__SupplierInvoicingCurrencyIsoCode__c}</apex:outputLabel>
+                                        <apex:inputField id="supplierMilestoneValue" value="{!TheMilestone.KimbleOne__SupplierInvoicingCurrencyMilestoneValue__c}" required="true"/>
+                                    </apex:pageBlockSectionItem>
+                                    <apex:pageBlockSectionItem rendered="{!TheMilestone.KimbleOne__MilestoneType__c = CostMilestoneId && TheDeliveryElement.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsUnitGenerated__c && ShowCosts}" >
+                                        <apex:outputLabel >{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__UnitValue__c.Label} {!TheMilestone.KimbleOne__SupplierInvoicingCurrencyIsoCode__c}</apex:outputLabel>
+                                        <apex:inputField id="supplierUnitValue" value="{!TheMilestone.KimbleOne__SupplierInvoicingCurrencyUnitValue__c}" required="true"/>
+                                    </apex:pageBlockSectionItem>
+                                    <apex:pageBlockSectionItem rendered="{!TheMilestone.KimbleOne__MilestoneType__c = CostMilestoneId && TheDeliveryElement.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsUnitGenerated__c && ShowCosts}" >
+                                        <apex:outputLabel >{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneUnits__c.Label}</apex:outputLabel>
+                                        <apex:inputField id="supplierMilestoneUnits" value="{!TheMilestone.KimbleOne__MilestoneUnits__c}" required="true"/>
+                                    </apex:pageBlockSectionItem>
+    
+                                    <apex:inputField value="{!TheMilestone.KimbleOne__Notes__c}" style="width:200px"/>
+    
+                                    <apex:inputField value="{!TheMilestone.KimbleOne__SharedWithCustomer__c}" rendered="{!TheDeliveryGroup.KimbleOne__SharedWithCustomer__c && !ISBLANK(TheDeliveryGroup)}"/>
+    
+                                    <apex:repeat var="f" value="{!$ObjectType.KimbleOne__Milestone__c.FieldSets.KimbleOne__MilestoneDetails}">
+                                        <apex:inputField value="{!TheMilestone[f]}" rendered="{!!CONTAINS(f.FieldPath,'.')}" required="{!f.Required}" styleClass="{!IF(AND($ObjectType.KimbleOne__Milestone__c.Fields[f].type == 'date',$ObjectType.KimbleOne__Milestone__c.Fields[f].updateable),'kimbleDatePicker','')}" />
+                                        <apex:outputField value="{!TheMilestone[f]}" rendered="{!CONTAINS(f.FieldPath,'.')}"/>
+                                    </apex:repeat>
+                                </apex:pageBlockSection>
+                            </apex:pageBlock>
+                        </apex:outputPanel>
+                    </apex:outputPanel>
+                </div>
+
+                <div id="CloneMilestonePopup" style="display:none">
+                    <apex:outputPanel id="clone-milestone-entry">
+
+                        <div id="cloneMilestoneErrors">
+                            <apex:pageMessages escape="false"/>
+                        </div>
+
+                        <apex:pageBlock mode="edit" rendered="{!$ObjectType.KimbleOne__Milestone__c.updateable}">
+                            <apex:pageBlockSection collapsible="false" showheader="false" columns="1">
+
+                                <apex:pageBlockSectionItem >
+                                    <apex:outputText id="milestoneToCloneLabel" value="{!$ObjectType.KimbleOne__Milestone__c.fields.Name.label}" />
+                                    <apex:inputField id="cloneNameInput" value="{!CloneMilestoneName.Name}"/>
+                                </apex:pageBlockSectionItem>
+
+                                <apex:pageBlockSectionItem >
+                                    <apex:outputText value="{!$Label.kimbleone__numberofcloneslabel}" />
+                                    <apex:inputField id="numberOfClonesInput" required="true" value="{!NumberOfClones.KimbleOne__InputInteger__c}" style="width:50px"/>
+                                </apex:pageBlockSectionItem>
+
+                                <apex:pageBlockSectionItem >
+                                    <apex:outputText value="{!$Label.kimbleone__clonelabel} {!$ObjectType.KimbleOne__Milestone__c.fields.KimbleOne__MilestoneDate__c.label}"/>
+                                    <apex:inputField id="cloneDateInput" required="true" value="{!CloneMilestoneDate.KimbleOne__InputDate__c}" styleClass="kimbleDatePicker" />
+                                </apex:pageBlockSectionItem>
+                            </apex:pageBlockSection>
+
+                            <apex:pageBlockButtons location="bottom">
+                                <apex:outputPanel id="cloneButtons">
+                                    <apex:commandButton styleclass="DisableButtonWhileBusy" action="{!CloneMilestones}" value="{!$Label.kimbleone__clonelabel}" status="MilestoneListLoadingStatus" rerender="clone-milestone-entry" oncomplete="hideModalBoxyWithErrorCheck('#cloneMilestoneErrors');getMilestones();"/>
+                                    <input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}" />
+                                </apex:outputPanel>
+                            </apex:pageBlockButtons>
+                        </apex:pageBlock>
+
+                    </apex:outputPanel>
+                </div>
+
+                <div id="EditFieldPopup" class="edit-field-popup" >
+                    <apex:outputPanel id="EditFieldPanelContainer">
+                        <apex:outputPanel layout="block" id="EditFieldPanel" rendered="{!!ISBLANK(TheMilestoneToUpdate)}">
+                            <div id="EditFieldPopupErrors">
+                                <apex:outputPanel layout="block" id="EditFieldError"><apex:pageMessages escape="false"/></apex:outputPanel>
+                            </div>
+                            <div id="PopupContents" data-field-name="{!TheFieldName}" milestone-id="{!TheClickedRecordId}">
+                                <apex:pageBlock id="Milestone" mode="edit" rendered="{!!ISBLANK(TheClickedRecordId)}">
+                                    <apex:pageBlockButtons location="bottom" id="ButtonsBlock" styleclass="ButtonsBlock">
+                                        <input type="button" onclick="saveMilestoneUpdates()" class="btn" value="{!$Label.kimbleone__save}" />
+                                        <input type="button"  onclick="hideModalBoxy();" class="btn" value="{!$Label.Cancel}" />
+                                    </apex:pageBlockButtons>
+    
+                                    <apex:pageblockSection collapsible="false" showheader="false" columns="1" title="{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__Milestone__c.label}">
+    
+                                        <apex:pageBlockSectionItem >
+                                            <apex:outputLabel value="{!TheFieldLabel}"/>
+                                            <apex:outputPanel layout="none">
+    
+                                                <apex:selectList id="action-type" size="1" rendered="{!TheChangeOptions.size > 1}" onchange="changeOptionsChange()">
+                                                    <apex:selectOptions value="{!TheChangeOptions}" />
+                                                </apex:selectList>
+    
+                                                <apex:selectList styleclass="input-value" value="{!TheMilestoneToUpdate[TheFieldName]}" size="1" rendered="{!TheFieldOptions.Size > 0}" >
+                                                    <apex:selectOptions value="{!TheFieldOptions}" />
+                                                </apex:selectList>
+    
+                                                <apex:inputField required="false"  styleclass="{!IF($ObjectType.KimbleOne__Milestone__c.Fields[TheFieldName].type == 'date','kimbleDatePicker','')} input-value {!ClassNames} " html-data-field-type="{!FieldType}" value="{!TheMilestoneToUpdate[TheFieldName]}" rendered="{!TheFieldOptions.Size == 0 && ISBLANK(MilestoneStatus)}">
+                                                    <apex:actionSupport event="onchange" rerender="EditFieldError"/>
+                                                </apex:inputField>
+    
+                                                <apex:inputCheckbox required="false" styleclass="input-value {!ClassNames}" html-data-field-type="{!FieldType}" value="{!MilestoneStatus.KimbleOne__InputCheckbox__c}" rendered="{!!ISBLANK(MilestoneStatus)}">
+                                                    <apex:actionSupport event="onchange" rerender="EditFieldError"/>
+                                                </apex:inputCheckbox>
+    
+                                                <apex:inputField required="false" styleclass="milestone-date-offset" value="{!MilestoneDateOffset.KimbleOne__InputInteger__c}" rendered="{!!ISBLANK(MilestoneDateOffset)}">
+                                                    <apex:actionSupport event="onchange" rerender="EditFieldError"/>
+                                                </apex:inputField>
+    
+                                            </apex:outputPanel>
+                                        </apex:pageBlockSectionItem>
+    
+                                    </apex:pageblockSection>
+                                    <apex:outputPanel layout="none" rendered="{!NumberOfSelectedMilestones > 1}">
+                                        <apex:pageblockSection collapsible="false" showheader="true" columns="1" title="{!$Label.kimbleone__applychangesto}"></apex:pageblockSection>
+                                        <div class="apply-to-section">
+                                            <div><input id="the-record-clicked" type="radio" checked="checked" name="apply-changes-group" value="single"/><label for="the-record-clicked">{!$Label.TheRecordClicked}</label></div>
+                                            <div><input id="selected-records" type="radio" name="apply-changes-group" value="all"/><label for="selected-records">{!$Label.All}&nbsp;<b><apex:outputText value="{!NumberOfSelectedMilestones}"/></b>&nbsp;selected records</label></div>
+                                        </div>
+    
+                                        <div id="save-progress"><i class="fa fa-spin fa-circle-o-notch"></i><span></span></div>
+    
+                                    </apex:outputPanel>
+    
+    
+                                </apex:pageBlock>
+                            </div>
+                        </apex:outputPanel>
+                    </apex:outputPanel>
+                </div>
+            </apex:form>
+        <script>
+
+            var IsInitialised = false;
+            var DeleteEnabled = false;
+            
+			function InitialiseItems()
+			{
+			    if(IsInitialised != true)
+                {
+                    SetupDatePicker();
+                    SetupTable();          
+                    
+                    IsInitialised = true;
+                }
+                
+                SetUpCheckBoxes();
+                EvaluateDeleteButtonStatus();
+                SetupDateSort();
+                SearchTableInput();
+                hideMilestoneNameEdit();
+            }
+            
+            function SearchTableInput()
+            {
+                var searchTerm = jQuery('.table-filter-term');
+                if(searchTerm.val() != undefined && searchTerm.val() != '')
+                {
+                    searchTable(jQuery('.table-filter-term'));
+                }
+            }
+
+            function SetupDatePicker()
+            {
+                //dateFormat: 'yy-mm-dd',
+                jQuery('.kimbleDatePicker').datepicker({
+                        dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+                        showOtherMonths: true,
+                        selectOtherMonths: true,
+                        changeMonth: true,
+                        changeYear: true});
+            }
+            
+	        jQuery(window).load(function()
+            {					
+                jQuery('.element-filter-dropdown').select2();
+                jQuery('.status-filter-dropdown').select2();
+                jQuery('.type-filter-dropdown').select2();
+                    
+                jQuery("input.select-all").each(function(){jQuery(this).prop('checked', false);});
+                
+                getMilestones();
+            });
+            
+            function newMilestone(elementId)
+            {
+                hideMilestoneNameEdit();
+                initialiseModalBoxy('#MilestonePopup', '{!JSENCODE($Label.New)}  {!$ObjectType.Milestone__c.label}', jQuery('form[id$=\'milestonePopupForm\']'));
+                newMilestoneFunction(elementId);
+            }  
+    
+            function editMilestoneClick(milestoneId)
+            {
+                initialiseModalBoxy('#MilestonePopup', '{!JSENCODE($Label.Edit)}  {!$ObjectType.Milestone__c.label}', jQuery('form[id$=\'milestonePopupForm\']'));
+                editMilestoneFunction(milestoneId);
+                jQuery('.milestone-tools').qtip('destroy', true);
+            }  
+    
+            function cloneMilestoneClick(milestoneId)
+            {
+                initialiseModalBoxy('#CloneMilestonePopup', '{!JSENCODE($Label.CloneLabel)}  {!$ObjectType.Milestone__c.label}', jQuery('form[id$=\'milestonePopupForm\']'));
+                cloneMilestoneFunction(milestoneId);
+                jQuery('.milestone-tools').qtip('destroy', true);
+            }  
+            
+            function initialiseMilestoneUpdateFieldClick(milestoneId, fieldName)
+            {
+                hideMilestoneNameEdit();
+                getSelectedMilestones(fieldName);
+                initialiseModalBoxy('#EditFieldPopup', '{!JSENCODE($Label.Edit)}  {!$ObjectType.Milestone__c.labelPlural}', jQuery('form[id$=\'milestonePopupForm\']'));
+                initialiseMilestoneUpdateFieldFunction(milestoneId, fieldName, selectedMilestones.length);
+            }
+            
+            function bulkDeleteButtonClick()
+            {
+                if(DeleteEnabled != true) return;
+                
+                hideMilestoneNameEdit();
+                getSelectedMilestones('DeleteMilestones');
+                
+                if(selectedMilestones.length == 0) return;
+                
+                var del = false;
+    
+                del = confirmDelete();
+                
+                if(del)
+                {
+                    Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.MilestonesEditController.BulkDeleteMilestones}',
+                        selectedMilestones,
+                        function(result, event){
+                            if (event.status)
+                            {                                        
+                                // success 
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                alert(event.message);
+                            }
+                            else
+                            {
+                                alert(event.message);
+                            }
+                                                 
+                        },
+                    {escape: false, timeout: 60000});
+                    
+                    getMilestones();
+                }
+            }
+            
+            function editMilestoneNameClick(milestoneId)
+            {
+                hideMilestoneNameEdit();
+                
+                var nameField =  jQuery('.milestone-name-row-' + milestoneId);
+                var theName = nameField.find('.milestone-name-output').text();
+			    
+			    nameField.find('.milestone-name-output').toggleClass('hidden-item');
+			    nameField.find('.milestone-name-edit').toggleClass('hidden-item');
+			    nameField.find('.milestone-name-input').toggleClass('hidden-item');
+			    nameField.find('.milestone-name-save').toggleClass('hidden-item');
+			    nameField.find('.milestone-name-cancel').toggleClass('hidden-item');
+                
+			    nameField.find('.milestone-name-input').val(theName);
+            }
+            
+            function hideMilestoneNameEdit()
+            {
+			    jQuery('.ms-name:visible .milestone-name-output:hidden').toggleClass('hidden-item');
+			    jQuery('.ms-name:visible .milestone-name-edit:hidden').toggleClass('hidden-item');
+			    jQuery('.ms-name:visible .milestone-name-input:visible').toggleClass('hidden-item');
+			    jQuery('.ms-name:visible .milestone-name-save:visible').toggleClass('hidden-item');
+			    jQuery('.ms-name:visible .milestone-name-cancel:visible').toggleClass('hidden-item');
+            }
+            
+            function saveMilestoneName(milestoneId)
+            {
+                var theNewName =  jQuery('.milestone-name-input:visible').val();
+                
+                if(theNewName.length == 0) 
+                {
+                    hideMilestoneNameEdit();
+                    return;
+                }
+              
+                jQuery('#loadingIndicatorOuterContainer').show();
+                
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.MilestonesEditController.SaveMilestoneName}',
+                    milestoneId, theNewName,
+                    function(result, event){
+                        if (event.status)
+                        {                                        
+                            // success
+			                jQuery('.ms-name:visible .milestone-name-output:hidden').text(theNewName);  
+                        }
+                        else if (event.type === 'exception')
+                        {
+                            alert(event.message);
+                        }
+                        else
+                        {
+                            alert(event.message);
+                        }
+    
+                        hideMilestoneNameEdit();
+                        SearchTableInput();
+                        
+                        jQuery('#loadingIndicatorOuterContainer').hide();                        
+                     },
+                 {escape: false, timeout: 60000});
+            }
+
+            function changeOptionsChange()
+            {
+                var action = jQuery('[id$="action-type"').val();
+                var parent = jQuery('[id$="action-type"').closest('td');
+    
+                parent.find('input').val('').change();
+    
+                if  (action == 'ShiftStartDateByDays')
+                {
+                    parent.find('.milestone-date-offset').show();
+                    parent.find('.dateInput').hide();
+                }
+                else
+                {
+                    parent.find('.milestone-date-offset').hide();
+                    parent.find('.dateInput').show();
+                }
+            }
+
+            function deleteMilestoneClick(milestoneId)
+            {
+                jQuery('.milestone-tools').qtip('destroy', true);
+
+                var del = false;
+    
+                del = confirmDelete();
+    
+                if (del)
+                {
+                    jQuery('#' + milestoneId).find('.fa-cog').replaceWith('<i class="fa fa-spin fa-circle-o-notch"></i>');
+    
+                    deleteMilestoneFunction(milestoneId);
+                }
+            }
+            
+            function SetupTable()
+            {
+			    jQuery('.kimble-enhanced-table').enhancedTable();
+			    InitialiseFilterHighlight();
+            }
+
+            function SetupDateSort()
+            {
+                jQuery.each(jQuery('.apply-date-sort'), function(i, obj){
+                    jQuery(obj).parent('td').attr('data-sort-type','number').attr('data-sort-value',kimble.parseDate(jQuery(obj).text(), true).valueOf());
+                });
+            }
+
+            function applyMilestonesFilter()
+            {
+                jQuery('#MilestoneFilterPopup').hide();
+                getMilestones();
+                InitialiseFilterHighlight();
+            }
+            
+            function InitialiseFilterHighlight()
+            {
+                $('.filterMilestoneButton').removeClass('toolbar-button-selected');
+               
+                jQuery.each(jQuery('.select2-container-multi'), function(i, obj) {
+                    if(jQuery(obj).select2('val').length > 0) $('.filterMilestoneButton').addClass('toolbar-button-selected');
+                });    
+            }
+    	
+            function clearMilestonesFilter()
+            {
+                jQuery('#MilestoneFilterPopup').hide();
+                
+                $('.filterMilestoneButton').removeClass('toolbar-button-selected');
+                jQuery('.hide-closed-checkbox').prop('checked',false);
+                
+                jQuery.each(jQuery('.select2-container-multi'), function(i, obj) {
+                    jQuery(obj).select2('val', '');
+                });
+                
+                getMilestones();
+            }
+
+            function SetUpCheckBoxes()
+            {
+                var checkboxGroupName = 'Milestones';
+                var allCheckboxId = 'selectAllMilestones';
+                var checkboxClass = '.select-milestone';
+    
+                jQuery('[id$=' + allCheckboxId + ']').unbind('change');
+                jQuery('[id$=' + allCheckboxId + ']').change(function(){
+//                    UncheckOrCheckGroup(jQuery(this),checkboxGroupName);
+                    
+                    var checkedobj = jQuery(this);
+                    var groupname = checkboxGroupName;
+                    if(checkedobj.is(':checked'))
+                    {
+                        jQuery.each(
+                            $('input:checkbox[name='+groupname+']:visible'), function(i,obj)
+                            {
+                                obj.checked=true;
+                            }
+                        );
+                    }
+                    else
+                    {
+                        jQuery.each(
+                            $('input:checkbox[name='+groupname+']'), function(i, obj)
+                            {
+                                obj.checked=false;
+                            }
+                        );
+                    }
+                    
+                    EvaluateDeleteButtonStatus();
+                });
+            }
+            
+            function EvaluateDeleteButtonStatus()
+            {
+                var groupname = 'Milestones';        
+                DeleteEnabled = false;            
+                                   
+                jQuery.each($('input:checkbox[name='+groupname+']'), function(i, obj){
+                    if(obj.checked == true)
+                    {
+                        if(jQuery(this).attr('can-delete') == 'true')
+                        {
+                            DeleteEnabled = true;
+                        }
+                        else
+                        {
+                            DeleteEnabled = false;
+                            return false;
+                        }
+                    }
+                });
+                    
+                if(DeleteEnabled == true)
+                {
+                    jQuery('.bulkDeleteButton').removeClass('disabled').addClass('enabled');
+                    jQuery('.bulkDeleteButton').find('i.fa-trash').addClass('enabled');
+                }
+                else
+                {
+                    jQuery('.bulkDeleteButton').addClass('disabled').removeClass('enabled');
+                    jQuery('.bulkDeleteButton').find('i.fa-trash').removeClass('enabled');
+                }
+            }
+            
+            var selectedMilestones = [];
+                        
+            function getSelectedMilestones(fieldName)
+            {
+                selectedMilestones = [];
+                
+                var dateFieldName = '<apex:outputText value="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneDate__c.Name}" />';
+                var valueFieldName = '<apex:outputText value="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneValue__c.Name}" />';
+                var percentageFieldName = '<apex:outputText value="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestonePercentage__c.Name}" />';
+                var statusFieldName = '<apex:outputText value="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneStatus__c.Name}" />';
+                 
+                if(fieldName == 'DeleteMilestones')
+                {
+                    jQuery.each(jQuery('.select-milestone:checked:visible'), function(i, inp){
+                        if(jQuery(this).attr('can-delete') == 'true') selectedMilestones.push(jQuery(this).attr('milestoneId'));
+                    });                    
+                }
+                else if(fieldName == dateFieldName)
+                {
+                    jQuery.each(jQuery('.select-milestone:checked'), function(i, inp){
+                        if(jQuery(this).attr('can-edit-date') == 'true') selectedMilestones.push(jQuery(this).attr('milestoneId'));
+                    });
+                }
+                else if(fieldName == valueFieldName)
+                {
+                    jQuery.each(jQuery('.select-milestone:checked'), function(i, inp){
+                        if(jQuery(this).attr('can-edit-value') == 'true') selectedMilestones.push(jQuery(this).attr('milestoneId'));
+                    });
+                }
+                else if(fieldName == percentageFieldName)
+                {
+                    jQuery.each(jQuery('.select-milestone:checked'), function(i, inp){
+                        if(jQuery(this).attr('can-edit-percentage') == 'true') selectedMilestones.push(jQuery(this).attr('milestoneId'));
+                    });
+                }
+                else if(fieldName == statusFieldName)
+                {
+                    jQuery.each(jQuery('.select-milestone:checked'), function(i, inp){
+                        if(jQuery(this).attr('can-edit-status') == 'true') selectedMilestones.push(jQuery(this).attr('milestoneId'));
+                    });
+                }
+                else
+                {
+                    jQuery.each(jQuery('.select-milestone:checked'), function(i, inp){
+                        selectedMilestones.push(jQuery(this).attr('milestoneId'));
+                    });
+                }
+            }
+            
+            function getTableHeader()
+            {
+                var html = '<tr class="headerRow"><th style="width:35px" class="headerRow"><input type="checkbox" id="selectAllMilestones" /></th><th style="width:36px" class="headerRow"><h2>{!$Label.kimbleone__actionlinksheader}</h2></th>';
+                
+                html += ' <th class="headerRow sortable"><h2>{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__DeliveryElement__c.Label}</h2></th>';
+                html += '<th class="headerRow sortable"><h2>{!$ObjectType.KimbleOne__Milestone__c.Fields.Name.Label}</h2></th>';
+                html += '<th class="headerRow"><h2>{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneStatus__c.Label}</h2></th>';
+                html += '<th class="headerRow sortable"><h2>{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneType__c.Label}</h2></th>';
+                html += '<th class="headerRow sortable"><h2>{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneDate__c.Label}</h2></th>';
+                html += '<th class="headerRow sortable"><h2>{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneValue__c.Label}</h2></th>';
+                html += '<th class="headerRow sortable"><h2>{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestonePercentage__c.Label}</h2></th>';
+    
+                html += '</tr>';
+    
+                return html;
+            }
+            
+            function getMilestoneRowHtml(m)
+            {
+                var dateFieldName = '<apex:outputText value="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneDate__c.Name}" />';
+                var valueFieldName = '<apex:outputText value="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneValue__c.Name}" />';
+                var percentageFieldName = '<apex:outputText value="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestonePercentage__c.Name}" />';
+                var statusFieldName = '<apex:outputText value="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneStatus__c.Name}" />';
+                var statusOpen = '<apex:outputText value="{!MilestoneOpenId}" />';
+                var statusCompleted = '<apex:outputText value="{!MilestoneCompleteId}" />';
+                
+                hasAccess = true;
+                
+                var row = '<tr class="dataRow tree-node " level="1">';
+                
+                //checkbox
+                row += '<td>';
+                if (hasAccess) row += '<input onclick="EvaluateDeleteButtonStatus();" class="select-milestone" name="Milestones" type="checkbox" milestoneId="' + m.Id + '" can-edit-date="' + m.CanEdit + '" can-edit-value="' + m.CanEditValue + '" can-edit-percentage="' + m.CanEditPct + '" can-edit-status="' + m.CanComplete + '" can-delete="' + m.CanDelete + '" />';
+                row += '</td>';
+                
+                //cog
+                row += '<td>';
+                if(m.CanClone) row += '<i class="fa fa-cog milestone-actions" milestone-id="' + m.Id + '" can-edit="' + m.CanEdit + '" can-delete="' + m.CanDelete + '" can-clone="' + m.CanClone + '" milestone-type="' + m.MilestoneType + '"/>';
+                row += '</td>';
+                
+                //element name
+                row += '<td>';
+                row += '<span>' + m.ScopedWithElementName + '</span>';
+                row += '</td>';
+                
+                //milestone name link
+                row += '<td class="ms-name milestone-name-row-' + m.Id + ' ' + (m.CanEdit ? 'editable' : 'readonly') + '">';
+                row += '<span class="milestone-name-output">' + m.Name + '</span>';
+                row += '<input class="milestone-name-input hidden-item" value="' + m.Name + '"></input>';              
+                if(m.CanEdit) row +=  '<i class="fa fa-pencil milestone-name-edit" onclick="editMilestoneNameClick(\'' + m.Id + '\');"></i>';
+                if(m.CanEdit) row +=  '<i class="fa fa-save hidden-item milestone-name-save" onclick="saveMilestoneName(\'' + m.Id + '\');" title="' + '{!JSENCODE($Label.Save)}' + '"></i>';
+                if(m.CanEdit) row +=  '<i class="fa fa-times hidden-item milestone-name-cancel" onclick="hideMilestoneNameEdit();" title="' + '{!JSENCODE($Label.Cancel)}' + '"></i>';
+                row += '</td>';
+                
+                //status checkbox
+		        var completeWarningHtml = '';
+                row += '<td class="centerAlignDataCell status-checkbox ' + (m.CanEdit ? 'editable' : 'readonly') + '" title="' + m.Status + '">';
+                if(m.CanComplete)
+                {
+                    row += '<a id="' + m.Id + '" onclick="initialiseMilestoneUpdateFieldClick(\'' + m.Id + '\',\'' + statusFieldName + '\');" style="text-decoration: none;" class="complete-milestone fa can-complete ';
+                    if(m.AutoComplete) completeWarningHtml += '<i class="fa fa-warning auto-complete-inline-warning" title="' + '{!JSENCODE($Label.MilestoneAutoCompletionWarning)}' +'"></i>';
+			    }
+                else
+                {
+                    row += '<span class="fa cannot-complete ';
+                }
+		
+                if (m.Status == 'Open') row += 'fa-square-o open';
+		        if (m.Status == 'CompletedUnapproved') row += 'fa-check-square completed-unapproved';
+		        if (m.Status == 'Completed') row += 'fa-check-square-o completed';	
+		        if (m.Status == 'Obsolete') row += 'fa-minus-circle obsolete';
+			
+                if (m.EventId != null && m.Status == 'Open') row += '" title="{!$Label.MilestoneLinkedToEventMessage}">';
+                else row += '">';
+                
+                if (m.CanComplete) row += '</a>' + completeWarningHtml;
+                else row += '</span>';
+		
+                row += '</td>';
+                
+                //type
+                row += '<td>';
+                row += '<span>' + m.MilestoneType + '</span>';
+                row += '</td>';
+                
+                //date
+                row += '<td class="' + (m.CanEdit ? 'editable' : 'readonly') + '">';
+                row += '<span class="apply-date-sort">' + (m.StartDate == null ? '' : kimble.formatDate(m.StartDate)) + '</span>';
+                if(m.CanEdit) row +=  '<i class="fa fa-pencil" onclick="initialiseMilestoneUpdateFieldClick(\'' + m.Id + '\',\'' + dateFieldName + '\');"></i>';
+                row += '</td>';
+                
+                //value
+                row += '<td class="' + (m.CanEditValue ? 'editable' : 'readonly') + '">';
+                if(m.MilestoneType == '{!RevenueMilestoneEnum}') row += '<span>' + (m.Value == null ? '' : m.InvoicingCurrencyIsoCode + ' ' + kimble.formatNumber(m.Value, '#,##0.00')) + '</span>';
+                else if({!!ShowCosts} && m.MilestoneType == '{!CostMilestoneEnum}') row += '<span>' + '-' + '</span>';
+                else if({!ShowCosts} && m.MilestoneType == '{!CostMilestoneEnum}') row += '<span>' + (m.Value == null ? '' : m.SupplierInvoicingCurrencyIsoCode + ' ' + kimble.formatNumber(m.Value, '#,##0.00')) + '</span>';
+                if(m.CanEditValue) row +=  '<i class="fa fa-pencil" onclick="initialiseMilestoneUpdateFieldClick(\'' + m.Id + '\',\'' + valueFieldName + '\');"></i>';
+                row += '</td>';
+                
+                //Pct
+                row += '<td class="' + (m.CanEditPct ? 'editable' : 'readonly') + '">';
+                row += '<span>' + (m.Percentage == null ? '' : kimble.formatNumber(m.Percentage, '0.00') + '%') + '</span>';
+                if(m.CanEditPct) row +=  '<i class="fa fa-pencil" onclick="initialiseMilestoneUpdateFieldClick(\'' + m.Id + '\',\'' + percentageFieldName + '\');"></i>';
+                row += '</td>';
+                
+                jQuery('.milestones-table tbody').append(row);
+                return row;
+            }
+            
+            function getFieldValue(m, fieldPath)
+            {
+               var flds = fieldPath.split('.');
+    
+               var val = m;
+    
+               for (var i=0;i<flds.length;i++)
+               {
+                   if (val != null) val = val[flds[i]];
+               }
+    
+               return val == null ? '' : val;
+            }
+            
+            jQuery(document).off('click','.milestone-actions').on('click', '.milestone-actions', function() {
+                hideMilestoneNameEdit();
+                
+                var $t = jQuery(this);
+                var milestoneId = $t.attr('milestone-id');
+                $t.qtip('destroy', true);
+
+                var content;
+                var ShowEdit = $t.attr('can-edit') == 'true';
+                var ShowClone = $t.attr('can-clone') == 'true';
+                var ShowDelete = $t.attr('can-delete') == 'true';
+                var MilestoneType = $t.attr('milestone-type');
+                
+                content = '<div class="tool-items" milestone-id="' + milestoneId + '">';
+
+                // edit 
+                if({!ShowCosts} && MilestoneType == '{!CostMilestoneEnum}' && ShowEdit) content += '<a href="javascript:void(0);" onclick="editMilestoneClick(\'' + milestoneId + '\')" milestone-id="' + milestoneId + '" class="tool-item milestone-edit-button"  title="{!$Label.Edit}" ><i class="fa fa-pencil-square-o"></i></a>';
+                else if(MilestoneType == '{!RevenueMilestoneEnum}' && ShowEdit) content += '<a href="javascript:void(0);" onclick="editMilestoneClick(\'' + milestoneId + '\')" milestone-id="' + milestoneId + '" class="tool-item milestone-edit-button"  title="{!$Label.Edit}" ><i class="fa fa-pencil-square-o"></i></a>';
+
+                // clone
+                if(ShowClone) content += '<a href="javascript:void(0);" onclick="cloneMilestoneClick(\'' + milestoneId + '\')" milestone-id="' + milestoneId + '" class="tool-item milestone-clone-button"  title="{!$Label.kimbleone__clonelabel}" ><i class="fa fa-clone"></i></a>';
+
+                // delete
+                if(ShowDelete) content += '<a href="javascript:void(0);" onclick="deleteMilestoneClick(\'' + milestoneId + '\')" milestone-id="' + milestoneId + '" class="tool-item" title="{!$Label.Delete}" class="actionLink"><i class="fa fa-trash-o"></i></a>';
+
+                content += '</div>';
+
+                $t.qtip({
+                    content:{
+                        text:  content,
+                    },
+                    position: {
+                        adjust: {
+                            method: 'flip flip'
+                        },
+                        my: 'center left',
+                        at: 'center right',
+                        viewport: $(window)
+                    },
+                    show: {
+                        event: 'click',
+                        solo: true,
+                        ready:true
+                    },
+                    hide: 'unfocus',
+                    style: {classes: 'qtip-light hide-qtip-border milestone-tools'}
+                });
+            });
+            
+            var milestonesToSave = [];
+    
+            function saveMilestoneUpdates()
+            {
+                if(jQuery('[id$="EditFieldError"] > span')[0].children.length > 0) return;
+    
+                jQuery('#loadingIndicatorOuterContainer').show();
+    
+                jQuery('.save-problem').qtip('destroy', true);
+                jQuery('.save-problem').remove();
+    
+                jQuery('#PopupContents .btn').prop('disabled', true).addClass('btnDisabled');
+    
+                milestonesToSave = []
+    
+                var selectedMilestoneId = jQuery('#PopupContents').attr('milestone-id');
+    
+                if (jQuery('#selected-records').is(':checked')) 
+                {
+                    getSelectedMilestones(jQuery('#PopupContents').attr('data-field-name'));
+                    milestonesToSave = selectedMilestones;
+                }
+                else
+                {
+                    milestonesToSave.push(selectedMilestoneId);
+                }
+                
+                saveAllSelectedMilestones();
+            }
+    
+            function saveAllSelectedMilestones()
+            {
+                if (Object.keys(milestonesToSave).length == 0)
+                {
+                     jQuery('#PopupContents .btn').prop('disabled', false).removeClass('btnDisabled');
+    
+                     jQuery('#loadingIndicatorOuterContainer').hide();
+    
+                     hideModalBoxy();
+    
+                     if (jQuery('.save-problem').length > 0)
+                        alert('{!JSENCODE($Label.OneOrMoreItemsHaveAnError)}');
+    
+                     return;
+                }
+    
+                saveArrayOfMilestones();
+            }
+            
+            function getMilestones()
+            {
+                jQuery('.milestones-table').find('thead').empty().append(getTableHeader());
+                jQuery('.milestones-table').find('tbody').empty();
+                
+                // apply filter
+                var typeFilterEnums = [];
+                var statusFilterEnums = [];
+                var elementFilterNames = [];
+    
+                jQuery.each(jQuery('.type-filter-dropdown').find('.select2-search-choice div'), function(i, obj) {
+                    typeFilterEnums.push(jQuery(obj).text());
+                });
+    
+                jQuery.each(jQuery('.status-filter-dropdown').find('.select2-search-choice div'), function(i, obj) {
+                    statusFilterEnums.push(jQuery(obj).text());
+                });
+    
+                jQuery.each(jQuery('.element-filter-dropdown').find('.select2-search-choice div'), function(i, obj) {
+                    elementFilterNames.push(jQuery(obj).text());
+                });
+                
+                getMilestoneRows(elementFilterNames, typeFilterEnums, statusFilterEnums);
+            }
+            
+            function getMilestoneRows(elementFilterNames, typeFilterEnums, statusFilterEnums)
+            {
+                jQuery('#loadingIndicatorOuterContainer').show();
+                
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.MilestonesEditController.getMilestones}',
+                    kimble.parseJSON('{!JSENCODE(FilterIdsJson)}'), elementFilterNames, typeFilterEnums, statusFilterEnums,
+                    function(result, event){
+                        if (event.status)
+                        {
+                            // success
+                            for(i = 0; i < result.length; i++)
+                            {
+                                getMilestoneRowHtml(result[i]);
+                            }
+                                          
+                            InitialiseItems();
+                        }
+                        else if (event.type === 'exception')
+                        {
+                            alert(event.message);
+                        }
+                        else
+                        {
+                            alert(event.message);
+                        }
+    
+                        jQuery('#loadingIndicatorOuterContainer').hide();                        
+                     },
+                 {escape: false, timeout: 60000});
+            }
+            
+            function saveArrayOfMilestones()
+            {
+                var fldName = jQuery('#PopupContents').attr('data-field-name');
+                var fldValue = getUpdateFieldValue();
+    
+                var action = jQuery('[id$="action-type"').val();
+    
+                if(action == 'ShiftStartDateByDays') fldValue = jQuery('.milestone-date-offset').val();
+                if(action == null || action == '') action = 'UpdateValue'
+    
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.MilestonesEditController.saveEditMilestoneField}',
+                    milestonesToSave, fldName, action, fldValue,
+                    function(result, event){
+                        if (event.status)
+                        {
+                            // success
+                        }
+                        else if (event.type === 'exception')
+                        {
+                            alert(event.message);
+                        }
+                        else
+                        {
+                            alert(event.message);
+                        }
+    
+                        hideModalBoxy();
+                        jQuery('#loadingIndicatorOuterContainer').hide();
+                        getMilestones();
+                     },
+                 {escape: false, timeout: 60000});
+            }
+                
+            function getUpdateFieldValue()
+            {
+                var $inp = jQuery('.input-value');
+    
+                if ($inp.is(':checkbox')) return $inp.is(':checked');
+    
+                var typ = $inp.attr('data-field-type');
+                var val = null;
+    
+                if (typ == 'REFERENCE')
+                {
+                    val = $inp.closest('td').find('[id $= "lkid"]').val();
+                }
+                else if (typ == 'INTEGER' || typ == 'LONG')
+                {
+                    val = kimble.parseNumber($inp.val(), '#,###');
+                }
+                else if (typ == 'DOUBLE' || typ == 'PERCENT' || typ == 'CURRENCY')
+                {
+                    val = kimble.parseNumber($inp.val(),'#,###.####');
+                }
+                else if (typ == 'DATE')
+                {
+                    val = kimble.parseDate($inp.val());
+                }
+                else
+                {
+                    val = $inp.val();
+                }
+    
+               return val;
+            }
+    	</script>
+
+        </apex:define>
+    </apex:composition>
+</apex:page>

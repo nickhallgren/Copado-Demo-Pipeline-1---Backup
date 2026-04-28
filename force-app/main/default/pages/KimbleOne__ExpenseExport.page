@@ -1,0 +1,327 @@
+<apex:page controller="KimbleOne.ExpenseExportController" showHeader="false" sidebar="false">
+
+
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__pdfjs, '/pdfjs-dist/build/pdf.js')}"/>
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__pdfjs, '/pdfjs-dist/build/pdf.js.map')}"/>
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__pdfjs, 'jspdf.debug.js')}"/>
+
+			<div id="generate-pdf-container" style="display:none">
+				<div style="position: absolute;background-color: grey;left: 0;top: 0;right: 0;bottom: 0;opacity: 0.2;text-align: center;align-content: center;"></div>
+				<div style="opacity:1;position: absolute;top: 50%;left: 50%;width: 400px;height: 80px;margin-top: -160px;margin-left: -200px;background-color: whitesmoke;padding: 15px;z-index: 10000;">
+					<div style="color: #4A4A56;font-weight: bold;">{!$Label.GeneratingPdf}</div>
+					<div id="att-progressbar" class="hidden-item"><div class="att-progress-label"></div></div>
+					<div id="generate-pdf-message"></div>
+				</div>
+
+				<div id="generate-pdf-canvas-container" style="display:none"></div>
+
+			</div>
+			<style>
+			div#att-progressbar {
+			    margin-bottom: 10px;
+			    margin-top: 5px;
+			}
+			.ui-progressbar
+			{
+			  position: relative;
+			}
+			.ui-progressbar-value.att-good {
+			    background-color: #4CAF50 !important;
+			    background-image: none;
+			}
+			.ui-progressbar-value.att-bad {
+			    background-color: red !important;
+			    background-image: none;
+			}
+			.att-progress-label
+			{
+				position: absolute;
+				left: 50%;
+				top: 4px;
+				font-weight: bold;
+				color: black;
+				font-size: 14px;
+			}
+			</style>
+<script>
+
+	var progressbar;
+	var progressStep = 0;
+
+	var pdfGenerationSettings = {"Width":{!PdfGenerationSettingsCanvasWidth}
+								,"Height":{!PdfGenerationSettingsCanvasHeight}
+								,"Compression":"{!JSENCODE(PdfGenerationSettingsCompression)}"
+								,"ImageQuality":{!JSENCODE(PdfGenerationSettingsImageQuality)}
+								,"PdfContentType":"{!JSENCODE(PdfGenerationSettingsPdfContentType)}"
+								,"PageType":"{!JSENCODE(PdfGenerationSettingsPageType)}"
+								,"Scale":{!JSENCODE(PdfGenerationSettingsScale)}};
+	jQuery(document).ready(function()
+	{
+		progressbar = jQuery( "#att-progressbar" );
+		progressLabel = jQuery( ".att-progress-label" );
+
+		progressbar.progressbar({
+			value: false,
+			change: function() {
+				progressLabel.text( progressbar.progressbar( "value" ).toFixed(2) + "%" );
+			}
+		});
+
+		resetProgressBar();
+
+		jQuery('#att-progressbar').removeClass('hidden-item');
+	});
+
+	function incrementProgressBar(incrementValue)
+	{
+		var val = progressbar.progressbar( "value" ) || 0;
+
+		progressbar.progressbar( "value",  incrementValue);
+
+		jQuery('.ui-progressbar-value').addClass('att-good');
+	}
+
+	function resetProgressBar()
+	{
+		progressbar.progressbar( "value",  0);
+
+		progressStep = attachmentsToGenerateCount;
+	}
+
+	function completeProgressBar()
+	{
+		progressbar.progressbar( "value",  100);
+	}
+
+	var attachmentsGenerationComplete;
+    var thePdfToDownload;
+	var headerFooterOptions;
+
+	function generateAttachments(id, context, options, oncomplete)
+	{
+		if (options == null) options = {showLogo:false, showFooter:false, showPageNumbers:false, footerText:null, logoUrl:null};
+
+		headerFooterOptions = options;
+
+		if ({!!ConversionEnabled})
+		{
+			oncomplete();
+  		}
+		else
+		{
+			documentContext = context;
+
+			//show loading indicator
+			getAttachmentsForContext(id);
+
+			if (oncomplete == null) oncomplete = function(){downloadPdf();}
+
+			attachmentsGenerationComplete = oncomplete;
+		}
+ 	}
+
+	var attachmentsToGenerateCount;
+    var contextAttachments;
+    var documentContext;
+	var pagesCounter = 1;
+
+	function getAttachmentsForContext(id)
+	{
+	    Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ExpenseExportController.GetAttachmentsForContext}',
+				id, function (result, event) {
+				if (event.status) {
+
+					if (result.length == 0)
+					{
+						jQuery('#generate-pdf-container').hide();
+						attachmentsGenerationComplete();
+
+						return;
+					}
+
+                    thePdfToDownload = new jsPDF('p', 'pt', pdfGenerationSettings.PageType,true);
+
+                    if (headerFooterOptions.showLogo)
+                    {
+                        //width defined in pixels - but specified in pt => 1px = 0.75pt
+                        thePdfToDownload.addImage(headerFooterOptions.logoData, headerFooterOptions.logoContentType, 10, 10, headerFooterOptions.logoWidth / 1.33333, headerFooterOptions.logoHeight / 1.33333, null, pdfGenerationSettings.Compression);
+                    }
+
+                    thePdfToDownload.setFontSize(26);
+                    thePdfToDownload.text(documentContext, 300, 300, null, null, 'center');
+                    attachmentsToGenerateCount = result.length * 2;
+
+                    contextAttachments = result;
+
+					jQuery('#generate-pdf-container').show();
+
+					resetProgressBar();
+
+					pagesCounter = 1;
+					processNextAttachment(true);
+
+				} else {
+					alert(event.message);
+
+				}
+			},
+			{escape: false,timeout: 60000
+		});
+ 	}
+
+    function processNextAttachment(firstTime)
+    {
+        if (contextAttachments.length == 0)
+        {
+            completeProgressBar();
+		    jQuery('#generate-pdf-container').hide();
+
+            attachmentsGenerationComplete();
+        }
+        else
+        {
+            addPageToPdf(pdfGenerationSettings.PageType);
+
+			getAttachment(contextAttachments.pop());
+        }
+    }
+
+    function downloadPdf()
+    {
+        thePdfToDownload.save(documentContext + '.pdf');
+    }
+
+	function getAttachment(attachmentId)
+	{
+		incrementProgressBar(Math.min(95, 100/attachmentsToGenerateCount));
+        attachmentsToGenerateCount--;
+
+		sforce.connection.query("SELECT Id, Name, ContentType, Body FROM Attachment WHERE Id ='" + attachmentId + "'", {
+			onSuccess : function(result) {
+			    	result = result.records;
+			    	incrementProgressBar(Math.min(95, 100/attachmentsToGenerateCount));
+            		attachmentsToGenerateCount--;
+
+			    	jQuery('#generate-pdf-canvas-container').append('<div style=""><canvas id="pdf-canvas' + result.Id + '"></canvas></div>');
+
+							if (result.ContentType == pdfGenerationSettings.PdfContentType)
+							{
+							    var _thePdf;
+
+								var pdfjsLib = window['pdfjs-dist/build/pdf'];
+
+								// The workerSrc property shall be specified.
+								pdfjsLib.GlobalWorkerOptions.workerSrc = '{!URLFOR($Resource.pdfjs, '/pdfjs-dist/build/pdf.worker.js')}';
+
+							    var loadingTask = pdfjsLib.getDocument({data:atob(result.Body)});
+
+                                loadingTask.promise.then(function(pdf) {
+                                    _thePdf = pdf;
+                                    var pageNumber = 1;
+                                    convertPdfPageToPng(_thePdf, pageNumber, result);
+                                });
+                            }
+                            else //assume image
+                            {
+                                var image = new Image();
+
+                                image.onload = function() {
+                                  var canvasId = '#pdf-canvas' + result.Id;
+				                  var canvas = jQuery(canvasId)[0];
+                                  var context = canvas.getContext('2d');
+
+                                  var w = pdfGenerationSettings.Width;
+                                  var h = pdfGenerationSettings.Height;
+
+                                  // get the scale
+                                  var scale = Math.min(w / image.width, h / image.height);
+
+                                  canvas.width = image.width * scale;
+	                              canvas.height = image.height * scale;
+                                  context.drawImage(image, 0, 0, image.width * scale, image.height * scale);
+
+                                  var dataURL = canvas.toDataURL('image/jpeg', pdfGenerationSettings.ImageQuality);
+
+                                  //thePdfToDownload.text(result.Name, 20, 20);
+                                  thePdfToDownload.addImage(dataURL, 'jpeg', 20, 50, canvas.width / 2, canvas.height / 2,null, pdfGenerationSettings.Compression);
+
+                                  jQuery(canvasId).closest('div').empty();
+
+                                  processNextAttachment();
+                                };
+								image.onerror = function() {
+
+									console.log('Error loading image:');
+									console.log(this.src);
+        						}
+
+								image.src = 'data:' + result.ContentType + ';base64,' + result.Body;
+                            }
+   			},
+			onFailure : function(error) {
+			    alert(error);
+   			}
+		  });
+ 	}
+
+	function convertPdfPageToPng(pdfObj, pageNumber, attachment)
+	{
+		pdfObj.getPage(pageNumber).then(function(page) {
+				console.log('Page ' + pageNumber + ' loaded');
+				jQuery('#generate-pdf-message').text(attachment.Name + ' :Converting page ' + pageNumber);
+				var scale = pdfGenerationSettings.Scale
+				var viewport = page.getViewport(scale);
+				var canvasId = '#pdf-canvas' + attachment.Id;
+				var canvas = jQuery(canvasId)[0];
+				var context = canvas.getContext('2d');
+				canvas.height = viewport.height;
+				canvas.width = viewport.width;
+
+				var renderContext = {canvasContext: context, viewport: viewport};
+
+				var renderTask = page.render(renderContext);
+				renderTask.promise.then(function () {
+
+					var dataURL = canvas.toDataURL('image/jpeg', pdfGenerationSettings.ImageQuality);
+
+                    thePdfToDownload.addImage(dataURL, 'jpeg', 20, 50, canvas.width / 2, canvas.height / 2, null, pdfGenerationSettings.Compression);
+
+                    if (pageNumber < pdfObj.numPages)
+                    {
+					    addPageToPdf(pdfGenerationSettings.PageType);
+					    convertPdfPageToPng(pdfObj, pageNumber + 1, attachment);
+					}
+					else
+					{
+					    jQuery(canvasId).closest('div').empty();
+					    processNextAttachment();
+					}
+				});
+			});
+	}
+
+	function addPageToPdf(pageType)
+	{
+		thePdfToDownload.addPage(pageType);
+
+		pagesCounter++;
+
+		if (headerFooterOptions.showFooter && headerFooterOptions.footerText != null)
+		{
+			thePdfToDownload.setFontSize(10);
+
+			var splitFooter = thePdfToDownload.splitTextToSize(headerFooterOptions.footerText, 480);
+			thePdfToDownload.text(splitFooter, 20, thePdfToDownload.internal.pageSize.height - (10 * splitFooter.length), null, null, 'left');
+   		}
+
+   		if (headerFooterOptions.showPageNumbers)
+		{
+			var pageNumberText = '{!$Label.PdfPage} ' + pagesCounter;
+
+			thePdfToDownload.setFontSize(10);
+			thePdfToDownload.text(pageNumberText, thePdfToDownload.internal.pageSize.width - 30, thePdfToDownload.internal.pageSize.height - 10, null, null, 'right');
+		}
+ 	}
+
+	</script>
+</apex:page>

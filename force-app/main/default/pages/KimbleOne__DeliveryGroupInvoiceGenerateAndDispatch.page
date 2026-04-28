@@ -1,0 +1,405 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" recordSetVar="DeliveryGroups" extensions="KimbleOne.DeliveryGroupInvGenAndDispatchCntrllr" showHeader="true" sidebar="false">
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+</apex:define>
+     
+<apex:define name="Content">
+
+<style>
+		.overall-status
+		{
+			width: 90% !important;
+		}
+		.Pending 
+		{
+			background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'pending16.gif')}');
+		}
+		.Processing 
+		{
+			background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'running16.gif')}');
+		}
+		.Completed 
+		{
+			background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'completed16.gif')}');
+		}
+		.Failed 
+		{
+			background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'failed16.gif')}');
+		}
+		.status-cell
+		{
+			width: 16px;
+			height: 16px;
+			display: block;
+		}
+		
+        .filterItem
+        {
+            padding-left: 20px;
+            background-repeat: no-repeat;
+            padding-right: 12px;
+            height: 18px;
+            display: block;
+            line-height: 18px;
+        }
+        .Pending
+        {
+            background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'pending16.gif')}');
+        }
+        .Processing
+        {
+            background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'running16.gif')}');
+        }
+        .Completed
+        {
+            background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'completed16.gif')}');
+        }
+        .Failed
+        {
+            background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'failed16.gif')}');
+        }
+        .btn-container {
+            margin-bottom: 6px;
+        }
+	</style>
+
+    <apex:form id="TheForm">
+        <apex:outputPanel >
+            <apex:pageBlock title="{!$Label.kimbleone__generatbatchinvoices}">
+                <apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__selectinvoicegenerationdetails}" columns="2">
+                    
+                    <apex:pageBlockSectionItem >
+                        <apex:outputText value="{!$Label.kimbleone__invoicefromdate}"/>
+                        <apex:inputField value="{!TheGlobalFilter.InvoiceFromDate.KimbleOne__InputDate__c}" styleClass="kimbleDatePicker" onChange="filterChange();"/>
+                    </apex:pageBlockSectionItem>
+        
+                    <apex:pageBlockSectionItem >
+                        <apex:outputText value="{!$ObjectType.KimbleOne__Invoice__c.fields.KimbleOne__InvoiceDate__c.label}"/>
+                        <apex:inputField required="true" value="{!TheGlobalFilter.InvoiceDate.KimbleOne__InputDate__c}" styleClass="kimbleDatePicker" onChange="filterChange();"/>
+                    </apex:pageBlockSectionItem>
+
+                    <apex:pageBlockSectionItem >
+                        <apex:outputText value="{!$Label.kimbleone__invoiceuptodate}"/>
+                        <apex:inputField value="{!TheGlobalFilter.InvoiceUpToDate.KimbleOne__InputDate__c}" styleClass="kimbleDatePicker" onChange="filterChange();"/>
+                    </apex:pageBlockSectionItem>
+
+                    <apex:pageBlockSectionItem >
+                        <apex:outputText value="{!$ObjectType.KimbleOne__InvoiceableItem__c.label} {!$Label.kimbleone__typelabel}"/>
+                        <apex:selectList styleClass="invoice-scope-dropdown" value="{!TheGlobalFilter.ItemType}" size="1" multiselect="false" onChange="filterChange();">
+                            <apex:selectOptions value="{!FilterItemTypes}"/>
+                        </apex:selectList>
+                    </apex:pageBlockSectionItem>
+                    
+                    <apex:pageBlockSectionItem rendered="{!DisplayGenerateInvoicePerElement}">
+                        <apex:outputText value="{!$Label.kimbleone__genericlabel09}"/>
+                        <apex:inputField value="{!GenerateInvoicePerElement.KimbleOne__InputCheckbox__c}" onChange="filterChange();"/>
+                    </apex:pageBlockSectionItem>
+                    
+                    <apex:pageBlockSectionItem rendered="{!DisplayGenerateInvoicePerPO}">
+                        <apex:outputText value="{!$Label.kimbleone__genericlabel10}"/>
+                        <apex:inputField value="{!GenerateInvoicePerPO.KimbleOne__InputCheckbox__c}" onChange="filterChange();"/>
+                    </apex:pageBlockSectionItem>
+                    
+                </apex:pageblockSection>
+
+                <apex:pageBlockSection title="{!$Label.kimbleone__attachmentoptionslabel}" columns="2">
+                    <apex:pageBlockSectionItem rendered="{!CustomDownloadsEnabled}">
+                        <apex:inputField value="{!IncludeTimeEntrySummaryAttachment.KimbleOne__InputCheckbox__c}" />
+                        <apex:outputLabel value="{!$Label.kimbleone__includetimeentrysummaryattachmentlabel}"/>
+                    </apex:pageBlockSectionItem>
+
+                    <apex:pageBlockSectionItem rendered="{!CustomDownloadsEnabled}">
+                        <apex:outputLabel for="timeEntryDownloadTypes" value="{!$Label.kimbleone__typelabel}" />
+                        <apex:selectList id="timeEntryDownloadTypes" value="{!TimeEntryDownloadType}" styleClass="downloadType" size="1">
+                            <apex:selectOptions value="{!TheTimeEntryDownloadTypes}"/>
+                        </apex:selectList>
+                    </apex:pageBlockSectionItem>
+
+                    <apex:pageBlockSectionItem >
+                        <apex:inputField value="{!IncludeExpenseSummaryAttachment.KimbleOne__InputCheckbox__c}" />
+                        <apex:outputLabel value="{!$Label.kimbleone__includeexpensesummaryattachmentlabel}"/>
+                    </apex:pageBlockSectionItem>
+
+                    <apex:pageBlockSectionItem rendered="{!CustomDownloadsEnabled}">
+                        <apex:outputLabel for="expenseItemDownloadTypes" value="{!$Label.kimbleone__typelabel}" />
+                        <apex:selectList id="expenseItemDownloadTypes" value="{!ExpenseItemDownloadType}" styleClass="downloadType" size="1">
+                            <apex:selectOptions value="{!TheExpenseItemDownloadTypes}"/>
+                        </apex:selectList>
+                    </apex:pageBlockSectionItem>
+
+                    <apex:pageBlockSectionItem rendered="{!!CustomDownloadsEnabled}"/>
+
+                    <apex:pageBlockSectionItem >
+                        <apex:inputField value="{!IncludeExpenseReceipts.KimbleOne__InputCheckbox__c}" />
+                        <apex:outputLabel value="{!$Label.kimbleone__includeexpensereceiptslabel}"/>
+                    </apex:pageBlockSectionItem>
+
+                </apex:pageBlockSection>
+
+                <apex:pageBlockSection id="filter-results" title="{!$ObjectType.KimbleOne__DeliveryGroup__c.labelPlural}" columns="1" collapsible="false">
+
+                    <apex:pageMessage severity="warning" title="{!NoGroupsFoundMessage}" rendered="{!TheFilterItems.size == 0}"/>
+
+                    <apex:outputPanel layout="none" rendered="{!TheFilterItems.size != 0}">
+                        <div class="btn-container">
+                            <input id="startButton" type="button" class="btn DisableButtonWhileBusy" value="{!JSENCODE($Label.Label017)}" onClick="generateInvoices('{!GenerateInvoicePerPO.KimbleOne__InputCheckbox__c}','{!GenerateInvoicePerElement.KimbleOne__InputCheckbox__c}');"/>
+                            <input id="dispatchButton" type="button" style="display:none;" class="btn DisableButtonWhileBusy" value="{!JSENCODE($Label.Dispatch)} {!JSENCODE($ObjectType.Invoice__c.labelPlural)}" onClick="RedirectToDispatchInvoices();"/>
+                        </div>
+
+                        <apex:pageBlockTable value="{!TheFilterItems}" var="filterItem">
+
+                            <apex:column headervalue="{!$Label.kimbleone__statuslabel}">
+                                <span id="{!JSENCODE(filterItem.Key)}" class="filterItem Pending"/>
+                                <input id="{!JSENCODE(filterItem.Key)}_json" type="hidden" value="{!JSENCODE(filterItem.JSONString)}"/>
+                            </apex:column>
+                            <apex:column >
+                                <apex:facet name="header">
+                                    <apex:outputPanel layout="none">
+                                        <apex:outputLabel value="{!$Label.kimbleone__selectlabel}"/><br/>
+                                        <apex:inputCheckbox styleClass="select-all" onChange="selectAllCheckboxes(); checkForSelected();"/>
+                                    </apex:outputPanel>
+                                </apex:facet>
+                                <apex:inputCheckbox value="{!filterItem.IsSelected.KimbleOne__InputCheckbox__c}" styleClass="row-selector" onChange="checkForSelected();"/>
+                            </apex:column>
+                            <apex:column headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Label}" value="{!filterItem.DeliveryGroupName}"/>
+                            <apex:column headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Label}" value="{!filterItem.DeliveryElementName}" rendered="{!GenerateInvoicePerElement.KimbleOne__InputCheckbox__c}"/>
+                            <apex:column headerValue="{!$Label.kimbleone__fromlabel}" value="{!filterItem.MinDate.KimbleOne__InputDate__c}"/>
+                            <apex:column headerValue="{!$Label.kimbleone__tolabel}" value="{!filterItem.MaxDate.KimbleOne__InputDate__c}"/>
+                            <apex:column headerValue="{!$Label.kimbleone__currency}" value="{!filterItem.CurrencyCode}"/>
+                            <apex:column headerValue="{!$Label.kimbleone__serviceslabel}" value="{!filterItem.TotalServices.KimbleOne__InputDecimal__c}"/>
+                            <apex:column headerValue="{!$Label.kimbleone__expenseslabel}" value="{!filterItem.TotalExpenses.KimbleOne__InputDecimal__c}"/>
+                        </apex:pageBlockTable>
+                    </apex:outputPanel>
+                </apex:pageBlockSection>
+
+                <apex:actionFunction name="filterChange" action="{!FilterChange}" rerender="refresh-filter-items,filter-results" onComplete="refreshFilterItems();"/>
+                
+                <apex:actionFunction action="{!DispatchInvoices}" name="RedirectToDispatchInvoices"/>
+
+                <apex:pageBlockButtons location="bottom">
+                    <apex:commandButton styleclass="DisableButtonWhileBusy" action="{!ReturnToDeliveryGroupListView}" value="{!$Label.kimbleone__cancel}" rerender="TheForm"/>
+                </apex:pageBlockButtons>
+
+            </apex:pageBlock>
+
+            <apex:outputPanel id="refresh-filter-items">
+                <script>
+				    function refreshFilterItems()
+					{
+					    theFilterItems = kimble.parseJSON("{!JSENCODE(TheFilterItemsJSON)}");
+					    theMap = new Map();
+						var i;
+						for (i = 0; i < theFilterItems.length; i++)
+						{
+							theMap.set(theFilterItems[i].Key, theFilterItems[i]);
+			            }
+
+			            initialiseItems();
+			            
+			            for(i=0;i<$('input.row-selector:checked:not(.selected)').length;i++)
+                            $(this).toggleClass('selected');
+					}
+
+                    $('input.row-selector').each(function(){$(this).change(function(){
+                        $(this).toggleClass('selected');
+                        checkForSelected();
+                    })});
+                    
+				</script>
+            </apex:outputPanel>
+
+        </apex:outputPanel>
+    </apex:form>
+</apex:define>
+</apex:composition>
+
+<script>
+    jQuery(window).load(function(){
+        initialiseItems();
+        refreshFilterItems();
+    });
+    function initialiseItems()
+    {
+        SetupDatePicker();
+        checkForSelected();
+    }
+    function SetupDatePicker()
+    {
+        //dateFormat: 'yy-mm-dd',
+        jQuery('.kimbleDatePicker').datepicker({
+                dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+                showOtherMonths: true,
+                selectOtherMonths: true,
+                changeMonth: true,
+                changeYear: true});
+    }
+    
+    var theMap;
+    var theFilterItems;
+
+    function resetSelectAll()
+    {
+        jQuery("input.select-all").each(function(){jQuery(this).prop('checked', false);jQuery(this).removeClass('selected')});
+    }
+
+    function selectAllCheckboxes()
+    {
+        if(jQuery("input.select-all:visible")[0].checked)
+        {
+            jQuery("input.row-selector:visible").each(function(){jQuery(this).prop('checked', true);jQuery(this).addClass('selected')});
+        }
+        else
+        {
+            jQuery("input.row-selector:visible").each(function(){jQuery(this).prop('checked', false);jQuery(this).removeClass('selected')});
+        }
+    }
+
+    function checkForSelected()
+    {
+        if(jQuery("input.row-selector:checked").length > 0)
+        {
+            jQuery('[id$=\'startButton\']').prop('disabled',false);
+        }
+        else
+        {
+            jQuery('[id$=\'startButton\']').prop('disabled',true);
+        }
+    }
+
+    function generateInvoices(invoicePerPO, invoicePerElement)
+    {
+        var selectorObj = $('.row-selector.selected:first');
+
+        if (selectorObj.length)
+        {
+            var rowContext = jQuery(selectorObj).closest('tr');
+            var obj = jQuery(rowContext).find('.filterItem.Pending');
+            $(obj).removeClass('Pending');
+            $(obj).removeClass('Failed');
+            $(obj).addClass('Processing');
+            $(selectorObj).removeClass('selected');
+
+            if(invoicePerPO == 'false' || $(obj).hasClass('PO-item'))
+                executeJob(JSON.stringify(theMap.get($(obj).attr('id'))), obj, invoicePerPO, invoicePerElement);
+            else
+                createPurchaseOrderFilterItems(JSON.stringify(theMap.get($(obj).attr('id'))), obj, invoicePerPO, invoicePerElement, rowContext);
+ 
+        }
+        else
+        {
+            var failed = $('.filterItem.Failed:first');
+
+            if (failed.length)
+            {
+                $('#startButton').removeClass('btnDisabled');
+                $('#startButton').addClass('btn');
+                $('#startButton').val('{!$Label.kimbleone__generatelabel} {!$ObjectType.KimbleOne__Invoice__c.labelPlural}');
+                $('#startButton').attr('disabled', true);
+                 resetSelectAll();
+                 selectAllCheckboxes();
+                 
+                 if($('.Completed').length)
+                    $('dispatchButton').show();
+                        
+                $('span.filterItem').each(function() {
+                    $(this).addClass('Pending');
+                });
+            }
+            else
+            {
+                RedirectToDispatchInvoices();
+            }
+        }
+    }
+
+    function executeJob(jsonObj, obj, invoicePerPO, invoicePerElement)
+    {
+        Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupInvGenAndDispatchCntrllr.GenerateInvoice}',
+            jsonObj, invoicePerPO, invoicePerElement,
+                function(result, event){
+                     if (event.status)
+                     {
+                        var jobStatus = result['TheJob'][KimbleNamespaceWithUnderscores + 'Status__r'][KimbleNamespaceWithUnderscores + 'Enum__c']
+                        $(".filterItem[id='" + result.TheKey + "']").removeClass('Processing');
+                        $(".filterItem[id='" + result.TheKey + "']").addClass(jobStatus);
+
+                        if (jobStatus == 'Failed')
+                        {
+                            obj.attr('title', result['TheJob'][KimbleNamespaceWithUnderscores + 'Message__c']);
+                            
+                            if(invoicePerPO != 'false' && $(obj).hasClass('PO-item')) $('.Processing').addClass(jobStatus);
+                        }
+                        else if (jobStatus == 'Completed')
+                        {
+                            $(".filterItem[id='" + result.TheKey + "']").closest('tr').fadeOut(2000);
+                            
+                            if(invoicePerPO != 'false' && $('.Pending.PO-item').length == 0) 
+                            {
+                                $('.Processing').addClass(jobStatus);
+                                $('.Processing').closest('tr').fadeOut(2000);
+                            }   
+                        }
+
+                        generateInvoices(invoicePerPO, invoicePerElement);
+                     }
+                     else if (event.type === 'exception')
+                     {
+                        alert(event.message);
+                     }
+                     else
+                     {
+                        alert(event.message);
+                     }
+            },
+            {escape: true, timeout: 60000}
+        );
+    }
+    
+    function createPurchaseOrderFilterItems(jsonObj, obj, invoicePerPO, invoicePerElement, parentRow)
+    {
+        Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupInvGenAndDispatchCntrllr.CreatePurchaseOrderFilterItems}',
+            jsonObj, invoicePerPO, invoicePerElement,
+                function(result, event){
+                     if (event.status)
+                     {
+                        var html = '';
+                            
+                        for(i=0;i<Object.keys(result).length;i++)
+                        {
+                            var key = Object.keys(result)[i];
+                            var val = result[Object.keys(result)[i]];
+                            
+                            if(theMap.has(key)) continue;
+                            
+                            theMap.put(key, val);
+                            
+                            html += '<tr class="dataRow "><td class="dataCell " colspan="1"><span class="filterItem Pending PO-item " id="' + key + '"></span></td>';
+                            html += '<td class="dataCell " colspan="1"><input type="checkbox" class="row-selector selected" checked></td>';
+                            html += '<td class="dataCell " colspan="1">' + val.PurchaseOrderName + '</td>';
+                            html += '<td/><td/><td/><td/><td/></tr>';
+                        }
+                        
+                        $(html).insertAfter(parentRow);
+                        
+                        generateInvoices(invoicePerPO,invoicePerElement);
+                     }
+                     else if (event.type === 'exception')
+                     {
+                        $(obj).removeClass('Processing');
+                        $(obj).addClass('Failed');
+                        obj.attr('title', event.message);
+                        generateInvoices(invoicePerPO,invoicePerElement);
+                     }
+                     else
+                     {
+                        alert(event.message);
+                     }
+            },
+            {escape: true, timeout: 60000}
+        );
+    }
+</script>
+
+</apex:page>

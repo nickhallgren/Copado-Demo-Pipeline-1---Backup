@@ -1,0 +1,702 @@
+<apex:page standardController="KimbleOne__Proposal__c" extensions="KimbleOne.ProposalDashboardController,KimbleOne.TooltipsController" sidebar="false" >
+
+	<apex:composition template="KimbleOne__SiteMaster">
+
+		<apex:define name="Menu">
+			<c:Menu DefaultHelpPage="MaintainProposalDetails.html" MenuContextType="{!IF(KimbleOne__Proposal__c.AcceptanceType__r.KimbleOne__Enum__c = 'Approval', 'ChangeOrder', 'Proposal')}"  MenuContextId="{!IF(KimbleOne__Proposal__c.AcceptanceType__r.KimbleOne__Enum__c = 'Approval', TheChangeOrder.Id, TheProposal.Id)}" MenuContextName="{!TheProposal.Name}" />
+		</apex:define>
+		     
+		<apex:define name="Content">
+			<!-- Ajax loaded pages don't load external resources so they have to be loaded in the parent page -->
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'RiskStyle.css')}"/>
+ 			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleJS, 'Charm.js')}"/>
+
+			<!-- Kimble Guidance -->
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+			<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+				<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/ProposalDashboardNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+				<apex:outputPanel layout="none" rendered="{!ProposalDashboardTipOverrideEnabled}">
+					<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+				</apex:outputPanel>
+			</apex:outputPanel>
+			
+            <chatter:feedWithFollowers entityId="{!KimbleOne__Proposal__c.Id}"/>
+
+			<apex:outputPanel id="ProposalDashboard" layout="block">
+
+            <div id="dashboard-container">
+ 		  		<div id="proposal-title">
+					<apex:outputPanel id="ProposalCard" layout="none">
+					<div id="ProposalItemsErrors">
+           		<apex:pageMessages escape="false"/>
+           	</div>
+					<div class="title-card-container">
+					<div class="title-card">
+						<div class="title-card-heading" >
+							<div class="title-card-heading-icon">
+								<div class="fa fa-square kimble-probability {!JSINHTMLENCODE(TheProposal.ForecastStatus__r.StyleClass__c)}" title="{!JSINHTMLENCODE(TheProposal.ForecastStatus__r.Name)}"></div>
+							</div>
+							<div class="title-card-heading-text">
+								<apex:outputText value="{!TheProposal.KimbleOne__ShortName__c}" title="{!TheProposal.KimbleOne__ShortName__c}"/>
+							</div>
+						</div>
+						
+						<div class="title-card-body">
+				  			<apex:outputPanel layout="none" rendered="{!IsProposalInProgress && ISBLANK(TheChangeOrder)}">
+				  			<div class="title-card-body-field">
+		
+								<apex:outputPanel layout="block" styleclass="toggle-forecast-level fixed-toggle fa fa-toggle-on fa-2 suppress-on fa-rotate-90" rendered="{!TheProposal.KimbleOne__ForecastAtDetailedLevel__c}" title="{!$Label.kimbleone__detailedlevelforecastheadinglabel}"></apex:outputPanel>
+								<span class="forecast-level-switch-container">
+					  				<apex:outputPanel layout="block" styleclass="toggle-forecast-level fa fa-toggle-on fa-2 suppress-on fa-rotate-270" rendered="{!!TheProposal.KimbleOne__ForecastAtDetailedLevel__c && $ObjectType.KimbleOne__Proposal__c.updateable}" title="{!$Label.kimbleone__detailedlevelforecastswitchheadinglabel}"></apex:outputPanel>
+		
+					  				<apex:outputPanel styleClass="tool-tip-content" >
+		
+										<apex:outputPanel styleClass="tool-tip-content-container" title="{!$Label.kimbleone__detailedlevelforecastswitchheadinglabel}" rendered="{!!TheProposal.KimbleOne__ForecastAtDetailedLevel__c}">
+											<apex:outputText styleClass="message-text" value="{!$Label.kimbleone__detailedlevelforecastswitchmessage}" />
+											
+											<apex:outputPanel rendered="{!ISBLANK(IncompleteElementsMessage)}">
+												<div>
+													<span class="tool-tip-inline-icon tool-tip-warn fa fa-exclamation-triangle" style="vertical-align: top;"></span>
+													<apex:outputText styleClass="message-text additional-details-text" value="{!$Label.kimbleone__detailedlevelforecastswitchwarningmessage}" />
+												</div>
+												
+												<div class="tool-tip-form-buttons">
+													<input id="switchToLowLevel" class="btn"  type="button" onclick="jQuery('.toggle-forecast-level').parent().parent().addClass('Loading').children().hide();jQuery('.forecast-level-switch-container').qtip('hide');toggleForecastLevel();" value="{!$Label.DetailedLevelForecastSwitchButtonLabel}"/>
+													<input id="cancelSwitchToLowLevel" class="btn"  type="button" onclick="cancelForecastLevelPopup();" value="{!$Label.Cancel}"/>
+												</div>
+											</apex:outputPanel>
+											
+											<apex:outputPanel rendered="{!!ISBLANK(IncompleteElementsMessage)}">
+												<div>
+													<span class="tool-tip-inline-icon tool-tip-warn fa fa-exclamation-triangle" style="vertical-align: top;"></span>
+													<apex:outputText styleClass="message-text additional-details-text" value="{!IncompleteElementsMessage}" />
+												</div>
+												
+												<div class="tool-tip-form-buttons">
+													<input id="cancelSwitchToLowLevel" class="btn"  type="button" onclick="cancelForecastLevelPopup();" value="{!$Label.Ok}"/>
+												</div>
+											</apex:outputPanel>
+											
+										</apex:outputPanel>
+		
+									</apex:outputPanel>
+				  				</span>
+		  					</div>
+		  					</apex:outputPanel>
+		  					<div id="forecastStatusOutput" class="title-card-body-field">
+		  						<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ForecastStatus__c.Label}" />
+		  						<span ><apex:outputField styleClass="center-aligned-block" value="{!TheProposal.ForecastStatus__r.Name}"/></span>
+		  					</div>
+		  					<div id="acceptanceDateOutput" class="title-card-body-field">
+		  						<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__AcceptanceDate__c.Label}" />
+		  						<span ><apex:outputField styleClass="center-aligned-block" value="{!TheProposal.KimbleOne__AcceptanceDate__c}"/></span>
+		  					</div>
+							<div id="contractRevenueOutput" class="title-card-body-field">
+								<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ContractRevenue__c.Label}" />
+								<span ><apex:outputField id="proposal-contract-revenue" styleClass="center-aligned-block" value="{!TheProposal.KimbleOne__ContractRevenue__c}"/></span>
+							</div>
+							<div id="contractCostOutput" class="title-card-body-field">
+								<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ContractCost__c.Label}" />
+			  					<span ><apex:outputField styleClass="center-aligned-block" value="{!TheProposal.KimbleOne__ContractCost__c}"/></span>
+							</div>
+							<div id="contractMarginOutput" class="title-card-body-field">
+								<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ContractMargin__c.Label}" />
+			  					<span ><apex:outputField styleClass="center-aligned-block" value="{!TheProposal.KimbleOne__ContractMargin__c}"/></span>
+							</div>
+				  			<div id="embeddedCharmsContainer" pageSource="ProposalCharmsCard"></div>
+						</div>
+					</div>
+					</div>
+		  			</apex:outputPanel>
+		  		</div>
+		  		<div class="full-width-dashboard-container">
+		  		<apex:repeat value="{!TheProposalGroupStructure.TheGroups}" var="group">
+					
+						<div id="financialSummaryContainer" class="cardContainer">
+
+							<div class="card inverted variable-width min-horizontal-padding">    
+								<div class="cardHeading inverted">
+									<h3 class="cardTitle"><apex:outputText value="{!$Label.kimbleone__deliverygroupfinancialsummary}"/> - <a class="undecorated-link" href="/{!group.Id}"><apex:outputText value="{!group.Name}"/></a></h3>
+								</div>
+							
+								<div class="cardBody">
+									<table class="list cardBodyTable" border="0" cellpadding="0" cellspacing="0">
+										<thead>
+											<tr class="headerRow">
+												<th id="deliveryElementHeader" class="headerRow"><h2>{!$ObjectType.DeliveryElement__c.Fields.Name.Label}</h2></th>
+												<th id="productHeader" class="headerRow"><h2>{!$ObjectType.DeliveryElement__c.Fields.Product__c.Label}</h2></th>
+												<th id="revenueHeader" class="headerRow centerAlignDataCell"><h2>{!$Label.RevenueLabel}</h2></th>
+												<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+													<th id="costHeader" class="headerRow centerAlignDataCell"><h2>{!$Label.CostLabel}</h2></th>
+												</apex:outputPanel>
+											</tr>
+										</thead>
+										<tbody>
+											<apex:repeat value="{!group.TheElements}" var="element">
+												<apex:outputPanel layout="none" rendered="{!element.IsPartOfProposal}">
+												<tr class="dataRow">
+													<td class="dataCell label-cell"><apex:outputText value="{!element.Name}"/></td>
+													<td class="dataCell label-cell"><apex:outputText value="{!element.ProductName}"/></td>
+													<td class="rightAlignDataCell currency-cell">
+														<apex:outputPanel layout="none" rendered="{!element.HasRevenue}">
+															<apex:outputText styleclass="kimble-format-currency" html-data-currency="{!element.CurrencyISOCode}" value="{!element.Revenue}"/>
+															<apex:outputText value="{!IF(!TheProposal.KimbleOne__ForecastAtDetailedLevel__c, '?', '')}"/>
+														</apex:outputPanel>
+													</td>
+													<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+														<td class="rightAlignDataCell currency-cell">
+															<apex:outputPanel layout="none" rendered="{!element.HasCost}">
+																<apex:outputText styleclass="kimble-format-currency" html-data-currency="{!element.CurrencyISOCode}" value="{!element.Cost}"/>
+																<apex:outputText value="{!IF(!TheProposal.KimbleOne__ForecastAtDetailedLevel__c, '?', '')}"/>
+															</apex:outputPanel>
+														</td>
+													</apex:outputPanel>
+												</tr>
+												<apex:repeat value="{!element.ScopedWithChildElements}" var="childElement">
+													<tr>
+														<td class="dataCell label-cell ">
+															<span class="scoped-with-element-ind fa fa-angle-right"/>
+															<span class="scoped-with-element"><apex:outputText value="{!childElement.Name}"/></span>
+														</td>
+														<td class="dataCell label-cell"><apex:outputText value="{!childElement.ProductName}"/></td>
+														<td class="rightAlignDataCell currency-cell">
+															<apex:outputPanel layout="none" rendered="{!childElement.HasRevenue}">
+																<apex:outputText styleclass="kimble-format-currency" html-data-currency="{!childElement.CurrencyISOCode}" value="{!childElement.Revenue}"/>
+																	<apex:outputText value="{!IF(!TheProposal.KimbleOne__ForecastAtDetailedLevel__c, '?', '')}"/>
+															</apex:outputPanel>
+														</td>
+														<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+															<td class="rightAlignDataCell currency-cell">
+																<apex:outputPanel layout="none" rendered="{!childElement.HasCost}">
+																	<apex:outputPanel layout="none" rendered="{!childElement.IsRateOverridden}">
+																		<span title="{!$Label.CostOverriddenLabel}" class="fa fa-info-circle tool-tip-inline-icon tool-tip-info"></span>
+																	</apex:outputPanel>								
+																	<apex:outputText styleclass="kimble-format-currency" html-data-currency="{!childElement.CurrencyISOCode}" value="{!childElement.Cost}"/>
+																	<apex:outputText value="{!IF(!TheProposal.KimbleOne__ForecastAtDetailedLevel__c, '?', '')}"/>
+																</apex:outputPanel>									
+															</td>
+														</apex:outputPanel>
+													</tr>												
+												</apex:repeat>
+												</apex:outputPanel>
+												<apex:repeat var="secondaryElement" value="{!element.RaisedAgainstElements}">
+													<apex:outputPanel layout="none" rendered="{!secondaryElement.IsPartOfProposal}">
+														<tr class="dataRow">
+															<td class="dataCell label-cell"><apex:outputText value="{!secondaryElement.Name}"/></td>
+															<td class="dataCell label-cell"><apex:outputText value="{!secondaryElement.ProductName}"/></td>
+															<td class="rightAlignDataCell currency-cell">
+																<apex:outputPanel layout="none" rendered="{!secondaryElement.HasRevenue}">
+																	<apex:outputText styleclass="kimble-format-currency" html-data-currency="{!secondaryElement.CurrencyISOCode}" value="{!secondaryElement.Revenue}"/>
+																	<apex:outputText value="{!IF(!TheProposal.KimbleOne__ForecastAtDetailedLevel__c, '?', '')}"/>
+																</apex:outputPanel>
+															</td>
+															<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+																<td class="rightAlignDataCell currency-cell">
+																	<apex:outputPanel layout="none" rendered="{!secondaryElement.HasCost}">
+																		<apex:outputPanel layout="none" rendered="{!secondaryElement.IsRateOverridden}">
+																			<span title="{!$Label.CostOverriddenLabel}" class="fa fa-info-circle tool-tip-inline-icon tool-tip-info"></span>
+																		</apex:outputPanel>	
+																		<apex:outputText styleclass="kimble-format-currency" html-data-currency="{!secondaryElement.CurrencyISOCode}" value="{!secondaryElement.Cost}"/>
+																		<apex:outputText value="{!IF(!TheProposal.KimbleOne__ForecastAtDetailedLevel__c, '?', '')}"/>
+																	</apex:outputPanel>									
+																</td>
+															</apex:outputPanel>
+														</tr>
+															<apex:repeat value="{!secondaryElement.ScopedWithChildElements}" var="childElement">
+																<tr>
+																	<td class="dataCell label-cell ">
+																		<span class="scoped-with-element-ind fa fa-angle-right"/>
+																		<span class="scoped-with-element"><apex:outputText value="{!childElement.Name}"/></span>
+																	</td>
+																	<td class="dataCell label-cell"><apex:outputText value="{!childElement.ProductName}"/></td>
+																	<td class="rightAlignDataCell currency-cell">
+																		<apex:outputPanel layout="none" rendered="{!childElement.HasRevenue}">
+																			<apex:outputText styleclass="kimble-format-currency" html-data-currency="{!childElement.CurrencyISOCode}" value="{!childElement.Revenue}"/>
+																				<apex:outputText value="{!IF(!TheProposal.KimbleOne__ForecastAtDetailedLevel__c, '?', '')}"/>
+																		</apex:outputPanel>
+																	</td>
+																	<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+																		<td class="rightAlignDataCell currency-cell">
+																			<apex:outputPanel layout="none" rendered="{!childElement.HasCost}">
+																				<apex:outputPanel layout="none" rendered="{!childElement.IsRateOverridden}">
+																					<span title="{!$Label.CostOverriddenLabel}" class="fa fa-info-circle tool-tip-inline-icon tool-tip-info"></span>
+																				</apex:outputPanel>	
+
+																				<apex:outputText styleclass="kimble-format-currency" html-data-currency="{!childElement.CurrencyISOCode}" value="{!childElement.Cost}"/>
+																				<apex:outputText value="{!IF(!TheProposal.KimbleOne__ForecastAtDetailedLevel__c, '?', '')}"/>
+																			</apex:outputPanel>									
+																		</td>
+				
+																	</apex:outputPanel>
+																</tr>												
+															</apex:repeat>
+															</apex:outputPanel>
+														
+											
+												</apex:repeat>
+											</apex:repeat>
+										</tbody>
+									</table>
+									<br/>
+								</div>
+							</div>
+							
+						</div>
+						
+						  		
+					  		
+		  		</apex:repeat>
+		  		
+		  		<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheProposalGroupStructure.TheMargins) && TheProposalGroupStructure.TheMargins.size > 0}">
+		  		<div id="marginSummaryContainer" class="cardContainer">
+					<div id="margin-summary" class="card inverted margin-summary-card min-horizontal-padding">    
+						<div class="cardHeading inverted">
+							<h3 class="cardTitle"><apex:outputText value="{!$Label.kimbleone__marginsummarylabel}"/></h3>
+						</div>
+					
+						<div class="cardBody">
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<table class="list" border="0" cellpadding="0" cellspacing="0">
+									<thead>
+										<tr class="headerRow">
+											<th class="dataCell"><h2></h2></th>
+											<th class="headerRow centerAlignDataCell"><h2>&nbsp;</h2></th>
+										</tr>
+									</thead>
+									<tbody>
+										<apex:repeat value="{!TheProposalGroupStructure.TheMargins}" var="marginLevel">
+											<tr class="dataRow">
+												<td class="currency-cell"><apex:outputText styleclass="margin-level-total" value="{!marginLevel.Name}"/></td>
+												<td class="rightAlignDataCell percentage-cell"><apex:outputText value="{!marginLevel.Percent}%"/></td>
+											</tr>
+										</apex:repeat>
+									</tbody>
+								</table>
+							</apex:outputPanel>
+						</div>
+					</div>
+						
+				</div>
+		  		</apex:outputPanel>
+		  		
+		  		</div>	
+		  		
+		  		<apex:outputPanel layout="none" rendered="{!ShowRiskManagementCards && !ISBLANK(TheProposalGroupStructure.TheRiskLevels) && TheProposalGroupStructure.TheRiskLevels.size > 0}">
+		  		<div class="card full-width min-horizontal-padding risk-assessment-card">
+					<div class="cardHeading inverted risk-header-title">
+						<h3 class="cardTitle"><apex:outputText value="{!$ObjectType.KimbleOne__RiskAssessment__c.Label}"/> - <a class="undecorated-link" href="/{!KimbleOne__Proposal__c.Id}"><apex:outputText value="{!KimbleOne__Proposal__c.Name}"/></a></h3>
+						
+						<div class="risk-header">
+							<table>
+								<tr id="riskSummarytr">
+								<apex:repeat value="{!TheProposalGroupStructure.TheRiskLevels}" var="theRiskSummaryLevel">
+	 								<td class="header-risk-summary-type-cell"><apex:outputText value="{!theRiskSummaryLevel.Name}"/></td>
+	 								<apex:outputPanel layout="none" rendered="{!!ISBLANK(theRiskSummaryLevel.SeverityName)}">
+	 									<td class="risk-attribute-cell header-risk-outcome-cell risk-outcome-cell {!JSENCODE(RiskSeverityStyleMap[theRiskSummaryLevel.SeverityName])}"><apex:outputText value="{!theRiskSummaryLevel.SeverityName}"/></td>
+	 								</apex:outputPanel>
+	 								<apex:outputPanel layout="none" rendered="{!ISBLANK(theRiskSummaryLevel.SeverityName)}">
+	 									<td class="risk-attribute-cell header-risk-outcome-cell risk-outcome-cell risk-severity-class-0"><apex:outputText value="-"/></td>
+	 								</apex:outputPanel>
+			   					</apex:repeat>
+								</tr>
+							</table>
+						</div>
+					</div>
+				</div>	
+				</apex:outputPanel>	
+            </div>
+            
+            <apex:form >
+				<apex:actionFunction action="{!ToggleForecastLevel}" name="toggleForecastLevel" rerender="ProposalDashboard" oncomplete="initialisePage()"></apex:actionFunction>
+				
+				<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+				<div style="display:none;" kimble-tip="null"></div>
+            </apex:form>
+            
+            </apex:outputPanel>
+
+			<script>	
+				jQuery(document).ready(function()
+				{					
+					var theContextId = '<apex:outputText value="{!ContextId}"/>';
+					
+					jQuery.each( jQuery('.dashboardContainer'), function(i, dashboardContainer) {
+							jQuery('div[pageSource]', dashboardContainer).each(function() {
+					   		var dashboardComponent = jQuery( this );
+					   		var pageSourceName = dashboardComponent.attr('pageSource');
+					   		
+					   		// kick off the population of the page with an ajax call
+							jQuery.ajax({ url: kimble.pages[pageSourceName] + theContextId})
+								.done(function(html) {
+									if(html != null && html != '')
+									{
+										jQuery(html).appendTo("#" + dashboardComponent.attr('id'));
+									}
+									else
+									{
+										// nothing to render in the component
+										// remove the container for this component to allow the page to re-flow
+										dashboardComponent.remove();
+									}
+								})
+								.fail(function(xhr, status, error) {
+									if(error !=null && error !="") {
+										console.log('ajax component load error: ' + error);
+										
+										// remove the container for this component to allow the page to re-flow
+										dashboardComponent.remove();
+									}								
+								})				
+					   });
+					})
+				});
+				
+		   		jQuery(window).load(function()
+				{
+					initialisePage();
+				});
+
+				function initialisePage()
+				{
+					initialiseDatesAndCurrencies();
+					initialiseHighLevelForecastSwitch();
+					initialisePageTips();
+				}
+				
+				function cancelForecastLevelPopup()
+				{
+					jQuery('.forecast-level-switch-container').qtip("hide");
+				}
+				
+				function initialiseHighLevelForecastSwitch()
+				{
+					jQuery('.forecast-level-switch-container').each(function() {
+						jQuery(this).qtip({
+							content:{
+								text:jQuery(this).children('.tool-tip-content'),
+								title:jQuery(this).children('.tool-tip-content').children('.tool-tip-content-container').attr('title'),
+								button: 'Close'
+							},
+							position: {
+					            adjust: {
+					                method: 'flip flip'
+					            },
+					            viewport: $(window)
+					        },
+					        show: {
+		      					event: 'click',
+		      					solo: true
+		   					},
+		   					hide: false,
+							style: {classes: 'qtip-light qtip-shadow qtip-rounded'}})
+					});	
+				}
+							
+				function initialiseDatesAndCurrencies()
+				{
+					kimble.formatDates();
+					kimble.formatCurrencies();
+				}
+				
+				/* Tooltips */
+				var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+				var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+				var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+				var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+				var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+				var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+			
+				function initialisePageTips()
+				{
+					ApplyTipAttributes();
+					initialiseTips();
+				}
+				
+				// add tip attributes to elements
+				function ApplyTipAttributes()
+				{
+					if(enableTips)
+					{
+						jQuery('[id$="financialSummaryContainer"]').attr('kimble-tip','Financials');
+						jQuery('[id$="deliveryElementHeader"]').attr('kimble-tip','FinDeliveryElement');
+						jQuery('[id$="productHeader"]').attr('kimble-tip','FinProduct').attr('kimble-tip-extended-text','FinProductExtendedText').attr('kimble-tip-help-link','ProductsServicesHelpLink');
+						jQuery('[id$="revenueHeader"]').attr('kimble-tip','FinRevenue');
+						jQuery('[id$="costHeader"]').attr('kimble-tip','FinCost');
+						jQuery('.risk-assessment-card').attr('kimble-tip','RiskAssessment').attr('kimble-tip-help-link','RisksHelpLink');
+						jQuery('[id$="riskSummarytr"]').attr('kimble-tip','RiskLevel').attr('kimble-tip-extended-text','RiskLevelExtendedText').attr('kimble-tip-help-link','RisksHelpLink');
+						jQuery('.toggle-forecast-level').attr('kimble-tip','ForecastLevelToggle').attr('kimble-tip-extended-text','ForecastLevelToggleExtendedText').attr('kimble-tip-help-link','SwitchForecastLevelHelpLink');
+						jQuery('[id$="forecastStatusOutput"]').attr('kimble-tip','ForecastStatus').attr('kimble-tip-help-link','UpdateForecastStatusHelpLink');
+						jQuery('[id$="acceptanceDateOutput"]').attr('kimble-tip','AcceptanceDate').attr('kimble-tip-extended-text','AcceptanceDateExtendedText');
+						jQuery('[id$="contractRevenueOutput"]').attr('kimble-tip','ContractRevenue').attr('kimble-tip-help-link','SwitchForecastLevelHelpLink');
+						jQuery('[id$="contractCostOutput"]').attr('kimble-tip','ContractCost').attr('kimble-tip-help-link','SwitchForecastLevelHelpLink');
+						jQuery('[id$="contractMarginOutput"]').attr('kimble-tip','MarginPct').attr('kimble-tip-help-link','ProposalMarginPercentageHelpLink');
+						jQuery('[id$="marginSummaryContainer"]').attr('kimble-tip','MarginSummary').attr('kimble-tip-extended-text','MarginSummaryExtendedText').attr('kimble-tip-help-link','ProposalMarginPercentageHelpLink');
+					}
+				}
+				
+				function updateTipsConfigSetting(newTipSetting)
+				{
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+						newTipSetting,
+							function(result, event){
+								if (event.status)
+								{
+									var data = {};
+									data.results = result;
+									loadGuidance();
+								}
+								else
+								{
+									alert(event.message);
+								}
+						},
+						{escape: false, timeout: 60000}
+					);
+				}
+			</script>	
+			
+			<style>						
+				#marginSummaryContainer {
+					display: table-cell;
+					height: 208px;
+				}
+				#financialSummaryContainer {
+					display: table-cell;
+					width: 100%;
+					height: 208px;
+				}
+				#financialSummaryContainer .card {
+					height: 99%;
+				}
+				
+				/* ensure that the financial summary and risk assessment spans the screen */
+				#riskAssessmentSummaryContainer, 
+				#riskAssessmentSummaryContainer .card,
+				.cardContainer .card
+				{
+					display: block;
+				}
+				
+				.full-width-dashboard-container {
+					display: table;
+					width: 100%;
+				  	margin-bottom: 5px;
+				}
+							
+				/*
+				    layout control
+				*/
+				
+				.ui-layout-center,.ui-layout-east, .ui-layout-west {
+				    padding: 0;
+				}
+				
+				.ui-layout-pane {
+					border: none;
+				}
+				
+				.ui-layout-east
+				{
+/* 					background-color: #F5F5F5; */
+				}
+				
+				.ui-layout-resizer
+				{
+					background: none;
+				}
+				
+				.ui-layout-content {
+				    padding: 0px;
+				}
+								
+				.cardBodyTable
+				{
+					width: 100%;
+				}
+				
+				/* override SF .message to fit in with dashboard style */
+				.message
+				{
+					margin: 3px 2px;
+				}
+				.dashboard-footer {
+					text-align: center;
+					background-color: #F5F5F5;
+					border-radius: 4px;
+					-webkit-box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+					box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+					padding-top: 3px;
+					margin-left: 2px;
+					margin-right: 2px;
+				}
+				.delivery-group-print-icon {
+					font-size: 18px;
+					position: relative;
+					left: -26px;
+					top: -8px;
+					color: #6F6F6F;
+				}
+				.delivery-program-indicator {
+					margin-left: 10px;
+					color: #428BCA;
+					font-size: 16px;
+				}
+				
+				.title-card {
+					padding: 4px 15px 4px 15px;
+				}
+				
+				.full-width {
+  				display: block;
+  			}
+  			.add-risk-icon {
+  				cursor: pointer;
+  				left: -10px;
+				position: relative;
+  			}
+  			.second-action-link {
+				margin-left: 6px;
+  			}
+  			.filter-text {
+				margin-bottom: 8px;
+			  	width: 100%;
+			}
+			.left-hand-panel {
+				display: inline-block;
+			}
+			.right-hand-panel {
+				display: inline-block;
+				position: relative;
+				top: 0;
+				vertical-align: top;
+				margin-left: 13px;
+			}
+			.inner-card {
+				min-width: 490px;
+			}
+			.risk-header {
+				text-align: right;
+				display: inline-block;
+				vertical-align: middle;
+				right: 14px;
+				position: absolute;
+				top: 4px;
+			}
+			.risk-header-title {
+				position: relative;
+			}
+			
+			.risk-summary-type {
+				border-bottom: 2px solid #bbb;
+				font-weight: bold;
+				font-style: italic;
+			}
+			.risk-summary-type-cell {
+				font-weight: bold;
+				font-style: italic;
+				border-bottom: 2px solid #bbb !important;
+			}
+			.overall-risk-summary-type-cell {
+				font-weight: bold;
+				font-size: 20px;
+			}
+			.header-risk-summary-type-cell {
+				font-size: 16px;
+				color: inherit;
+				font-family: inherit;
+				font-weight: 500;
+				line-height: 1.1;
+				padding-left: 34px;
+				padding-right: 15px;
+			}
+			.risk-template-table {
+				width: 700px !important;
+			}
+
+			.table-wrapper {
+				height: 355px;
+			  	overflow-y: auto;
+  				overflow-x: hidden;
+			}
+			.risk-summary-container {
+				display: inline-block;
+			}
+			.risk-severity-summary-container {
+				margin-left: 20px;
+			}
+			.cardBody {
+				margin-bottom: 10px;
+			}
+			
+			.risk-summary-table {
+				width: 100%;
+			}
+		   .margin-summary-card {
+				position: relative;
+				width: 158px;
+				min-width: 0px;
+			  	height: 99%;
+			}
+		    .currency-cell {
+		    	width: 110px;
+		    }
+		    .percentage-cell {
+		    	width: 90px;
+		    }
+		    .summary-level-cell {
+		    	padding-left: 20px !important;
+		    }
+		    .cardBodyTable {
+		    	width: 100%;
+		    }
+		    .margin-level-total {
+		    	font-weight: bold;
+		    }
+			.rightAlignDataCell {
+			    text-align: right;
+			}
+			.centerAlignDataCell {
+				text-align: center;
+			}
+			.scoped-with-element-ind {
+ 				padding-left: 5px;
+			}
+			.scoped-with-element {
+ 				padding-left: 5px;
+			}			
+			.tool-tip-info {
+				color: #428BCA;
+			}
+			
+			/* forecast level switch and popup */
+			.Loading 
+			{	
+				background-image: url('{!URLFOR($Resource.JobImages, 'running16.gif')}') !important;
+				background-repeat:no-repeat !important;
+				background-position: 50%, 50%;
+			}
+			.Loading>span
+			{
+				display:none;
+			}
+							
+			.tool-tip-inline-icon {
+				font-size: 15px;
+				display: inline-block;
+			    vertical-align: bottom;
+			    margin-left: 3px;
+			}
+			.additional-details-text {
+			    width: 210px;
+			}
+			.fixed-toggle {
+				cursor: default;
+			}
+			</style>
+		</apex:define>
+	</apex:composition>
+</apex:page>

@@ -1,0 +1,790 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.DeliveryGroupDashboardController,KimbleOne.TooltipsController" sidebar="false" >
+
+	<apex:composition template="KimbleOne__SiteMaster">
+
+		<apex:define name="Menu">
+			<c:Menu DefaultHelpPage="DeliveryEngagements.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryGroup__c.Id}" MenuContextName="{!KimbleOne__DeliveryGroup__c.Name}" />
+		</apex:define>
+
+		<apex:define name="Content">
+			<!-- Ajax loaded pages don't load external resources so they have to be loaded in the parent page -->
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__jQueryBarGraph, 'jqBarGraph.1.1.min.js')}"/>
+
+			<apex:outputPanel rendered="{!ICSEnabled}">
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__ChartJs)}"/>
+			</apex:outputPanel>
+
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'RiskStyle.css')}"/>
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleJS, 'Charm.js')}"/>
+
+			<!-- Kimble Guidance -->
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+			<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+				<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/DeliveryGroupDashboardNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+				<apex:outputPanel layout="none" rendered="{!DeliveryGroupDashboardTipOverrideEnabled}">
+					<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+				</apex:outputPanel>
+			</apex:outputPanel>
+
+			<chatter:feedWithFollowers entityId="{!KimbleOne__DeliveryGroup__c.Id}"/>
+
+			<div id="dashboard-layout" class="dashboardLayout">
+				<div id="dashboardContainer" class="dashboardContainer">
+					<div id="delivery-group-title">
+						<apex:outputPanel id="DeliveryGroupCard" layout="none">
+							<div class="title-card-container">
+								<div class="title-card">
+									<div class="title-card-heading" >
+										<div class="title-card-heading-icon">
+											<apex:variable value="{!KimbleOne__DeliveryGroup__c.ForecastStatus__r.KimbleOne__StyleClass__c}" var="StyleClassValue"/>
+											<apex:variable value="{!KimbleOne__DeliveryGroup__c.ForecastStatus__r.Name}" var="GroupForecastStatus"/>
+											<div class="fa fa-square kimble-probability {!JSENCODE(StyleClassValue)}" title="{!JSENCODE(GroupForecastStatus)}"></div>
+										</div>
+										<div class="title-card-heading-text">
+											<apex:outputText title="{!KimbleOne__DeliveryGroup__c.Name}" value="{!KimbleOne__DeliveryGroup__c.Name}"/>
+											<apex:outputPanel layout="none" rendered="{!!ISBLANK(KimbleOne__DeliveryGroup__c.KimbleOne__DeliveryProgram__c)}">
+												<apex:outputLink styleClass="undecorated-link delivery-program-indicator fa fa-link" value="/{!KimbleOne__DeliveryGroup__c.KimbleOne__DeliveryProgram__c}" title="{!$ObjectType.KimbleOne__DeliveryProgram__c.Fields.Name.Label}: {!JSENCODE(KimbleOne__DeliveryGroup__c.DeliveryProgram__r.Name)}"/>
+											</apex:outputPanel>
+											<apex:outputPanel layout="none" rendered="{!deliveryPortfolios.size == 1}">
+												<apex:repeat value="{!deliveryPortfolios}" var="deliveryPortfolio">
+													<apex:outputLink styleClass="undecorated-link delivery-portfolio-indicator fa fa-list" value="/{!deliveryPortfolio.Id}" title="{!$ObjectType.KimbleOne__DeliveryPortfolio__c.Label}: {!JSENCODE(deliveryPortfolio.Name)}"/>
+												</apex:repeat>
+											</apex:outputPanel>
+											<apex:outputPanel layout="none" rendered="{!deliveryPortfolios.size > 1}">
+												<div data-floating-dropdown="#delivery-portfolios-menu-data" class="delivery-portfolio-indicator fa fa-list burger-menu" title="{!$ObjectType.DeliveryPortfolio__c.LabelPlural}"></div>
+												<div id="delivery-portfolios-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-left" style="margin-top:1px">
+													<ul class="floating-dropdown-menu">
+														<apex:repeat value="{!deliveryPortfolios}" var="deliveryPortfolio">
+															<li><apex:outputLink styleClass="actionLink" value="/{!deliveryPortfolio.Id}"><apex:outputText value="{!deliveryPortfolio.Name}"/></apex:outputLink></li>
+														</apex:repeat>
+													</ul>
+												</div>
+											</apex:outputPanel>
+										</div>
+									</div>
+
+									<div class="title-card-body">
+										<div id="embeddedCharmsContainer" context-id="{!KimbleOne__DeliveryGroup__c.Id}" pageSource="DeliveryGroupCharmsCard"><i class="charm-loading fa fa-circle-o-notch fa-spin fa-3x fa-fw"/></div>
+									</div>
+								</div>
+							</div>
+						</apex:outputPanel>
+					</div>
+					<apex:pageMessages escape="false"/>
+
+					<apex:repeat value="{!DashboardLayout.Rows}" var="dashboardRow">
+						<div class="cardRowContainer">
+							<apex:repeat value="{!dashboardRow.Itms}" var="dashboardItem">
+								<div context-id="{!ContextId}" pageSource="{!dashboardItem.Src}" class="cardContainer"></div>
+							</apex:repeat>
+						</div>
+					</apex:repeat>
+					<apex:repeat value="{!DashboardLayout.Itms}" var="dashboardItem">
+						<div context-id="{!ContextId}" pageSource="{!dashboardItem.Src}" class="cardContainer"></div>
+					</apex:repeat>
+				</div>
+
+				<div class="dashboard-footer">
+					<apex:outputLink style="text-decoration: none;" styleClass="edit-layout-btn" value="{!$Page.KimbleOne__DeliveryGroupDashboardEdit}?id={!KimbleOne__DeliveryGroup__c.Id}" title="{!$Label.kimbleone__editlayout}" rendered="{!ShowDashboardEdit}">
+						<div id="editDeliveryGroupDashboardLayoutBtn" class="footer-button {!IF(CustomDashboardLayout, 'highlight', '')}">
+							<i class="fa fa-th delivery-group-layout-edit-icon"></i>
+						</div>
+					</apex:outputLink>
+					<apex:outputLink style="text-decoration: none;" styleClass="print-btn" value="{!$Page.KimbleOne__DeliveryGroupHomePrint}?id={!KimbleOne__DeliveryGroup__c.Id}" title="{!$Label.kimbleone__print}" rendered="{!ShowEngagementPrint}">
+						<div class="footer-button">
+							<i class="fa fa-print delivery-group-print-icon"></i>
+						</div>
+					</apex:outputLink>
+				</div>
+			</div>
+			<div id="DeliveryElementPopup" style="display: none">
+				<apex:outputPanel id="DeliveryElementPopupPanel">
+					<apex:form >
+						<apex:inputText styleClass="DefaultCurrencyForDeliveryElementUpdate" style="display:none" value="{!FinancialCardCurrency}"/>
+						<apex:pageBlock >
+							<div id="DeliveryElementPopupErrors">
+								<apex:pageMessages escape="false"/>
+							</div>
+							<apex:pageBlockButtons location="bottom">
+								<apex:commandButton action="{!updateDeliveryElement}"
+													value="{!$Label.kimbleone__save}"
+													oncomplete="if(hideModalBoxyWithErrorCheck('#DeliveryElementPopupErrors'))window.location = window.location;"
+													styleclass="DisableButtonWhileBusy"
+													reRender="DeliveryElementPopupPanel"
+													rendered="{!OR(OR(theDeliveryElementObject.Product__r.ProductDomain__r.RevenueGenerationModel__r.IsUsageGenerated__c, theDeliveryElementObject.Product__r.ProductDomain__r.CostGenerationModel__r.IsUsageGenerated__c),
+                                                    theDeliveryElementObject.Product__r.ProductDomain__r.CostGenerationModel__c != null,
+                                                    theDeliveryElementObject.Product__r.ProductDomain__r.RevenueGenerationModel__c != null)}"/>
+								<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}" />
+							</apex:pageBlockButtons>
+							<apex:pageblockSection collapsible="false" showheader="false" columns="2">
+								<apex:pageBlockSectionItem rendered="{!theDeliveryElementObject.KimbleOne__ResourcedActivity__c != null}">
+									<apex:outputLabel >{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__BaselineUsage__c.Label} <span>({!IF(theDeliveryElementObject.KimbleOne__DeliveryElementOperatedWith__c != null,theDeliveryElementObject.DeliveryElementOperatedWith__r.ResourcedActivity__r.ForecastUnitType__r.KimbleOne__Suffix__c, theDeliveryElementObject.ResourcedActivity__r.ForecastUnitType__r.KimbleOne__Suffix__c)})</span></apex:outputLabel>
+									<apex:outputPanel >
+										<apex:inputField value="{!theDeliveryElementObject.KimbleOne__BaselineUsage__c}" rendered="{!theDeliveryElementObject.KimbleOne__ResourcedActivity__c != null}"/>
+									</apex:outputPanel>
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem rendered="{!theDeliveryElementObject.KimbleOne__ResourcedActivity__c != null}" />
+
+								<apex:pageBlockSectionItem rendered="{!showExpenses}">
+									<apex:outputLabel >{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__BaselineExpensesContractRevenue__c.Label} <span>({!FinancialCardCurrency})</span></apex:outputLabel>
+									<apex:outputPanel >
+										<apex:inputField value="{!theDeliveryElementObject.KimbleOne__BaselineExpensesContractRevenue__c}" required="true"  rendered="{!!IsInvoicingCurrencyUsedInFinancial}"/>
+										<apex:inputField value="{!theDeliveryElementObject.KimbleOne__BaselineInvCcyExpensesContractRevenue__c}" required="true"  rendered="{!IsInvoicingCurrencyUsedInFinancial}"/>
+									</apex:outputPanel>
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem rendered="{!AND(showExpenses, ShowBaselineExpenseCost)}">
+									<apex:outputLabel >{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__BaselineExpensesContractCost__c.Label} <span>({!FinancialCardCurrency})</span></apex:outputLabel>
+									<apex:outputPanel >
+										<apex:outputPanel rendered="{!CanEditBaselineExpenseCost}">
+											<apex:inputField value="{!theDeliveryElementObject.KimbleOne__BaselineExpensesContractCost__c}" required="true" rendered="{!!IsInvoicingCurrencyUsedInFinancial}" />
+											<apex:inputField value="{!BaselineInvExpensesContractCost.KimbleOne__InputDecimal__c}" required="true" rendered="{!IsInvoicingCurrencyUsedInFinancial}" />
+										</apex:outputPanel>
+										<apex:outputText value="{!theDeliveryElementObject.KimbleOne__BaselineExpensesContractCost__c}" rendered="{!!CanEditBaselineExpenseCost}" />
+									</apex:outputPanel>
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem >
+									<apex:outputLabel >{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__BaselineServicesContractRevenue__c.Label} <span>({!FinancialCardCurrency})</span></apex:outputLabel>
+									<apex:outputPanel >
+										<apex:inputField value="{!theDeliveryElementObject.KimbleOne__BaselineServicesContractRevenue__c}" required="true" rendered="{!!IsInvoicingCurrencyUsedInFinancial}"/>
+										<apex:inputField value="{!theDeliveryElementObject.KimbleOne__BaselineInvCcyServicesContractRevenue__c}" required="true" rendered="{!IsInvoicingCurrencyUsedInFinancial}"/>
+									</apex:outputPanel>
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem rendered="{!ShowBaselineCost}">
+									<apex:outputLabel >{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__BaselineServicesContractCost__c.Label} <span>({!FinancialCardCurrency})</span></apex:outputLabel>
+									<apex:outputPanel >
+										<apex:outputPanel rendered="{!theDeliveryElementObject.Product__r.ProductDomain__r.KimbleOne__CostGenerationModel__c != null && CanEditBaselineCost}" >
+											<apex:inputField value="{!theDeliveryElementObject.KimbleOne__BaselineServicesContractCost__c}" required="true" rendered="{!!IsInvoicingCurrencyUsedInFinancial}" />
+											<apex:inputField value="{!BaselineInvServicesContractCost.KimbleOne__InputDecimal__c}" required="true" rendered="{!IsInvoicingCurrencyUsedInFinancial}" />
+										</apex:outputPanel>
+										<apex:outputText value="{!theDeliveryElementObject.KimbleOne__BaselineServicesContractCost__c}" rendered="{!NOT(theDeliveryElementObject.Product__r.ProductDomain__r.KimbleOne__CostGenerationModel__c != null) || !CanEditBaselineCost}" />
+									</apex:outputPanel>
+								</apex:pageBlockSectionItem>
+							</apex:pageblockSection>
+						</apex:pageBlock>
+					</apex:form>
+				</apex:outputPanel>
+			</div>
+			<apex:form >
+				<apex:actionFunction action="{!overrideBaselineElement}"
+									 name="overrideBaselineElement"
+									 rerender="DeliveryElementPopupPanel"
+									 oncomplete="showModalBoxy();">
+					<apex:param assignTo="{!elementId}" name="elementId" value="{!elementId}"/>
+					<apex:param assignTo="{!FinancialCardCurrency}" name="FinancialCardCurrency" value="{!FinancialCardCurrency}"/>
+				</apex:actionFunction>
+
+				<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+				<div style="display:none;" kimble-tip="null"></div>
+				
+			</apex:form>
+			<script>
+				var filterLabels = {};
+				filterLabels['services'] = '{!JSENCODE($Label.ServicesLabel)}';
+				filterLabels['expenses'] = '{!JSENCODE($Label.ExpensesLabel)}';
+				filterLabels['all'] = '{!JSENCODE($Label.All)}';
+				filterLabels['revsummary'] = '{!JSENCODE($Label.RevenueSummaryLabel)}';
+				filterLabels['marsummary'] = '{!JSENCODE($Label.MarginSummaryLabel)}';
+				filterLabels['cstsummary'] = '{!JSENCODE($Label.CostSummaryLabel)}';
+				filterLabels['icsummary'] = '{!JSENCODE($Label.IntercompanyMarginSummary)}';
+				filterLabels['apply'] = '{!JSENCODE($Label.ApplyFilter)}';
+
+				var showFilter = <apex:outputText value="{!ShowFilter}"/>;
+				var showRevFilter = <apex:outputText value="{!ShowRevFilter}"/>;
+				var showCstFilter = <apex:outputText value="{!ShowCstFilter}"/>;
+				var showMarFilter = <apex:outputText value="{!ShowMarFilter}"/>;
+				var showIcFilter = <apex:outputText value="{!ShowIcFilter}"/>;
+
+				var componentsToLoad = 0;
+
+                jQuery(document).ready(function()
+                {
+					componentsToLoad = jQuery('.dashboardContainer div[pageSource]').length;
+
+                    jQuery.each( jQuery('.dashboardContainer'), function(i, dashboardContainer) {
+                            jQuery('div[pageSource]', dashboardContainer).each(function() {
+                               loadDashboardComponent(jQuery( this ));
+                       });
+                    })
+                });
+
+				function SetStatusSummaryCardHeight()
+				{
+					var variableHeightEnabled = '<apex:outputText value="{!StatusCardVariableHeight}"/>';
+
+					if(variableHeightEnabled == 'true')
+					{
+						if($('#summaryCardBody').is(':visible'))
+						{
+							$('#summaryCardBody').css('height', 'auto');
+						}
+						else
+						{
+	    					setTimeout(function(){ $('#summaryCardBody').css('height', 'auto'); }, 500);
+	  					}
+	  				}
+				}
+
+                function loadDashboardComponent(dashboardComponent)
+                {
+                    var pageSourceName = dashboardComponent.attr('pageSource');
+
+                       // kick off the population of the page with an ajax call - always provide ID, only provide currency if on the source element
+                       var displayCurrencyParam = '';
+
+                       if(dashboardComponent.attr('display-currency') != null)
+                       {
+                           displayCurrencyParam = '&currencyISOCode=' + dashboardComponent.attr('display-currency');
+                       }
+
+			   		var domainParam = '';
+
+			   		if(dashboardComponent.attr('domain') != null)
+			   		{
+			   			domainParam = '&domain=' + dashboardComponent.attr('domain');
+			   		}
+
+			   		jQuery.ajax({ url: kimble.pages[pageSourceName] + dashboardComponent.attr('context-id') + displayCurrencyParam + domainParam})
+                        .done(function(html) {
+                            dashboardComponent.empty();
+
+                            if(html != null && html != '')
+                            {
+                                jQuery(html).appendTo(dashboardComponent);
+                            }
+                            else
+                            {
+                                // nothing to render in the component
+                                // remove the container for this component to allow the page to re-flow
+                                dashboardComponent.remove();
+                            }
+
+							componentLoadComplete();
+                        })
+                        .fail(function(xhr, status, error) {
+                            if(error !=null && error !="") {
+                                console.log('ajax component load error: ' + error);
+                                // hide the container for this component
+                                dashboardComponent.hide();
+                            }
+							componentLoadComplete();
+                        })
+                }
+
+				function componentLoadComplete()
+				{
+					componentsToLoad -= 1;
+					if(componentsToLoad <= 0) jQuery.publish('kimble.dashboard-load-complete');
+				}
+
+                function baselineElement(elementId)
+                {
+                    if (confirm('{!$Label.AreYouSure}'))
+                    {
+                        jQuery('#' + elementId + ' .burger-menu').hide();
+                        jQuery('#' + elementId + ' .Loading').show();
+
+                        Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupDashboardController.BaselineDeliveryElement}',
+                               elementId,
+                                  function(result, event){
+                                     if (event.status)
+                                    {
+                                         //reload screen
+                                         window.location = window.location;
+                                     }
+                                     else if (event.type === 'exception')
+                                     {
+                                         alert(event.message);
+                                         jQuery('#' + elementId + ' .burger-menu').show();
+                                        jQuery('#' + elementId + ' .Loading').hide();
+                                     }
+                                     else
+                                     {
+                                         alert(event.message);
+                                         jQuery('#' + elementId + ' .burger-menu').show();
+                                        jQuery('#' + elementId + ' .Loading').hide();
+                                     }
+                         },
+                         {escape: true, timeout: 60000});
+                     }
+				}
+
+				jQuery.subscribe('kimble.dashboard-load-complete', function(event, data)
+				{
+					if(showFilter)
+					{
+					    initialiseFilters();
+						setFilterTooltips();
+					}
+
+					SetStatusSummaryCardHeight();
+                    
+                    initialisePageTips();
+				});
+
+				function initialiseFilters()
+				{
+					jQuery('.card-filter-icon').qtip('destroy', true);
+
+	                jQuery('.card-filter-icon').qtip({
+						content: {
+							text: function(event, api) {
+								return generateCardFilterHtml();
+							},
+							button: 'Cancel'
+						},
+						position: {
+						   	my: 'center right',
+							at: 'center left'
+						},
+						show: {
+		 					event: 'click',
+		 					solo: true
+	  					},
+	  					hide: false,
+						style: {classes: 'qtip-light qtip-shadow qtip-rounded card-filter-qtip'}
+				    });
+				}
+
+				function generateCardFilterHtml()
+				{
+					var html = '';
+
+					html += '<div class="group-card-filters">';
+
+					if (typeof revenueDomainFilter !== 'undefined' && showRevFilter)
+					{
+						html += '<div class="card inverted min-horizontal-padding revenue-summary-filters">';
+
+						html += '<div class="cardHeading inverted">';
+						html += '<h3 class="cardTitle">' + filterLabels['revsummary'] + '</h3>';
+						html += '</div>';
+
+						html += '<div class="cardBody">';
+						html += '<label><input type="radio"' + (revenueDomainFilter == 'All' ? ' checked="checked"' : '') + ' name="rev-sum-filter" value="All">' + filterLabels['all'] + '</input></label>';
+						html += '<label><input type="radio"' + (revenueDomainFilter == 'Services' ? ' checked="checked"' : '') + ' name="rev-sum-filter" value="Services">' + filterLabels['services'] + '</input></label>';
+						html += '<label><input type="radio"' + (revenueDomainFilter == 'Expenses' ? ' checked="checked"' : '') + ' name="rev-sum-filter" value="Expenses">' + filterLabels['expenses'] + '</input></label>';
+						html += '</div>';
+
+						html += '</div>';
+					}
+
+					if (typeof costDomainFilter !== 'undefined' && showCstFilter)
+					{
+						html += '<div class="card inverted min-horizontal-padding cost-summary-filters">';
+
+						html += '<div class="cardHeading inverted">';
+						html += '<h3 class="cardTitle">' + filterLabels['cstsummary'] + '</h3>';
+						html += '</div>';
+
+						html += '<div class="cardBody">';
+						html += '<label><input type="radio"' + (costDomainFilter == 'All' ? ' checked="checked"' : '') + ' name="cst-sum-filter" value="All">' + filterLabels['all'] + '</input></label>';
+						html += '<label><input type="radio"' + (costDomainFilter == 'Services' ? ' checked="checked"' : '') + ' name="cst-sum-filter" value="Services">' + filterLabels['services'] + '</input></label>';
+						html += '<label><input type="radio"' + (costDomainFilter == 'Expenses' ? ' checked="checked"' : '') + ' name="cst-sum-filter" value="Expenses">' + filterLabels['expenses'] + '</input></label>';
+						html += '</div>';
+
+						html += '</div>';
+					}
+
+					if (typeof marginDomainFilter !== 'undefined' && showMarFilter)
+					{
+						html += '<div class="card inverted min-horizontal-padding margin-summary-filters">';
+
+						html += '<div class="cardHeading inverted">';
+						html += '<h3 class="cardTitle">' + filterLabels['marsummary'] + '</h3>';
+						html += '</div>';
+
+						html += '<div class="cardBody">';
+						html += '<label><input type="radio"' + (marginDomainFilter == 'All' ? ' checked="checked"' : '') + ' name="mar-sum-filter" value="All">' + filterLabels['all'] + '</input></label>';
+						html += '<label><input type="radio"' + (marginDomainFilter == 'Services' ? ' checked="checked"' : '') + ' name="mar-sum-filter" value="Services">' + filterLabels['services'] + '</input></label>';
+						html += '<label><input type="radio"' + (marginDomainFilter == 'Expenses' ? ' checked="checked"' : '') + ' name="mar-sum-filter" value="Expenses">' + filterLabels['expenses'] + '</input></label>';
+						html += '</div>';
+
+						html += '</div>';
+					}
+
+					if (typeof intercompanySummaryDomainFilter !== 'undefined' && showIcFilter)
+					{
+						html += '<div class="card inverted min-horizontal-padding ic-margin-summary-filters">';
+
+						html += '<div class="cardHeading inverted">';
+						html += '<h3 class="cardTitle">' + filterLabels['icsummary'] + '</h3>';
+						html += '</div>';
+
+						html += '<div class="cardBody">';
+						html += '<label><input type="radio"' + (intercompanySummaryDomainFilter == 'All' ? ' checked="checked"' : '') + ' name="ic-mar-sum-filter" value="All">' + filterLabels['all'] + '</input></label>';
+						html += '<label><input type="radio"' + (intercompanySummaryDomainFilter == 'Services' ? ' checked="checked"' : '') + ' name="ic-mar-sum-filter" value="Services">' + filterLabels['services'] + '</input></label>';
+						html += '<label><input type="radio"' + (intercompanySummaryDomainFilter == 'Expenses' ? ' checked="checked"' : '') + ' name="ic-mar-sum-filter" value="Expenses">' + filterLabels['expenses'] + '</input></label>';
+						html += '</div>';
+
+						html += '</div>';
+					}
+
+					html += '<input class="btn" type="Button" onclick="applyDomainFilter();" name="apply-filter" value="' + filterLabels['apply'] + '"/>';
+
+					html += '</div>';
+					html += '</div>';
+
+					return html;
+				}
+
+				function applyDomainFilter()
+				{
+					if (typeof revenueDomainFilter !== 'undefined' && showRevFilter)
+					{
+						var newRevenueDomainFilter = jQuery('.group-card-filters:visible .revenue-summary-filters input[name="rev-sum-filter"]:checked').val();
+						if(revenueDomainFilter != newRevenueDomainFilter) revenueSummaryDomainFilterChange(newRevenueDomainFilter);
+
+				    	var filterTooltip = filterLabels['all'];
+				    	if(revenueDomainFilter == 'Services') filterTooltip = filterLabels['services'];
+				    	else if(revenueDomainFilter == 'Expenses') filterTooltip = filterLabels['expenses'];
+
+				    	jQuery('.filter-rev-sum-icon').prop('title', filterTooltip);
+					}
+
+					if (typeof marginDomainFilter !== 'undefined' && showMarFilter)
+					{
+						var newMarginDomainFilter = jQuery('.group-card-filters:visible .margin-summary-filters input[name="mar-sum-filter"]:checked').val();
+						if(marginDomainFilter != newMarginDomainFilter) marginSummaryDomainFilterChange(newMarginDomainFilter);
+					}
+
+					if (typeof costDomainFilter !== 'undefined' && showCstFilter)
+					{
+						var newCostDomainFilter = jQuery('.group-card-filters:visible .cost-summary-filters input[name="cst-sum-filter"]:checked').val();
+						if(costDomainFilter != newCostDomainFilter) costSummaryDomainFilterChange(newCostDomainFilter);
+					}
+
+					if (typeof intercompanySummaryDomainFilter !== 'undefined' && showIcFilter)
+					{
+						var newIntercompanySummaryDomainFilter = jQuery('.group-card-filters:visible .ic-margin-summary-filters input[name="ic-mar-sum-filter"]:checked').val();
+						if(intercompanySummaryDomainFilter != newIntercompanySummaryDomainFilter) intercompanyMarginSummaryDomainFilterChange(newIntercompanySummaryDomainFilter);
+					}
+
+					setFilterTooltips();
+					jQuery('.card-filter-icon').qtip("hide");
+				}
+
+				function setFilterTooltips()
+				{
+					if (typeof revenueDomainFilter !== 'undefined' && showRevFilter)
+					{
+				    	var filterTooltip = filterLabels['all'];
+				    	if(revenueDomainFilter == 'Services') filterTooltip = filterLabels['services'];
+				    	else if(revenueDomainFilter == 'Expenses') filterTooltip = filterLabels['expenses'];
+
+				    	jQuery('.filter-rev-sum-icon').prop('title', filterTooltip);
+					}
+
+					if (typeof marginDomainFilter !== 'undefined' && showMarFilter)
+					{
+				    	var filterTooltip = filterLabels['all'];
+				    	if(marginDomainFilter == 'Services') filterTooltip = filterLabels['services'];
+				    	else if(marginDomainFilter == 'Expenses') filterTooltip = filterLabels['expenses'];
+
+				    	jQuery('.filter-mar-sum-icon').prop('title', filterTooltip);
+					}
+
+					if (typeof costDomainFilter !== 'undefined' && showCstFilter)
+					{
+				    	var filterTooltip = filterLabels['all'];
+				    	if(costDomainFilter == 'Services') filterTooltip = filterLabels['services'];
+				    	else if(costDomainFilter == 'Expenses') filterTooltip = filterLabels['expenses'];
+
+				    	jQuery('.filter-cst-sum-icon').prop('title', filterTooltip);
+					}
+
+					if (typeof intercompanySummaryDomainFilter !== 'undefined' && showIcFilter)
+					{
+				    	var filterTooltip = filterLabels['all'];
+				    	if(intercompanySummaryDomainFilter == 'Services') filterTooltip = filterLabels['services'];
+				    	else if(intercompanySummaryDomainFilter == 'Expenses') filterTooltip = filterLabels['expenses'];
+
+				    	jQuery('.filter-ic-mar-sum-icon').prop('title', filterTooltip);
+					}
+                }
+
+                function baselineOverride(elementId)
+                {
+                    initialiseModalBoxy('#DeliveryElementPopup', '{!JSENCODE($Label.Edit)} {!JSENCODE($Label.BaselineLabel)}');
+                    overrideBaselineElement(elementId, jQuery(".DefaultCurrencyForDeliveryElementUpdate").val());
+                }	
+                
+                /* Tooltips */
+				var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+				var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+				var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+				var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+				var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+				var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+			
+				function initialisePageTips()
+				{
+					ApplyTipAttributes();
+					initialiseTips();
+				}
+				
+				// add tip attributes to elements
+				function ApplyTipAttributes()
+				{
+					if(enableTips)
+					{
+					    // Revenue Summary Card
+						jQuery('[id$="revenueSummaryCard"]').parent().parent().attr('kimble-tip','RevenueSummaryRSC').attr('kimble-tip-help-link','DeliveryEngagementHelpLink');
+						jQuery(".graphLabeldivForRevenueSummaryGraph:contains('{!JSENCODE($Label.ProjectedLabel)}')").parent().attr('kimble-tip','ProjectedRSC').attr('kimble-tip-extended-text','ProjectedRSCExtendedText').attr('kimble-tip-help-link','DeliveryEngagementHelpLink');
+						jQuery(".graphLabeldivForRevenueSummaryGraph:contains('{!JSENCODE($Label.ActualLabel)}')").parent().attr('kimble-tip','ActualRSC').attr('kimble-tip-help-link','DeliveryEngagementHelpLink');
+						jQuery(".graphLabeldivForRevenueSummaryGraph:contains('{!JSENCODE($Label.BaselineLabel)}')").parent().attr('kimble-tip','BaselineRSC').attr('kimble-tip-help-link','DeliveryEngagementHelpLink');
+						jQuery(".graphLabeldivForRevenueSummaryGraph:contains('{!JSENCODE($Label.POCoverLabel)}')").parent().attr('kimble-tip','POCoverRSC').attr('kimble-tip-help-link','DeliveryEngagementHelpLink');
+						jQuery(".graphLabeldivForRevenueSummaryGraph:contains('{!JSENCODE($Label.InvoicedLabel)}')").parent().attr('kimble-tip','InvoicedRSC').attr('kimble-tip-extended-text','InvoicedRSCExtendedText').attr('kimble-tip-help-link','DeliveryEngagementHelpLink');
+						// Margin Summary Card
+						jQuery('[id$="marginSummaryCardHeading"]').attr('kimble-tip','MarginSummary').attr('kimble-tip-help-link','DeliveryEngagementHelpLink');
+						jQuery('[id$="divForBaselineMargin"]').attr('kimble-tip','BaselineMSC').attr('kimble-tip-help-link','DeliveryEngagementHelpLink');
+						jQuery('[id$="divForProjectedMargin"]').attr('kimble-tip','ProjectedMSC').attr('kimble-tip-help-link','DeliveryEngagementHelpLink');
+						// Financials table
+						jQuery('[id$="financialSummaryCardHeading"]').parent().attr('kimble-tip','Financials').attr('kimble-tip-extended-text','FinancialsExtendedText').attr('kimble-tip-help-link','DeliveryEngagementHelpLink');
+						jQuery('[id$="finacialsBaselineColumn"]').attr('kimble-tip','BaselineFT').attr('kimble-tip-help-link','DeliveryEngagementHelpLink');
+						jQuery('[id$="finacialsProjectedColumn"]').attr('kimble-tip','ProjectedFT').attr('kimble-tip-extended-text','ProjectedFTExtendedText').attr('kimble-tip-help-link','DeliveryEngagementHelpLink');
+						jQuery('[id$="finacialsActualColumn"]').attr('kimble-tip','ActualFT').attr('kimble-tip-help-link','DeliveryEngagementHelpLink');
+						jQuery('.currency-mode-toggle-container').attr('kimble-tip','FinancialCurrencyToggle').attr('kimble-tip-help-link','DeliveryEngagementHelpLink');
+						// Cost Summary Card
+						jQuery('[id$="costSummaryCardHeading"]').parent().attr('kimble-tip','CostSummary');
+						jQuery(".graphLabeldivForCostSummaryGraph:contains('{!JSENCODE($Label.BaselineLabel)}')").parent().attr('kimble-tip','BaselineCSC');
+						jQuery(".graphLabeldivForCostSummaryGraph:contains('{!JSENCODE($Label.ActualLabel)}')").parent().attr('kimble-tip','ActualCSC');
+						jQuery(".graphLabeldivForCostSummaryGraph:contains('{!JSENCODE($Label.ProjectedLabel)}')").parent().attr('kimble-tip','ProjectedCSC');
+						jQuery(".graphLabeldivForCostSummaryGraph:contains('{!JSENCODE($Label.InvoicedLabel)}')").parent().attr('kimble-tip','InvoicedCSC');
+						// Risk Summary Card
+						jQuery('[id$="risksTopCardHeading"]').parent().parent().attr('kimble-tip','RiskAssessment').attr('kimble-tip-help-link','RisksHelpLink');
+						jQuery('[id$="topRisksTable"]').attr('kimble-tip','TopRisks').attr('kimble-tip-help-link','RisksHelpLink');
+						jQuery('[id$="riskSummaryRiskLevel"]').parent().attr('kimble-tip','RiskLevel').attr('kimble-tip-help-link','RisksHelpLink');
+						// RAG Summary Card and Stage Summary Card
+						jQuery('[id$="usagePercentCompleteOutput"]').parent().attr('kimble-tip','PercentComplete');
+						jQuery('[id$="divGroupStatusCard"]').attr('kimble-tip','Summary').attr('kimble-tip-extended-text','SummaryExtendedText').attr('kimble-tip-help-link','DeliveryEngagementHelpLink');
+						jQuery('[id$="divStageSummaryCard"]').attr('kimble-tip','StageSummary');
+						// Intercompany Summary Card
+						jQuery('[id$="intercompanySummaryCardHeading"]').parent().attr('kimble-tip','IntercompanySummary');
+						jQuery(".graphLabeldivForMarginSummaryGraph").parent().attr('kimble-tip','MarginICSC');
+						jQuery('[id$="intercompanySummaryCardHeading"]').parent().attr('kimble-tip','SummaryCardIC').attr('kimble-tip-extended-text','SummaryICExtendedText').attr('kimble-tip-help-link','SummaryICHelpLink');
+						
+						// Other
+						jQuery('[id$="editDeliveryGroupDashboardLayoutBtn"]').attr('kimble-tip','EditLayoutbutton').attr('kimble-tip-extended-text','EditLayoutbuttonExtendedText');
+					}
+				}
+				
+				
+				function updateTipsConfigSetting(newTipSetting)
+				{
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+						newTipSetting,
+							function(result, event){
+								if (event.status)
+								{
+									var data = {};
+									data.results = result;
+									loadGuidance();
+								}
+								else
+								{
+									alert(event.message);
+								}
+						},
+						{escape: false, timeout: 60000}
+					);
+				}
+            </script>
+
+			<style>
+                div#DeliveryElementPopup {
+                    width: 825px;
+                }
+                div.cardRowContainer {
+                    display: table;
+                     width: 100%;
+                      margin-bottom: 2px;
+                }
+                div.cardRowContainer div.cardContainer[pagesource] {
+                    display: table-cell;
+                }
+                div.cardRowContainer div.cardContainer .card
+                {
+                    display: block;
+                    min-width: unset;
+                }
+                div.cardContainer[pagesource="DeliveryGroupStatusCard"] {
+                     width: 100%;
+                    overflow:hidden;
+                }
+                div.cardContainer[pagesource="RevenueSummaryCard"] {
+                    min-width: 440px;
+                    height: 208px;
+                }
+                div.cardContainer[pagesource="CostSummaryCard"] {
+                    min-width: 440px;
+                }
+                div.cardContainer[pagesource="MarginSummaryCard"] {
+                    min-width: 160px;
+                    height: 208px;
+                }
+                div#marginSummaryCardHeading {
+					white-space: nowrap;
+					overflow: hidden;
+					text-overflow: ellipsis;
+					max-width: 124px;
+				}
+                div.cardContainer[pagesource="IntercompanySummaryCard"] {
+                    min-width: 160px;
+                    height: 208px;
+                }
+
+                /* translations */
+                div[class^='graphLabeldivFor'] {
+					white-space: nowrap;
+					text-overflow: ellipsis;
+					overflow: hidden;
+				}
+
+                /*
+                    layout control
+                */
+
+                .ui-layout-center,.ui-layout-east, .ui-layout-west {
+                    padding: 0;
+                }
+
+                .ui-layout-pane {
+                    border: none;
+                }
+
+                .ui-layout-east
+                {
+/*                     background-color: #F5F5F5; */
+                }
+
+                .ui-layout-resizer
+                {
+                    background: none;
+                }
+
+                .ui-layout-content {
+                    padding: 0px;
+                }
+
+                .cardBodyTable
+                {
+                    width: 100%;
+                }
+
+                /* override SF .message to fit in with dashboard style */
+                .message
+                {
+                    margin: 3px 2px;
+                }
+                .dashboard-footer {
+                    text-align: center;
+                    background-color: #F5F5F5;
+                    border-radius: 4px;
+                    -webkit-box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+                    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+                    padding-top: 3px;
+                    margin-left: 2px;
+                    margin-right: 2px;
+				    height: 34px;
+				    position: relative;
+				    text-align: left;
+                }
+				.footer-button {
+				    padding: 4px;
+				    margin-top: 2px;
+				    margin-left: 6px;
+				    background-color: white;
+				    border-radius: 2px;
+				    border: 1px solid #ccc;
+                    position: relative;
+				    width: 17px;
+				    height: 17px;
+                    color: #6F6F6F;
+					cursor: pointer;
+				}
+				.footer-button i {
+				    font-size: 19px;
+                }
+				i.delivery-group-layout-edit-icon {
+				    position: absolute;
+				    top: 4px;
+				    left: 3px;
+                }
+				.footer-button.highlight {
+				    color: white;
+				    background-color: #1A9EFF;
+				}
+				i.delivery-group-print-icon {
+				    position: absolute;
+				    top: 4px;
+				    left: 4px;
+                }
+                a.edit-layout-btn {
+				    display: inline-block;
+				}
+				.group-card-filters {
+				    background-color: white;
+				}
+				.group-card-filters .card {
+				    min-width: unset;
+					display: block;
+					margin: 12px !important;
+				}
+				.group-card-filters .cardHeading {
+					width: 180px;
+				}
+				.card-filter-qtip .qtip-content {
+				    padding: 0px;
+				}
+				i.card-filter-icon {
+				    position: absolute;
+				    left: 2px;
+				    top: 41px;
+				    font-size: 15px;
+				    padding: 4px;
+				    cursor: pointer;
+				    border-radius: 4px;
+		        	color: #c2c2c2;
+				}
+				i.card-filter-icon.f-active {
+				    color: #1A9EFF !important;
+				}
+				.group-card-filters input.btn {
+				    float: right;
+				    margin-right: 7px;
+				    margin-bottom: 7px;
+				}
+				.group-card-filters label {
+				    cursor: pointer;
+				    margin-right: 5px;
+				}
+				a.print-btn {
+				    position: absolute;
+				    left: 50%;
+				    top: 3px;
+                }
+                .delivery-program-indicator,
+                .delivery-portfolio-indicator {
+                    margin-left: 10px;
+                    color: #428BCA;
+                    font-size: 16px;
+                }
+                .delivery-portfolio-indicator {
+                    cursor: pointer;
+                }
+                .cardIconWarn {
+					color: #E58E1A;
+				}
+            </style>
+
+		</apex:define>
+	</apex:composition>
+</apex:page>

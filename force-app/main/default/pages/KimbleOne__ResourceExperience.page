@@ -1,0 +1,314 @@
+<apex:page standardController="KimbleOne__Resource__c"
+		   extensions="KimbleOne.ResourceExperienceController,KimbleOne.FilesAndAttachmentsController" sidebar="false">
+
+	<apex:composition template="KimbleOne__SiteMaster">
+
+		<apex:define name="Menu">
+			<c:Menu DefaultHelpPage="ResourceExperienceHistory.html" MenuContextType="Resource" MenuContextId="{!KimbleOne__Resource__c.Id}" MenuContextName="{!KimbleOne__Resource__c.Name}"/>
+		</apex:define>
+
+		<apex:define name="Content">
+
+
+			<apex:outputPanel id="ActivityAssignmentsList">
+				<apex:form >
+					<apex:pageBlock id="ActivityAssignmentsBlock" title="{!$Label.kimbleone__resourceexperienceassignmentexperience}">
+						<apex:pageBlockTable value="{!ActAssignExpHistList}" var="assignment">
+							<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+								<apex:outputLink rendered="{!assignment.ExperienceHistory__r.size==0 && $ObjectType.KimbleOne__ExperienceHistory__c.createable}"
+												 styleClass="actionLink" value="#" onclick="initialiseModalBoxy('#ActivityExperienceHistoryPopup', '{!JSENCODE($Label.kimbleone__new)} {!$ObjectType.KimbleOne__ExperienceHistory__c.label}'); newActivityExperienceHistory('{!JSINHTMLENCODE(assignment.Id)}','{!JSINHTMLENCODE(assignment.ResourcedActivity__r.Name)}','{!JSINHTMLENCODE(assignment.ResourcedActivity__r.DeliveryElement__r.DeliveryGroup__r.Account__r.Name)}');">{!$Label.kimbleone__new}</apex:outputLink>
+								<apex:outputLink rendered="{!assignment.ExperienceHistory__r.size>0 && $ObjectType.KimbleOne__ExperienceHistory__c.updateable}"
+												 styleClass="actionLink" value="#" onclick="initialiseModalBoxy('#ActivityExperienceHistoryPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__ExperienceHistory__c.label}'); editActivityExperienceHistory('{!JSINHTMLENCODE(assignment.ExperienceHistory__r[0].Id)}','{!JSINHTMLENCODE(assignment.ResourcedActivity__r.Name)}','{!JSINHTMLENCODE(assignment.ResourcedActivity__r.DeliveryElement__r.DeliveryGroup__r.Account__r.Name)}');">{!$Label.kimbleone__edit}</apex:outputLink>
+							</apex:column>
+
+							<apex:column value="{!assignment.ResourcedActivity__r.DeliveryElement__r.DeliveryGroup__r.Account__r.Name}" headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__Account__c.Label}"></apex:column>
+							<apex:column value="{!assignment.ResourcedActivity__r.Name}" headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ResourcedActivity__c.Label}"></apex:column>
+
+							<apex:column value="{!assignment.KimbleOne__StartDate__c}" headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__StartDate__c.Label}"></apex:column>
+							<apex:column value="{!assignment.KimbleOne__ForecastP3EndDate__c}" headerValue="{!$Label.kimbleone__enddatelabel}"></apex:column>
+							<apex:column value="{!assignment.ActivityAssignmentType__r.KimbleOne__Enum__c}" headerValue="{!$Label.kimbleone__activityassignmenttypeheading}"></apex:column>
+							<apex:column >
+								<apex:facet name="header">{!$ObjectType.KimbleOne__ExperienceHistory__c.Fields.KimbleOne__ResponsibilitiesDescription__c.Label}</apex:facet>
+								<apex:outputPanel rendered="{!assignment.ExperienceHistory__r.size>0}">
+									<apex:outputField value="{!assignment.ExperienceHistory__r[0].ResponsibilitiesDescription__c}" />
+								</apex:outputPanel>
+								<apex:outputPanel rendered="{!assignment.ExperienceHistory__r.size==0}">
+									&nbsp;
+								</apex:outputPanel>
+							</apex:column>
+
+							<apex:column headerValue="{!$ObjectType.KimbleOne__ExperienceHistory__c.Fields.KimbleOne__Status__c.Label}">
+								<apex:repeat value="{!assignment.ExperienceHistory__r}" var="actExpHist" rows="1">
+									<apex:outputText value="{!actExpHist.Status__r.KimbleOne__Enum__c}" />
+								</apex:repeat>
+							</apex:column>
+
+						</apex:pageBlockTable>
+
+						<apex:actionFunction action="{!newActivityExperienceHistory}"
+											 name="newActivityExperienceHistory" rerender="ActivityExperiencePanel"
+											 oncomplete="showModalBoxy(); initialiseItems();">
+							<apex:param name="activityassignmentId" value="" />
+							<apex:param name="resourceActivityName" value="" />
+							<apex:param name="accountName" value="" />
+						</apex:actionFunction>
+
+						<apex:actionFunction action="{!editActivityExperienceHistory}"
+											 name="editActivityExperienceHistory" rerender="ActivityExperiencePanel"
+											 oncomplete="showModalBoxy(); initialiseItems();">
+							<apex:param name="experiencehistoryId" value="" />
+							<apex:param name="resourceActivityName" value="" />
+							<apex:param name="accountName" value="" />
+						</apex:actionFunction>
+
+
+					</apex:pageBlock>
+				</apex:form>
+			</apex:outputPanel>
+
+
+
+
+			<apex:outputPanel id="OtherAssignmentsList">
+				<apex:form >
+					<apex:pageBlock id="OtherAssignmentsBlock" title="{!$Label.kimbleone__resourceexperienceotherexperience}">
+
+						<apex:pageBlockButtons location="top">
+							<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ExperienceHistory__c.createable}">
+								<input type="button" class="btn" value="{!$Label.kimbleone__new} {!$Label.kimbleone__resourceexperienceotherexperience}"
+									   onclick="initialiseModalBoxy('#ExperienceHistoryPopup', '{!JSENCODE($Label.New)} {!$ObjectType.ExperienceHistory__c.label}');newExperienceHistory();"></input>
+							</apex:outputPanel>
+						</apex:pageBlockButtons>
+
+						<apex:pageBlockTable value="{!ResourceExperienceHistorys}" var="history" >
+							<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+								<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ExperienceHistory__c.updateable}">
+									<apex:outputLink value="#"
+													 onclick="initialiseModalBoxy('#ExperienceHistoryPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__ExperienceHistory__c.label}');getExperienceHistory('{!JSENCODE(history.Id)}')">{!$Label.kimbleone__edit}
+									</apex:outputLink>
+								</apex:outputPanel>
+								<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ExperienceHistory__c.deletable}">
+									&nbsp;|&nbsp;
+									<apex:commandLink onclick="var d = confirmDelete();if(!d) return;" action="{!deleteExperienceHistory}" reRender="OtherAssignmentsList">{!$Label.kimbleone__delete}
+										<apex:param name="historyId" value="{!history.Id}" />
+									</apex:commandLink>
+								</apex:outputPanel>
+							</apex:column>
+
+							<apex:column value="{!history.Name}"  headerValue="{!$ObjectType.KimbleOne__ExperienceHistory__c.Fields.Name.Label}"/>
+							<apex:column value="{!history.KimbleOne__Account__c}"   headerValue="{!$ObjectType.KimbleOne__ExperienceHistory__c.Fields.KimbleOne__Account__c.Label}"/>
+							<apex:column value="{!history.KimbleOne__StartDate__c}"   headerValue="{!$ObjectType.KimbleOne__ExperienceHistory__c.Fields.KimbleOne__StartDate__c.Label}"/>
+							<apex:column value="{!history.KimbleOne__EndDate__c}"   headerValue="{!$ObjectType.KimbleOne__ExperienceHistory__c.Fields.KimbleOne__EndDate__c.Label}"/>
+
+							<apex:column headerValue="{!$ObjectType.KimbleOne__ExperienceHistory__c.Fields.KimbleOne__Status__c.Label}">
+								<apex:repeat value="{!history}" var="otherExpHist" rows="1">
+									<apex:outputText value="{!otherExpHist.Status__r.KimbleOne__Enum__c}" />
+								</apex:repeat>
+							</apex:column>
+						</apex:pageBlockTable>
+
+						<apex:actionFunction action="{!newExperienceHistory}"
+											 name="newExperienceHistory" rerender="OtherExperiencePanel"
+											 oncomplete="showModalBoxy();initialiseItems();">
+						</apex:actionFunction>
+
+						<apex:actionFunction action="{!getResourceExperienceHistory}"
+											 name="getExperienceHistory" rerender="OtherExperiencePanel"
+											 oncomplete="showModalBoxy()">
+							<apex:param name="historyId" value="" />
+						</apex:actionFunction>
+
+					</apex:pageBlock>
+
+				</apex:form>
+
+
+				<apex:relatedList list="CombinedAttachments" rendered="{!AttachmentsEnabled}"/>
+				<apex:relatedList subject="{!KimbleOne__Resource__c}" list="AttachedContentDocuments" rendered="{!FilesEnabled}"/>
+
+			</apex:outputPanel>
+
+
+
+
+
+
+
+
+
+
+
+
+			<div id="ActivityExperienceHistoryPopup" style="display: none">
+				<apex:outputPanel id="ActivityExperiencePanel" >
+					<apex:form >
+						<apex:pageBlock >
+
+							<div id="ActivityExperienceHistoryPopupErrors">
+								<apex:pageMessages escape="false"/>
+							</div>
+							<apex:pageBlockButtons location="bottom">
+								<apex:commandButton action="{!upsertActivityExperienceHistory}"
+													oncomplete="hideModalBoxyWithErrorCheck('#ActivityExperienceHistoryPopupErrors'); initialiseItems();"
+													reRender="ActivityExperiencePanel, ActivityAssignmentsList" value="{!$Label.kimbleone__save}"  />
+								<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+							</apex:pageBlockButtons>
+
+							<apex:pageblockSection collapsible="false" showheader="false"
+												   columns="1">
+
+								<apex:pageblockSectionItem labelstyle="text-align:left">
+									<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ResourcedActivity__c.Label}"/>
+									<apex:outputText value="{!resourceActivityName}" />
+								</apex:pageblockSectionItem>
+								<apex:pageblockSectionItem labelstyle="text-align:left">
+									<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__Account__c.Label}"/>
+									<apex:outputText value="{!accountName}" />
+								</apex:pageblockSectionItem>
+
+							</apex:pageblockSection>
+							<apex:pageblockSection collapsible="false" showheader="false"
+												   columns="2">
+								<apex:inputField styleclass="kimbleDatePicker" value="{!ExperienceHistory_AssignmentExperience.KimbleOne__StartDate__c}"/>
+								<apex:inputField styleclass="kimbleDatePicker" value="{!ExperienceHistory_AssignmentExperience.KimbleOne__EndDate__c}"/>
+							</apex:pageblockSection>
+
+							<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+								<apex:pageBlockSectionItem labelStyle="text-align:left">
+									<apex:outputLabel value="{!$ObjectType.KimbleOne__ExperienceHistory__c.Fields.KimbleOne__ActivityDescription__c.Label}"/>
+									<apex:outputText value="" />
+								</apex:pageBlockSectionItem>
+								<apex:pageblockSectionItem labelStyle="text-align:left">
+									<apex:inputTextarea cols="60" rows="6" value="{!ActivityDescription}" />
+									<apex:outputText value="" />
+								</apex:pageblockSectionItem>
+
+								<apex:pageBlockSectionItem labelStyle="text-align:left">
+									<apex:outputLabel value="{!$ObjectType.KimbleOne__ExperienceHistory__c.Fields.KimbleOne__ResponsibilitiesDescription__c.Label}"/>
+									<apex:outputText value="" />
+								</apex:pageBlockSectionItem>
+								<apex:pageblockSectionItem labelStyle="text-align:left">
+									<apex:inputTextarea cols="60" rows="6" value="{!Responsibilities}" />
+									<apex:outputText value="" />
+								</apex:pageblockSectionItem>
+
+								<apex:pageBlockSection collapsible="false" showheader="false" columns="1" >
+									<apex:pageBlockSectionItem labelStyle="text-align:left">
+										<apex:outputText value="{!$ObjectType.KimbleOne__ExperienceHistory__c.Fields.KimbleOne__Status__c.Label}"/>
+										<apex:inputText id="ResourceSelfActExperienceStatus" value="{!ExperienceHistory_AssignmentExperience.KimbleOne__Status__c}" styleclass="kimbledropdown ExperienceHistoryStatus null false true" required="true" />
+									</apex:pageblockSectionItem>
+								</apex:pageBlockSection>
+
+							</apex:pageBlockSection>
+
+						</apex:pageBlock>
+
+					</apex:form>
+
+				</apex:outputPanel>
+			</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+			<div id="ExperienceHistoryPopup" style="display: none"><apex:outputPanel id="OtherExperiencePanel">
+
+					<apex:form >
+
+						<apex:pageBlock >
+
+							<div id="ExperienceHistoryPopupErrors"><apex:pageMessages escape="false"/></div>
+
+							<apex:pageBlockButtons location="bottom">
+
+								<apex:commandButton action="{!saveExperienceHistory}"
+													value=" {!$Label.kimbleone__save}"
+													oncomplete="hideModalBoxyWithErrorCheck('#ExperienceHistoryPopupErrors'); initialiseItems();"
+													reRender="OtherAssignmentsList, OtherExperiencePanel" />
+								<input class="btn" type="button" onclick="hideModalBoxy();"
+									   value="{!$Label.Cancel}" />
+
+							</apex:pageBlockButtons>
+
+							<apex:pageBlockSection collapsible="false" showheader="false" columns="1">
+								<apex:inputField value="{!ExperienceHistory_OtherExperience.Name}" required="true" />
+								<apex:inputField value="{!ExperienceHistory_OtherExperience.KimbleOne__Account__c}" />
+							</apex:pageblockSection>
+
+							<apex:pageblockSection collapsible="false" showheader="false" columns="2">
+								<apex:inputField value="{!ExperienceHistory_OtherExperience.KimbleOne__StartDate__c}" styleclass="kimbleDatePicker"/>
+								<apex:inputField value="{!ExperienceHistory_OtherExperience.KimbleOne__EndDate__c}" styleclass="kimbleDatePicker"/>
+							</apex:pageblockSection>
+
+							<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+								<apex:pageBlockSectionItem labelStyle="text-align:left">
+									<apex:outputText value="{!$ObjectType.KimbleOne__ExperienceHistory__c.Fields.KimbleOne__ActivityDescription__c.Label}" />
+									<apex:outputText value="" />
+								</apex:pageBlockSectionItem>
+								<apex:pageBlockSectionItem >
+									<apex:inputTextarea value="{!ActivityDescription}" cols="60" rows="6" />
+									<apex:outputText value="" />
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem labelStyle="text-align:left">
+									<apex:outputText value="{!$ObjectType.KimbleOne__ExperienceHistory__c.Fields.KimbleOne__ResponsibilitiesDescription__c.Label}" />
+									<apex:outputText value="" />
+								</apex:pageBlockSectionItem>
+								<apex:pageBlockSectionItem >
+									<apex:inputTextarea value="{!Responsibilities}" cols="60" rows="6" />
+									<apex:outputText value="" />
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSection collapsible="false" showheader="false" columns="1" >
+									<apex:pageBlockSectionItem labelStyle="text-align:left">
+										<apex:outputText value="{!$ObjectType.KimbleOne__ExperienceHistory__c.Fields.KimbleOne__Status__c.Label}"/>
+										<apex:inputText id="ResourceSelfOtherExperienceStatus" value="{!ExperienceHistory_OtherExperience.KimbleOne__Status__c}" styleclass="kimbledropdown ExperienceHistoryStatus null true true" required="true" />
+									</apex:pageblockSectionItem>
+								</apex:pageBlockSection>
+
+							</apex:pageblockSection>
+						</apex:pageBlock>
+
+					</apex:form>
+
+				</apex:outputPanel></div>
+			<script>
+				jQuery(document).ready(function() {
+					if(isSFLightning()) jQuery('input[name="newNote"],input[name="attachFile"]').hide();
+				});
+
+				jQuery(window).load(function()
+				{
+					initialiseItems();
+				});
+				function initialiseItems()
+				{
+					SetupDatePicker();
+				}
+				function SetupDatePicker()
+				{
+					//dateFormat: 'yy-mm-dd',
+					jQuery('.kimbleDatePicker').datepicker({
+							dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+							showOtherMonths: true,
+							selectOtherMonths: true,
+							changeMonth: true,
+							changeYear: true});
+				}
+
+			</script>
+		</apex:define>
+
+	</apex:composition>
+
+</apex:page>

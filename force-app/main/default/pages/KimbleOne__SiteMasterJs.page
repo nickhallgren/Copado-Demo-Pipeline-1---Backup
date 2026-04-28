@@ -1,0 +1,1580 @@
+<apex:page controller="KimbleOne.SiteMasterController" contentType="text/javascript" cache="true"  showHeader="false" sidebar="false">
+
+	<apex:outputPanel layout="none" rendered="{!EnableLightningLinkStyle}">
+	    document.write('<link href="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'LightningLinkStyles.css')}" rel="stylesheet"/>');
+	</apex:outputPanel> 
+
+	<apex:outputPanel layout="none" rendered="{!EnableToggleHighlightStyle}">
+	    document.write('<link href="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'LightningToggleStyle.css')}" rel="stylesheet"/>');
+	</apex:outputPanel> 
+
+	<apex:outputPanel layout="none" rendered="{!!ISBLANK(StylesheetOverrideResource)}">
+	    document.write('<link href="{!URLFOR(StylesheetOverrideResource)}" rel="stylesheet"/>');
+	</apex:outputPanel> 
+
+var __sfdcSessionId = '{!JSENCODE($Api.Session_ID)}';
+
+var KimbleNamespaceWithPeriod = '';
+var KimbleNamespaceWithUnderscores = '';
+var KimbleNamespaceWithOutUnderscores='';
+	<apex:outputPanel layout="none" rendered="{!$Label.kimbleone__namespace != 'null'}">
+		KimbleNamespaceWithPeriod = '{!JSENCODE($Label.kimbleone__namespace)}.';
+		KimbleNamespaceWithUnderscores = '{!JSENCODE($Label.kimbleone__namespace)}__';
+		KimbleNamespaceWithOutUnderscores= '{!JSENCODE($Label.kimbleone__namespace)}';
+	</apex:outputPanel>
+	
+	<apex:outputPanel layout="none" rendered="{!!IsKimbleEnabled}">
+		document.write('<div id="triggers-disabled-overlay" style="top: 100px;right: 0;width: 100%;height: 100%;font-weight: bold;position: absolute;text-align: center;filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);-moz-opacity: 0.9;-khtml-opacity: 0.9;opacity: 0.9;z-index: 1000;background-color: #fefefe;"><div id="triggers-disabled-message" style="position: absolute;top: 50%;height: 10em;margin-top: -2em;width: 100%;color: #b42b33;font-size: 40px;font-weight: bold;">System is undergoing maintenance. <p>Please contact Kimble Support.</p></div></div>');
+	</apex:outputPanel>
+	<apex:outputPanel layout="none" rendered="{!WalkMeEnabled}">
+		(function() {var walkme = document.createElement('script'); walkme.type = 'text/javascript'; walkme.async = true; walkme.src = 'https://cdn.walkme.com/users/2ac8a5acb4674a008cda3b31314462fc/walkme_2ac8a5acb4674a008cda3b31314462fc_https.js'; var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(walkme, s); window._walkmeConfig = {smartLoad:true}; })();
+	</apex:outputPanel>	
+var kimble;
+if (!kimble){
+	kimble = {};
+}
+
+//must be in lower case
+kimble.localeMapping = {'en-us' : '', 
+						'en-ca' : 'en-GB',
+						'en-ie-euro' : 'en-GB',
+						'en-ie' : 'en-GB',
+						'lb' : 'fr', 
+						'fr-lu' : 'fr', 
+						'en-in' : 'en-GB',
+						'en-my' : 'en-GB',
+						'en-sg' : 'en-HK'};
+						
+kimble.numberLocaleMapping = {'fr-ca' : 'fr'};
+						
+kimble.locale = '{!JSENCODE(Locale)}';
+kimble.dateLocale = kimble.locale;
+kimble.regional;
+kimble.user = {};
+kimble.labels = {};
+kimble.pages = {};
+kimble.permissions = {AssignResource : KimbleNamespaceWithUnderscores + 'AssignResource', DeassignResource : KimbleNamespaceWithUnderscores + 'DeassignResource', AssignResourceAsCandidate : KimbleNamespaceWithUnderscores + 'AssignResourceAsCandidate'};
+kimble.user.isAdmin = <apex:outputText value="{!IsAdmin}"/>;
+// required for WalkMe integration
+kimble.version = '1.24';
+kimble.CRMIntegrationMode = '{!CRMIntegrationMode}';
+
+kimble.parseJSON = function(j)
+{
+	try
+	{
+		return JSON.parse(j.replace(/\\"/g, '"'));
+	}
+	catch(e)
+	{
+		return JSON.parse(j);
+	}
+}
+
+kimble.addDays = function(dte, days) {
+	return new Date(dte.getFullYear(), dte.getMonth(), dte.getDate() + days, 0, 0, 0, 0);
+	}
+
+kimble.UTCStringFromMilliseconds = function(seconds) {
+	var s = new Date(seconds).toISOString();
+
+	return s.substr(s, s.indexOf('T'));
+	}
+
+
+$(window).load(function(){
+    
+    jQuery.datepicker.setDefaults($.datepicker.regional['']);
+	
+	// Luxembourgish date locale override
+	jQuery.datepicker.regional.lb.dateFormat = "mm/dd/yy";
+	// Polish date locale override
+	jQuery.datepicker.regional['pl-PL'] = jQuery.extend({}, jQuery.datepicker.regional.pl);
+	jQuery.datepicker.regional.pl.dateFormat = "yy-mm-dd";
+	// English Hong Kong date locale override
+	jQuery.datepicker.regional['en-HK'] = jQuery.extend({}, jQuery.datepicker.regional['']);
+	jQuery.datepicker.regional['en-HK'].dateFormat = "dd/mm/yy";
+	// Hebrew date locale override
+	jQuery.datepicker.regional['iw'] = jQuery.extend({}, jQuery.datepicker.regional['']);
+	jQuery.datepicker.regional['iw'].dateFormat = 'dd/mm/yy';
+	
+	var mappedLocale = kimble.localeMapping[kimble.dateLocale.toLowerCase()];
+	
+	if (mappedLocale != undefined)
+		kimble.dateLocale = mappedLocale;
+
+	if (jQuery.datepicker.regional[kimble.dateLocale] == null)
+		kimble.dateLocale = kimble.locale.split('-')[0];
+		
+	if (jQuery.datepicker.regional[kimble.dateLocale] == null)
+		kimble.dateLocale = '';
+	
+	if (kimble.numberLocaleMapping[kimble.locale.toLowerCase()] != undefined)
+	{
+		kimble.locale = kimble.numberLocaleMapping[kimble.dateLocale.toLowerCase()];
+	}
+	
+	kimble.regional = jQuery.datepicker.regional[kimble.dateLocale];
+	
+	kimble.parseId = function (val)
+	{
+		if (val === null || val === '' || val == undefined) return null;
+		
+		return val;
+	}
+	
+	kimble.parseNumber = function (val, format)
+	{
+		if (val === null || val === '' || val == undefined) return null;
+		
+		return jQuery.parseNumber(val,{format:format, locale:kimble.locale, isFullLocale:false}).valueOf(); 
+	}
+	
+	kimble.formatNumber = function (val, format)
+	{
+		if (val === null || val === '' || val == undefined) return null;
+		
+		return jQuery.formatNumber(val, {format: format, locale:kimble.locale, isFullLocale:false});
+	}
+	
+	kimble.parseDate = function (val, asDate)
+	{
+		if (val == null || val == '') return null;
+		
+		var dte = jQuery.datepicker.parseDate(kimble.regional.dateFormat, val);
+		
+		if (asDate) return dte;
+		
+		return dte.toKimbleUTC();
+	}
+	
+	kimble.formatDate = function (val)
+	{	
+		if (val == '' || val == null) return '';
+		
+		return jQuery.datepicker.formatDate(kimble.regional.dateFormat, val.toDate())
+	}
+	
+	kimble.formatDateTime = function (val)
+	{	
+		if (val == '' || val == null) return '';
+		
+		// the JqueryUI datepicker only supports date so here we use it to format
+		// the date and then append the time to the end (as that has no regional format)
+		return jQuery.datepicker.formatDate(kimble.regional.dateFormat, val.toDateDiscardTime()) + ' ' + val.getTimeFromDateTime()
+	}		
+
+	kimble.formatDateWithFormat = function (val, format)
+	{	
+		if (val == '' || val == null) return '';
+		
+		return jQuery.datepicker.formatDate(format, val.toDate())
+	}	
+
+	kimble.formatDates = function (selector)
+	{
+		var sel = (selector != undefined ? selector : '.kimble-format-date');
+
+		jQuery.each(jQuery(sel), function (i, obj) {
+			var $o = jQuery(obj);
+			$o.text(kimble.formatDate($o.text())).removeClass(sel.replace(/\./g, ""));
+		});
+	}
+	
+	kimble.formatDateTimes = function ()
+	{
+		jQuery.each(jQuery('.kimble-format-date-time'), function (i, obj) {
+			var $o = jQuery(obj);
+			$o.text(kimble.formatDateTime($o.text())).removeClass('kimble-format-date-time');
+		});
+	}
+	
+	kimble.formatCurrencies = function (selector)
+	{
+		var sel = (selector != undefined ? selector : '.kimble-format-currency');
+
+		jQuery.each(jQuery(sel), function (i, obj) {
+			var $o = jQuery(obj);
+			var currencyCode = '';
+			
+			if ($o.attr("data-currency") != null) currencyCode = $o.attr("data-currency") + ' ';
+			
+			if ($o.is('input'))
+			{
+				if ($o.val() != '') $o.val(kimble.formatNumber($o.val(), '#,##0.00'));				
+			}
+			else
+			{
+				if ($o.text() != '') $o.text(currencyCode + kimble.formatNumber($o.text(), '#,##0.00'));
+			}
+			
+			$o.removeClass(sel.replace(/\./g, ""));
+		});
+	}
+	
+	kimble.replaceNull = function (val, def)
+	{
+		return (val == null?def:val);
+	}
+	
+	kimble.replaceValue = function (val, nullVal)
+	{
+		return (val == nullVal || val == null ? null : val);
+	}
+
+	kimble.escapeHTML = function (str) {
+		var p = document.createElement('p');
+		p.appendChild(document.createTextNode(str));
+		return p.innerHTML;
+	}
+
+	kimble.encodeHTML = function(str) {
+		var buf = [];
+
+		for (var i=str.length-1;i>=0;i--) {
+		buf.unshift(['&amp;#', str[i].charCodeAt(), ';'].join(''));
+		}
+
+		return buf.join('');
+	}
+
+	kimble.firstDayIndex = <apex:outputText value="{!FirstDayIndex}"/>;
+
+	jQuery('.format-as-currency-value').each(function(i, obj)
+	{
+		obj.val(kimble.formatNumber(obj.val(), '#,##0.##'));
+	});
+	
+	//lightning overrides
+	if(isSFLightning())
+	{
+		// ensure same body padding as classic for full width pages
+		jQuery('html body').css('padding','10px');
+		
+		// add missing 'Custom299Tab' class to body to restore VF formatting (SF case 14902423)
+		//jQuery('html body').addClass('Custom299Tab');
+		
+		// prevent menu floating out of shallow pages
+		jQuery('#side-bar-container').css('min-height','95vh');
+	}
+
+	kimble.initialiseDatePickers = function()
+	{
+		jQuery('.kimbleDatePicker').datepicker({
+			dateFormat: kimble.regional.dateFormat,
+			firstDay: kimble.firstDayIndex,
+			showOtherMonths: true,
+			selectOtherMonths: true,
+			changeMonth: true,
+			changeYear: true
+		});
+	}
+});								
+
+var currentBoxy = null;
+var currentBoxyDropdownsCount=0;
+var ReferenceDataCache=new Array();//Cache for reference data already loaded on page
+
+function initialiseModalBoxy(contentSelector, windowTitle, appendToElement)
+{
+	if (appendToElement != null)
+		currentBoxy = new Boxy($(contentSelector),{draggable:true, title:windowTitle, modal: true, closeable: false, appendToElement: appendToElement});
+	else
+		currentBoxy = new Boxy($(contentSelector),{draggable:true, title:windowTitle, modal: true, closeable: false});
+
+	currentBoxy.getContent().css('visibility','hidden');
+}
+
+function initialiseNonModalBoxy(contentSelector, windowTitle, appendToElement)
+{
+	currentBoxy = new Boxy($(contentSelector),{draggable:true, title:windowTitle, modal: false, closeable: false, appendToElement: appendToElement}); 
+	currentBoxy.getContent().css('visibility','hidden');
+}
+
+/* STACKED BOXY IMPLEMENTATION - MAYBE THIS SHOULD BE MERGED INTO STANDARD BOXY IMPLEMENTATION*/
+var stackedBoxy = [];
+function initialiseStackedModalBoxy(contentSelector, windowTitle, appendToElement)
+{
+	stackedBoxy.push(new Boxy($(contentSelector),{draggable:true, title:windowTitle, modal: true, closeable: false, appendToElement: appendToElement}));
+
+	stackedBoxy[stackedBoxy.length - 1].getContent().css('visibility','hidden');
+}
+
+function showStackedModalBoxy()
+{
+	var topBoxy = stackedBoxy[stackedBoxy.length - 1];
+	if (topBoxy != null)
+	{
+		getReferenceData();
+		topBoxy.getContent().css('visibility','visible').hide().fadeIn('6000');
+		topBoxy.getContent().find("input:text:visible:first").each(function(){
+		try{
+		$(this).focus();
+		}
+		catch(e)
+		{
+		//error
+		}
+		});//focus on first visible input box
+		topBoxy.center();
+	}
+}
+
+function hideStackedModalBoxy()
+{
+	if(stackedBoxy.length > 0)
+	{
+		var topBoxy = stackedBoxy[stackedBoxy.length - 1];
+		topBoxy.hide();
+		stackedBoxy.pop();
+	}
+}
+
+
+function hideStackedModalBoxyWithErrorCheck(errorSelector)
+{
+	if($(errorSelector + ' &gt; span')[0].children.length == 0) {
+	    hideStackedModalBoxy();
+		return true;
+	}
+	else
+	{
+	 getReferenceData();
+	 return false;
+	}
+}
+
+var showAccountInSummary = false;
+
+var doneOnce = false;
+
+/**
+**
+**Will show a new modal box focusing on the first control
+**/
+function showModalBoxy()
+{
+	if (currentBoxy != null)
+	{
+		getReferenceData();
+	  //	reregisterButtonsToDisable();
+			currentBoxy.getContent().css('visibility','visible').hide().fadeIn('6000');
+			currentBoxy.getContent().find("input:text:visible:first").each(function(){
+						try{
+							$(this).focus();
+						}
+						catch(e)
+						{
+						//error
+						}
+					});//focus on first visible input box
+		sizeModalBoxyToFitHeight();
+		currentBoxy.center();
+	}
+}
+/**
+**
+**Will show a new modal box focusing specified control
+**/
+
+function showModalBoxyWithFocus(obj)
+{
+	if (currentBoxy != null)
+	{
+		getReferenceData();
+	 	currentBoxy.getContent().css('visibility','visible').hide().fadeIn('6000');
+		obj.focus();
+		sizeModalBoxyToFitHeight();
+		currentBoxy.center();
+	}
+}
+function RefreshModalBoxy()
+{
+	getReferenceData();
+}
+function hideModalBoxy()
+{
+	if(currentBoxy != null)
+		currentBoxy.hide();
+}
+
+
+function hideModalBoxyWithErrorCheck(errorSelector)
+{
+	if($(errorSelector + ' &gt; span')[0].children.length == 0) {
+		hideModalBoxy();
+		return true;
+	}
+	else
+	{
+		getReferenceData();
+		return false;
+	}
+}
+
+function sizeModalBoxyToFitHeight()
+{
+	if(jQuery('.boxy-wrapper:visible').height() > window.innerHeight)
+	{
+		var maxHeight = window.innerHeight - jQuery('.boxy-wrapper:visible .title-bar').height() - 25;
+		jQuery('.boxy-wrapper:visible .boxy-content').addClass('boxy-scroll').height(maxHeight);
+	}
+	else
+	{
+		jQuery('.boxy-wrapper:visible .boxy-content').removeClass('boxy-scroll');
+		jQuery('.boxy-wrapper:visible .boxy-content').css('height', 'initial');
+	}
+}
+
+function isSFClassic()
+{
+	return ( (typeof sforce == 'undefined' || typeof sforce.one == 'undefined') );
+}
+
+function isSFLightning()
+{
+	return ( !isSFClassic() );
+}
+
+// window.location can't be used in lightning 
+// so instead we use the lightning js navigation routines
+// we can only use these if in lightning as otherwise they will be undefined
+function safeNavigateToSForceURL(theURL)
+{
+	if(isSFClassic())
+	{
+		// SF Classic
+		window.location = theURL;
+	}
+	else
+	{
+		// SF Lightning
+		sforce.one.navigateToURL(theURL, false);
+	}
+}
+
+function safeNavigateToSForceURLNewTab(theURL)
+{
+	if(isSFClassic())
+	{
+		window.open(theURL);
+	}
+	else
+	{
+		safeNavigateToSForceURL(theURL);
+	}
+}
+
+function safeNavigateToSForceURLForReport(theURL)
+{
+	var launchAsNewTab = '{!LaunchReportsMenuInNewTab}';
+	
+	if(launchAsNewTab == 'true')
+	{
+		window.open(theURL);
+	}
+	else
+	{ 
+		safeNavigateToSForceURL(theURL);
+	}
+}
+
+function safeRedirectToSForceURL(theURL)
+{
+	if(isSFClassic())
+	{
+		// SF Classic
+		window.location = theURL;
+	}
+	else
+	{
+		// SF Lightning
+		sforce.one.navigateToURL(theURL, true);
+	}
+}
+
+function safeRedirectParentToSForceURL(theURL)
+{
+	if(isSFClassic())
+	{
+		// SF Classic
+		window.top.location = theURL;
+	}
+	else
+	{
+		// SF Lightning
+		sforce.one.navigateToURL(theURL, true);
+	}
+}
+
+function safeNavigateToSObject(theObjectId)
+{
+	if(isSFClassic())
+	{
+		// SF Classic
+		window.location = '/' + theObjectId;
+	}
+	else
+	{
+		// SF Lightning
+		sforce.one.navigateToSObject(theObjectId);
+	}
+}
+
+function safeShowSFInlineHover(lookupId, theObjectId)
+{
+	var lightningURLParam = (isSFClassic() ? '' : '&amp;isdtp=p1'); 
+	LookupHoverDetail.getHover(lookupId, '/' + theObjectId + '/m?retURL=%2F' + theObjectId + '&amp;isAjaxRequest=1' + lightningURLParam).show();
+}
+
+function safeHideSFInlineHover(lookupId)
+{
+	LookupHoverDetail.getHover(lookupId).hide();
+}
+
+function referenceDataCallbackSuccess(itemsJson)
+{
+    referenceDataCallbackSuccessReal(itemsJson,this.target);
+}
+function referenceDataCallbackSuccessReal(itemsJson,kimbletextbox)
+{
+  	try
+  	{
+  	referenceDataItemCount--;
+	ReferenceDataCache[kimbletextbox.data('Identifier')]=itemsJson;
+			
+	if(kimbletextbox.next().is('select'))
+    {
+    	//ignore created already by removing former
+    	
+    	kimbletextbox.next().remove();
+    }
+   
+		//create select input fill with options from above
+		var select=$("<select></select>");
+		
+		// give the select an ID based on the source textbox
+		if(kimbletextbox.attr('id') != undefined)
+		{
+			select.attr('id',kimbletextbox.attr('id') + '_SELECT');
+		}
+	    	
+	    select.change(function(){
+	    	$(this).prev().val(this.options[this.selectedIndex].value);
+	    	$(this).prev().change();
+	    	});
+	    	
+	     
+    	if(kimbletextbox.is('.HideControl'))
+    	{
+    		select.attr('class','HideControl');
+    	}	
+	    kimbletextbox.hide();
+	    var curVal=kimbletextbox.val();
+			    
+			
+ 			//alert('IncludeDefaultValue? '+ kimbletextbox.attr('class').split(/\s+/)[4]);
+			//IncludeDefaultValue
+			if (kimbletextbox.attr('class').split(/\s+/)[4]=='true')
+			//if(!(kimbletextbox.is('.NotIncludeDefaultValue')))
+			{
+				select.append($("<option></option>").attr("value","").text("--None--"));   
+	    	}
+	    	var selectedval='';
+	    	$.each(itemsJson, function(key, value)
+			{   
+				if(curVal==value.Id)
+			    {
+			    	 select.
+			          append($("<option></option>").
+			          attr("value",value.Id).attr("selected","selected").text(value.Name)); 
+					selectedval=value.Id;
+			    }
+			    else
+			    {
+			   		select.
+			          append($("<option></option>").
+			          attr("value",value.Id).text(value.Name)); 
+					/**if (kimbletextbox.attr('class').split(/\s+/)[5] == 'true')
+					if(key==0)
+					{
+						selectedval=value.Id;
+						
+					}**/
+			    }
+			});
+			
+			if (itemsJson.length > 0 &amp;&amp; kimbletextbox.attr('class').split(/\s+/)[4]=='false')
+			{
+				if(selectedval=='')
+				kimbletextbox.val(itemsJson[0].Id);
+				else
+				kimbletextbox.val(selectedval);
+			}
+			
+			//alert('IsMandatory? '+ kimbletextbox.attr('class').split(/\s+/)[3]);			
+			//IsMandatory?
+			if (kimbletextbox.attr('class').split(/\s+/)[3]=='true'){ 
+			//if((kimbletextbox.is('.IsMandatory'))) {
+
+				var parent = kimbletextbox.parent();
+				var kimbletextboxcopy = kimbletextbox.clone(); //clean copy
+				
+				//we are going to remove all the children. Before we will save kimbletextbox to write it again (between other html elements with more things)			
+				//delete all children!
+				parent.children().each(function(){
+					$(this).remove();
+				});
+
+				var firstchild = $("<div></div>").attr("class","requiredInput");
+				firstchild.append ( $("<div></div>").attr("class","requiredBlock") );
+				//kimbletextboxcopy.after(select);
+				firstchild.append (  kimbletextboxcopy );
+				
+				parent.append(firstchild);
+				
+				kimbletextboxcopy.after(select);
+			} else {
+				kimbletextbox.after(select);
+			}
+			
+			
+			<!-- if (kimbletextbox.attr('class').split(/\s+/)[5] == 'true')//run onclick events
+				if(selectedval!='')
+					{
+				
+						select.change();
+						//$('#'+selectname).change();
+						//document.getElementById(kimbletextbox.attr('name')+'_SELECT').onchange();
+						ToggleAControlsClass('.PeriodRateBandList','false',5);
+						kimbletextbox.attr('value',selectedval);// doesn't work explicitly doing this for now
+					}
+			 -->
+			//kimbletextbox.data('root',select);
+			
+	    	//onselectedchange event set value of input
+	    	
+	    	
+	 }
+	 catch(err)
+	 {
+	 	var vDebug = ""; 
+	    for (var prop in err) 
+	    {  
+	       vDebug += "property: "+ prop+ " value: ["+ err[prop]+ "]\n"; 
+	    } 
+	    vDebug += "toString(): " + " value: [" + err.toString() + "]"; 
+	    alert(vDebug); 
+	 }   	
+    
+}
+
+var referenceDataItemCount=0;
+
+function getReferenceData()
+{
+	
+      if (referenceDataItemCount > 0)
+      {
+      	//alert('a='+referenceDataItemCount ); 
+        return;
+      }    
+      var kimbledropdowns = $('.kimbledropdown, .kimblecustomlookup,.kimblecustomlookup2');
+      
+      referenceDataItemCount = kimbledropdowns.length;
+		//alert('n'+referenceDataItemCount ); 
+        
+	
+    kimbledropdowns.each(function(){
+    	//load ref data items based on this.class
+    	var itemsJson;
+    	//var aClass = $(this).attr('class').split(' ')[0];
+    	//if (aClass == 'kimbledropdown')
+    	if ($(this).is('.kimbledropdown'))
+    	
+    	{
+    	
+    		GetReferenceDataItems($(this).attr('class').split(/\s+/)[1],$(this));
+    	}
+    	else if($(this).is('.kimblecustomlookup'))
+    	{
+    		GetReferenceDataItemsByNameAndFilter($(this).attr('class').split(/\s+/)[1],$(this).attr('class').split(/\s+/)[2],$(this));
+    	}
+    	else
+    	{
+    		GetReferenceDataItemsByNameAndTwoFilters($(this).attr('class').split(/\s+/)[1],$(this).attr('class').split(/\s+/)[2],$(this).attr('class').split(/\s+/)[6],$(this));
+    	}
+    	
+    });
+}
+
+
+
+function ToggleAControlsClass(controlidcls,newvalue,index)
+{
+
+	var newclasses='';
+	var arr=  $(controlidcls).attr('class').split(/\s+/);
+	for(key in arr )
+	{
+		value=arr[key];
+		if(key==index)
+			newclasses=newclasses+newvalue+' ';
+			else
+			newclasses=newclasses+value+' ';
+		}
+		$(controlidcls).attr('class',newclasses);
+}
+
+  function DisableButton(buttona,altText)
+  {
+   	   $('.'+buttona).attr('disabled','disabled');
+	   $('.'+buttona).removeClass('btn');
+	   $('.'+buttona).addClass('btnDisabled');
+       if(altText!='')
+	   {
+		 	$('.'+buttona).attr('value',altText);
+	   }
+   }
+    
+   function EnableButton(buttona,origText)
+   {
+   	  	$('.'+buttona).removeAttr('disabled');
+		$('.'+buttona).removeClass('btnDisabled');
+		$('.'+buttona).addClass('btn');
+		if(origText!='')
+		{
+			$('.'+buttona).attr('value',origText);
+		}
+	}
+	function DisableButtonPanel(buttonpanel,altText,specifyButtons)
+    {
+       	var childSpecified=(specifyButtons.length>0)?true:false;
+	   	
+	   	$('.'+buttonpanel).children().each(function() {
+	   		
+	   		if(childSpecified)
+	   		{	
+				for(a in specifyButtons)
+	   			{
+	   			if($(this).is('.'+specifyButtons[a]))
+	   	   			{
+			   	   		 $(this).attr('disabled','disabled');
+			   			 $(this).removeClass('btn');
+			   			 $(this).addClass('btnDisabled');
+		       			if(altText!='')
+			   			{
+				 			$(this).attr('value',altText);
+			   			};
+		   			}
+	   	   			
+	   	   		}
+	   	   	}
+	   	   	else if($(this).is('.IgnoreButtonWhileDisabling'))
+	   	   	{
+	   	   	
+	   	   	}
+	   	   	else
+	   	   	{
+	   	   		 $(this).attr('disabled','disabled');
+	   			 $(this).removeClass('btn');
+	   			 $(this).addClass('btnDisabled');
+       			if(altText!='')
+	   			{
+		 			$(this).attr('value',altText);
+	   			}
+	  	   	}
+	    });
+   }
+   function EnableButtonPanel(buttonpanel)
+   {
+   	$('.'+buttonpanel).children().each(function() {
+   
+      	$(this).removeAttr('disabled');
+		$(this).removeClass('btnDisabled');
+		$(this).addClass('btn');
+	   });                  
+	}
+   
+   function DisableParentsChildren(obj,altText)
+   {
+		
+   		obj.parent().children().each(function() {
+   	   		if($(this).is('.IgnoreButtonWhileDisabling'))
+	   	   	{
+	   	   	}
+	   	   	else
+	   	   	{
+	   	   		 $(this).attr('disabled','disabled');
+	   			 $(this).removeClass('btn');
+	   			 $(this).addClass('btnDisabled');
+       			if(altText!='')
+	   			{
+		 			$(this).attr('value',altText);
+	   			}
+	  	   	}
+  	 	});
+   }
+	function DisableButtonA(obj,altText)
+	{
+		obj.attr('disabled','disabled');
+	   	obj.removeClass('btn');
+	   obj.addClass('btnDisabled');
+       	if(altText!='')
+	   	{
+		 	obj.attr('value',altText);
+	   	}
+	}
+	
+	function UncheckOrCheckGroup(checkedobj,groupname)
+	{
+		if(checkedobj.is(':checked'))
+		{
+			jQuery.each(
+				$('input:checkbox[name='+groupname+']'), function(i,obj)
+				{
+					obj.checked=true;
+				}
+			);
+		}
+		else
+		{
+			jQuery.each(
+				$('input:checkbox[name='+groupname+']'), function(i, obj)
+				{
+					obj.checked=false;
+				}
+			);
+		}
+	}
+	function UnCheckParent(checkedobj,parentID)
+	{
+		if(!checkedobj.is(':checked'))
+		{
+			$('#'+parentID)[0].checked=false;
+		}
+	}
+	
+	function BlockSection(sectionId)
+	{
+		$(sectionId).block({  message: 'Please Wait...'  });
+	}
+	function BlockSectionNoMsg(sectionId)
+	{
+		$(sectionId).block({  message: null /**,  css: {cursor:'pointer',backgroundColor:'#A8A8A8 ' } **/});
+	}
+	function UnblockSection(sectionId)
+	{
+		$(sectionId).unblock(); 
+	}
+	function reregisterButtonsToDisable()
+	{
+	 //	$('.DisableButtonWhileBusy').each(function(){
+	 //	$(this).live('click', function() {
+	 //	$(this).click(function() {
+	 ///		alert($(this).attr('onclick'));
+ 	//		DisableParentsChildren($(this),'Reloading...',[]);
+	//	});
+	//	});
+			// .live removed from Jquery 1.7 onwards. Following instructions here: http://api.jquery.com/live/
+			// the commented .live implementation is replaced with .on
+			//$('.DisableButtonWhileBusy').live('click', function() {
+			$(document).on("click", ".DisableButtonWhileBusy", function() {
+	 	
+	 		
+ 			DisableParentsChildren($(this),'Reloading...',[]);
+	
+		});
+		
+	}
+	function hideControls(query)
+	{
+		$(query).addClass('HideControl');
+	}
+	function unHideControls(query)
+	{
+		$(query).removeClass('HideControl');
+	}
+	
+	function defaultCursorPosition() { 
+		//we should avoid the input visible text box id=phSearchInput (searching box at the top of the screen)
+		$("input:not(#phSearchInput):text:visible:first").each(function(){$(this).focus();})
+		
+	}
+	
+	
+	$(document).ready(initFunctions)
+	
+	function initFunctions(){	
+		
+		if (typeof DatePicker != 'undefined')
+		{
+		DatePicker.prototype.position = function () {
+		    if ($(this.myElement).hasClass('kimbleDatePicker'))
+		    {
+		    	this.shim.setStyle('display','none');
+		    }
+		    else
+		    {
+			    var matched = false;
+			    for (var a = 0, b = 0, c = this.myElement; c != null &amp;&amp; c != this.calendarDiv.offsetParent;) {
+			        a += c.offsetLeft;
+			        b += c.offsetTop;
+			        c = c.offsetParent;
+			        if (c == this.calendarDiv.offsetParent)
+			        	matched = true;
+			    }
+			    if (getObjY(this.myElement) + this.calendarDiv.offsetHeight > getScrollY() + getWindowHeight()) b -= this.calendarDiv.offsetHeight;
+			    else b += this.myElement.offsetHeight;
+			    c = "left";
+			    if (LC.isRtlPage()) {
+			        c = "right";
+			        a = this.calendarDiv.offsetParent.offsetWidth - a - this.myElement.offsetWidth
+			    }
+			    if (!matched)
+			    	b = b - (isSFClassic() ? $('.bodyDiv') : $('#content-pane').closest('body').parent()).offset().top;
+			    	
+			    this.shim.setStyle(c, a + "px");
+			    this.shim.setStyle("top", b + "px");
+			    $(this.calendarDiv).css('z-index', '2000');
+			 }
+		};
+		}
+		
+		//Extend sforce xml object to read property with namespace
+		sforce.Xml.prototype.value = getWithNamespace;
+		sforce.Xml.prototype.dateValue = getDateWithNamespace;
+		
+		String.prototype.replaceAt=function(index, char) {
+      		return this.substr(0, index) + char + this.substr(index+char.length);
+   		}
+   		
+   		if (typeof String.prototype.endsWith !== 'function') {
+    		String.prototype.endsWith = function(suffix) {
+        		return this.indexOf(suffix, this.length - suffix.length) !== -1;
+			};
+		}
+   		
+		ReferenceDataCache=new Array();
+		getReferenceData();
+		reregisterButtonsToDisable();
+		
+		defaultCursorPosition();
+		
+		String.prototype.format = function() {
+    		var s = this,
+        	i = arguments.length;
+
+    		while (i--) {
+        		s = s.replace(new RegExp('\\{' + i + '\\}', 'gm'), arguments[i]);
+    		}
+    		return s;
+		};
+		
+		String.prototype.toDate = function () {
+			
+			var parts = this.split('-');
+			if (parts.length != 3) return null;
+			
+			return new Date(parts[0], parts[1] - 1, parts[2]);
+			
+		};
+
+		String.prototype.toDateDiscardTime = function () {
+			
+			var datetimeparts = this.split('T');
+			var dateparts = datetimeparts[0].split('-');
+
+			if (dateparts.length != 3) return null;
+			
+			return new Date(dateparts[0], dateparts[1] - 1, dateparts[2]);
+		};
+				
+		String.prototype.getTimeFromDateTime = function (includeSeconds) {
+			
+			var datetimeparts = this.split('T');
+			var dateparts = datetimeparts[0].split('-');
+			var timeparts = datetimeparts[1].split(':');
+
+			if (dateparts.length != 3) return null;
+			
+			// time portion will depend on whether the time has been recorded with seconds
+			var theTimeString = '';
+			for(var counter = 0; counter &lt; timeparts.length; counter++)
+			{
+				if(counter==0) theTimeString = timeparts[counter].padToTwoDigits();
+				else if(counter==1) theTimeString += ':' + timeparts[counter].padToTwoDigits();
+				else if(counter==2 &amp;&amp; includeSeconds) theTimeString += ':' + timeparts[counter].replace('Z', '').padToTwoDigits();
+			}
+			
+			return theTimeString;
+			
+		};
+		
+		String.prototype.padToTwoDigits = function () {
+		    return this > 9 ? "" + this: "0" + this;
+		}
+				
+		Date.prototype.toKimbleUTC = function () {
+			
+			return this.getFullYear() + '-' + (this.getMonth() + 1) + '-' + this.getDate();
+			
+		};
+
+		Date.prototype.toKimbleUTCWithPadding = function () {
+
+			return this.getFullYear() + '-' + (this.getMonth() + 1).padToTwoDigits() + '-' + this.getDate().padToTwoDigits();
+
+		};
+
+		Number.prototype.padToTwoDigits = function() {
+			return this > 9 ? "" + this: "0" + this;
+		}
+
+		Date.prototype.kimbleAddDays = function(days){
+			return new Date(this.getFullYear(), this.getMonth(), this.getDate() + days, 0, 0, 0, 0);
+    	}
+
+		String.prototype.kimbleUTCAddDays = function(days){
+			return this.toDate().kimbleAddDays(Math.ceil(days)).toKimbleUTC();
+    	}
+		///
+	}
+	
+	//PUT ALL OUR WEBSERVICE CALLS HERE
+	
+	
+	
+	
+	function getWithNamespace(property)
+	{
+		return this.get(KimbleNamespaceWithUnderscores + property);
+	}
+	
+	function getDateWithNamespace(property)
+	{
+		return this.getDate(KimbleNamespaceWithUnderscores + property);
+	}
+	
+	function GetReferenceDataItems(domain,obj)
+	{
+		if(ReferenceDataCache[domain]!=null)
+		{
+			referenceDataCallbackSuccessReal(ReferenceDataCache[domain],obj);
+			return;
+		}
+		obj.data('Identifier',domain);
+		var callback = {onSuccess : referenceDataCallbackSuccess,target:obj, onFailure : function(e){onError(e)}};
+		sforce.apex.execute(KimbleNamespaceWithPeriod + 'ReferenceDataWebService','GetItems',{domain:domain},callback);
+	}
+	
+	function GetReferenceDataItemsByNameAndFilter(name, filter,obj)
+	{
+		if(ReferenceDataCache[name+':'+filter]!=null)
+		{
+			referenceDataCallbackSuccessReal(ReferenceDataCache[name+':'+filter],obj);
+			return;
+		}
+		obj.data('Identifier',name+':'+filter);
+		var callback = {onSuccess : referenceDataCallbackSuccess,target:obj, onFailure : onError};
+		sforce.apex.execute(KimbleNamespaceWithPeriod + 'ReferenceDataWebService',name,{filter:filter},callback);
+	}
+	function GetReferenceDataItemsByNameAndTwoFilters(name, filter1,filter2,obj)
+	{
+		if(ReferenceDataCache[name+':'+filter1+'-'+filter2]!=null)
+		{
+			referenceDataCallbackSuccessReal(ReferenceDataCache[name+':'+filter1+'-'+filter2],obj);
+			return;
+		}
+		obj.data('Identifier',name+':'+filter1+'-'+filter2);
+		var callback = {onSuccess : referenceDataCallbackSuccess,target:obj, onFailure : onError};
+		sforce.apex.execute(KimbleNamespaceWithPeriod + 'ReferenceDataWebService',name,{filter1:filter1,filter2:filter2},callback);
+	}
+	function onError(e)
+	{
+		
+		var errormsg=(e+' ').replace(/\s/g, "+");//replace spaces with +, query strings represent spaces with +
+		errormsg=errormsg.replace(/#/g, "+");// #s cause breakage in text
+//		window.location.href='{!$Page.ApplicationError}'+'?msg={!$Label.JavaScriptReloadingErrorMessage}&amp;StackTrace='+errormsg;
+		
+	}
+	
+	function GetCurrencyExchangeRate(from,to,callbackmethod,obj)
+	{
+		var callback = {onSuccess : callbackmethod,target:obj, onFailure : onError};
+		sforce.apex.execute(KimbleNamespaceWithPeriod + 'CurrencyWebService','GetCurrencyExchangeRate',{fromCurrencyIsoCode:from,toCurrencyIsoCode:to},callback);
+	}
+	function GetCurrencyExchangeRateForDate(from,to, forDate, callbackmethod,obj)
+	{
+		var callback = {onSuccess : callbackmethod,target:obj, onFailure : onError};
+		sforce.apex.execute(KimbleNamespaceWithPeriod + 'CurrencyWebService','GetCurrencyExchangeRateForDate',{fromCurrencyIsoCode:from,toCurrencyIsoCode:to, theDate:forDate},callback);
+	}
+
+	function RunJob(jobId, obj, onSuccessCallback)
+	{
+		//retry job if job throws error message - job will not throw error if it fails.
+		var runJobError = function(e) {
+			console.log('Retrying job due to error ' + e);
+			RunJob(jobId, obj, onSuccessCallback);
+		};
+
+		var callback = {onSuccess : onSuccessCallback, target:obj, onFailure : runJobError};
+		sforce.apex.execute(KimbleNamespaceWithPeriod + 'JobWebService','RunJob',{jobId:jobId}, callback);
+	}
+	
+	
+	function simpleReferenceDataCallbackSuccess(itemsJson)
+	{
+
+	
+ 	 	var select= this.target;
+ 	 		select.html('');
+ 	 		if(select.is('.IncNoneOption'))
+ 	 		{
+ 	 			 select.
+			          append($("<option></option>").attr("value",'').text('--None--')); 
+ 	 		}
+ 	 		var isFound=false;
+ 	 		$.each(itemsJson, function(key, value)
+			{   
+					if(select.data('selectedval')==value.Id)
+					{
+						select.append($("<option></option>").attr("value",value.Id).attr("selected","selected").text(value.Name)); 
+						isFound=true;
+					}
+					else
+					 	select.append($("<option></option>").attr("value",value.Id).text(value.Name)); 
+			});
+			if(!isFound) if(select.is('.IncNilOption'))
+			{
+				 select. append($("<option></option>").attr("value",select.data('selectedval')).attr("selected","selected").text('--  --')); 
+			}
+			
+	    
+	    if(select.is('.RunOnChangeAuto'))
+	    {
+	    	select.change();
+	    }	
+	    	
+    
+	}
+	
+	function LoadSection(ContentDivId,Url,CallbackSec)
+	{
+		
+		$('#'+ContentDivId).html(' <center><img src="{!URLFOR($Resource.LoadingImage)}"/><br/>{!$Label.Loading}</center>');
+		
+		$.ajax({
+                        type: "GET",
+                        url: Url,
+                        async: true,
+                         dataType: "text",
+                        success: function(data){
+                   				
+                   				$('#'+ContentDivId).html(data);
+      						if(CallbackSec!=null)
+  								CallbackSec();
+  							  	
+  							}
+
+                        });
+	}
+	
+	function loadJobsPopup(obj, contextId, oncomplete)
+	{
+		$.ajax({
+                   type: "GET",
+                   url: '{!$Page.JobsPendingPopup}?id=' + contextId,
+                   async: true,
+                   dataType: "text",
+                   success: function(data){
+                   		var h = obj.height();
+                   		obj.html(data);
+                   		obj.find('#pendingJobsBody').height(h - 50);
+      					RunAllJobs(oncomplete);
+      				}
+				});
+	}
+	
+	function loadJobsInline(obj, contextId, title, oncomplete)
+	{
+		$.ajax({
+                   type: "GET",
+                   url: '{!$Page.JobsPendingInline}?id=' + contextId + '&amp;title=' + title, 
+                   async: true,
+                   dataType: "text",
+                   success: function(data){
+                   		var h = obj.height();
+                   		obj.html(data);
+                   		if (h > 50)	obj.find('#pendingJobsBody').height(h - 50);
+      					RunAllJobs(oncomplete);
+      				}
+				});
+	}
+
+	function loadSpecificJobsInline(obj, contextId, jobName, title, oncomplete)
+	{
+		$.ajax({
+		type: "GET",
+		url: '{!$Page.JobsPendingInline}?id=' + contextId + '&amp;jobName=' + jobName + '&amp;title=' + title,
+		async: true,
+		dataType: "text",
+		success: function(data){
+		var h = obj.height();
+		obj.html(data);
+		if (h > 50)	obj.find('#pendingJobsBody').height(h - 50);
+		RunAllJobs(oncomplete);
+		}
+		});
+	}
+
+	function loadAllJobsInline(obj, contextId, title, oncomplete)
+	{
+		$.ajax({
+				type: "GET",
+				url: '{!$Page.JobsPendingInline}?allJobs=1&amp;id=' + contextId + '&amp;title=' + title,
+				async: true,
+				dataType: "text",
+				success: function(data){
+					var h = obj.height();
+					obj.html(data);
+					if (h > 50)	obj.find('#pendingJobsBody').height(h - 50);
+					RunAllJobs(oncomplete);
+				}
+		});
+	}
+
+	var silentJobsToRun;
+	var silentThreads = 2;
+
+	function loadAndRunSilentJobs(contextId)
+	{
+		//Enable Silent Jobs setting
+		if (contextId == null || contextId == '' || <apex:outputText value="{!!SilentJobsModeEnabled}"/>) return;
+
+		jQuery.ajax({type: "GET",
+			url: '{!$Page.JobsPendingInline}?id=' + contextId + '&amp;silent=true',
+			async: true,
+			dataType: "json",
+			success: function (data) {
+				silentJobsToRun = data;
+
+				for (var i=0;i&lt;silentThreads;i++){
+					if(silentJobsToRun.length != 0){
+						setTimeout(function(){ RunAllSilentJobs(); }, (i+1) * 1000);
+					}
+				}
+			}
+		});
+	}
+
+	function RunAllSilentJobs()
+	{
+		if (silentJobsToRun.length == 0) return;
+
+		var jobId = silentJobsToRun.shift();
+
+		RunSilentJob(jobId, function(){RunAllSilentJobs()});
+	}
+
+	function RunSilentJob(jobId, onSuccessCallback)
+	{
+		var callback = {onSuccess : onSuccessCallback, target:null, onFailure : function(e){console.log(e);}};
+		sforce.apex.execute(KimbleNamespaceWithPeriod + 'JobWebService','RunJob',{jobId:jobId}, callback);
+	}
+
+	function initialiseKTips()
+	{
+		var enableKTips = <apex:outputText value="{!ShowKimbleGuidanceTooltips}"/>; 
+		
+		if(enableKTips)
+		{
+			jQuery('[k-tip]').qtip('destroy', true).each(function()
+			{
+			   jQuery(this).qtip({content: jQuery(this).attr('k-tip'), position: {my: 'bottom center', at: 'top center'},style: {classes: 'qtip-light qtip-shadow qtip-rounded k-tip-qtip'}});
+			});
+		}
+	}		
+
+	function days_between(date1, date2) {
+
+    // The number of milliseconds in one day
+    var ONE_DAY = 1000 * 60 * 60 * 24
+
+    // Convert both dates to milliseconds
+    var date1_ms = date1.getTime()
+    var date2_ms = date2.getTime()
+
+    // Calculate the difference in milliseconds
+    var difference_ms = Math.abs(date1_ms - date2_ms)
+    
+    // Convert back to days and return
+    return Math.round(difference_ms/ONE_DAY)
+
+}
+
+function daysBetween(date1, date2) {
+
+    // The number of milliseconds in one day
+    var ONE_DAY = 1000 * 60 * 60 * 24;
+
+    // Convert both dates to milliseconds
+    var date1_ms = date1.getTime();
+    var date2_ms = date2.getTime();
+
+    // Calculate the difference in milliseconds
+    var difference_ms = date1_ms - date2_ms;
+    
+    // Convert back to days and return
+    return Math.round(difference_ms/ONE_DAY);
+
+}
+
+function kimbleGetStartOfWeek(dte)
+{
+	var offset = dte.getDate() - dte.getDay() +  kimble.firstDayIndex - (dte.getDay() >= kimble.firstDayIndex ? 0 : 7);
+	return new Date(dte.getFullYear(), dte.getMonth(), offset , 0, 0, 0, 0);
+}
+
+var KimbleLookupPage = '{!$Page.Lookup}';
+
+function createCookie(name, value) {
+    document.cookie = escape(name) + "=" + escape(value) + "; path=/";
+}
+
+function readCookie(name) {
+    var nameEQ = escape(name) + "=";
+    var ca = document.cookie.split(';');
+    for (var i = 0; i &lt; ca.length; i++) {
+        var c = ca[i];
+        while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) == 0) return unescape(c.substring(nameEQ.length, c.length));
+    }
+    return null;
+}
+var retryLimit = 3;
+var waitTime = 2000;
+var retryCount = 0;
+
+function checkOperationSuccess(obj)
+{
+	if (jQuery('.KimbleRetryOperation').length > 0)
+	{
+		if (retryCount &lt; retryLimit)
+		{
+			jQuery('.KimbleRetryOperation').closest('.message').hide();
+		
+			if (obj.hasClass('DisableButtonWhileBusy'))
+				DisableParentsChildren(obj,'Retrying...',[]);
+		
+			window.setTimeout(function(){obj.click();}, waitTime);
+		
+			retryCount++;
+			return false;
+		}
+		else
+		{
+			retryCount = 0;
+			return true;
+		}
+	}
+	else
+	{
+		retryCount = 0;
+		return true;
+	}
+}
+
+function checkRemoteActionSuccess(e, fn)
+{
+	if (e.message == 'KimbleRetryOperation')
+	{
+		if (retryCount &lt; retryLimit)
+		{
+			window.setTimeout(fn, waitTime);
+		
+			retryCount++;
+			return false;
+		}
+		else
+		{
+			e.message = 'Kimble is currently busy please try again.';
+			retryCount = 0;
+			return true;
+		}
+	}
+	else
+	{
+		retryCount = 0;
+		return true;
+	}
+}
+
+function getComputedHeight(sourceSelector)
+{
+	var h = null;
+	if(jQuery(sourceSelector)[0] != undefined)
+	{
+		h = jQuery(sourceSelector)[0].getBoundingClientRect().height;
+	}
+	return h;
+}
+
+function matchComputedHeight(sourceSelector, targetSelector)
+{
+	var actualH = getComputedHeight(sourceSelector);
+	if(actualH != null) jQuery(targetSelector).css('height', actualH + 'px');
+}
+
+function getComputedWidth(sourceSelector)
+{
+	var w = null;
+	if(jQuery(sourceSelector)[0] != undefined)
+	{
+		w = jQuery(sourceSelector)[0].getBoundingClientRect().width;
+	}
+	return w;
+}
+
+function matchComputedWidth(sourceSelector, targetSelector)
+{
+	var actualW = getComputedWidth(sourceSelector);
+	if(actualW != null) jQuery(targetSelector).css('width', actualW + 'px');
+}
+
+function browserSupportsHtml5Type(theType)
+{
+	var i = document.createElement('input');
+	i.setAttribute('type', theType);
+	return i.type !== 'text';
+}
+
+function hasEllipsis(e)
+{
+	return (e.scrollWidth > e.offsetWidth);
+}
+
+function refreshPoller(statusObjectName, statusFieldName, statusObjectId, origStatusVal, callback)
+{
+	var statusPollResult = sforce.connection.query("SELECT Id, " + statusFieldName + " FROM " + statusObjectName + " WHERE Id='" + statusObjectId + "'");
+	var currentStatus = statusPollResult.records[statusFieldName];
+
+	if(origStatusVal != currentStatus)
+	{
+		clearInterval();
+		callback();
+	}
+}
+
+function reloadVFPage()
+{
+	window.location.reload();
+}
+
+function traceWhoops()
+{
+	console.log(decodeURI(jQuery('a[href^="mailto:appmonitor"]').attr('href')));
+}
+
+function traceAction(theMsg)
+{
+	//console.log(theMsg);
+	//console.timeStamp(theMsg);
+}
+
+function traceActionStart(timerName)
+{
+	//console.time(timerName);
+}
+
+function traceActionEnd(timerName)
+{
+	//console.timeEnd(timerName);
+}
+
+// Pub/Sub Implementation
+;(function( $, window, document ) {
+var o = $( {} );
+$.each({
+trigger: 'publish',
+on:         'subscribe',
+off:         'unsubscribe',
+one:       'subscribeOnce'
+}, function( key, val ){
+$[val] = function() {
+o[key].apply( o, arguments );
+}
+});
+})( jQuery, window, document, undefined );
+
+kimble.pages['ActivityAssignmentHover'] = '{!$Page.ActivityAssignmentHover}?id=';
+kimble.pages['TaskAssignmentHover'] = '{!$Page.TaskAssignmentHover}?id=';
+kimble.pages['ResourceProfile'] = '{!$Page.ResourceProfile}?id=';
+
+// Dashboard Cards - supporting ajx load on DeliveryGroupDashboard
+kimble.pages['DeliveryGroupStatusCard'] = '{!$Page.DeliveryGroupStatusCard}?id=';
+kimble.pages['MarginSummaryCard'] = '{!$Page.MarginSummaryCard}?id=';
+kimble.pages['RevenueSummaryCard'] = '{!$Page.RevenueSummaryCard}?id=';
+kimble.pages['StageSummaryCard'] = '{!$Page.DeliveryGroupStageSummaryCard}?id=';
+kimble.pages['CostSummaryCard'] = '{!$Page.CostSummaryCard}?id=';
+kimble.pages['FinancialSummaryCard'] = '{!$Page.FinancialSummaryCard}?id=';
+kimble.pages['ProposalRiskSummaryCard'] = '{!$Page.ProposalRiskSummaryCard}?id=';
+kimble.pages['DeliveryGroupRiskSummaryCard'] = '{!$Page.DeliveryGroupRiskSummaryCard}?id=';
+kimble.pages['DeliveryProgramRiskSummaryCard'] = '{!$Page.DeliveryRiskSummaryCard}?programId=';
+kimble.pages['DeliveryPortfolioRiskSummaryCard'] = '{!$Page.DeliveryRiskSummaryCard}?portfolioId=';
+kimble.pages['DeliveryProgramFinancialSummaryCard'] = '{!$Page.DeliveryProgramFinancialSummaryCard}?programId=';
+kimble.pages['DeliveryPortfolioFinancialSummaryCard'] = '{!$Page.DeliveryProgramFinancialSummaryCard}?portfolioId=';
+kimble.pages['RiskSummaryCard'] = '{!$Page.RiskSummaryCard}?id=';
+kimble.pages['IssueSummaryCard'] = '{!$Page.IssueSummaryCard}?id=';
+kimble.pages['TrackingPlanSummaryCard'] = '{!$Page.TrackingPlanSummaryCard}?id=';
+kimble.pages['PlanMilestoneSummaryCard'] = '{!$Page.PlanMilestoneSummaryCard}?id=';
+kimble.pages['MilestoneSummaryCard'] = '{!$Page.MilestoneSummaryCard}?id=';
+kimble.pages['DeliveryGroupFieldsCard'] = '{!$Page.DeliveryGroupFieldsCard}?id=';
+kimble.pages['DeliveryGroupCharmsCard'] = '{!$Page.DeliveryGroupCharmsCard}?id=';
+kimble.pages['DeliveryPortfolioCharmsCard'] = '{!$Page.DeliveryPortfolioCharmsCard}?id=';
+kimble.pages['DeliveryProgramCharmsCard'] = '{!$Page.DeliveryProgramCharmsCard}?id=';
+kimble.pages['ResourceCharmsCard'] = '{!$Page.ResourceCharmsCard}?id=';
+kimble.pages['BusinessUnitCharmsCard'] = '{!$Page.BusinessUnitCharmsCard}?id=';
+kimble.pages['DeliveryGroupInvoicesCharmsCard'] = '{!$Page.DeliveryGroupInvoicesCharmsCard}?id=';
+kimble.pages['ProposalCharmsCard'] = '{!$Page.ProposalCharmsCard}?id=';
+kimble.pages['OtherResourcedActivityCharmsCard'] = '{!$Page.OtherResourcedActivityCharmsCard}?id=';
+kimble.pages['ResourceDaySummary'] = '{!$Page.ResourceDaySummary}?id=';
+kimble.pages['StatusSummaryCard'] = '{!$Page.StatusSummaryCard}?id=';
+kimble.pages['IntercompanySummaryCard'] = '{!$Page.IntercompanySummaryCard}?id=';
+
+kimble.pages['Menu'] = '{!$Page.Menu}';
+
+kimble.labels['InsufficientForecastableDaysMessage'] = '{!JSENCODE($Label.InsufficientForecastableDaysMessage)}';
+kimble.labels['ExceededForecastUsageMessage'] = 'Cannot schedule days, forecast usage is exceeded.';
+kimble.labels['ResourceOverUtilisedError'] = 'Resource is over utilised';
+kimble.labels['FirmTimeAfterEndDateMessage'] = '{!JSENCODE($Label.FirmTimeAfterEndDateMessage)}';
+kimble.labels['ResourceOverUtilisedWarning'] = '{!JSENCODE($Label.ResourceOverUtilisedWarning)}';
+kimble.labels['ClickForActionsMessage'] = '{!JSENCODE($Label.ClickForActionsMessage)}';
+kimble.labels['Calendar'] = '{!JSENCODE($Label.CalendarLabel)}';
+kimble.labels['ResourceAssignedBeforeTheirStartDate'] = '{!JSENCODE($Label.ResourceAssignedBeforeTheirStartDate)}';
+kimble.labels['ResourceAssignedAfterTheirEndDate'] = '{!JSENCODE($Label.ResourceAssignedAfterTheirEndDate)}';
+kimble.labels['NoResourcesFound'] = '{!JSENCODE($Label.NoResourcesFound)}';
+kimble.labels['TooManyResourcesFoundForCapabilitySearch'] = '{!JSENCODE($Label.RestrictedResultsForCapabilitySearchMessage)}';
+kimble.labels['TooManyResourcesFound'] = '{!JSENCODE($Label.RestrictedResultsMessage)}';
+kimble.labels['ignore-nbd'] = '{!$ObjectType.PlanTask__c.Fields.IncludeNonBusinessDays__c.Label}';
+kimble.labels['FirmTimeBeforeStartDateMessage'] = '{!JSENCODE($Label.FirmTimeBeforeStartDateMessage)}';
+kimble.labels['UnsavedChangesHeading'] = '{!JSENCODE($Label.UnsavedChangesHeading)}';
+kimble.labels['UnsavedChangesMessage'] = '{!JSENCODE($Label.UnsavedChangesMessage)}';
+kimble.labels['RequiredValue'] = '{!JSENCODE($Label.RequiredValue)}';
+kimble.labels['UnsavedChangesPlan'] = '{!JSENCODE($Label.UnsavedChangesPlan)}';
+kimble.labels['ResourceOverUtilisedAllWarning'] = '{!JSENCODE($Label.ResourceOverUtilisedOnAllAssignmentsWarning)}';
+kimble.labels['ImportantEventsMessage'] = '{!JSENCODE($Label.CalendarTasksMessage)}';
+kimble.labels['Edit'] = '{!JSENCODE($Label.Edit)}';
+kimble.labels['CancelSnip'] = '{!JSENCODE($Label.CancelSnipAssignment)}';
+kimble.labels['ViewResource'] = '{!JSENCODE($Label.ViewResource)}';
+kimble.labels['ResourceProfile'] = '{!JSENCODE($Label.ResourceProfileLabel)}';
+kimble.labels['CapabilityScoreLabel'] = '{!JSENCODE($Label.CapabilityScoreColumnHeader)}';
+kimble.labels['SnipAssignment'] = '{!JSENCODE($Label.SnipAssignmentLabel)}';
+kimble.labels['ScheduledDayLabel'] = '{!JSENCODE($Label.ScheduledDay)}';
+kimble.labels['AssignmentHasExpenseMessage'] = '{!JSENCODE($Label.AssignmentHasExpenseMessage)}';
+kimble.labels['ScheduledDaysExceedRemainingForecast'] = '{!JSENCODE($Label.ScheduledDaysExceedRemainingForecast)}';
+kimble.labels['EnhancedTableSearchPlaceholder'] = '{!JSENCODE($Label.EnhancedTableSearchPlaceholder)}';
+kimble.labels['CannotBeGreaterThan'] = '{!JSENCODE($Label.CannotBeGreaterThan)}';
+kimble.labels['IsUsageProfiled'] = '{!JSENCODE($ObjectType.ActivityAssignment__c.Fields.IsUsageProfiled__c.Label)}';
+
+</apex:page>

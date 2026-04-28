@@ -1,0 +1,462 @@
+<apex:page controller="KimbleOne.ActivityAssignmentsBulkEditController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__ReferenceData__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+     	
+     	<c:Menu DefaultHelpPage="ManyAssignments.html" MenuContextType="{!MenuContext}" MenuContextId="{!ThePageContext.Id}" MenuContextName="{!ThePageContext['Name']}" />
+     	
+    </apex:define>
+    
+    <apex:define name="Content">
+    	
+    	<apex:form id="TheForm">
+    	<div id="pageErrors">
+    		<apex:pageMessages escape="False" />
+		</div>
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__ActivityAssignmentUsagePattern)}" />
+		<script>var assignments = {};</script>
+		<apex:pageBlock title="{!$Label.kimbleone__activityassignmentsbulkeditheading}" mode="edit">
+           	<apex:pageBlockButtons location="bottom">
+           		<apex:commandButton action="{!Cancel}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__cancel}" rerender="TheForm" rendered="{!TheActivityAssignmentsBulkEditWizard.CanCancel && !TheActivityAssignmentsBulkEditWizard.HasFinished}"/>
+           		<apex:commandButton action="{!TheActivityAssignmentsBulkEditWizard.GoPrevious}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__previous}" reRender="TheForm" rendered="{!TheActivityAssignmentsBulkEditWizard.CanGoPrevious}"/>
+            	<apex:commandButton action="{!TheActivityAssignmentsBulkEditWizard.GoNext}" styleclass="DisableButtonWhileBusy" value="{!TheActivityAssignmentsBulkEditWizard.NextLabel}" reRender="TheForm" rendered="{!TheActivityAssignmentsBulkEditWizard.CanGoNext}"/>
+            </apex:pageBlockButtons>
+			
+			<div id="BulkAssignmentEditJobs">
+			<!-- SELECT ASSIGNMENTS TO INCLUDE AND ATTRIBUTES TO UPDATE-->
+			<apex:outputPanel layout="none" rendered="{!TheActivityAssignmentsBulkEditWizard.CurrentStep.StepName == 'SelectAssignmentsToUpdate'}">
+			<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__selectassignmentstoupdateheading}" columns="2" >
+           	
+           	<apex:pageBlockSectionItem rendered="{!TheActivityAssignmentsBulkEditWizard.CanEditStartDate && !ISBLANK(TheActivityAssignmentsBulkEditWizard.StartDateOffset.InputInteger__c) }">
+           		<apex:outputLabel value="{!$Label.kimbleone__startdateoffsetlabel}"/>
+		        <apex:inputField id="startDateOffset" value="{!TheActivityAssignmentsBulkEditWizard.StartDateOffset.KimbleOne__InputInteger__c}"/>           	
+           	</apex:pageBlockSectionItem>
+           	
+           	<apex:pageBlockSectionItem rendered="{!TheActivityAssignmentsBulkEditWizard.CanEditStartDate && ISBLANK(TheActivityAssignmentsBulkEditWizard.StartDateOffset.InputInteger__c) }">
+           		<apex:outputLabel value="{!$Label.kimbleone__newexpectedstartdate}"/>
+		        <apex:inputField id="startDateOffset" value="{!TheActivityAssignmentsBulkEditWizard.StartDateOffset.KimbleOne__InputDate__c}"/>           	
+           	</apex:pageBlockSectionItem>       
+           	
+           	<apex:pageBlockSectionItem rendered="{!TheActivityAssignmentsBulkEditWizard.CanEditRevenue}">
+           		<apex:outputLabel value="{!$Label.kimbleone__updaterevenuerateslabel}"/>
+           		<apex:outputPanel layout="none">
+	           		<apex:selectlist id="revRateChangeMode" value="{!TheActivityAssignmentsBulkEditWizard.SelectedRevenueRateChangeMode}" size="1">
+	           			<apex:SelectOptions value="{!TheActivityAssignmentsBulkEditWizard.TheRevenueRateChangeOptions}"/>
+	           		</apex:selectlist>
+			        <apex:inputField id="revRateAmount" value="{!TheActivityAssignmentsBulkEditWizard.RevenueRateChange.KimbleOne__InputDecimal__c}"/>
+		       	</apex:outputPanel>           	
+           	</apex:pageBlockSectionItem>
+			
+           	
+          	</apex:pageblockSection>	
+           	
+           	<apex:pageBlockTable value="{!TheActivityAssignmentsBulkEditWizard.TheActivityAssignments}" var="assignment" rendered="{!TheActivityAssignmentsBulkEditWizard.TheActivityAssignments.size != 0}">
+					<apex:column headerValue="{!$Label.kimbleone__selectlabel}">
+						<apex:inputField value="{!TheActivityAssignmentsBulkEditWizard.TheActivityAssignmentsForSelection[assignment.Id].InputCheckbox__c}"/>
+					</apex:column>
+					<apex:column value="{!assignment.ResourcedActivity__r.Name}" rendered="{!TheActivityAssignmentsBulkEditWizard.HasMultipleElements}"/>
+					<apex:column value="{!assignment.Resource__r.Name}" />
+					<apex:column value="{!assignment.ActivityRole__r.Name}" />
+					<apex:column headervalue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__TemporalForecastRevenueRate__c.Label}">
+						<apex:outputText value="{!TheActivityAssignmentsBulkEditWizard.TheInvoicingCurrencyRevenueRates[assignment.Id].CurrencyISOCode}" styleclass="kimbleCurrencyCode" />
+						<apex:outputField value="{!TheActivityAssignmentsBulkEditWizard.TheInvoicingCurrencyRevenueRates[assignment.Id].InputDecimal__c}" />
+						<apex:outputText value=" ({!assignment.ResourcedActivityOperatedWith__r.InvoicingUnitType__r.Name})" />											
+					</apex:column>
+					<apex:column value="{!assignment.UsageBehaviourRule__r.Name}" />
+					<apex:column value="{!assignment.KimbleOne__StartDate__c}" />
+					<apex:column value="{!assignment.KimbleOne__ForecastP3EndDate__c}" />
+					<apex:column headervalue="{!$ObjectType.ActivityAssignment__c.Fields.UtilisationPercentage__c	.Label}">
+						<apex:outputText value="{!ROUND(assignment.KimbleOne__BaselineUtilisationPercentage__c,0)}"/>
+					</apex:column>
+					<apex:column headervalue="{!$Label.kimbleone__deliverygrouphomeremaining}">
+						<apex:outputField value="{!assignment.KimbleOne__EntryRemainingUsage__c}"/>
+						<apex:outputText value=" ({!assignment.ResourcedActivityOperatedWith__r.ForecastUnitType__r.KimbleOne__Suffix__c})"/>
+					</apex:column>
+				</apex:pageBlockTable>
+           	 
+			</apex:outputPanel>
+			
+			<!-- CONFIRM ASSIGNMENT CHANGES -->
+			<apex:outputPanel layout="none" rendered="{!!TheActivityAssignmentsBulkEditWizard.HasFinished && TheActivityAssignmentsBulkEditWizard.CurrentStep.StepName == 'ConfirmAssignmentChanges'}">
+			<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__confirmassignmentchangesheading}"  columns="1">
+           	</apex:pageBlockSection>
+           		<apex:outputPanel rendered="{!TheActivityAssignmentsBulkEditWizard.TheActivityAssignmentsToUpdate.size != 0}">
+           		<table class="list" border="0" cellpadding="0" cellspacing="0">
+           			<thead class="rich-table-thead">
+           				<tr class="headerRow">
+           					<apex:outputPanel layout="none" rendered="{!TheActivityAssignmentsBulkEditWizard.HasMultipleElements}">
+           						<th class="headerRow" scope="col"><div><apex:outputText value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.Name.Label}"/></div></th>
+           					</apex:outputPanel>
+           					<th class="headerRow" scope="col"><div><apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__Resource__c.Label}"/></div></th>
+           					<th class="headerRow" scope="col"><div><apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ActivityRole__c.Label}"/></div></th>
+           					<th class="headerRow" scope="col"><div><apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__TemporalForecastRevenueRate__c.Label}"/></div></th>
+           					<th class="headerRow" scope="col"><div><apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UsageBehaviourRule__c.Label}"/></div></th>      					
+           					<th class="headerRow" scope="col"><div><apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__StartDate__c.Label}"/></div></th>
+           					<th class="headerRow" scope="col"><div><apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ForecastP3EndDate__c.Label}"/></div></th>
+           					<th class="headerRow" scope="col"><div><apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UtilisationPercentage__c.Label}"/></div></th>
+           					<th class="headerRow" scope="col"><div><apex:outputText value="{!$Label.kimbleone__deliverygrouphomeremaining}"/></div></th>
+           				</tr>
+           			</thead>
+           			<tbody>
+           				<apex:repeat value="{!TheActivityAssignmentsBulkEditWizard.TheActivityAssignmentsToUpdate}" var="assignment">
+	           				<apex:variable value="{!TheActivityAssignmentsBulkEditWizard.TheCandidateAssignmentsToUpdateMap[assignment.TheActivityAssignment.Id]}" var="candidates"/>        
+	           				<tr class="dataRow">
+	           					<apex:outputPanel layout="none" rendered="{!TheActivityAssignmentsBulkEditWizard.HasMultipleElements}">
+		           					<td class="dataCell"><apex:outputField value="{!assignment.TheActivityAssignment.ResourcedActivity__r.Name}"/></td>
+	           					</apex:outputPanel>
+	           					<td class="dataCell">
+	           						<apex:outputPanel layout="none" rendered="{!candidates.size > 0}">
+	           							<img class="twister collapsed" src="/s.gif" onclick="toggleCandidates(this, '{!JSINHTMLENCODE(assignment.TheActivityAssignment.Id)}');"/>
+	           						</apex:outputPanel>
+	           						<apex:outputField value="{!assignment.TheActivityAssignment.KimbleOne__Resource__c}"/>
+	           					</td>
+	           					<td class="dataCell"><apex:outputField value="{!assignment.TheActivityAssignment.KimbleOne__ActivityRole__c}"/></td>
+	           					<td class="dataCell">
+	           						<apex:outputPanel layout="none" rendered="{!TheActivityAssignmentsBulkEditWizard.CanUpdateRevenueMap[assignment.TheActivityAssignment.Id]}">
+										<div class="nowrap">
+											<apex:outputText value="{!TheActivityAssignmentsBulkEditWizard.TheInvoicingCurrencyRevenueRates[assignment.TheActivityAssignment.Id].CurrencyISOCode}" styleclass="kimbleCurrencyCode" rendered="{!!ISBLANK(TheActivityAssignmentsBulkEditWizard.TheInvoicingCurrencyRevenueRates[assignment.TheActivityAssignment.Id])}"/>
+											<apex:outputField value="{!TheActivityAssignmentsBulkEditWizard.TheInvoicingCurrencyRevenueRates[assignment.TheActivityAssignment.Id].InputDecimal__c}" rendered="{!!ISBLANK(TheActivityAssignmentsBulkEditWizard.TheInvoicingCurrencyRevenueRates[assignment.TheActivityAssignment.Id])}"/>
+											<apex:outputText value=" ({!assignment.TheActivityAssignment.ResourcedActivityOperatedWith__r.InvoicingUnitType__r.Name})" rendered="{!!ISBLANK(TheActivityAssignmentsBulkEditWizard.TheInvoicingCurrencyRevenueRates[assignment.TheActivityAssignment.Id])}"/>
+										</div>
+										<div class="nowrap">
+											<apex:inputField required="true" style="width:60px" value="{!assignment.RevenueRate.KimbleOne__InputDecimal__c}"/>
+										</div>
+									</apex:outputPanel>
+									<apex:outputPanel layout="none" rendered="{!!TheActivityAssignmentsBulkEditWizard.CanUpdateRevenueMap[assignment.TheActivityAssignment.Id]}">
+										<apex:outputText value="{!TheActivityAssignmentsBulkEditWizard.TheInvoicingCurrencyRevenueRates[assignment.TheActivityAssignment.Id].CurrencyISOCode}" styleclass="kimbleCurrencyCode" rendered="{!!ISBLANK(TheActivityAssignmentsBulkEditWizard.TheInvoicingCurrencyRevenueRates[assignment.TheActivityAssignment.Id])}"/>
+										<apex:outputField value="{!TheActivityAssignmentsBulkEditWizard.TheInvoicingCurrencyRevenueRates[assignment.TheActivityAssignment.Id].InputDecimal__c}" rendered="{!!ISBLANK(TheActivityAssignmentsBulkEditWizard.TheInvoicingCurrencyRevenueRates[assignment.TheActivityAssignment.Id])}"/>
+									</apex:outputPanel>
+									
+	           					</td>	
+	           					<td class="dataCell"><apex:outputField value="{!assignment.TheActivityAssignment.UsageBehaviourRule__r.Name}"/></td>
+	           					<td class="dataCell">
+	           						<script>
+										assignments['{!JSENCODE(assignment.TheActivityAssignment.Id)}'] = {hoursPerDay:{!assignment.TheActivityAssignment.HoursPerDay__c}, 
+																											resourceId:'{!JSENCODE(assignment.TheActivityAssignment.Resource__c)}', 
+																											usagepattern:'{!JSENCODE(assignment.TheActivityAssignment.UsagePattern__c)}', 
+																											utilisationpercentage:{!assignment.TheActivityAssignment.UtilisationPercentage__c}, 
+																											entryspec:'{!JSENCODE(assignment.TheActivityAssignment.UsagebehaviourRule__r.EntrySpecification__r.Enum__c)}', 
+																											preserveProfile:{!assignment.TheActivityAssignment.IsUsageProfiled__c}, 
+																											factor:{!assignment.Factor}, 
+																											startDate:new Date({!YEAR(assignment.StartDate.InputDate__c)}, {!MONTH(assignment.StartDate.InputDate__c) - 1}, {!DAY(assignment.StartDate.InputDate__c)})};						
+									</script>
+									<div class="nowrap assignment-start-date assignment-info" assignment-id="{!assignment.TheActivityAssignment.Id}">
+										<apex:outputPanel layout="none" rendered="{!ISBLANK(assignment.TheActivityAssignment.KimbleOne__LatestTimeEntryDate__c) && !TheActivityAssignmentsBulkEditWizard.IsResourcedParentMap[assignment.TheActivityAssignment.Id]}">
+											<div>
+												<!-- <apex:outputText styleclass="changeLabel" value="{!$Label.OriginalLabel}"/> -->
+												<apex:outputField value="{!assignment.TheActivityAssignment.KimbleOne__StartDate__c}"/>							
+											</div>
+											<div>
+												<!-- <apex:outputText styleclass="changeLabel" value="{!$Label.New}"/> -->
+												<apex:inputField required="true" id="EntryStartDate" styleclass="kimbleDatePicker" value="{!assignment.StartDate.KimbleOne__InputDate__c}"/>
+											</div>
+										</apex:outputPanel>
+										<apex:outputPanel layout="none" rendered="{!!ISBLANK(assignment.TheActivityAssignment.KimbleOne__LatestTimeEntryDate__c) || TheActivityAssignmentsBulkEditWizard.IsResourcedParentMap[assignment.TheActivityAssignment.Id]}">
+											<apex:outputField value="{!assignment.TheActivityAssignment.KimbleOne__StartDate__c}"/>	
+										</apex:outputPanel>
+									</div>
+	           					</td>
+	           					<td class="dataCell">
+	           						<div class="nowrap assignment-end-date" >
+										<div>
+											<apex:outputField value="{!assignment.TheActivityAssignment.KimbleOne__ForecastP3EndDate__c}"/>							
+										</div>
+										<div>
+											<apex:inputField required="true" id="EntryEndDate" styleclass="kimbleDatePicker {!IF(assignment.TheActivityAssignment.UsagebehaviourRule__r.EntrySpecification__r.KimbleOne__Enum__c='DerivedEndDate','disabled','')}" value="{!assignment.EndDate.KimbleOne__InputDate__c}"/>
+										</div>
+									</div>	
+	           					</td>
+	           					<td class="dataCell">
+	           						<div class="nowrap assignment-utilisation" >
+										<div>
+											<apex:outputText value="{!ROUND(assignment.TheActivityAssignment.KimbleOne__BaselineUtilisationPercentage__c,0)}"/>						
+										</div>
+										<div>
+											<apex:inputField required="true" id="EntryUtilisation" styleclass="{!IF(assignment.TheActivityAssignment.UsagebehaviourRule__r.EntrySpecification__r.KimbleOne__Enum__c='DerivedUtilisation','disabled','')}" style="width:50px" value="{!assignment.UtilisationPercentage.KimbleOne__InputInteger__c}"/>
+										</div>
+									</div>
+	           					</td>
+	           					<td class="dataCell">
+	           						<div class="nowrap assignment-remaining" >
+										<div>
+											<apex:outputField value="{!assignment.TheActivityAssignment.KimbleOne__EntryRemainingUsage__c}"/>
+											<apex:outputText value=" ({!assignment.TheActivityAssignment.ResourcedActivityOperatedWith__r.ForecastUnitType__r.KimbleOne__Suffix__c})"/>						
+										</div>
+										<div>
+											<apex:inputField required="true" id="EntryRemainingUsage" styleclass="{!IF(assignment.TheActivityAssignment.UsagebehaviourRule__r.EntrySpecification__r.KimbleOne__Enum__c='DerivedUsage','disabled','')}" style="width:50px" value="{!assignment.RemainingUsage.KimbleOne__InputDecimal__c}"/>
+										</div>
+									</div>		
+	           					</td>
+							</tr>
+							<apex:repeat value="{!Candidates}" var="candidate">
+								<tr class="dataRow" style="display:none" parent-id="{!assignment.TheActivityAssignment.Id}">
+	           					<td class="dataCell">
+	           						<span class="candidate-indent"></span>
+	           						<apex:outputField value="{!candidate.TheActivityAssignment.Resource__c}"/>
+	           					</td>
+	           					<td class="dataCell"><apex:outputField value="{!candidate.TheActivityAssignment.ActivityRole__c}"/></td>
+	           					<td class="dataCell"></td>	
+	           					<td class="dataCell"><apex:outputField value="{!candidate.TheActivityAssignment.UsageBehaviourRule__r.Name}"/></td>
+	           					<td class="dataCell">
+	           						<script>
+										assignments['{!JSENCODE(candidate.TheActivityAssignment.Id)}'] = {resourceId:'{!JSENCODE(candidate.TheActivityAssignment.Resource__c)}', 
+																										  usagepattern:'{!JSENCODE(candidate.TheActivityAssignment.UsagePattern__c)}', 
+																										  utilisationpercentage:{!candidate.TheActivityAssignment.UtilisationPercentage__c}, 
+																										  entryspec:'{!JSENCODE(candidate.TheActivityAssignment.UsagebehaviourRule__r.EntrySpecification__r.Enum__c)}', 
+																										  preserveProfile:{!candidate.TheActivityAssignment.IsUsageProfiled__c}, 
+																										  factor:{!candidate.Factor}, 
+																										  startDate:new Date({!YEAR(candidate.StartDate.InputDate__c)}, {!MONTH(candidate.StartDate.InputDate__c) - 1}, {!DAY(candidate.StartDate.InputDate__c)})};							
+									</script>
+									<div class="nowrap assignment-start-date assignment-info" assignment-id="{!candidate.TheActivityAssignment.Id}">
+										<apex:outputPanel layout="none" rendered="{!ISBLANK(candidate.TheActivityAssignment.LatestTimeEntryDate__c)}">
+											<div>
+												<!-- <apex:outputText styleclass="changeLabel" value="{!$Label.OriginalLabel}"/> -->
+												<apex:outputField value="{!candidate.TheActivityAssignment.StartDate__c}"/>							
+											</div>
+											<div>
+												<!-- <apex:outputText styleclass="changeLabel" value="{!$Label.New}"/> -->
+												<apex:inputField required="true" id="EntryStartDate" styleclass="kimbleDatePicker" value="{!candidate.StartDate.InputDate__c}"/>
+											</div>
+										</apex:outputPanel>
+										<apex:outputPanel layout="none" rendered="{!!ISBLANK(assignment.TheActivityAssignment.KimbleOne__LatestTimeEntryDate__c)}">
+											<apex:outputField value="{!candidate.TheActivityAssignment.StartDate__c}"/>	
+										</apex:outputPanel>
+									</div>
+	           					</td>
+	           					<td class="dataCell">
+	           						<div class="nowrap assignment-end-date" >
+										<div>
+											<apex:outputField value="{!candidate.TheActivityAssignment.ForecastP3EndDate__c}"/>							
+										</div>
+										<div>
+											<apex:inputField required="true" id="EntryEndDate" styleclass="kimbleDatePicker {!IF(candidate.TheActivityAssignment.UsagebehaviourRule__r.EntrySpecification__r.Enum__c='DerivedEndDate','disabled','')}" value="{!candidate.EndDate.InputDate__c}"/>
+										</div>
+									</div>	
+	           					</td>
+	           					<td class="dataCell">
+	           						<div class="nowrap assignment-utilisation" >
+										<div>
+											<apex:outputText value="{!ROUND(candidate.TheActivityAssignment.BaselineUtilisationPercentage__c,0)}"/>						
+										</div>
+										<div>
+											<apex:inputField required="true" id="EntryUtilisation" styleclass="{!IF(candidate.TheActivityAssignment.UsagebehaviourRule__r.EntrySpecification__r.Enum__c='DerivedUtilisation','disabled','')}" style="width:50px" value="{!candidate.UtilisationPercentage.InputInteger__c}"/>
+										</div>
+									</div>
+	           					</td>
+	           					<td class="dataCell">
+	           						<div class="nowrap assignment-remaining" >
+										<div>
+											<apex:outputField value="{!candidate.TheActivityAssignment.EntryRemainingUsage__c}"/>
+											<apex:outputText value=" ({!candidate.TheActivityAssignment.ResourcedActivityOperatedWith__r.ForecastUnitType__r.Suffix__c})"/>						
+										</div>
+										<div>
+											<apex:inputField required="true" id="EntryRemainingUsage" styleclass="{!IF(candidate.TheActivityAssignment.UsagebehaviourRule__r.EntrySpecification__r.Enum__c='DerivedUsage','disabled','')}" style="width:50px" value="{!candidate.RemainingUsage.InputDecimal__c}"/>
+										</div>
+									</div>		
+	           					</td>
+							</tr>
+							</apex:repeat>
+							
+						</apex:repeat>
+					</tbody>
+           		</table>
+           		</apex:outputPanel>
+           			           					           		
+           		<script>
+           			resourceAvailabilityMap = kimble.parseJSON("{!JSENCODE(TheActivityAssignmentsBulkEditWizard.ResourceAvailabilityMapJson)}");
+           				
+           			initialise();
+           			 
+           		</script>
+           		
+           	</apex:outputPanel>
+           
+           	<apex:outputPanel rendered="{!TheActivityAssignmentsBulkEditWizard.HasFinished}">
+               	
+               	<script>
+					jQuery(function () {
+		                	loadJobsInline($('#BulkAssignmentEditJobs'), '{!JSINHTMLENCODE(TheActivityAssignmentsBulkEditWizard.JobContext)}','{!JSENCODE($Label.UpdatingAssignmentsMessage)}', finish);
+		            });
+		           
+		        </script>
+		           	   
+           	</apex:outputPanel>
+           	
+           	</div>
+		</apex:pageBlock>
+		</apex:form>
+		<script>
+		
+		 function finish()
+		 {
+		 	safeNavigateToSForceURL('{!JSINHTMLENCODE(RedirectTo)}');
+		 }
+		
+		var resourceAvailabilityMap;
+		
+		function initialise()
+		{
+			jQuery('.disabled').prop('disabled', true);
+			
+			jQuery('.kimbleDatePicker').datepicker({
+		   		dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true,
+					selectOtherMonths: true,
+					beforeShowDay: resourceAvailabilityOverlay
+			});
+			
+			jQuery('[id$="StartDate"]').change(recalculateUsage);
+			
+			jQuery.each(jQuery('[id$="StartDate"]'), function() {
+				jQuery(this).change();
+			});
+			
+			jQuery('[id$="EntryRemainingUsage"]').change(recalculateUsage);
+		
+			jQuery('[id$="EntryUtilisation"]').change(recalculateUsage);
+		
+			jQuery('[id$="EntryEndDate"]').change(recalculateUsage);
+			
+		}
+		
+		function toggleCandidates(twister, parentId)
+		{
+			jQuery(twister).toggleClass('expanded');
+			jQuery('[parent-id="' + parentId + '"]').toggle();
+		}
+		
+		function recalculateUsage()
+		{
+			var assignmentId = jQuery(this).closest('tr').find('div.assignment-info').attr('assignment-id');
+			var assignment = assignments[assignmentId];
+			var resourceId = assignment.resourceId;
+			
+			var rowContext = jQuery(this).closest('tr');
+			
+			var startDate = assignment.startDate;
+			
+			if (rowContext.find('[id$="StartDate"]').length == 1)
+				startDate = rowContext.find('[id$="StartDate"]').datepicker("getDate");
+					
+			var entrySpecification = assignment.entryspec;
+			var preserveUsage = assignment.preserveProfile;
+			var forecastToUnitConversionFactor = assignment.factor;
+			
+			var remainingUsage = rowContext.find('[id$="EntryRemainingUsage"]');
+			var entryUtilisation = rowContext.find('[id$="EntryUtilisation"]');
+			var endDate = rowContext.find('[id$="EntryEndDate"]').datepicker("getDate");
+			var availability = new ResourceAvailabilityUsagePattern(resourceAvailabilityMap[resourceId]);
+			
+			var remainingUsageVal = kimble.parseNumber(remainingUsage.val());
+			var entryUtilisationVal = kimble.parseNumber(entryUtilisation.val());
+			
+			var assignmentUsage = new ActivityAssignmentUsagePattern(assignment.hoursPerDay, startDate, assignment.usagepattern, assignment.utilisationpercentage, entryUtilisation.val());
+			
+			try
+			{
+				if (entrySpecification == "DerivedEndDate")
+				{
+					if (remainingUsage.val() == '') return;
+				
+					if (entryUtilisation.val() == '' || entryUtilisationVal <= 0) return;
+					
+					var usageInHours = new Number(remainingUsageVal) * forecastToUnitConversionFactor;
+					
+					assignmentUsage = assignmentUsage.createForDerivedEndDate(startDate, usageInHours, entryUtilisationVal, availability, assignment.hoursPerDay);
+					
+					rowContext.find('[id$="EntryEndDate"]').datepicker('setDate', assignmentUsage.endDate);
+					
+				}
+				else if (entrySpecification == "DerivedUtilisation")
+				{
+					if (remainingUsage.val() == '') return;
+					
+					if (endDate == null) return;
+					
+					var remainingUsageInHours = remainingUsageVal * forecastToUnitConversionFactor;
+					
+					assignmentUsage = assignmentUsage.createForDerivedUtilisation(startDate, endDate, remainingUsageInHours, availability, assignment.hoursPerDay);
+					entryUtilisation.val(jQuery.formatNumber(assignmentUsage.targetUtilisation, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+				}
+				else //Dervied Usage - default
+				{
+					if (entryUtilisation.val() == '' || entryUtilisationVal < 0) return;
+					
+					if (endDate == null) return;
+					
+					assignmentUsage = assignmentUsage.createForDerivedUsage(startDate, endDate, entryUtilisationVal ,availability, assignment.hoursPerDay);
+					
+					var newUsageInHours = assignmentUsage.totalForecastUsageInHours;
+					var newUsageInForecastUnits = newUsageInHours / forecastToUnitConversionFactor;
+					
+					remainingUsage.val(jQuery.formatNumber(newUsageInForecastUnits, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));					
+				}
+				
+				assignment.usagepattern = assignmentUsage.usagePattern;	
+				assignment.utilisationpercentage = assignmentUsage.actualUtilisation;
+			}
+			catch(e)
+			{
+				jQuery('#assignment-error').show();
+	       		jQuery('#assignment-error-text').text(kimble.labels[e]);       		
+			}
+		}
+		
+		function resourceAvailabilityOverlay(date) 
+		{
+	  		var assignmentId = jQuery(this).closest('tr').find('div.assignment-info').attr('assignment-id');;
+			
+			var assignment = assignments[assignmentId];
+			var resourceId = assignment.resourceId;
+			
+	  		var resource = resourceAvailabilityMap[resourceId];
+	  		
+	  		earliestOpenDate = resource.StartDate.toDate();
+	  		
+	  		var offsetInDays = Math.round((date.getTime() - earliestOpenDate.getTime()) / (1000*60*60*24));
+	  		
+	  		if (offsetInDays < 0)
+	  			return [false,"closedperiod","Closed Period"];
+	  		
+	  		var availabilityChar = resource.UsagePattern.substring(offsetInDays,offsetInDays + 1);
+	  		
+	  		if (availabilityChar == '|')
+	  			return [false,"closedperiod","Closed Period"];
+	  		
+	  		if (availabilityChar == '!')
+	  			return [false,"Unavailable","Unavailable"];
+	  		
+	  		if (availabilityChar == '-')
+	  			return [false,"NonBusDay","Non business day"];
+	  		
+	  		return [true, null];  		
+  		
+  		}
+		
+		</script>
+		<style>
+			.changeLabel{color: #000;font-size: .9em;font-weight: bold;width:55px;display:inline-block}
+			.nowrap>div {white-space:nowrap;}
+			.candidate-indent{width: 18px;display: inline-block;}
+			.twister:hover {cursor: pointer;}
+			.twister
+			{
+    height: 11px;
+    width: 11px;
+    background: transparent url('/img/alohaSkin/twisty_sprite.png') 0px 0px no-repeat;
+    margin-left: 3px;
+    margin-right: 12px;
+    
+}
+.twister.collapsed
+{   
+    background-position: 1px -1px;
+}
+.twister.expanded
+{
+    background-position: 1px -12px;
+}
+		</style>
+	</apex:define>
+</apex:composition>
+</apex:page>

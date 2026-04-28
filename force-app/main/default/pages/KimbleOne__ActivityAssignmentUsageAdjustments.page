@@ -1,0 +1,146 @@
+<apex:page controller="KimbleOne.ActivityAssignmentUsageAdjustmentsCtrllr" showHeader="false" sidebar="false">
+	
+	
+	<apex:form id="TheAssignmentUsageForm">
+	<apex:actionRegion >
+		<div id="assignmentUsagePopup" style="display:none">
+		<apex:outputPanel id="PopupContent">
+			<div id="adjustmentLoadingContainer" class="loadingIndicator">
+				<div id="loadingIndicatorInnerContainer"><img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}</div>
+			</div>
+			<apex:pageBlock title="{!$ObjectType.KimbleOne__UsageAdjustment__c.LabelPlural}">
+				<apex:pageBlockButtons location="top">
+					<apex:commandButton action="{!NewAdjustment}" value="{!$Label.kimbleone__new}" onclick="toggleAdjustmentLoading()" oncomplete="toggleAdjustmentLoading()" rerender="PopupContent" rendered="{!AllowNewClick && $ObjectType.KimbleOne__UsageAdjustment__c.createable}"/>
+				</apex:pageBlockButtons>
+				<apex:pageMessages id="MessagesPanel" escape="false" />
+				<apex:pageblockSection columns="2">
+					<apex:outputField value="{!TheActivityAssignment.Name}"/>
+					<apex:outputField value="{!TheActivityAssignment.KimbleOne__StartDate__c}"/>
+					<apex:outputField value="{!TheActivityAssignment.KimbleOne__BaselineUsage__c}"/>
+					<apex:outputField value="{!TheActivityAssignment.KimbleOne__EntryRemainingUsage__c}"/>
+				</apex:pageblockSection>
+				
+				<apex:variable value="false" var="isEditMode"/>
+				
+				<apex:pageBlockTable value="{!TheUsageAdjustments}" var="adjustment" styleClass="adjustments-grid">
+					
+					<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+						<apex:variable value="{!!ISBLANK(EditUsageAdjustment) && adjustment.Id = EditUsageAdjustment.Id}" var="isEditMode"/>
+						<apex:variable value="{!0}" var="rowNum"/>
+						<apex:outputLink rendered="{!adjustment.KimbleOne__Status__c = DraftId && !isEditMode && $ObjectType.KimbleOne__UsageAdjustment__c.updateable}" styleclass="actionLink" value="javascript:void(0)" onclick="toggleAdjustmentLoading();sendAdjustmentForApproval('{!adjustment.Id}')"><span title="{!$Label.SubmitForApprovalLink}" class="fa fa-share-square-o"></span></apex:outputLink>
+						<apex:outputLink rendered="{!adjustment.KimbleOne__Status__c = DraftId && !isEditMode && $ObjectType.KimbleOne__UsageAdjustment__c.updateable}" styleclass="actionLink" value="javascript:void(0)" onclick="toggleAdjustmentLoading();editAdjustment('{!adjustment.Id}')"><span title="{!$Label.Edit}" class="fa fa-pencil-square-o"></span></apex:outputLink>
+						<apex:outputLink rendered="{!adjustment.KimbleOne__Status__c = DraftId && !isEditMode && $ObjectType.KimbleOne__UsageAdjustment__c.deletable}" styleclass="actionLink" value="javascript:void(0)" onclick="if (confirmDelete()) {toggleAdjustmentLoading();deleteAdjustment('{!adjustment.Id}')}"><span title="{!$Label.Delete}" class="fa fa-trash-o"></span></apex:outputLink>
+						<apex:commandButton action="{!SaveAdjustment}" value="{!$Label.kimbleone__ok}" rendered="{!isEditMode && ($ObjectType.KimbleOne__UsageAdjustment__c.createable || $ObjectType.KimbleOne__UsageAdjustment__c.updateable)}" rerender="PopupContent" onclick="toggleAdjustmentLoading()" oncomplete="toggleAdjustmentLoading()"/>
+						<apex:commandButton action="{!CancelAdjustment}" value="{!$Label.kimbleone__cancel}" rendered="{!isEditMode}"  onclick="toggleAdjustmentLoading()" oncomplete="toggleAdjustmentLoading()" rerender="PopupContent"/>
+					</apex:column>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__UsageAdjustment__c.Fields.Name.Label}">
+						<apex:outputField value="{!adjustment.Name}"/>
+					</apex:column>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__UsageAdjustment__c.Fields.KimbleOne__UsageAdjustmentReason__c.Label}">
+						<apex:selectList value="{!EditUsageAdjustment.KimbleOne__UsageAdjustmentReason__c}" size="1" required="true" rendered="{!isEditMode}">
+							<apex:selectOptions value="{!TheUsageAdjustmentReasons}" />
+						</apex:selectList>
+						<apex:outputField value="{!adjustment.KimbleOne__UsageAdjustmentReason__c}" rendered="{!!isEditMode}"/>
+					</apex:column>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__UsageAdjustment__c.Fields.KimbleOne__AdjustmentUsage__c.Label}">
+						<apex:inputField value="{!EditUsageAdjustment.KimbleOne__AdjustmentUsage__c}" rendered="{!isEditMode}"/>
+						<apex:outputField value="{!adjustment.KimbleOne__AdjustmentUsage__c}" rendered="{!!isEditMode}"/>
+					</apex:column>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__UsageAdjustment__c.Fields.KimbleOne__Description__c.Label}">
+						<apex:inputField value="{!EditUsageAdjustment.KimbleOne__Description__c}" rendered="{!isEditMode}"/>
+						<apex:outputField value="{!adjustment.KimbleOne__Description__c}" rendered="{!!isEditMode}"/>
+					</apex:column>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__UsageAdjustment__c.Fields.KimbleOne__Status__c.Label}">
+						<apex:outputField value="{!adjustment.KimbleOne__Status__c}"/>
+					</apex:column>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__UsageAdjustment__c.Fields.KimbleOne__ApprovedDate__c.Label}">
+						<apex:outputField value="{!adjustment.KimbleOne__ApprovedDate__c}"/>
+						
+					</apex:column>
+					
+				</apex:pageBlockTable>
+				<div style="text-align:center; padding-top:6px;">
+					<input class="btn" type="button" value="{!$Label.Close}" onclick="hideModalBoxy();"/>
+				</div>
+				
+			</apex:pageBlock>
+		</apex:outputPanel>
+		</div>
+		
+		<apex:actionFunction action="{!LoadTheUsageAdjustments}" name="loadTheAssignmentUsageAdjustments" rerender="PopupContent" oncomplete="initialiseAssignmentUsageAdjustments();">
+			<apex:param name="activityAssignmentId" value="" />
+		</apex:actionFunction>
+		
+		<apex:actionFunction action="{!EditAdjustment}" name="editAdjustment" rerender="PopupContent" oncomplete="toggleAdjustmentLoading();">
+			<apex:param name="usageAdjustmentId" value="" />
+		</apex:actionFunction>
+		
+		<apex:actionFunction action="{!DeleteAdjustment}" name="deleteAdjustment" rerender="PopupContent" oncomplete="toggleAdjustmentLoading();">
+			<apex:param name="usageAdjustmentId" value="" />
+		</apex:actionFunction>
+		
+		<apex:actionFunction action="{!SendAdjustmentForApproval}" name="sendAdjustmentForApproval" rerender="PopupContent" oncomplete="toggleAdjustmentLoading();">
+			<apex:param name="usageAdjustmentId" value="" />
+		</apex:actionFunction>
+		
+	</apex:actionRegion>
+	</apex:form>
+	
+	<script>
+		function toggleAdjustmentLoading()
+		{
+			jQuery('#adjustmentLoadingContainer').toggle();
+		}
+	
+		function openAssignmentUsageAdjustments(assignmentId) 
+		{
+			initialiseModalBoxy('#assignmentUsagePopup', '{!JSENCODE($Label.Edit)} {!$ObjectType.ActivityAssignment__c.label}', jQuery('form[id$=\'TheAssignmentUsageForm\']'));
+			loadTheAssignmentUsageAdjustments(assignmentId);
+		}
+		
+		function initialiseAssignmentUsageAdjustments()
+		{
+			showModalBoxy();
+			toggleAdjustmentLoading();
+		}
+		
+	</script>
+	<style>
+	.adjustments-grid .actionLink span {
+		font-size: 14px;
+		margin-right: 4px;
+	}
+	/*
+    loading panel
+	*/
+	
+	.loadingIndicator {
+	   top:0;
+	   right:0;
+	   width:100%;
+	   height:100%;
+	   font-weight: bold;
+	   position:absolute;
+	   text-align:center;
+	   /* IE filter */
+	   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+	   -moz-opacity:0.7;    /* Mozilla extension */
+	   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+	   opacity:0.7; /* CSS3 */
+	   z-index:1000;
+	   background-color:white;
+	}
+	
+	.loadingIndicator img {
+	    margin-right:9px;
+	}
+	
+	#loadingIndicatorInnerContainer { 
+	    position:absolute; 
+	    top:50%;
+	    height:10em; 
+	    margin-top:-2em;
+	    width:100%;
+	}
+</style>
+</apex:page>

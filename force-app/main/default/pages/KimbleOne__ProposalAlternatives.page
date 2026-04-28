@@ -1,0 +1,920 @@
+<apex:page standardcontroller="KimbleOne__Proposal__c" extensions="KimbleOne.ProposalAlternativesController" showHeader="true" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+	<c:Menu DefaultHelpPage="MaintainProposalDetails.html" MenuContextType="Proposal"  MenuContextId="{!KimbleOne__Proposal__c.Id}" MenuContextName="{!KimbleOne__Proposal__c.Name}" />
+</apex:define>
+    
+<apex:define name="Content">
+
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'RiskStyle.css')}"/>
+
+	<!-- set the scroll container size up to fit the page nicely (in classic or lightning) -->
+	<apex:outputPanel rendered="{!$User.UIThemeDisplayed == 'Theme3'}">
+		<style>
+			#proposals-container { /* classic page */
+				height: calc(100vh - 250px);
+				min-height: var(--proposal-container-min-height); /* --proposal-container-min-height set in resize event */
+				width: var(--proposal-container-width); 		  /* --proposal-container-width set in resize event */
+				overflow: scroll;
+			}
+		</style>
+	</apex:outputPanel>
+	<apex:outputPanel rendered="{!$User.UIThemeDisplayed != 'Theme3'}">
+		<style>
+			#proposals-container { /* Lightning page */
+				height: calc(100vh - 70px);
+				min-height: var(--proposal-container-min-height); /* --proposal-container-min-height set in resize event */
+				overflow: scroll;
+			}
+		</style>
+	</apex:outputPanel>
+
+	<!-- styles for the 1st column and 1st & 2nd row, to make them fixed headers (i.e. non-scrolling ) -->
+	<style>
+		thead th.header-row-1 {
+			position: -webkit-sticky; /* for Safari */
+			position: sticky;
+			top: 0px;
+			z-index: 2;
+		}
+		thead th.header-row-2 {
+			position: -webkit-sticky; /* for Safari */
+			position: sticky;
+			top: 36px;
+			z-index: 2;
+		}
+		thead th:first-child {
+			left: 0px;
+			z-index: 3;
+		}
+		tbody .row-hdr  {
+			position: -webkit-sticky; /* for Safari */
+			position: sticky;
+			left: 0;
+			z-index: 1;
+		}
+		.details-table {
+			border-collapse: separate;
+  			border-spacing: 0;
+		}
+		.details-table thead th {
+			box-shadow: inset 1px 1px 0 white, inset -1px -1px 0 white;
+		}
+		.details-table tbody td {
+			box-shadow: inset 1px 1px 0 white, inset -1px -1px 0 white;
+		}
+	</style>
+
+
+	<style>
+
+		table.details-table tr:not(.p-usage-row):hover,
+		.p-summary-cell .cell-centre-wrapper:hover {
+			background-color: #e7f4f8;
+		}
+		.details-table td {
+			padding: 6px !important;
+		}
+		#proposals-container table tr td:nth-child(1) {
+			text-align: left;
+			font-weight: bold;
+			background-color: #eeeeee;
+		}
+		#proposals-container table tr td:nth-child(1) div {
+			width: 170px;
+		}
+		#proposals-container thead th,
+		#proposals-container tr.p-inds-row td {
+			background-color: #eeeeee;
+			font-size: 14px;
+		}
+		div.p-inds i.fa {
+			padding: 6px;
+			font-size: 18px;
+			border-radius: 4px;
+			display: inline-block;
+			vertical-align: middle;
+		}
+		div.p-inds {
+			text-align: center;
+			white-space: nowrap;
+		}
+		i.fa-star.p-ind,
+		.make-pref:hover {
+			color: green;
+		}
+		.ind-pill {
+			font-size: 11px;
+			padding: 4px;
+			border-radius: 2px;
+			display: inline-block;
+			border: none !important;
+			margin-left: 4px;
+			font-style: normal;
+			white-space: normal;
+			width: 70px;
+			text-align: center;
+			vertical-align: middle;
+		}
+		.ind-pill.prf-ind {
+			color: white;
+			background-color: green;
+		}
+		i.jump-to-proposal {
+			margin-left: 5px;
+			font-size: 14px;
+		}
+		.p-name {
+			font-size: 14px;
+			width: 200px;
+			text-align: center;
+    		white-space: normal;
+			cursor: pointer;
+			padding: 6px 0px;
+		}
+		.make-pref {
+			cursor: pointer;
+		}
+		.with-inds {
+			position: relative;
+		}
+		.cell-ind {
+			font-size: 20px;
+			position: absolute;
+			right: 20px;
+			top: 2px;
+  		}
+		tr.p-fins-hdr-row {
+			text-align: center;
+		}
+		tr.sec-row td:nth-child(1) {
+			font-style: italic;
+			font-weight: normal !important;
+		}
+		.cell-val.fin-val {
+			text-align: right;
+			margin-right: 50px;
+		}
+		.cell-val.num-val,
+		.cell-val.dte-val {
+			text-align: right;
+			display: inline-block;
+		}
+		i.rev-ind {
+			color: orange;
+		}
+		i.neg-ind {
+			color: #f44336;
+		}
+		i.pos-ind {
+			color: #008000;
+		}
+		i.info-ind {
+			color: #428BCA;
+		}
+		.cell-centre-wrapper {
+			text-align: center;
+		}
+		.cell-val.risk-level {
+			width: 90px;
+			border-radius: 2px;
+			padding: 2px;
+			text-align: center;
+			display: inline-block;
+		}
+		.cell-val.risk-level.with-action {
+			cursor: pointer;
+  		}
+		.in-cell-lab {
+			text-align: left;
+			font-style: italic;
+			margin-bottom: 3px;
+			background-color: #f1f1f1;
+			padding: 4px;
+		}
+		.in-cell-val {
+		    padding-right: 10px;
+  		}
+		.p-summary-cell .cell-val {
+			text-align: right;
+			margin-bottom: 8px;
+		}
+		td.p-summary-cell {
+			vertical-align: top;
+		}
+		.p-summary-cell .cell-centre-wrapper {
+			margin-bottom: 6px;
+			border: 1px solid #ececec;
+		}
+		tr.p-usage-row {
+			vertical-align: top;
+		}
+		td.row-hdr {
+			white-space: nowrap;
+			min-width: 180px;
+			/* position: relative; */
+  		}
+  		.hist-cell-val {
+			background-color: #729bc7;
+			padding-left: 4px;
+			border-radius: 2px;
+			white-space: nowrap;
+			color: white;
+		}
+		tr.collapse-row td {
+			background-color: #eeeeee;
+		}
+		i.toggle-row-btn {
+			position: absolute;
+			right: 5px;
+			font-size: 20px;
+			top: 0px;
+			color: #BBB;
+			padding: 4px;
+			cursor: pointer;
+		}
+		/* progress */
+		.loadingIndicator {
+			right:0;
+			width:100%;
+			height:100%;
+			font-weight: bold;
+			position: fixed;
+			margin-top: 0px;
+			top: 0px;
+			text-align:center;
+			/* IE filter */
+			filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+			-moz-opacity:0.7;	/* Mozilla extension */
+			-khtml-opacity:0.7;  /* Safari/Conqueror extension */
+			opacity:0.7; /* CSS3 */
+			z-index:1000;
+			background-color:white;
+			display:none;
+		}
+		.loadingIndicator img {
+			margin-right:9px;
+		}
+		#loadingIndicatorInnerContainer{
+			position:absolute;
+			top:50%;
+			height:10em;
+			margin-top:-2em;
+			width:100%;
+		}
+		div#loadingIndicatorInnerContainer {
+			position: relative;
+			top: 50%;
+		}
+	</style>
+
+	<apex:outputPanel id="ErrorMessages">
+		<apex:pageMessages escape="false"/>
+	</apex:outputPanel>
+	<div id="remote-action-error" style="display:none"><span><div class="message errorM3"><table border="0" cellpadding="0" cellspacing="0" class="messageTable" style="padding:0px;margin:0px;"><tbody><tr valign="top"><td><img alt="error" class="msgIcon" src="/s.gif" title="{!$Label.Error}"/></td><td class="messageCell"><div class="messageText" id="remote-action-error-text"><br/></div></td></tr><tr><td></td><td></td></tr></tbody></table></div></span></div>
+
+	<div id="loadingIndicatorOuterContainer" class="loadingIndicator" style="display:none">
+		<div id="loadingIndicatorInnerContainer">
+			<img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+		</div>
+	</div>
+
+	<div id="alt-proposals-container">
+		<div id="proposals-container">
+		</div>
+	</div>
+
+	<script>
+		var propLab = {};
+
+		propLab['CapMeetsRequirement'] = '{!JSENCODE($Label.MeetsRequirementLabel)}';
+
+		var proposalId = '{!KimbleOne__Proposal__c.Id}';
+		var theDetails;
+
+		jQuery(window).load(function()
+        {
+		    initPropAlternatives = true;
+		    initialiseResizeHandler();
+            initialiseProposalDetails();
+
+            jQuery.subscribe('kimble.menustatechange', function(){
+				jQuery(window).resize();
+			});
+			jQuery.subscribe('kimble.menuexpandchange', function(){
+				jQuery(window).resize();
+			});
+			jQuery.subscribe('kimble.menucollapsechange', function(){
+				jQuery(window).resize();
+			});
+			jQuery(window).resize();
+        });
+
+		function initialiseResizeHandler()
+		{
+			jQuery(window).resize(function() {
+ 				setWidthOfProposalsContainer();
+			});
+		}
+
+		// in 'classic' we need to manage the resizing of the proposals-container width ...
+        function setWidthOfProposalsContainer()
+        {
+			var sidebarCollapsed, sidebarContainerHeight,
+				proposalContainerWidth, proposalContainerHeight,
+				proposalContainer = document.querySelector('#proposals-container'),
+				sidebarContainer = document.querySelector('#side-bar-container'),
+				sfHeaderWidth = jQuery('#AppBodyHeader').width(); // only available in classic (not lightning)
+
+		    sidebarCollapsed = sidebarContainer.classList.contains('side-bar-collapsed');
+
+		    // if Classic set the width ...
+			if (sfHeaderWidth) {
+				console.log('Classic mode');
+				proposalContainerWidth = (sidebarCollapsed) ? sfHeaderWidth - 30 : sfHeaderWidth - 230;
+				proposalContainer.style.setProperty('--proposal-container-width', proposalContainerWidth+'px');
+			}
+			// set min-height for both Classic and Lightning ...
+			sidebarContainerHeight = sidebarContainer.clientHeight - 50;
+			proposalContainer.style.setProperty('--proposal-container-min-height', (sidebarCollapsed) ? 'none' : sidebarContainerHeight+'px');
+        }
+
+        function initialiseProposalDetails()
+        {
+            getDetails();
+            initialiseActions();
+        }
+
+		var initPropAlternatives = false;
+		function initialiseDynamicElements()
+		{
+			initialiseCurrencies();
+			overlayAnnotations();
+			applyCookie();
+			initPropAlternatives = false;
+		}
+
+        function applyCookie()
+        {
+            var theCookie = readCookie('kimble.propalternativespreferences');
+
+            if(theCookie != null)
+            {
+				theCookie = theCookie.split(';');
+
+				if(theCookie[0] == "true") toggleRowDisplay(null, jQuery('.p-fins-hdr-row').find('.toggle-row-btn'));
+				if(theCookie[1] == "true") toggleRowDisplay(null, jQuery('.p-res-hdr-row').find('.toggle-row-btn'));
+				if(theCookie[2] == "true") toggleRowDisplay(null, jQuery('.p-effort-hdr-row').find('.toggle-row-btn'));
+				if(theCookie[3] == "true") toggleRowDisplay(null, jQuery('.p-period-sum-hdr-row').find('.toggle-row-btn'));
+				if(theCookie[4] == "true") toggleRowDisplay(null, jQuery('.p-risk-hdr-row').find('.toggle-row-btn'));
+            }
+        }
+
+        function setCookie()
+        {
+            if(initPropAlternatives) return;
+            // cookie: tracks collapse state of sections
+            var finC = jQuery('.p-fins-hdr-row .fa-angle-double-down:visible').length > 0;
+            var resC = jQuery('.p-res-hdr-row .fa-angle-double-down:visible').length > 0;
+            var eftC = jQuery('.p-effort-hdr-row .fa-angle-double-down:visible').length > 0;
+            var usgC = jQuery('.p-period-sum-hdr-row .fa-angle-double-down:visible').length > 0;
+            var rskC = jQuery('.p-risk-hdr-row .fa-angle-double-down:visible').length > 0;
+
+            var cookie = finC + ';' + resC + ';'  + eftC + ';'  + usgC + ';'  + rskC;
+   		    createCookie('kimble.propalternativespreferences', cookie);
+        }
+
+		function initialiseCurrencies()
+		{
+		}
+
+		function initialiseActions()
+		{
+		    jQuery(document).off('click', '.toggle-row-btn').on('click', '.toggle-row-btn', toggleRowDisplay);
+		}
+
+		function overlayAnnotations()
+		{
+			//jQuery('#alt-proposals-container').find('.meets-cap-ind').prop('title', revLab['CapMeetsRequirement']);
+		}
+
+		function toggleRowDisplay(r, forcetarget)
+		{
+			var target = (forcetarget != undefined ? forcetarget : jQuery(this));
+			var theRow = target.closest('tr');
+			if(target.hasClass('fa-angle-double-up'))
+			{
+				target.addClass('hidden-item');
+				theRow.find('.fa-angle-double-down').removeClass('hidden-item');
+
+				theRow.nextUntil('tr.collapse-row').addClass('hidden-item');
+			}
+			else
+			{
+				target.addClass('hidden-item');
+				theRow.find('.fa-angle-double-up').removeClass('hidden-item');
+
+				theRow.nextUntil('tr.collapse-row').removeClass('hidden-item');
+			}
+
+			if(forcetarget == undefined) setCookie();
+  		}
+
+		function jumpToProposal(pId)
+		{
+		    showWorking();
+		    safeNavigateToSForceURL('{!$Page.ProposalItems}?id=' + pId);
+  		}
+
+  		function jumpToRiskAssessment(pId)
+  		{
+		    showWorking();
+		    safeNavigateToSForceURL('{!$Page.ProposalRiskDashboard}?id=' + pId);
+    	}
+
+		function getTableHeaderHtml(d)
+		{
+			var html = '';
+
+			html += '<thead>';
+			html += '<th class="header-row-1"></th>'; //row headings
+
+			d.TheAlternativeProposals.forEach(function(p)
+			{
+			    var navLink = "jumpToProposal('" + p.Id + "')";
+				html += '<th class="header-row-1">';
+				html += '<div class="p-name" title="' + p.Name + '" onclick="' + navLink + '">' + p.Name + '<i class="fa fa-external-link jump-to-proposal"></i></div>';
+				html += '</th>';
+			});
+
+			html += getTableIndidatorsRowHtml(d);
+
+			html += '</thead>';
+
+			return html;
+		}
+
+		function switchPreferred(pId)
+		{
+		    var d = confirmDelete();
+		    if(!d) return;
+
+		    showWorking();
+		    makeAlternativePreferred(pId);
+  		}
+
+		function getTableIndidatorsRowHtml(d)
+		{
+			var html = '';
+			var canEditProposal = {!$ObjectType.Proposal__c.updateable};
+
+			html += '<tr class="p-inds-row">';
+			html += '<th class="header-row-2"></th>'; //row headings
+
+			d.TheAlternativeProposals.forEach(function(p)
+			{
+				html += '<th class="header-row-2">';
+				html += '<div class="p-inds">';
+				if(p.IsPreferred) {
+				    html += '<i class="fa fa-star p-ind"></i>';
+					html += '<div class="ind-pill prf-ind" title="{!JSENCODE($Label.PreferredLabel)}">{!UPPER(JSENCODE($Label.PreferredLabel))}</div>';
+				}
+				else if (p.IsOpen && canEditProposal) {
+				    var prefClick = "switchPreferred('" + p.Id + "');";
+			        html += '<div class="make-pref" title="{!JSENCODE($Label.ProposalAlternativeNarrative01)}" onclick="' + prefClick + '">';
+				    html += '<i class="fa fa-star-o"></i>';
+				    html += '{!JSENCODE($Label.MakePreferredProposal)}';
+				    html += '</div>';
+    			}
+				html += '</div>';
+				html += '</th>';
+			});
+
+			html += '</tr>';
+
+			return html;
+		}
+
+		function getTableFinancialsRowsHtml(d)
+		{
+			var html = '';
+
+			html += '<tr class="p-fins-hdr-row sec-row collapse-row">';
+			html += '<td class="row-hdr">{!JSENCODE($Label.DeliveryGroupFinancialSummary)}<i class="toggle-row-btn fa fa-angle-double-up" title="{!JSENCODE($Label.CollapseDisplayLabel)}"></i><i class="toggle-row-btn hidden-item fa fa-angle-double-down" title="{!JSENCODE($Label.Expand)}"></i></td>'; //section heading
+
+			// empty cells to span the props for this hdr row
+			d.TheAlternativeProposals.forEach(function(p)
+			{
+			    html += '<td>' + p.PropCurr; 
+			    if (p.IsForecastDetailed)
+			    {
+			    	html += '<i class="fa fa-toggle-on suppress-on fa-rotate-90 dropdown-icon"></i>';
+			    }
+			    else
+			    {
+			    	html += '<i class="fa fa-toggle-on suppress-on fa-rotate-270 dropdown-icon"></i>';
+			    }	
+			   	html += '</td>';
+			});
+			html += '</tr>';
+
+			// determine spreads for percentile formatting
+			var revArr = [];
+			var cstArr = [];
+			var mrgArr = [];
+			d.TheAlternativeProposals.forEach(function(p)
+			{
+			    revArr.push(p.ContractRevenue);
+			    cstArr.push(p.ContractCost);
+			    mrgArr.push((p.ContractMargin ? p.ContractMargin : 0));
+			});
+
+			html += '<tr class="p-fins-rev-row">';
+			html += '<td class="row-hdr">{!$ObjectType.Proposal__c.Fields.ContractRevenue__c.Label}</td>'; //section heading
+			d.TheAlternativeProposals.forEach(function(p)
+			{
+				html += '<td class="p-fin-cell with-inds">';
+				html += '<div>';
+				html += '<div class="cell-val fin-val">' + formatCurrencyValue(p.ContractRevenue) + '</div>';
+				html += '<i class="fa fa-circle cell-ind" style="color: ' + convertPercentileToHSLColour(calcPercentile(p.ContractRevenue, revArr)) + ';"></i>';
+				html += '</div>';
+				html += '</td>';
+			});
+			html += '</tr>';
+
+			html += '<tr class="p-fins-cost-row">';
+			html += '<td class="row-hdr">{!$ObjectType.Proposal__c.Fields.ContractCost__c.Label}</td>'; //section heading
+			d.TheAlternativeProposals.forEach(function(p)
+			{
+				html += '<td class="p-fin-cell with-inds">';
+				html += '<div>';
+				html += '<div class="cell-val fin-val">' + formatCurrencyValue(p.ContractCost) + '</div>';
+				html += '<i class="fa fa-circle cell-ind" style="color: ' + convertPercentileToHSLColour(calcPercentile(p.ContractCost, cstArr, true)) + ';"></i>';
+				html += '</div>';
+				html += '</td>';
+			});
+			html += '</tr>';
+
+			html += '<tr class="p-fins-margin-row">';
+			html += '<td class="row-hdr">{!$ObjectType.Proposal__c.Fields.ContractMargin__c.Label}</td>'; //section heading
+			d.TheAlternativeProposals.forEach(function(p)
+			{
+				var pMarginVal = (p.ContractMargin ? p.ContractMargin : 0);
+
+				html += '<td class="p-fin-cell with-inds">';
+				html += '<div>';
+				html += '<div class="cell-val fin-val">';
+				html += (p.ContractMargin ? kimble.formatNumber(pMarginVal, '###.##') : '-');
+				html += '</div>';
+				html += '<i class="fa fa-circle cell-ind" style="color: ' + convertPercentileToHSLColour(calcPercentile(pMarginVal, mrgArr)) + ';"></i>';
+				html += '</div>';
+				html += '</td>';
+			});
+			html += '</tr>';
+
+			return html;
+		}
+
+		function getTableResourcingRowsHtml(d)
+		{
+			var html = '';
+
+			html += '<tr class="p-res-hdr-row sec-row collapse-row">';
+			html += '<td class="row-hdr">{!JSENCODE($Label.GenericLabel03)}<i class="toggle-row-btn fa fa-angle-double-up" title="{!JSENCODE($Label.CollapseDisplayLabel)}"></i><i class="toggle-row-btn hidden-item fa fa-angle-double-down" title="{!JSENCODE($Label.Expand)}"></i></td>'; //section heading
+
+			// empty cells to span the props for this hdr row
+			d.TheAlternativeProposals.forEach(function(p)
+			{
+			    html += '<td></td>';
+			});
+			html += '</tr>';
+
+			html += '<tr class="p-fins-sd-row">';
+			html += '<td class="row-hdr">{!$ObjectType.DeliveryElement__c.Fields.EarliestAssignmentStartDate__c.Label}</td>'; //section heading
+			d.TheAlternativeProposals.forEach(function(p)
+			{
+				html += '<td class="p-dte-cell with-inds">';
+				html += '<div class="cell-centre-wrapper">';
+				html += '<div class="cell-val dte-val">' + formatUTCValue(p.StartDateUTC) + '</div>';
+				/*html += '<i class="fa fa-arrow-circle-down cell-ind neg-ind"></i>';*/
+				html += '</div>';
+				html += '</td>';
+			});
+			html += '</tr>';
+
+			html += '<tr class="p-fins-ed-row">';
+			html += '<td class="row-hdr">{!$ObjectType.DeliveryElement__c.Fields.LatestAssignmentEndDate__c.Label}</td>'; //section heading
+			d.TheAlternativeProposals.forEach(function(p)
+			{
+				html += '<td class="p-dte-cell with-inds">';
+				html += '<div class="cell-centre-wrapper">';
+				html += '<div class="cell-val dte-val">' + formatUTCValue(p.EndDateUTC) + '</div>';
+				/*html += '<i class="fa fa-arrow-circle-down cell-ind neg-ind"></i>';*/
+				html += '</div>';
+				html += '</td>';
+			});
+			html += '</tr>';
+
+			html += '<tr class="p-fins-dur-row">';
+			html += '<td class="row-hdr">{!$ObjectType.PlanTask__c.Fields.Duration__c.Label}</td>'; //section heading
+			d.TheAlternativeProposals.forEach(function(p)
+			{
+				html += '<td class="p-num-cell with-inds">';
+				html += '<div class="cell-centre-wrapper">';
+				html += '<div class="cell-val num-val">' + formatNumericValue(p.Duration) + '</div>';
+				/*html += '<i class="fa fa-arrow-circle-down cell-ind neg-ind"></i>';*/
+				html += '</div>';
+				html += '</td>';
+			});
+			html += '</tr>';
+
+			html += '<tr class="p-effort-hdr-row sec-row collapse-row">';
+			html += '<td class="row-hdr">{!JSENCODE($Label.EffortSummaryHeading)}<i class="toggle-row-btn fa fa-angle-double-up" title="{!JSENCODE($Label.CollapseDisplayLabel)}"></i><i class="toggle-row-btn hidden-item fa fa-angle-double-down" title="{!JSENCODE($Label.Expand)}"></i></td>'; //section heading
+
+			// empty cells to span the props for this hdr row
+			d.TheAlternativeProposals.forEach(function(p)
+			{
+			    html += '<td></td>';
+			});
+			html += '</tr>';
+
+			html += '<tr class="p-usage-row">';
+			html += '<td class="row-hdr"></td>'; //section heading
+			d.TheAlternativeProposals.forEach(function(p)
+			{
+				html += '<td class="p-summary-cell">';
+
+				p.ResourceSummaries.forEach(function(s)
+				{
+					html += '<div class="cell-centre-wrapper">';
+					if(s.BusinessUnitName != undefined && s.BusinessUnitName != '') html += '<div class="cell-val"><div class="in-cell-lab">{!$ObjectType.BusinessUnit__c.Label}</div><div class="in-cell-val">' + s.BusinessUnitName + '</div></div>';
+					if(s.GradeName != undefined && s.GradeName != '') html += '<div class="cell-val"><div class="in-cell-lab">{!$ObjectType.Grade__c.Label}</div><div class="in-cell-val">' + s.GradeName + '</div></div>';
+					if(s.LocationName != undefined && s.LocationName != '') html += '<div class="cell-val"><div class="in-cell-lab">{!$ObjectType.Location__c.Label}</div><div class="in-cell-val">' + s.LocationName + '</div></div>';
+					if(s.NumberOfResources != undefined && s.NumberOfResources != '') html += '<div class="cell-val"><div class="in-cell-lab">{!$ObjectType.Resource__c.LabelPlural}</div><div class="in-cell-val">' + formatNumericValue(s.NumberOfResources) + '</div></div>';
+					if(s.NumberOfFTEs != undefined && s.LocationName != '') html += '<div class="cell-val"><div class="in-cell-lab">{!JSENCODE($Label.Label023)}</div><div class="in-cell-val">' + formatNumericValue(s.NumberOfFTEs) + '</div></div>';
+					html += '</div>';
+				});
+
+				html += '</td>';
+			});
+			html += '</tr>';
+
+			html += '<tr class="p-period-sum-hdr-row sec-row collapse-row">';
+			html += '<td class="row-hdr">{!JSENCODE($Label.Label024)}<i class="toggle-row-btn fa fa-angle-double-up" title="{!JSENCODE($Label.CollapseDisplayLabel)}"></i><i class="toggle-row-btn hidden-item fa fa-angle-double-down" title="{!JSENCODE($Label.Expand)}"></i></td>'; //section heading
+
+			// empty cells to span the props for this hdr row
+			d.TheAlternativeProposals.forEach(function(p)
+			{
+			    html += '<td></td>';
+			});
+			html += '</tr>';
+
+			d.SortedResourceProfilePeriods.forEach(function(resP)
+			{
+			    var theDate = resP.toDate();
+				html += '<tr class="p-period-sum-row">';
+				html += '<td class="row-hdr">' + kimble.regional.monthNamesShort[theDate.getMonth()] + ' ' + theDate.getFullYear(); + '</td>'; //section heading
+
+				d.TheAlternativeProposals.forEach(function(p)
+				{
+					html += '<td class="p-period-sum-cell">';
+					html += '<div class="hist-cell-wrapper">';
+					if(p.ResourceProfile[resP] != undefined)
+					{
+					   var histProp = p.ResourceProfile[resP] / d.MaxUsage * 100;
+					   html += '<div class="hist-cell-val" style="width:' + histProp + '%">' + formatNumericValue(p.ResourceProfile[resP]) + '</div>';
+					}
+					html += '</div>';
+					html += '</td>';
+				});
+				html += '</tr>';
+			});
+
+			return html;
+		}
+
+		function getTableRiskRowsHtml(d)
+		{
+			var html = '';
+
+			html += '<tr class="p-risk-hdr-row sec-row collapse-row">';
+			html += '<td class="row-hdr">{!JSENCODE($ObjectType.RiskAssessment__c.Label)}<i class="toggle-row-btn fa fa-angle-double-up" title="{!JSENCODE($Label.CollapseDisplayLabel)}"></i><i class="toggle-row-btn hidden-item fa fa-angle-double-down" title="{!JSENCODE($Label.Expand)}"></i></td>'; //section heading
+
+			// empty cells to span the props for this hdr row
+			d.TheAlternativeProposals.forEach(function(p)
+			{
+			    html += '<td></td>';
+			});
+			html += '</tr>';
+
+			d.RiskLevels.forEach(function(r)
+			{
+				html += '<tr class="p-risk-level-row">';
+				html += '<td class="row-hdr">' + r + '</td>'; //section heading
+				d.TheAlternativeProposals.forEach(function(p)
+				{
+					html += '<td class="p-txt-cell risk-level-cell">';
+					html += '<div class="cell-centre-wrapper">';
+					var riskLevel = (p.RiskLevels[r].SeverityName != undefined ? p.RiskLevels[r].SeverityName : '-');
+					var riskStyle = (p.RiskLevels[r].SeverityName != undefined ? d.RiskLevelStyles[p.RiskLevels[r].SeverityName] : 'risk-severity-class-0');
+					var navLink = (p.RiskCount != undefined && p.RiskCount > 0 ? "jumpToRiskAssessment('" + p.Id + "');" : '');
+					html += '<div class="cell-val risk-level ' + riskStyle + (navLink != '' ? ' with-action ' : '') + '" title="' + (navLink != '' ? '{!JSENCODE($ObjectType.RiskAssessment__c.Label)}' : '') + '" onclick="' + navLink + '">' + riskLevel + '</div>';
+					html += '</div>';
+					html += '</td>';
+				});
+				html += '</tr>';
+			});
+
+			html += '<tr class="p-risk-num-row">';
+			html += '<td class="row-hdr">{!JSENCODE($Label.Label025)}</td>'; //section heading
+			d.TheAlternativeProposals.forEach(function(p)
+			{
+				html += '<td class="p-num-cell">';
+				html += '<div class="cell-centre-wrapper">';
+				html += '<div class="cell-val num-val">' + formatNumericValue(p.RiskCount) + '</div>';
+				html += '</div>';
+				html += '</td>';
+			});
+			html += '</tr>';
+
+			return html;
+		}
+
+		function getTableBodyHtml(d)
+		{
+			var html = '';
+
+			html += getTableFinancialsRowsHtml(d);
+			html += getTableResourcingRowsHtml(d);
+			if(d.RiskLevels.length > 0) html += getTableRiskRowsHtml(d);
+
+			return html;
+		}
+
+		function getDetailsHtml(d)
+		{
+			var html = '';
+
+			html += '<table class="details-table list">';
+
+			html += '<thead>';
+			html += getTableHeaderHtml(d);
+			html += '</thead>';
+
+			html += '<tbody>';
+			html += getTableBodyHtml(d);
+			html += '</tbody>';
+
+			html += '</table>';
+
+			return html;
+		}
+
+		function populateDetails()
+		{
+			jQuery('#proposals-container').html(getDetailsHtml(theDetails));
+
+			initialiseDynamicElements();
+
+			hideWorking();
+		}
+
+		function getDetails()
+		{
+			showWorking();
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ProposalAlternativesController.GetProposals}',
+				proposalId,
+					function(result, event){
+						if (event.status)
+						{
+							theDetails = result;
+							populateDetails();
+						}
+						else
+						{
+							alert(event.message);
+						}
+
+						hideWorking();
+				},
+			 {escape: false, timeout: 60000});
+		}
+
+		function hideWorking()
+		{
+			jQuery('#loadingIndicatorOuterContainer').hide();
+		}
+
+		function showWorking()
+		{
+			jQuery('#loadingIndicatorOuterContainer').show();
+		}
+
+		function formatCurrencyValue(theValue)
+		{
+			theValue = (theValue == undefined || theValue == null || theValue == '' ? '0' : theValue);
+			return kimble.formatNumber(theValue, '#,##0.00');
+		}
+
+		function formatNumericValue(theValue)
+		{
+			theValue = (theValue == undefined || theValue == null || theValue == '' ? '0' : theValue);
+			return kimble.formatNumber(theValue, '#,##0');
+		}
+
+		function formatUTCValue(theValue)
+		{
+			if(theValue == undefined || theValue == null || theValue == '') return '-';
+			return kimble.formatDate(theValue);
+		}
+
+		function convertPercentileToHexColour(pct)
+		{
+			var r, g, b = 0;
+
+			if(pct < 50) {
+				r = 200;
+				g = Math.round(5.1 * pct);
+			}
+			else {
+				g = 200;
+				r = Math.round(510 - 5.10 * pct);
+			}
+
+			var h = r * 0x10000 + g * 0x100 + b * 0x1;
+			return '#' + ('000000' + h.toString(16)).slice(-6);
+		}
+
+		function convertPercentileToHSLColour(percent, start = 0, end = 120) {
+		    // Change the start and end values to reflect the hue map
+			// http://www.ncl.ucar.edu/Applications/Images/colormap_6_3_lg.png
+
+			/*
+			Quick ref:
+				0 – red
+				60 – yellow
+				120 – green
+				180 – turquoise
+				240 – blue
+				300 – pink
+				360 – red
+			*/
+			var a = percent / 100,
+				b = (end - start) * a,
+				c = b + start;
+
+			// Return a CSS HSL string
+			//return 'hsl('+c+', 100%, 39%)';
+			return 'hsl('+c+', 70%, 60%)';
+		}
+
+		function calcPercentile(v, arr, invert = false)
+		{
+			var s = 0;
+			var b = 0;
+
+			var h = 0;
+			var l = 0;
+
+			for (var i = 0; i < arr.length; i++)
+			{
+			    if (arr[i] > h) {
+			        h = arr[i];
+			        if(l == 0) l = h;
+				}
+			    if (arr[i] < l) l = arr[i];
+
+				if (arr[i] < v)
+				{
+					s += 1;
+				}
+				else
+				{
+					b += 1;
+				}
+			}
+
+			var res = 0;
+			// special case, if there is no range between highest and lowest
+			// then we need to assume a percentile of 1 (rather than mathematically which would be 0)
+			if(h-l == 0)
+				res = (!invert ? 100 : 0);
+			else
+				res = (s/(s+b-1) * 100);
+
+			return (!invert ? res : 100 - res);
+		}
+
+	</script>
+
+<apex:form id="TheForm">
+	<apex:actionFunction action="{!MakeAlternativePreferred}" name="makeAlternativePreferred" rerender="TheForm">
+		<apex:param name="pId" value="" />
+	</apex:actionFunction>
+</apex:form>
+</apex:define>
+</apex:composition>
+</apex:page>

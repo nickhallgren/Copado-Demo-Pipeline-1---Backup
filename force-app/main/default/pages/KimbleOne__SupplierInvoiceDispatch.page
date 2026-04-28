@@ -1,0 +1,250 @@
+<apex:page id="SupplierInvoiceDispatch" standardController="KimbleOne__SupplierInvoice__c" recordSetVar="supplierInvoices" extensions="KimbleOne.SupplierInvoiceDispatchController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__SupplierInvoice__c">
+<apex:composition template="KimbleOne__SiteMaster">
+
+    <apex:define name="Content">
+
+    <style>
+        .supplier-invoice
+        {
+            padding-left: 20px;
+            background-repeat: no-repeat;
+            padding-right: 12px;
+            height: 18px;
+            display: block;
+            line-height: 18px;
+        }
+        .Pending
+        {
+            background-image: url('{!URLFOR($Resource.JobImages, 'pending16.gif')}');
+        }
+        .Processing
+        {
+            background-image: url('{!URLFOR($Resource.JobImages, 'running16.gif')}');
+        }
+        .Completed
+        {
+            background-image: url('{!URLFOR($Resource.JobImages, 'completed16.gif')}');
+        }
+        .Failed
+        {
+            background-image: url('{!URLFOR($Resource.JobImages, 'failed16.gif')}');
+        }
+        .select-list-container {
+            margin-bottom: 6px;
+        }
+		.inline-icon-cell {
+			width: 26px;
+		}
+		.inline-icon {
+			font-size: 18px;
+		}
+		.inline-contact-pencil,
+		.inline-contact-cancel,
+		.inline-contact-save {
+			cursor: pointer;
+		}
+		i.fa.inline-contact-pencil,
+		i.fa.inline-contact-save,
+		i.fa.inline-contact-cancel,
+		i.fa.inline-contact-working {
+			font-size: 14px;
+			margin-left: 5px;
+		}
+		i.fa.inline-contact-pencil:hover,
+		i.fa.inline-contact-save:hover,
+		i.fa.inline-contact-cancel:hover {
+			color: #1A9EFF;
+		}
+		.contact-title
+		{
+			display: inline-block;
+			max-width: 380px;
+			font-size: 14px;
+			white-space: normal;
+		}
+    </style>
+
+    <apex:form id="TheForm">
+        <apex:pageBlock title="{!$Label.kimbleone__email} {!$ObjectType.KimbleOne__SupplierInvoice__c.labelPlural}">
+            <apex:pageMessages />
+
+            <apex:pageBlockButtons location="top">
+                <apex:commandButton id="backButton" value="{!JSENCODE($Label.kimbleone__back)}" action="{!GoBack}"/>
+                <input id="emailButton" type="button" class="btn DisableButtonWhileBusy" value="{!JSENCODE($Label.Email)}" onClick="sendSupplierInvoices();"/>
+            </apex:pageBlockButtons>
+
+            <apex:pageBlockSection columns="1">
+                <apex:selectList id="email-template" value="{!TheSelectedEmailTemplateDocumentId}" size="1" label="{!$Label.kimbleone__emailtemplatelabel}" disabled="{!TheEmailTemplateDocumentsOptions.size == 1}">
+                    <apex:selectOptions value="{!TheEmailTemplateDocumentsOptions}"/>
+                </apex:selectList>
+            </apex:pageBlockSection>
+
+            <apex:pageBlockSection columns="1" rendered="{!TheSupplierInvoices.size == 0}">
+                <apex:pageMessage severity="info" title="{!NoSupplierInvoicesFound}"/>
+            </apex:pageBlockSection>
+
+            <apex:pageBlockSection columns="1" rendered="{!TheSupplierInvoices.size > 0}">
+                <apex:pageBlockTable value="{!TheSupplierInvoices}" var="item">
+                    <apex:column headervalue="{!$Label.kimbleone__statuslabel}">
+                        <apex:outputPanel layout="none" rendered="{!!ISBLANK(item.TheSupplierInvoice.SupplierContact__r.Email)}">
+                            <span id="{!JSENCODE(item.TheSupplierInvoice.Id)}" class="supplier-invoice Pending"/>
+                        </apex:outputPanel>
+                        <apex:outputPanel layout="none" rendered="{!ISBLANK(item.TheSupplierInvoice.SupplierContact__r.Email)}">
+                            <span id="{!JSENCODE(item.TheSupplierInvoice.Id)}" class="supplier-invoice Failed" title="{!JSENCODE(EmailRequiredLabel)}"/>
+                        </apex:outputPanel>
+                    </apex:column>
+                    <apex:column >
+                        <apex:facet name="header">
+                            <apex:outputPanel layout="none">
+                                <apex:outputLabel value="{!$Label.kimbleone__selectlabel}"/><br/>
+                                <apex:inputCheckbox styleClass="select-all" onChange="selectAllCheckboxes(); checkForSelected();"/>
+                            </apex:outputPanel>
+                        </apex:facet>
+                        <apex:inputCheckbox value="{!item.IsSelected.KimbleOne__InputCheckbox__c}" styleClass="row-selector" disabled="{!ISBLANK(item.TheSupplierInvoice.SupplierContact__r.Email)}"/>
+                    </apex:column>
+                    <apex:column headerValue="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.Name.Label}">
+                        <apex:outputField value="{!item.TheSupplierInvoice.Name}"/>
+                    </apex:column>
+                    <apex:column headerValue="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.KimbleOne__InvoiceDate__c.Label}">
+                        <apex:outputField value="{!item.TheSupplierInvoice.KimbleOne__InvoiceDate__c}"/>
+                    </apex:column>
+                    <apex:column headerValue="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.KimbleOne__SupplierAccount__c.Label}">
+                        <apex:outputField value="{!item.TheSupplierInvoice.KimbleOne__SupplierAccount__c}"/>
+                    </apex:column>
+                    <apex:column headerValue="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.KimbleOne__SupplierContact__c.Label}">
+                        <apex:outputField value="{!item.TheSupplierInvoice.KimbleOne__SupplierContact__c}"/>
+                    </apex:column>
+                    <apex:column headerValue="{!$ObjectType.Contact.Fields.Email.Label}">
+                        <apex:outputField value="{!item.TheSupplierInvoice.SupplierContact__r.Email}"/>
+                    </apex:column>
+                    <apex:column headerValue="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.KimbleOne__NetAmount__c.Label}">
+                        <apex:outputField value="{!item.TheSupplierInvoice.KimbleOne__NetAmount__c}"/>
+                    </apex:column>
+                    <apex:column headerValue="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.KimbleOne__TaxAmount__c.Label}">
+                        <apex:outputField value="{!item.TheSupplierInvoice.KimbleOne__TaxAmount__c}"/>
+                    </apex:column>
+                </apex:pageBlockTable>
+            </apex:pageBlockSection>
+        </apex:pageBlock>
+
+        <script>
+            jQuery(window).load(function(){
+                initialiseItems();
+            });
+
+            function initialiseItems()
+            {
+                if ({!IsFilterMode})
+                {
+                    jQuery('[id$=\'emailButton\']').prop('disabled',false);
+                    jQuery("input.select-all:visible").prop('checked', true);
+                    jQuery("input.row-selector:visible:not(:disabled)").addClass('selected');
+                }
+                else
+                {
+                    jQuery('[id$=\'emailButton\']').prop('disabled',true);
+                    resetSelectAll();
+                }
+            }
+
+            function resetSelectAll()
+            {
+                jQuery("input.select-all").each(function(){jQuery(this).prop('checked', false);jQuery(this).removeClass('selected')});
+            }
+
+            function selectAllCheckboxes()
+            {
+                if(jQuery("input.select-all:visible")[0].checked)
+                {
+                    jQuery("input.row-selector:visible:not(:disabled)").each(function(){jQuery(this).prop('checked', true);jQuery(this).addClass('selected')});
+                }
+                else
+                {
+                    jQuery("input.row-selector:visible:not(:disabled)").each(function(){jQuery(this).prop('checked', false);jQuery(this).removeClass('selected')});
+                }
+            }
+
+            function checkForSelected()
+            {
+                if(jQuery("input.row-selector:checked").length > 0)
+                {
+                    jQuery('[id$=\'emailButton\']').prop('disabled',false);
+                }
+                else
+                {
+                    jQuery('[id$=\'emailButton\']').prop('disabled',true);
+                }
+            }
+
+            function sendSupplierInvoices()
+            {
+                var selectorObj = $('.row-selector.selected:first');
+
+                if (selectorObj.length)
+                {
+                    var rowContext = jQuery(selectorObj).closest('tr');
+                    var obj = jQuery(rowContext).find('.supplier-invoice.Pending');
+                    $(obj).removeClass('Pending');
+                    $(obj).addClass('Processing');
+                    $(selectorObj).removeClass('selected');
+
+                    executeJob(obj, $(obj).attr('id'), jQuery('[id$="email-template"').val());
+                }
+                else
+                {
+                    var failed = $('.supplier-invoice.Failed:first');
+
+                    if (failed.length)
+                    {
+                        $('#emailButton').removeClass('btnDisabled');
+                        $('#emailButton').addClass('btn');
+                        $('#emailButton').val('{!$Label.Email}');
+                        $('#emailButton').attr('disabled', true);
+                         resetSelectAll();
+                         selectAllCheckboxes();
+                    }
+                    else
+                        window.location.reload();
+                }
+            }
+
+            function executeJob(obj, supplierInvoiceId, emailtemplateId)
+            {
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.SupplierInvoiceDispatchController.SendSupplierInvoice}',
+                    supplierInvoiceId, emailtemplateId,
+                        function(result, event){
+                             if (event.status)
+                             {
+                                $(".supplier-invoice[id='" + supplierInvoiceId + "']").removeClass('Processing');
+                                $(".supplier-invoice[id='" + supplierInvoiceId + "']").addClass(result.TheResult);
+
+                                if (result.TheResult == 'Failed')
+                                    obj.attr('title', result.TheMessage);
+                                else if (result.TheResult == 'Completed')
+                                    $(".supplier-invoice[id='" + supplierInvoiceId + "']").closest('tr').fadeOut(2000);
+
+                                sendSupplierInvoices();
+                             }
+                             else if (event.type === 'exception')
+                             {
+                                alert(event.message);
+                             }
+                             else
+                             {
+                                alert(event.message);
+                             }
+                    },
+                    {escape: true, timeout: 60000}
+                );
+            }
+
+            $('input.row-selector').each(function(){$(this).change(function(){
+                $(this).toggleClass('selected');
+                checkForSelected();
+            })});
+        </script>
+
+    </apex:form>
+    </apex:define>
+</apex:composition>
+</apex:page>

@@ -1,0 +1,122 @@
+<apex:page standardController="KimbleOne__Payment__c" extensions="KimbleOne.PaymentAllocationController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__Payment__c">
+
+	<apex:Composition template="KimbleOne__SiteMaster">
+		<apex:define name="Menu">
+			<c:Menu rendered="{!KimbleOne__Payment__c.Id != null}" MenuContextType="Payment" MenuContextId="{!KimbleOne__Payment__c.Id}" MenuContextName="{!KimbleOne__Payment__c.Name}"/> 
+		</apex:define>
+		
+		<apex:define name="Content">
+			<apex:pageBlock title="{!JSENCODE(aPayment.Name)} - {!$Label.kimbleone__allocateinvoicestopayment}" >
+				<apex:outputPanel id="paymentDetailPanel">
+					<apex:messages />
+					<apex:pageBlock >
+						<apex:pageBlockSection columns="1">
+							<apex:outputField value="{!aPayment.Name}"/>
+							<apex:outputField value="{!aPayment.Account__r.Name}"/>
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel for="paymentAmount" value="{!$ObjectType.KimbleOne__Payment__c.Fields.KimbleOne__PaymentAmount__c.Label}"></apex:outputLabel>
+								<apex:outputPanel layout="none">
+									<apex:outputText value="{!aPayment.CurrencyIsoCode}" styleclass="kimbleCurrencyCode" />
+									<apex:outputText value="{!aPayment.KimbleOne__PaymentAmount__c}"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							<apex:outputField value="{!aPayment.KimbleOne__PaymentDate__c}"/>
+							
+							<apex:repeat value="{!$ObjectType.KimbleOne__Payment__c.FieldSets.KimbleOne__PaymentDetails}" var="f">
+     							<apex:outputField value="{!KimbleOne__Payment__c[f]}"/>
+   							</apex:repeat>
+						</apex:pageBlockSection>
+				    </apex:pageBlock>
+				</apex:outputPanel>
+					
+				<apex:pageBlockSection columns="2">
+					<apex:pageBlockSectionItem >
+						<apex:pageBlock title="{!$Label.kimbleone__invoicestobeallocated}">
+							<apex:outputPanel id="availableInvoicesPanel">
+							<apex:form >							
+								<apex:pageBlockTable value="{!availableInvoicesList}" var="availableInvoice" >
+									<apex:column headerValue="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__Reference__c.Label}" value="{!availableInvoice.invoice.KimbleOne__Reference__c}" style="text-align:left"/>
+									<apex:column headerValue="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__InvoiceDate__c.Label}" value="{!availableInvoice.invoice.KimbleOne__InvoiceDate__c}" style="text-align:center" />
+									<apex:column headerValue="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__GrossAmount__c.Label}" style="text-align:right">
+										<apex:outputPanel layout="none">
+											<apex:outputText value="{!availableInvoice.invoice.CurrencyIsoCode}" styleclass="kimbleCurrencyCode" />
+											<apex:outputText value="{!availableInvoice.invoice.KimbleOne__GrossAmount__c}"/>
+										</apex:outputPanel>
+									</apex:column>
+									<apex:column headerValue="{!$Label.kimbleone__paymentallocationcreditedvalue}" style="text-align:right">
+										<apex:outputPanel layout="none">
+											<apex:outputText value="{!availableInvoice.invoice.CurrencyIsoCode}" styleclass="kimbleCurrencyCode" />
+											<apex:outputText value="{!availableInvoice.creditedAmount.KimbleOne__InputCurrency__c}"/>
+										</apex:outputPanel>
+									</apex:column>
+									<apex:column headerValue="{!$Label.kimbleone__paymentallocationunpaidinvoicevalue}" style="text-align:right">
+										<apex:outputPanel layout="none">
+											<apex:outputText value="{!availableInvoice.invoice.CurrencyIsoCode}" styleclass="kimbleCurrencyCode" />
+											<apex:outputText value="{!availableInvoice.remainingPaymentAmount.KimbleOne__InputCurrency__c}"/>
+										</apex:outputPanel>
+									</apex:column>
+									<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+										<apex:outputPanel rendered="{!$ObjectType.KimbleOne__InvoicePayment__c.createable}"> 
+										    <apex:outputLink styleClass="actionLink" value="#" onclick="initialiseModalBoxy('#NewPaymentAllocationPopup', '{!JSENCODE($Label.kimbleone__add)} {!$ObjectType.KimbleOne__InvoicePayment__c.label}');allocateToPayment('{!JSINHTMLENCODE(availableInvoice.invoice.Id)}')">{!$Label.kimbleone__add}</apex:outputLink>
+										</apex:outputPanel>
+									</apex:column>
+								</apex:pageBlockTable>
+								<apex:actionFunction action="{!loadPaymentAllocationDetails}" name="allocateToPayment" rerender="newPaymentAllocationDetails" oncomplete="showModalBoxy()">
+									<apex:param name="iid" value=""></apex:param>
+								</apex:actionFunction> 
+							</apex:form>
+							</apex:outputPanel>
+						</apex:pageBlock>
+					</apex:pageBlockSectionItem>
+					
+					<apex:pageBlockSectionItem >
+						<apex:pageBlock title="{!$Label.kimbleone__invoicesalreadyassigned}">
+							<apex:outputPanel id="invoicesPaymentAllocationsPanel">
+								<apex:pageBlockTable value="{!invoicePaymentAllocationsList}" var="invoicePayment">
+									<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+										<apex:outputLink value="#" onclick="if (confirmDelete()) deleteInvoicePaymentAllocation('{!JSINHTMLENCODE(invoicePayment.Id)}')" rendered="{!$ObjectType.KimbleOne__InvoicePayment__c.deletable}">{!$Label.kimbleone__remove}</apex:outputLink>
+									</apex:column>
+									<apex:column headerValue="{!$ObjectType.KimbleOne__InvoicePayment__c.Fields.KimbleOne__Payment__c.Label}" value="{!invoicePayment.Payment__r.Name}" style="text-align:left"></apex:Column>									
+									<apex:column headerValue="{!$ObjectType.KimbleOne__InvoicePayment__c.Fields.KimbleOne__Invoice__c.Label}" value="{!invoicePayment.Invoice__r.KimbleOne__Reference__c}" style="text-align:left"></apex:Column>									
+									<apex:column headerValue="{!$ObjectType.KimbleOne__InvoicePayment__c.Fields.KimbleOne__PaymentAmount__c.Label}" value="{!invoicePayment.KimbleOne__PaymentAmount__c}" ></apex:Column>
+								</apex:PageBlockTable>
+								<apex:form >
+									<apex:actionFunction action="{!deleteInvoicePaymentAllocation}" name="deleteInvoicePaymentAllocation" rerender="invoicesPaymentAllocationsPanel, availableInvoicesPanel">
+										<apex:param name="ipid" value=""></apex:param>
+									</apex:actionFunction>
+								</apex:form>
+								
+							</apex:outputPanel>
+						</apex:pageBlock>
+					</apex:pageBlockSectionItem>
+  
+  					  					
+				</apex:pageBlockSection>
+			</apex:pageBlock>
+
+			<!-- The allocation details -->
+			<div id="NewPaymentAllocationPopup" style="display:none">
+				<apex:outputPanel id="newPaymentAllocationDetails">
+					<apex:form >
+						<apex:pageBlock >
+							<div id="paymentAllocationErrors">
+								<apex:pageMessages escape="false"/>
+							</div>
+		            		<apex:pageBlockButtons location="bottom">
+								<apex:commandButton value="{!$Label.kimbleone__save}" action="{!allocateToPayment}" oncomplete="hideModalBoxyWithErrorCheck('#paymentAllocationErrors')" rerender="invoicesPaymentAllocationsPanel, newPaymentAllocationDetails, availableInvoicesPanel" />
+								<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+							</apex:pageBlockButtons>
+							<apex:pageBlockSection columns="1">
+								<apex:pageBlockSectionItem >
+									<apex:outputLabel for="orderValueInput" value="{!$ObjectType.KimbleOne__InvoicePayment__c.Fields.KimbleOne__PaymentAmount__c.Label} {!currentPaymentAllocation.CurrencyIsoCode}"/>
+									<apex:inputField id="orderValueInput" required="true" value="{!currentPaymentAllocation.KimbleOne__PaymentAmount__c}"/>
+								</apex:pageBlockSectionItem>
+							</apex:pageBlockSection>
+					    </apex:pageBlock>
+					</apex:form>
+				</apex:outputPanel>
+			</div>
+
+		</apex:define>
+	</apex:Composition>
+</apex:page>

@@ -1,0 +1,159 @@
+<apex:page controller="KimbleOne.CustomerOrgSettingsController" sidebar="false">
+	<apex:composition template="KimbleOne__SiteMaster">
+		<apex:define name="Menu">
+			<c:Menu DefaultHelpPage="ReferenceData.html" MenuContextName="{!IF($CurrentPage.Parameters.mode != 'catalog', 'Customer Org Configuration Settings', $ObjectType.KimbleOne__ConfigurationCatalogItem__c.labelPlural)}" BreadCrumbLink="{!$Page.KimbleOne__ReferenceDataHome}" BreadCrumbName="{!$ObjectType.KimbleOne__ReferenceData__c.Label}"/>
+		</apex:define>
+		<apex:define name="Content">
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'SettingsStyle.css')}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleJS, 'Charm.js')}"/>
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleJS, 'ConfigSettings.js')}"/>
+
+			<style>
+			#data-loading {
+				text-align: center;
+				font-size: 200px;
+				color: #d3d3d3;
+				position: absolute;
+				filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+				-moz-opacity: 0.7;
+				-khtml-opacity: 0.7;
+				opacity: 0.7;
+				z-index: 1000;
+				background-color: #fff;
+				height: calc(100% - 70px);
+    			width: calc(100% - 118px);
+				padding: 100px 50px 0px 50px;
+			}
+			</style>
+
+			<apex:outputPanel layout="none" rendered="{!!ISBLANK(NoAccessMessage)}">
+				<apex:outputText value="{!NoAccessMessage}"/>
+			</apex:outputPanel>
+			
+			<apex:outputPanel layout="none" rendered="{!ISBLANK(NoAccessMessage)}">
+			<apex:outputPanel layout="none" rendered="{!$CurrentPage.Parameters.mode != 'catalog'}">
+			<apex:outputPanel id="orgWideSettingsCharmsCard" layout="none">
+			<div class="title-card-container">
+				<div class="title-card">
+					<div class="title-card-heading" >
+						<div class="title-card-heading-text">
+						</div>
+					</div>
+					
+					<div class="title-card-body">
+			  			<div id="embeddedCharmsContainer" pageSource="HealthCheck"></div>
+					</div>
+				</div>
+			</div>
+ 			</apex:outputPanel>
+
+			<div id="data-loading" class="hidden-item"><i class="fa fa-circle-o-notch fa-spin"></i></div>
+			<apex:repeat value="{!OrderedConfigSectionKeyMap}" var="sectionKey">
+			<apex:pageblock title="{!ConfigSectionKeyToHeadingMap[sectionKey]}">
+				<apex:repeat value="{!ConfigSettingsMap[sectionKey]}" var="theSetting">
+					<apex:variable value="{!IF(theSetting.Enabled, '', 'always-disabled')}" var="disabledStyle"/>
+					<div class="config-item" id="{!JSENCODE(theSetting.SettingName)}" setting-name="{!JSENCODE(theSetting.SettingName)}" data-on-complete="{!JSENCODE(theSetting.OnComplete)}">
+						<span class="config-item-heading" search-text="{!JSENCODE(theSetting.Narrative)}{!JSENCODE(ConfigSectionKeyToHeadingMap[sectionKey])}{!IF(theSetting.IsNew,$Label.New,'')}">{!JSENCODE(theSetting.Narrative)}</span>
+						<apex:outputPanel layout="none" rendered="{!theSetting.SettingType == 'boolean'}">
+							<i class="k-tgl {!JSENCODE(disabledStyle)} {!JSENCODE(theSetting.CustomSettingType)} fa {!IF(theSetting.SettingBooleanValue, 'fa-toggle-on', 'fa-toggle-off')} {!IF(theSetting.ReloadOnChange, 'reload-on-change', '')} boolean-config-item"></i>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!theSetting.SettingType == 'integer'}">
+							<input disabled="disabled" class="{!JSENCODE(disabledStyle)} disabled-until-ready {!JSENCODE(theSetting.CustomSettingType)} integer-config-item" value="{!theSetting.SettingIntegerValue}"/>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!theSetting.SettingType == 'string'}">
+							<input disabled="disabled" class="{!JSENCODE(disabledStyle)} disabled-until-ready {!JSENCODE(theSetting.CustomSettingType)} string-config-item" value="{!JSENCODE(theSetting.SettingStringValue)}"/>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!theSetting.SettingType == 'date'}">
+							<input disabled="disabled" class="{!JSENCODE(disabledStyle)} disabled-until-ready {!JSENCODE(theSetting.CustomSettingType)} date-config-item" value="{!JSENCODE(theSetting.SettingUTCDateValue)}"/>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!theSetting.SettingType == 'action'}">
+							<div class="{!JSENCODE(disabledStyle)} action-btn disabled-until-ready">{!JSENCODE($Label.kimbleone__recalculate)}</div>
+						</apex:outputPanel>
+						<div class="config-item-placeholder fa fa-spin fa-circle-o-notch hidden-item"/>
+						<apex:outputPanel layout="none" rendered="{!theSetting.IsHierarchy}">
+						<i class="fa fa-info-circle hierarchy-setting-ind"></i>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!theSetting.IsNew}">
+						<i class="fa fa-asterisk new-setting-ind" title="{!$Label.New}"></i>
+						</apex:outputPanel>						
+						<apex:outputPanel layout="none" rendered="{!theSetting.SettingType == 'string-choice'}">
+						<select class="{!JSENCODE(disabledStyle)} {!JSENCODE(theSetting.CustomSettingType)} select-config-item">
+						<apex:repeat value="{!theSetting.SettingStringChoices}" var="opt">
+							<apex:outputPanel layout="none" rendered="{!!ISBLANK(theSetting.SettingStringValue) && opt.Value == theSetting.SettingStringValue}">
+								<option value="{!JSENCODE(opt.Value)}" selected="selected">{!JSENCODE(opt.Label)}</option>
+							</apex:outputPanel>
+							<apex:outputPanel layout="none" rendered="{!opt.Value != theSetting.SettingStringValue}">
+								<option value="{!JSENCODE(opt.Value)}">{!JSENCODE(opt.Label)}</option>
+							</apex:outputPanel>
+						</apex:repeat>
+						</select>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!theSetting.SettingType == 'integer-choice'}">
+						<select class="{!JSENCODE(disabledStyle)} {!JSENCODE(theSetting.CustomSettingType)} select-config-item">
+						<apex:repeat value="{!theSetting.SettingStringChoices}" var="opt">
+							<apex:outputPanel layout="none" rendered="{!!ISBLANK(theSetting.SettingIntegerValue) && opt.Value == TEXT(theSetting.SettingIntegerValue)}">
+								<option value="{!JSENCODE(opt.Value)}" selected="selected">{!JSENCODE(opt.Label)}</option>
+							</apex:outputPanel>
+							<apex:outputPanel layout="none" rendered="{!opt.Value != TEXT(theSetting.SettingIntegerValue)}">
+								<option value="{!JSENCODE(opt.Value)}">{!JSENCODE(opt.Label)}</option>
+							</apex:outputPanel>
+						</apex:repeat>
+						</select>
+						</apex:outputPanel>
+					</div>
+				</apex:repeat>
+			</apex:pageblock>
+			</apex:repeat>
+			
+			<script>
+			
+			var HealthCheckPageUrl = '<apex:outputText value="{!$Page.KimbleOne__HealthCheck}"/>';
+			var SetKimbleConfigBooleanValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetKimbleConfigBooleanValue}"/>';
+			var SetInsightPreferenceValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetInsightPreferenceValue}"/>';
+			var SetInvoicePreferenceValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetInvoicePreferenceValue}"/>';
+			var SetUIPreferenceValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetUIPreferenceValue}"/>';
+			var SetPlanPreferenceValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetPlanPreferenceValue}"/>';
+			var SetExchangeRateSettingValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetExchangeRateSettingValue}"/>';
+			var SetBusinessUnitPreferenceValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetBusinessUnitPreferenceValue}"/>';
+			var SetProductPreferenceValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetProductPreferenceValue}"/>';
+			var SetMyTimesheetPreferenceValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetMyTimesheetPreferenceValue}"/>';
+			var SetMyActivityAssignmentPreferenceValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetMyActivityAssignmentPreferenceValue}"/>';
+			var SetOperationalSettingValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetOperationalSettingValue}"/>';
+			var SetKimbleOneSettingValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetKimbleOneSettingValue}"/>';
+			var SetResourcePreferenceValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetResourcePreferenceValue}"/>';
+			var SetLocationPreferenceValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetLocationPreferenceValue}"/>';
+			var SetResourceAssignmentsPreferenceValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetResourceAssignmentsPreferenceValue}"/>';
+			var SetReferenceGenerationSettingValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetReferenceGenerationSettingValue}"/>';
+			var SetFlexiblePreferenceValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetFlexiblePreferenceValue}"/>';
+			var SetMyCalendarPreferenceValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetMyCalendarPreferenceValue}"/>';
+			var SetKimbleOneConfigSettingValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetKimbleOneConfigSettingValue}"/>';
+			var SetNameGenerationSettingValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetNameGenerationSettingValue}"/>';
+			var SetKimbleConfigStringValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetKimbleConfigStringValue}"/>';
+			var SetKimbleConfigIntegerValueRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetKimbleConfigIntegerValue}"/>';
+			var SetFirstOpenPeriodRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetFirstOpenPeriod}"/>';
+			var SetDefaultPlanItemConstraintTypeRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetDefaultPlanItemConstraintType}"/>';
+			var SetCorporateCalendarRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.SetCorporateCalendar}"/>';
+			var ActionItemClickRemoteActionUrl = '<apex:outputText value="{!$RemoteAction.CustomerOrgSettingsController.ExecuteAction}"/>';
+			
+			jQuery(window).ready(function () {
+				initialise();
+
+				// if the caller has indicated a setting name, find this and enter the search criteria to filter the page
+				var searchString = getQueryVariable('search-string');
+				if(searchString != null && searchString != '') jQuery('#filter-input').val(decodeURI(searchString).split('+').join(' ')).keyup();
+			});
+			
+			jQuery(window).load(function() {
+				formatDates();
+			});
+			</script>
+			</apex:outputPanel>
+			<apex:outputPanel layout="none" rendered="{!$CurrentPage.Parameters.mode = 'catalog'}">
+				<apex:canvasApp developerName="{!ConfigCatalogCanvasAppName}" height="2000" width="100%" maxHeight="infinite" parameters="{mode:'customer'}"/>
+			</apex:outputPanel>
+			</apex:outputPanel>
+		</apex:define>
+	</apex:composition>
+</apex:page>

@@ -1,0 +1,187 @@
+<apex:page controller="KimbleOne.IntercompanySummaryCardController" showHeader="false" sidebar="false" contentType="text/css" >
+	<style>
+		canvas {
+			-moz-user-select: none;
+			-webkit-user-select: none;
+			-ms-user-select: none;
+		}
+
+		.internal-margin-summary-info-icon {
+			position: absolute;
+			font-size: 16px;
+			right: 6px;
+			color: #428BCA;
+		}
+		.intercompany-summary-card {
+			position: relative;
+			min-width: unset;
+		}
+		.currency-cell {
+			width: 110px;
+		}
+		.percentage-cell {
+			width: 90px;
+		}
+		.summary-level-cell {
+			padding-left: 20px !important;
+		}
+		.cardBodyTable {
+			width: 100%;
+		}
+		.margin-level-total {
+			font-weight: bold;
+		}
+		.rightAlignDataCell {
+			text-align: right;
+		}
+		.centerAlignDataCell {
+			text-align: center;
+		}
+	</style>
+
+    <apex:outputPanel layout="none" rendered="{!ShowCosts && IsIntercompany}">
+
+		<div class="card inverted min-horizontal-padding variable-width intercompany-summary-card">
+			<div id="intercompanySummaryCardHeading" class="cardHeading inverted">
+				<h3 class="cardTitle"><apex:outputText value="{!$Label.kimbleone__intercompanymarginsummary} ({!TheDeliveryGroup.CurrencyIsoCode})"/></h3>
+			</div>
+
+			<apex:outputPanel layout="none">
+				<div class="cardBody">
+					<apex:outputPanel layout="none" rendered="{!MixedProbabilityMode && !ISBLANK(TheDisplayStatus) && TheDisplayStatus != ''}">
+						<span class="fa fa-info-circle internal-margin-summary-info-icon">
+							<div class="tooltiptext"><apex:outputText value="{!TheDisplayStatus}"/></div>
+						</span>
+					</apex:outputPanel>
+
+					<apex:outputPanel layout="none" rendered="{!ShowFilter}">
+						<i class="fa fa-filter card-filter-icon filter-ic-mar-sum-icon" title="{!$Label.TargetFiltersHeader}"></i>
+					</apex:outputPanel>
+
+					<canvas id="the-intercompany-summary-chart" height="150" width="400"></canvas>
+				</div>
+			</apex:outputPanel>
+		</div>
+	</apex:outputPanel>
+
+	<script>
+
+		var intercompanySummaryDomainFilter = '<apex:outputText value="{!IntercompanySummaryDomainFilter}"/>';
+
+		function intercompanyMarginSummaryDomainFilterChange(domainFilter)
+		{
+			var container =	jQuery('.intercompany-summary-card').closest('[pagesource]');
+
+			container.attr('domain', domainFilter);
+
+			loadDashboardComponent(container);
+		}
+
+		function initialiseChartJsGraphs()
+		{
+		    if(jQuery('#the-intercompany-summary-chart').length == 0) return;
+
+			Chart.defaults.global.defaultFontColor = 'black';
+			var chartAnalysisData = [];
+			var dataLabels = [];
+			var barColors = [];
+			var deliveryGroupMargin = jQuery.parseJSON('<apex:outputText value="{!JSENCODE(TheDeliveryGroupMargin)}"/>');
+
+			chartAnalysisData.push(deliveryGroupMargin.MarginAmount);
+			dataLabels.push(deliveryGroupMargin.Name);
+			barColors.push('#729BC7');
+
+			var summaryData = jQuery.parseJSON('<apex:outputText value="{!JSENCODE(TheBusinessUnitMargins)}"/>');
+
+			for (var i = 0; i < summaryData.length; i++)
+			{
+				chartAnalysisData.push(summaryData[i].MarginAmount);
+				dataLabels.push(summaryData[i].Name);
+				barColors.push('#BBB');
+			}
+
+			var chartDatasets = [];
+			chartDatasets.push({backgroundColor: barColors, data: chartAnalysisData});
+			var barChartData = {labels: dataLabels, datasets: chartDatasets};
+
+			var ctx = document.getElementById('the-intercompany-summary-chart').getContext('2d');
+
+			var summaryChart = new Chart(ctx, {
+			    id: 'intercompanymarginchart',
+				type: 'bar',
+				data: barChartData,
+				borderWidth: 1,
+				options: {
+				    layout: {
+				        padding: {
+				            top: 10
+                        },
+                    },
+					tooltips: {
+						enabled: false
+					},
+					responsive: false,
+					scales: {
+						xAxes: [{
+							gridLines : {
+								display: false
+							}
+						}],
+						yAxes: [{
+							display: false,
+							ticks: {
+								beginAtZero: true
+							}
+						}]
+					},
+					legend: {
+						display: false
+					},
+					maintainAspectRatio: true,
+					animation: {
+						duration: 500,
+						onProgress () {
+							const chartInstance = this.chart;
+							const ctx = chartInstance.ctx;
+							const dataset = this.data.datasets[0];
+							const meta = chartInstance.controller.getDatasetMeta(0);
+							ctx.textBaseline = 'bottom';
+							ctx.textAlign = 'center';
+
+							meta.data.forEach(function(bar, index) {
+								var data = dataset.data[index];
+								ctx.fillText($.formatNumber(data, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}), bar._model.x, bar._model.y);
+							});
+						}
+					}
+				}
+			});
+
+			<apex:outputPanel layout="none" rendered="{!MixedProbabilityMode && !ISBLANK(TheDisplayStatus) && TheDisplayStatus != ''}">
+				initialiseInfoIndicator();
+			</apex:outputPanel>
+
+			initialiseFilterIndicator();
+		}
+
+		function initialiseFilterIndicator()
+		{
+			jQuery('.filter-ic-mar-sum-icon').toggleClass('f-active', intercompanySummaryDomainFilter != 'All');
+		}
+
+		function initialiseInfoIndicator()
+		{
+			jQuery('.internal-margin-summary-info-icon').qtip({content:{text:jQuery('.internal-margin-summary-info-icon').children('.tooltiptext')},
+			position: {
+				adjust: {
+					method: 'flip flip'
+				},
+				viewport: $(window)
+			},
+			style: {classes: 'qtip-light qtip-shadow qtip-rounded'}})
+		}
+
+		if ({!ShowCosts})
+			initialiseChartJsGraphs();
+	</script>
+</apex:page>

@@ -1,0 +1,299 @@
+<apex:page controller="KimbleOne.SupplierPurchaseOrderPrintController" showHeader="false" sidebar="false" renderAs="{!IF($CurrentPage.parameters.renderAs=='html','html','pdf')}">
+<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__PdfHeaderFooterStyle, 'PdfHeaderFooterStyle-A4.css')}"/>
+<apex:stylesheet value="{!$Resource.KimbleOne__InvoiceCreditNoteStyle}" />
+<apex:variable var="DraftCSS" value="Draft" rendered="{!$CurrentPage.parameters.IsDraft = 'true'}">
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__Watermark,'watermark.css')}" />
+</apex:variable>
+
+
+<c:PdfHeaderFooter type="header" position="right" >
+	<div>
+		<br/>
+		<br/>					
+		<apex:image value="{!documentUrl}" styleClass="image" height="{!$Label.kimbleone__supplierpot2logoheight}" width="{!$Label.kimbleone__supplierpot2logowidth}"></apex:image><br/><br/>
+	</div>
+</c:PdfHeaderFooter>
+<c:PdfHeaderFooter type="header" position="left" textStyleClass="title">
+	<div>
+		<br/>
+		<apex:outputText value="{!$Label.kimbleone__supplierpot2headtext}"></apex:outputText>
+	</div>
+</c:PdfHeaderFooter>
+<!-- Following two lines ensure that the header is not repeated on each subsequent page -->
+<c:PdfHeaderFooter type="header" position="left" textStyleClass="title">
+</c:PdfHeaderFooter>
+<c:PdfHeaderFooter type="header" position="right" textStyleClass="title">
+</c:PdfHeaderFooter>
+
+<html>
+	<body>
+	<table id="poDetails" class="table" >	
+		<tbody>
+			<!-- Addresses -->
+			<tr>
+				<!-- Left Hand Column -->
+				<!-- explicit height, width and padding ensures that the address banner always takes up the same space  -->
+				<!-- (as if only a few lines the rest of the document would come into view in the envelope window) -->
+				<td width="55%" height="160px" style="padding-top: 37px;">
+					<!-- Suppliers Address -->
+					<c:AddressOutput TheAddress="{!ToAddress}" addressStyle="UKWindowC4Recipient"/>
+				</td>
+				
+				<!-- Right Hand Column -->
+				<!-- explicit height, width and padding ensures that the address banner always takes up the same space  -->
+				<!-- (as if only a few lines the rest of the document would come into view in the envelope window) -->				
+				<td width="45%" height="160px" style="padding-top: 37px;">
+					<!-- Nested table ensures that the address has a left hand edge matching the values in the table in the next row -->
+					<table class="table">
+						<tr>
+							<td class="referenceLabelCell">  
+								<!-- No content, this cell ensures the address is in the RHS of the page -->
+							</td>
+							<td>
+								<!-- Business Unit Address -->
+								<c:AddressOutput TheAddress="{!FromAddress}" addressStyle="UKPlainFormatting"/>
+							</td>
+						</tr>
+					</table>
+				</td>
+			</tr>
+			<!-- Addresses (end) -->
+			
+			<!-- Notes and Ship To Address -->
+			<tr>
+				<td>
+					<table class="table">
+						<tr>
+							<td>
+							<apex:outputText value="{0}" styleClass="boldLabel">
+								<apex:param value="{!$Label.kimbleone__supplierpot2suppliernotes}"></apex:param>
+							</apex:outputText>
+							<br/>				
+							<apex:outputText value="{0}" styleClass="textLeft">
+								<apex:param value="{!supplierRequisition.KimbleOne__SupplierNotes__c}"></apex:param>
+							</apex:outputText>
+							</td>			
+						</tr>
+					</table>
+				</td>
+				<td>
+					<table class="table">
+						<apex:outputPanel layout="none" rendered="{!!ISBLANK(supplierRequisition.KimbleOne__ShippingAddress__c)}">
+							<tr>
+								<td class="referenceLabelCell">  
+									<!-- No content, this cell ensures the address is in the RHS of the page -->
+								</td>
+								<td class="addressBlock">
+									<apex:outputText value="{0}" styleClass="boldLabel">
+										<apex:param value="{!$Label.kimbleone__supplierpot2shipto}"></apex:param>
+									</apex:outputText>
+									<br/>
+									<apex:outputField value="{!supplierRequisition.KimbleOne__ShippingAddress__c}"></apex:outputField>
+								</td>
+							</tr>
+						</apex:outputPanel>
+					</table>
+				</td>
+			</tr>
+			<!-- Notes and Ship to Address (end) -->
+			
+			<!-- References -->
+			<tr>
+				<!--  Reference, Date and Terms -->
+				<td>
+					<table id="referenceInfo" class="table">
+						<tr>
+							<td class="referenceLabelCell">
+								<apex:outputText value="{0}" styleClass="boldLabel">
+									<apex:param value="{!$Label.kimbleone__supplierpot2purchaseorderreference}"></apex:param>
+								</apex:outputText>						
+							</td>
+							<td class="valueCell">
+								<apex:outputText value="{0}" styleClass="textLeft">
+									<apex:param value="{!supplierPO.Name}"></apex:param>
+								</apex:outputText>
+							</td>
+						</tr>								
+						<tr>
+							<td class="referenceLabelCell">
+								<apex:outputText value="{0}" styleClass="boldLabel">
+									<apex:param value="{!$Label.kimbleone__supplierpot2purchaseorderdate}"></apex:param>
+								</apex:outputText>						
+							</td>
+							<td class="valueCell">
+								<apex:outputText value="{0, date, dd MMMM yyyy}" styleClass="textLeft">
+									<apex:param value="{!supplierRequisition.KimbleOne__RequisitionDate__c}"></apex:param>
+								</apex:outputText>
+							</td>
+						</tr>								
+						<tr>
+							<td class="referenceLabelCell">
+								<apex:outputText value="{0}" styleClass="boldLabel">
+									<apex:param value="{!$Label.kimbleone__supplierpot2paymentterms}"></apex:param>
+								</apex:outputText>						
+							</td>
+							<td class="valueCell">
+								<apex:outputText value="{!$Label.kimbleone__dayssuffix}" styleClass="textLeft">
+									<apex:param value="{!supplierAccountInvoicingModel.KimbleOne__InvoicePaymentTermDays__c}"></apex:param>
+								</apex:outputText>
+							</td>
+						</tr>								
+					</table>				
+				</td>
+				<!--  Reference, Date and Terms (end) -->
+				
+				<!-- Request Details -->
+				<td>
+					<table class="table">
+						<apex:outputPanel layout="none" rendered="{!supplierRequisition.Resource__r.Name != null}">
+						<tr>
+							<td class="referenceLabelCell">
+								<apex:outputText value="{0}" styleClass="boldLabel">
+									<apex:param value="{!$Label.kimbleone__supplierpot2requestedbyname}"></apex:param>
+								</apex:outputText>						
+							</td>
+							<td class="valueCell">
+								<apex:outputText value="{0}" styleClass="textLeft">
+									<apex:param value="{!supplierRequisition.Resource__r.Name}"></apex:param>
+								</apex:outputText>
+							</td>
+						</tr>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!supplierRequisition.Resource__r.Contact__r.Email != null}">
+						<tr>
+							<td class="referenceLabelCell">
+								<apex:outputText value="{0}" styleClass="boldLabel">
+									<apex:param value="{!$Label.kimbleone__supplierpot2requestedbyemail}"></apex:param>
+								</apex:outputText>						
+							</td>
+							<td class="valueCell">
+								<apex:outputText value="{0}" styleClass="textLeft">
+									<apex:param value="{!supplierRequisition.Resource__r.Contact__r.Email}"></apex:param>
+								</apex:outputText>
+							</td>
+						</tr>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!supplierRequisition.Resource__r.Contact__r.Phone != null}">
+						<tr>
+							<td class="referenceLabelCell">
+								<apex:outputText value="{0}" styleClass="boldLabel">
+									<apex:param value="{!$Label.kimbleone__supplierpot2requestedbyphone}"></apex:param>
+								</apex:outputText>						
+							</td>
+							<td class="valueCell">
+								<apex:outputText value="{0}" styleClass="textLeft">
+									<apex:param value="{!supplierRequisition.Resource__r.Contact__r.Phone}"></apex:param>
+								</apex:outputText>
+							</td>
+						</tr>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!supplierRequisition.KimbleOne__ExpectedReceiptDate__c != null}">
+						<tr>
+							<td class="referenceLabelCell">
+								<apex:outputText value="{0}" styleClass="boldLabel">
+									<apex:param value="{!$Label.kimbleone__supplierpot2expectedreceiptdate}"></apex:param>
+								</apex:outputText>						
+							</td>
+							<td class="valueCell">
+								<apex:outputText value="{0, date, dd MMMM yyyy}" styleClass="textLeft">
+									<apex:param value="{!supplierRequisition.KimbleOne__ExpectedReceiptDate__c}"></apex:param>
+								</apex:outputText>
+							</td>
+						</tr>
+						</apex:outputPanel>
+					</table>				
+				</td>
+				<!-- Request Details (end) -->
+			</tr>
+			<!-- References (end) -->
+		</tbody>
+	</table>
+	
+	<br/>
+	
+	<table id="supplierReqLines" class="table">
+		<thead>
+			<tr>
+				<th width="10%" class="boldLabel">{!$label.SUPPLIERPOT2LineNo}</th>
+				<th width="60%" class="boldLabel">{!$Label.SUPPLIERPOT2Desc}</th>					
+				<th width="10%" class="boldLabel">{!$Label.SUPPLIERPOT2Units}</th>					
+				<th width="10%" class="boldLabelRight">{!$Label.SUPPLIERPOT2Amount}</th>					
+				<th width="10%" class="boldLabelRight">{!$Label.SUPPLIERPOT2Total}</th>
+			</tr>
+			<tr>
+				<th colspan="5" style="">
+					<hr/>
+				</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr><td></td></tr>
+			<tr><td></td></tr>
+			<apex:variable value="{!0}" var="netAmount"/>
+     			<apex:repeat value="{!SupplierRequisitionLines}" var="reqLine">
+				<tr>
+					<td class="textLeft" >
+						<apex:outputField value="{!reqLine.KimbleOne__LineNumber__c}"/>
+					</td>
+					<td class="textLeft">
+						<apex:outputText value="{!reqLine.Name}">
+						</apex:outputText>
+					</td>
+					<td class="textLeft">
+						<apex:outputField value="{!reqLine.KimbleOne__RequisitionedUnits__c}"/>
+					</td>
+					<td class="amount">
+						<apex:outputText value="{0, number, #,##0.00}">
+							<apex:param value="{!ROUND(reqLine.KimbleOne__UnitAmount__c,2)}"/>
+						</apex:outputText>
+					</td>
+					<td class="amount">
+						<apex:outputText value="{0, number, #,##0.00}">
+							<apex:param value="{!ROUND(reqLine.KimbleOne__NetAmount__c,2)}"/>
+						</apex:outputText>
+					</td>
+				</tr>
+     				<apex:variable value="{!netAmount+reqLine.KimbleOne__NetAmount__c}" var="netAmount"/>
+			</apex:repeat>
+			<tr>
+				<th colspan="5">
+					<hr/>
+				</th>
+			</tr>
+		</tbody>
+	</table>
+
+	<br/>
+	
+	<table id="invoiceTotals" class="tableTotals nobreak">
+		<thead>
+			<tr>
+				<th width="20%"/>
+				<th width="20%"/>
+				<th width="20%"/>
+				<th width="20%"/>
+				<th width="20%"/>
+			</tr>
+		</thead>
+		<tbody>
+			
+			<tr>
+				<td colspan="3"/>
+				<td colspan="3"><hr/></td>
+			</tr>
+			<tr>
+				<td colspan="3"/>
+				<td class="boldLabel">{!$Label.SUPPLIERPOT2TableTotal}</td>
+				<td class="boldLabelRight" >
+					<apex:outputField value="{!supplierRequisition.CurrencyIsoCode}" />
+					<apex:outputText value="{0, number, #,##0.00}">
+						<apex:param value="{!netAmount}"/>
+					</apex:outputText>
+				</td>
+			</tr>
+		</tbody>			
+	</table>
+		
+	</body>
+</html>
+</apex:page>

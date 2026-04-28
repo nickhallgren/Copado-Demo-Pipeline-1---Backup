@@ -1,0 +1,193 @@
+<apex:page controller="KimbleOne.ApprovalRuleTemplatesController" sidebar="false" tabStyle="KimbleOne__ReferenceData__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+	<c:Menu DefaultHelpPage="ApprovalRules.html" MenuContextType="{!menuContextType}" MenuContextId="{!menuContextId}" MenuContextName="{!menuContextName}"/>
+	
+</apex:define>
+
+<apex:define name="Content">
+	
+	<apex:outputPanel id="ApprovalRuleTemplatesMainPanel">
+
+       	<apex:form >  
+       	      
+			<apex:pageMessages escape="false"/>
+
+			<apex:pageBlock id="ApprovalRuleTemplatesPageBlock" title="{!$ObjectType.KimbleOne__ApprovalRuleTemplate__c.LabelPlural}">
+			
+            	<apex:pageBlockButtons location="top">
+					<input type="button" id="ApprovalRuleTemplatesNewButton" class="btn" value="{!$Label.New}" onclick="initialiseModalBoxy('#ApprovalRuleTemplatesNewPopup', '{!JSENCODE($Label.New)} {!$ObjectType.ApprovalRuleTemplate__c.Label}');newApprovalRuleTemplate()"/>
+            	</apex:pageBlockButtons>
+			
+            	<apex:pageBlockTable value="{!approvalRuleTemplatesList}" var="appRulTemp" >
+          		<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+					<apex:outputLink styleClass="actionLink" value="#" onclick="initialiseModalBoxy('#ApprovalRuleTemplatesEditPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__ApprovalRuleTemplate__c.label}');editApprovalRuleTemplate('{!JSINHTMLENCODE(appRulTemp.Id)}');">
+						{!$Label.kimbleone__edit}
+					</apex:outputLink>
+					&nbsp; | &nbsp;
+					<apex:commandLink styleClass="actionLink" action="{!deleteApprovalRuleTemplate}" onclick="if(!confirmDelete()) return false;">
+						{!$Label.kimbleone__delete}
+						<apex:param name="approvalRuleTemplateId" value="{!appRulTemp.Id}" />
+					</apex:commandLink>			
+	  			</apex:column>
+				<apex:column value="{!appRulTemp.Name}" headerValue="{!$ObjectType.KimbleOne__ApprovalRuleTemplate__c.Fields.Name.Label}" />
+				<apex:column value="{!appRulTemp.KimbleOne__ApprovalType__c}" headerValue="{!$ObjectType.KimbleOne__ApprovalRuleTemplate__c.Fields.KimbleOne__ApprovalType__c.Label}" />
+				<apex:column value="{!appRulTemp.KimbleOne__Approver1Type__c}"  headerValue="{!$ObjectType.KimbleOne__ApprovalRuleTemplate__c.Fields.KimbleOne__Approver1Type__c.Label}" />
+				<apex:column value="{!appRulTemp.KimbleOne__Approver2Type__c}"  headerValue="{!$ObjectType.KimbleOne__ApprovalRuleTemplate__c.Fields.KimbleOne__Approver2Type__c.Label}" />
+					 
+				</apex:pageBlockTable>
+				
+			</apex:pageBlock>
+			
+       		<apex:actionFunction action="{!newApprovalRuleTemplate}" name="newApprovalRuleTemplate" rerender="ApprovalRuleTemplatesNewPopupPanel" oncomplete="showModalBoxy();"/>
+       		
+ 			<apex:actionFunction action="{!retrieveApprovalRuleTemplate}" name="editApprovalRuleTemplate" rerender="ApprovalRuleTemplatesEditPopupPanel" oncomplete="showModalBoxy();">
+       		   	<apex:param name="approvalRuleTemplateId" value="" />
+       		</apex:actionFunction>
+       						
+		</apex:form>
+	</apex:outputPanel>			
+
+
+	<div id="ApprovalRuleTemplatesEditPopup" style="display:none">
+  
+		<apex:outputPanel id="ApprovalRuleTemplatesEditPopupPanel">
+
+     		<apex:form >
+ 
+           		<apex:pageBlock >
+           		
+           			<div id="ApprovalRuleTemplatesEditPopupErrors">
+           				<apex:pageMessages escape="false"/>
+           			</div>
+ 
+            		<apex:pageBlockButtons location="bottom">
+						<apex:commandButton action="{!editApprovalRuleTemplate}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#ApprovalRuleTemplatesEditPopupErrors')" reRender="ApprovalRuleTemplatesMainPanel, ApprovalRuleTemplatesEditPopupPanel"/>
+						<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+					</apex:pageBlockButtons>
+					
+             		<apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+              
+               			<apex:outputfield value="{!approvalRuleTemplate.KimbleOne__ApprovalType__c}" />
+               			<apex:inputfield value="{!approvalRuleTemplate.Name}" required="True"/>
+               			  
+						<apex:pageblockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ApprovalRuleTemplate__c.Fields.KimbleOne__Approver1Type__c.Label}"/>
+               				<apex:selectList value="{!approvalRuleTemplate.KimbleOne__Approver1Type__c}" size="1" onchange="refreshEdit()">
+								<apex:selectOptions value="{!ApproverTypes}" />
+							</apex:selectList>
+               			</apex:pageblockSectionItem>
+               			
+               			<apex:pageblockSectionItem rendered="{!ShowApprover1ActorRole}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ApprovalRule__c.Fields.KimbleOne__Approver1ActorRole__c.Label}"/>
+               				<apex:selectList value="{!approvalRuleTemplate.KimbleOne__Approver1ActorRole__c}" size="1" >
+								<apex:selectOptions value="{!ActorRoles}" />
+							</apex:selectList>
+               			</apex:pageblockSectionItem>
+               			
+						<apex:pageblockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ApprovalRuleTemplate__c.Fields.KimbleOne__Approver2Type__c.Label}"/>
+               				<apex:selectList value="{!approvalRuleTemplate.KimbleOne__Approver2Type__c}" size="1" onchange="refreshEdit()">
+								<apex:selectOptions value="{!ApproverTypes}" />
+							</apex:selectList>
+               			</apex:pageblockSectionItem>
+               			
+               			
+               			<apex:pageblockSectionItem rendered="{!ShowApprover2ActorRole}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ApprovalRule__c.Fields.KimbleOne__Approver2ActorRole__c.Label}"/>
+               				<apex:selectList value="{!approvalRuleTemplate.KimbleOne__Approver2ActorRole__c}" size="1" >
+								<apex:selectOptions value="{!ActorRoles}" />
+							</apex:selectList>
+               			</apex:pageblockSectionItem>
+
+		            </apex:pageBlockSection>
+            
+        		</apex:pageBlock>
+				<apex:actionFunction name="refreshEdit" rerender="ApprovalRuleTemplatesEditPopupPanel" oncomplete="showModalBoxy();"/>
+         	</apex:form>
+
+        </apex:outputPanel>
+  
+	</div>
+	
+	<div id="ApprovalRuleTemplatesNewPopup" style="display: none">
+	
+		<apex:outputPanel id="ApprovalRuleTemplatesNewPopupPanel">
+
+			<apex:form >
+			
+				<apex:pageBlock >
+			
+					<div id="ApprovalRuleTemplatesNewPopupErrors">
+						<apex:pageMessages escape="false" />
+					</div>
+					
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton id="save" action="{!insertApprovalRuleTemplate}" value="{!$Label.kimbleone__save}" oncomplete=";hideModalBoxyWithErrorCheck('#ApprovalRuleTemplatesNewPopupErrors');" rerender="ApprovalRuleTemplatesMainPanel, ApprovalRuleTemplatesNewPopupPanel" />
+						<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}" />
+					</apex:pageBlockButtons>
+	
+					<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+               			
+    					<apex:pageblockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ApprovalRuleTemplate__c.Fields.KimbleOne__ApprovalType__c.Label}"/>
+				            <apex:selectList id="approvalRuleTemplateApprovalType" value="{!approvalRuleTemplate.KimbleOne__ApprovalType__c}" size="1" required="true" >
+								<apex:selectOptions value="{!TheApprovalTypes}" />
+							</apex:selectList>
+          				</apex:pageBlockSectionItem>
+
+               			<apex:pageblockSectionItem rendered="{!renderProductDomainInput}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ApprovalRuleTemplate__c.Fields.KimbleOne__ProductDomain__c.Label}"/>
+               				<apex:inputText value="{!approvalRuleTemplate.KimbleOne__ProductDomain__c}" styleclass="kimblecustomlookup GetProductDomainList null false true" required="True"/>                 			             			
+               			</apex:pageblockSectionItem>
+               			
+               			<apex:inputfield value="{!approvalRuleTemplate.Name}" required="True"/>
+               			  
+						<apex:pageblockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ApprovalRuleTemplate__c.Fields.KimbleOne__Approver1Type__c.Label}"/>
+               				<apex:selectList value="{!approvalRuleTemplate.KimbleOne__Approver1Type__c}" size="1" onchange="refreshNew()">
+								<apex:selectOptions value="{!ApproverTypes}" />
+							</apex:selectList>
+               			</apex:pageblockSectionItem>
+               			
+               			<apex:pageblockSectionItem rendered="{!ShowApprover1ActorRole}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ApprovalRule__c.Fields.KimbleOne__Approver1ActorRole__c.Label}"/>
+               				<apex:selectList value="{!approvalRuleTemplate.KimbleOne__Approver1ActorRole__c}" size="1" >
+								<apex:selectOptions value="{!ActorRoles}" />
+							</apex:selectList>
+               			</apex:pageblockSectionItem>
+               			
+						<apex:pageblockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ApprovalRuleTemplate__c.Fields.KimbleOne__Approver2Type__c.Label}"/>
+               				<apex:selectList value="{!approvalRuleTemplate.KimbleOne__Approver2Type__c}" size="1" onchange="refreshNew()">
+								<apex:selectOptions value="{!ApproverTypes}" />
+							</apex:selectList>
+               			</apex:pageblockSectionItem>
+               			
+               			
+               			<apex:pageblockSectionItem rendered="{!ShowApprover2ActorRole}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ApprovalRule__c.Fields.KimbleOne__Approver2ActorRole__c.Label}"/>
+               				<apex:selectList value="{!approvalRuleTemplate.KimbleOne__Approver2ActorRole__c}" size="1" >
+								<apex:selectOptions value="{!ActorRoles}" />
+							</apex:selectList>
+               			</apex:pageblockSectionItem>
+
+					</apex:pageblockSection>
+					
+				</apex:pageBlock>
+				
+				<apex:actionFunction name="refreshNew" rerender="ApprovalRuleTemplatesNewPopupPanel" oncomplete="showModalBoxy();"/>
+			</apex:form>
+			
+		</apex:outputPanel>
+		
+	</div>
+	
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

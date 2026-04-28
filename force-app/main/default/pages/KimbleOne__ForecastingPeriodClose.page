@@ -1,0 +1,1283 @@
+<apex:page controller="KimbleOne.ForecastingPeriodCloseController" extensions="KimbleOne.SecurityController,KimbleOne.TooltipsController" sidebar="false" tabstyle="PeriodManagement__tab">
+
+	<apex:composition template="KimbleOne__SiteMaster">
+		<apex:define name="Menu">
+
+			<c:Menu DefaultHelpPage="CloseForecastingPeriod.html" MenuContextType="Organisation" MenuContextName="Period Management" ChildName="{!timePeriod.Name} - ({!timePeriod.KimbleOne__StartDate__c} {!$Label.kimbleone__to} {!timePeriod.KimbleOne__EndDate__c})"/>
+
+		</apex:define>
+
+		<apex:define name="Content">
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__jQueryBarGraph, 'jqBarGraph.1.1.min.js')}"/>
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+
+			<!-- Kimble Guidance -->
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+			<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+				<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/ForecastingPeriodCloseNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+				<apex:outputPanel layout="none" rendered="{!ForecastingPeriodCloseTipOverrideEnabled}">
+					<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+				</apex:outputPanel>
+			</apex:outputPanel>
+			
+			<apex:pageMessage summary="{!$Label.kimbleone__errors}" severity="error" strength="2" rendered="{!!ISBLANK(errorsList) && errorsList.size>0}">
+				<ul style=" margin:0px ;padding:0">
+					<apex:repeat value="{!errorsList}" var="msg">
+						<li id="" >
+							<apex:outputText value="{!msg.Message}"/>
+						</li>
+					</apex:repeat>
+				</ul>
+			</apex:pageMessage>
+
+			<style>
+			.go-date-btn {
+				position: absolute;
+				left: 0px;
+				background-color: transparent;
+				top: 0px;
+				width: 32px;
+				border: 0px;
+				margin: 0px;
+				padding: 0px;
+				cursor: pointer;
+				height:30px;
+				outline:0;
+				color:transparent;
+			}
+			#initial-focus {
+			    width: 0;
+				border: 0;
+				outline: 0;
+   			}
+			div.toolbar-button {
+				display: inline-block;
+				padding: 6px 10px 6px 10px;
+				background-color: white;
+				border: 1px solid #ccc;
+				border-radius: 2px;
+				cursor: pointer;
+			}
+			div.toolbar-button.active {
+				text-decoration: none;
+				color: white;
+				background-color: #1A9EFF;
+			}
+			div.toolbar-button:not(.active):hover {
+				background-color: #f4f6f9;
+			}
+			div.toolbar-button.bigger-btn .fa {
+				font-size: 18px;
+				width: 20px;
+				text-align: center;
+			}
+			div.toolbar-button.bigger-btn{
+				padding: 6px;
+			}
+			.toolbar a {
+				margin-right: 3px;
+			}
+			.toolbar {
+				display: table;
+				width: 100%;
+			}
+			.filter-button.toolbar-button-selected {
+				text-decoration: none;
+				color: white;
+				background-color: #1A9EFF;
+			}
+			.control-cell {
+				display: table-cell;
+				vertical-align: middle;
+				position: relative;
+			}
+			div#toolbar-container {
+				margin-bottom: 6px;
+				max-width: 1310px;
+			}
+		</style>
+
+			<script>
+			$(function () {
+					loadAllJobsInline(jQuery('#jobsPanel'), '{!JSINHTMLENCODE(TimePeriod.Id)}','', periodCloseJobsComplete);
+			});
+
+			function periodCloseJobsComplete(ranJobs)
+			{
+				jQuery('#jobsPanel').hide();
+				jQuery('#contentsPanel').show();
+			}
+
+	</script>
+
+			<div id="jobsPanel">
+
+			</div>
+
+			<div id="contentsPanel" style="display:none">
+				<apex:form >
+					<div style="position:relative">
+						<div>
+							<div id="FilterPopup" style="display:none;">
+								<div id="Filters">
+									<div class="filter-header">{!$Label.kimbleone__filter}<i onclick="jQuery('#FilterPopup').hide();" class="filter-collapse-btn fa fa-angle-double-up" title="{!$Label.kimbleone__close}"></i></div>
+
+									<apex:repeat value="{!TheFilterCriteriaOptions}" var="criterion">
+
+										<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'REFERENCE'}">
+											<div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!criterion.Name}</div>
+											<input class="criteria-filter lookup-filter" data-key="{!criterion.Key}" data-lookup-object-type="{!criterion.LookupObjectType}" data-object-type="{!criterion.ObjectType}" data-data-source="{!criterion.DataSource}" data-field-name="{!criterion.FieldName}" data-display-type="{!criterion.DisplayType}" type="hidden" id="criterion-{!JSINHTMLENCODE(criterion.Name)}" style="width:100%"/>
+										</apex:outputPanel>
+
+										<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'PICKLIST' || criterion.DisplayType == 'MULTIPICKLIST'}">
+											<div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!criterion.Name}</div>
+											<input class="criteria-filter picklist-filter" data-key="{!criterion.Key}" data-display-type="{!criterion.DisplayType}" type="hidden" id="criterion-{!JSINHTMLENCODE(criterion.Name)}" style="width:100%"/>
+										</apex:outputPanel>
+
+										<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'BOOLEAN'}">
+											<div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!JSINHTMLENCODE(criterion.Name)}<input data-key="{!criterion.Key}" data-object-type="{!criterion.ObjectType}" data-field-name="{!criterion.FieldName}" data-display-type="{!criterion.DisplayType}" style="margin-bottom: 0px; vertical-align: bottom;" type="checkbox"  id="criterion-{!criterion.Name}" class="criteria-filter boolean-filter"/></div>
+										</apex:outputPanel>
+
+										<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'NUMERIC' || criterion.DisplayType == 'DATE'}" >
+											<div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!JSINHTMLENCODE(criterion.Name)}</div>
+											<table border="0" cellpadding="0" cellspacing="0" style="font-size: 11px;color: #4a4a56;" data-key="{!criterion.Key}" data-display-type="{!criterion.DisplayType}" class="criteria-filter {!criterion.DisplayType}-filter"  id="{!JSINHTMLENCODE(criterion.Name)}">
+												<tr>
+													<td><span style="margin-left: 4px;">{!$Label.LessThanLabel}</span></td>
+													<td><span style="margin-left: 4px;">{!$Label.EqualToLabel}</span></td>
+													<td><span style="margin-left: 4px;">{!$Label.GreaterThanLabel}</span></td>
+												</tr>
+												<tr>
+													<td style="padding-right: 2px;">
+														<div style="border: 2px solid #E0E0E0;height: 25px;width: 57px;padding-left: 4px;vertical-align: middle;display: table-cell;">
+															<input id="{!JSINHTMLENCODE(criterion.Name)}-lt-filter" type="text" style="width: 57px;font-size: 11px;border: 0;outline: 0;" data-key="{!criterion.Key}" data-display-type="{!criterion.DisplayType}"/>
+														</div>
+													</td>
+													<td style="padding-right: 2px;">
+														<div style="border: 2px solid #E0E0E0;height: 25px;width: 57px;padding-left: 4px;vertical-align: middle;display: table-cell;">
+															<input id="{!JSINHTMLENCODE(criterion.Name)}-eq-filter" type="text" style="width: 57px;font-size: 11px;border: 0;outline: 0;" data-key="{!criterion.Key}" data-display-type="{!criterion.DisplayType}"/>
+														</div>
+													</td>
+													<td style="padding-right: 2px;">
+														<div style="border: 2px solid #E0E0E0;height: 25px;width: 57px;padding-left: 4px;vertical-align: middle;display: table-cell;">
+															<input id="{!JSINHTMLENCODE(criterion.Name)}-gt-filter" type="text" style="width: 57px;font-size: 11px;border: 0;outline: 0;" data-key="{!criterion.Key}" data-display-type="{!criterion.DisplayType}"/>
+														</div>
+													</td>
+
+												</tr>
+											</table>
+										</apex:outputPanel>
+
+									</apex:repeat>
+
+									<input class="btn" id="applyFilterButton" onclick="applyFilter();" type="Button" value="{!$Label.GoButton}"/>
+
+									<input class="btn" id="clearFilterButton" onclick="clearFilter();" type="Button" value="{!$Label.ClearAllLabel}"/>
+
+									<span>
+                			<label>Save this as my default</label>
+                			<input type="checkbox" id="saveAsDefault"/>
+           				</span>
+								</div>
+
+								<apex:actionFunction action="{!saveFilter}" name="SaveFilterParam" reRender="TheForm">
+									<apex:param name="filterParam" value="" />
+									<apex:param name="urlDetail" value="" />
+								</apex:actionFunction>
+
+								<script>
+		  				var filterApplied = false;
+                		var basePageUrl;
+
+                		function initialiseFilter(pageUrl)
+                		{
+                    		basePageUrl = pageUrl;
+							console.log('--- TheFilterCriteriaOptions ---'+'{!TheFilterCriteriaOptions}');
+		                    <apex:repeat value="{!TheFilterCriteriaOptions}" var="criterion">
+
+		                        <apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'REFERENCE'}">
+		                            jQuery('[id="criterion-{!criterion.Name}"]').select2({
+		                                    minimumInputLength: 1,
+		                                    multiple: true,
+		                                    query: function (query) {
+		                                        var $t = this;
+		                                        var find = function() {lookupCriterion($t.element.data(), query);};
+		                                        find();
+		                                    }
+		                                });
+		                                //needs to be json format {id: "a2K1t0000009X04EAE", text: "Director"}
+		                            jQuery('[id="criterion-{!criterion.Name}"]').select2('data', lookupObjectNames('{!criterion.LookupObjectType}', '{!criterion.DefaultValue}'));
+
+		                        </apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'BOOLEAN'}">
+
+									if ('{!criterion.DefaultValue}'){
+										jQuery('[id="criterion-{!criterion.Name}"]').prop('checked', true);
+										filterApplied = true;
+									}
+
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'NUMERIC' || criterion.DisplayType == 'DATE'}">
+									if('{!criterion.DefaultValue}')
+									{
+										 var defaultValues = '{!criterion.DefaultValue}'.split(':');
+
+										defaultValues.forEach(function(item){
+											if(item.includes('lessThan')){jQuery('[id="{!criterion.Name}-lt-filter"]').val(item.replace('lessThan',''));}
+											if(item.includes('equalTo')){jQuery('[id="{!criterion.Name}-eq-filter"]').val(item.replace('equalTo',''));}
+											if(item.includes('greaterThan')){jQuery('[id="{!criterion.Name}-gt-filter"]').val(item.replace('greaterThan',''));}
+										});
+										filterApplied = true;
+									}
+
+									if('{!criterion.DisplayType}' == 'DATE')
+									{
+										jQuery('[id="{!criterion.Name}"] :input').each(function(){jQuery(this).addClass('kimbleDatePicker');});
+									}
+
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'PICKLIST' || criterion.DisplayType == 'MULTIPICKLIST'}">
+
+									var optionData = [];
+									<apex:repeat value="{!criterion.TheOptions}" var="opt">
+										var optItem = {id:'{!opt.Value}',text:'{!opt.Label}'};
+										optionData.push(optItem);
+									</apex:repeat>
+
+									jQuery('[id="criterion-{!criterion.Name}"]').select2({
+											minimumInputLength: 1,
+											multiple: true,
+											data: optionData
+										});
+
+									jQuery('[id="criterion-{!criterion.Name}"]').select2('val','{!criterion.DefaultValue}'.split(','));
+									if('{!criterion.DefaultValue}'){filterApplied = true;}
+
+								</apex:outputPanel>
+							</apex:repeat>
+
+		                    if (filterApplied)
+		                    {
+		                        jQuery('.filter-button').addClass('toolbar-button-selected');
+		                    }
+                		}
+
+                		function lookupCriterion(d, query)
+		                {
+		                    Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ForecastingPeriodCloseController.FindLookupValues}',
+		                        d.lookupObjectType, d.dataSource, d.fieldName, query.term,
+		                            function(result, event){
+		                                 if (event.status)
+		                                 {
+		                                    var data = {};
+
+		                                    data.results = result;
+		                                    query.callback(data);
+		                                }
+		                                else if (event.type === 'exception')
+		                                {
+		                                    alert(event.message);
+		                                }
+		                                else
+		                                {
+		                                    alert(event.message);
+		                                }
+		                        },
+		                        {escape: false, timeout: 60000}
+		                    );
+		                }
+
+		                function lookupObjectNames(objectType, values)
+		                {
+		                    //build sforce.connection.query to lookup values
+		                    if (values == '') return values;
+
+		                    var param = values.split(',').join('\',\'');
+
+		                    var result = sforce.connection.query("SELECT Id, Name FROM " + objectType + " WHERE Id IN ('" + param + "')");
+
+		                    var records = [];
+
+		                    if (!jQuery.isArray(result.records))
+		                        records.push(result.records);
+		                    else
+		                        records = result.records;
+
+		                    var data = [];
+
+		                    for (var i=0;i<records.length;i++)
+		                    {
+		                        data.push({id:records[i].Id, text:records[i].Name});
+		                    }
+
+		                    filterApplied = true;
+
+		                    return data;
+		                }
+
+						function clearFilter()
+						{
+							var url = basePageUrl;
+
+							jQuery.each(jQuery('.criteria-filter:not(div)'), function(i, obj) {
+								var $obj = jQuery(obj);
+								url += '&' + $obj.data().key + '=';
+								$obj.select2("val", "");
+
+							jQuery('[id="' + $obj.attr('id') + '"] :input').each(function(){
+									jQuery(this).val('');
+								});
+							});
+
+							jQuery.each(jQuery(".boolean-filter"), function(i,obj) {
+								var $obj = jQuery(obj);
+								$obj.prop("checked", false);
+							});
+
+							jQuery("#saveAsDefault").prop('checked', false);
+						}
+
+						function applyFilter()
+						{
+							jQuery('#FilterPopup').hide();
+
+							var url = basePageUrl;
+							var jsonVal = '{ \"Forecasting\": {';
+							var data = jQuery('.criteria-filter:not(div)');
+
+
+						jQuery.each(jQuery('.criteria-filter:not(div)'), function(i, obj) {
+
+							var isLastElement = i == data.length -1;
+							var $obj = jQuery(obj);
+
+							if($obj.data().displayType == 'REFERENCE' || $obj.data().displayType == 'PICKLIST' || $obj.data().displayType == 'MULTIPICKLIST'){
+								url += '&' + $obj.data().key + '=' + $obj.val();
+							}
+							else if($obj.data().displayType == 'BOOLEAN'){
+								if($obj.prop('checked')){url += '&' + $obj.data().key + '=' + true;}
+							}
+							else if($obj.data().displayType == 'NUMERIC' || $obj.data().displayType == 'DATE'){
+
+									var critString = '&' + $obj.data().key + '=';
+
+									var assembledValues = assembleNumericFilters($obj);
+
+									if(assembledValues.hasValues)
+									{
+										critString += assembledValues.stringValue;
+										url += critString;
+									}
+							}
+
+							if ($('#saveAsDefault').is(":checked"))
+							{
+
+								if($obj.data().displayType == 'REFERENCE' || $obj.data().displayType == 'PICKLIST' || $obj.data().displayType == 'MULTIPICKLIST'){
+									jsonVal += '\"'+$obj.data().key+'\" :';
+									jsonVal += '\"'+$obj.val()+'\"';
+								}
+								else if($obj.data().displayType == 'BOOLEAN'){
+									jsonVal += '\"'+$obj.data().key+'\" :';
+
+										if($obj.prop('checked')){
+											jsonVal += '\"'+$obj.prop('checked')+'\"';
+										}else{
+											jsonVal += '\"'+'\"';
+										}
+								}
+								else if($obj.data().displayType == 'NUMERIC' || $obj.data().displayType == 'DATE'){
+									jsonVal += '\"'+$obj.data().key+'\" :';
+
+									var assembledDefaultValues = assembleNumericFilters($obj);
+
+									if(assembledValues.hasValues)
+									{
+										jsonVal += '\"'+assembledValues.stringValue+'\"';
+									}else{
+										jsonVal += '\"'+'\"';
+									}
+								}
+
+								if (!isLastElement) {
+									jsonVal += ',';
+								}
+							}
+						});
+
+						if ($('#saveAsDefault').is(":checked"))
+						{
+							jsonVal += '}}';
+							SaveFilterParam(jsonVal, url);
+
+						}
+						else
+							safeNavigateToSForceURL(url);
+					}
+
+					function assembleNumericFilters($obj){
+
+						var returnString = '';
+						var hasCriteria = false;
+						var isFirst = true;
+
+							jQuery('[id="' + $obj.attr('id') + '"] :input').each(function(){
+
+								var item = jQuery(this);
+
+								var itemValue = '';
+
+								if(item.val()){itemValue = getFormattedValue(item,$obj.data().displayType)};
+
+								if(itemValue.length > 0){
+									if(!isFirst){returnString += ':';}
+									returnString += getOperator(item) + itemValue;
+									hasCriteria = true;
+									isFirst = false;
+								}
+							})
+
+							var returnItem = {stringValue: returnString, hasValues : hasCriteria};
+							return returnItem;
+					}
+
+					function getFormattedValue(item,displayType){
+
+					    var returnValue = '';
+
+						if(displayType == 'DATE'){returnValue = item.val();}
+						if(displayType == 'NUMERIC'){returnValue = item.val().replace(/\s/g,'').replace(/\D/g,'');}
+
+						return returnValue;
+
+     				}
+
+					function getOperator(obj){
+
+						var operatorString;
+						var id = obj.attr('id');
+
+						if(id.endsWith('-lt-filter')){operatorString = 'lessThan';}
+						if(id.endsWith('-eq-filter')){operatorString = 'equalTo';}
+						if(id.endsWith('-gt-filter')){operatorString = 'greaterThan';}
+
+						return operatorString;
+					}
+		  			</script>
+							</div>
+						</div>
+						<style>
+		        div#FilterPopup {
+				    position: absolute;
+				    top: 37px;
+				    padding: 5px;
+				    width: 349px;
+				    height: 219px;
+				    z-index: 999;
+				    border-color: #ddd;
+				    border-style: solid;
+				    border-width: 0px 1px 1px 1px;
+				    background-color: #fff;
+				    box-shadow: rgba(31, 31, 31, 0.16) 4px 3px 8px;
+				    left: 0px;
+				    overflow-y: auto;
+				}
+
+				.filter-header {
+				    font-weight: bold;
+				    font-size: 14px;
+				    padding: 10px;
+				    background-color: #F5F5F5;
+				    border: 1px solid #DDD;
+				    border-radius: 4px;
+				    margin-left: 2px;
+				    margin-right: 2px;
+				}
+
+				i.filter-collapse-btn.fa.fa-angle-double-up {
+				    color: #BBB;
+				    cursor: pointer;
+				    padding-right: 6px;
+				    position: absolute;
+				    right: 13px;
+				    top: 13px;
+				    font-size: 26px;
+				}
+
+				input#applyFilterButton {
+				    margin-top: 10px;
+				}
+				.string-filter {
+				    border: 2px solid #e0e0e0;
+				    height: 25px;
+				    padding-right: -14px;
+
+				}
+
+				/* SELECT 2 STYLING */
+				.select2-results li {margin-left:0px;}
+
+				.select2-container-multi .select2-choices
+				{
+					border: 2px solid rgb(224,224,224);
+					background-image:none;
+				}
+
+				.select2-container-multi .select2-choices .select2-search-choice {
+					border: 1px solid #aaaaaa;
+					border-radius: 4px;
+					padding: 5px 20px 5px 5px;
+					background-image:none;
+				}
+
+				.select2-container-multi .select2-search-choice-close {
+					background-image:  url({!URLFOR($Resource.AssignmentImages, 'assignmentSprite.png')});
+					background-position: -2px -29px;
+					background-repeat: no-repeat;
+					left:auto;
+				}
+
+				.select2-container-multi .select2-choices .select2-search-choice .select2-search-choice-close:hover {
+					background-position: -2px -1px;
+				}
+		    </style>
+					</div>
+
+					<div>
+						<div style="position: relative;">
+
+							<div id="toolbar-container">
+								<div class="toolbar">
+									<div id="nav-bar" class="control-cell no-select" style="font-size:0px;">
+										<input type="text" id="initial-focus"/>
+										<apex:outputLink value="javascript:void(0);" onclick="GoPreviousPeriod()" title="{!$Label.kimbleone__previousperiod}"><div id="previous-period" class="toolbar-button bigger-btn"><i class="fa fa-angle-double-left"></i></div></apex:outputLink>
+										<div class="toolbar-button bigger-btn" style="position:relative;margin-right: 3px;"><i class="fa fa-calendar"></i><apex:inputText styleClass="datepicker go-date-btn" value="{!GoDate.KimbleOne__InputDate__c}"><apex:actionSupport event="onchange" action="{!ForecastingPeriodChange}" /></apex:inputText></div>
+
+										<apex:outputLink value="javascript:void(0);" onclick="GoNextPeriod()" title="{!$Label.kimbleone__nextperiod}"><div id="next-period" class="toolbar-button bigger-btn"><i class="fa fa-angle-double-right"></i></div></apex:outputLink>
+
+										<apex:outputLink value="javascript:void(0);" onclick="jQuery('#FilterPopup').show();SetupDatePicker();" title="{!$Label.kimbleone__filter}"><div class="toolbar-button bigger-btn filter-button"><i class="fa fa-filter"></i></div></apex:outputLink>
+
+									</div>
+								</div>
+							</div>
+
+							<span>
+
+						<script>
+
+							$(window).load(function(){
+
+								$('.datepicker').datepicker({
+										dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+										showOtherMonths: true,
+										selectOtherMonths: true
+										});
+								});
+						</script>
+					</span>
+
+
+							<!--
+					<span style="font-weight:bold;position:relative;top:-10px;">{!JSENCODE(timePeriod.Name)}&nbsp;&nbsp;&nbsp;{<apex:outputField value="{!timePeriod.StartDate__c}"/>&nbsp;-&nbsp;<apex:outputField value="{!timePeriod.EndDate__c}"/>}</span>
+						&nbsp;&nbsp;&nbsp;&nbsp;
+						<apex:outputLink value="#" onclick="GoPreviousPeriod()" title="{!$Label.kimbleone__previousperiod}">
+							<apex:image url="{!URLFOR($Resource.AssignmentImages, 'PreviousButtonSquare.png')}"
+								alt="{!$Label.kimbleone__previousperiod}" width="30" height="30" />
+						</apex:outputLink>
+
+						<span>
+							<apex:inputText styleClass="datepicker" style="width:0px;border:0px; margin:0px; padding:0px;" value="{!GoDate.KimbleOne__InputDate__c}">
+								<apex:actionSupport event="onchange" action="{!ForecastingPeriodChange}" />
+							</apex:inputText>
+							<script>
+							$(window).load(function(){
+
+									$('.datepicker').datepicker({
+										dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+										showOtherMonths: true,
+										selectOtherMonths: true,
+										buttonText: '{!JSENCODE($Label.OpenTimePeriodDropdownToolTip)}',
+										buttonImageOnly: true,
+										buttonImage: '{!URLFOR($Resource.AssignmentImages, 'CalendarButtonSquare.png')}',
+										showOn: "button",
+										});
+								});
+						</script></span>
+
+						<apex:outputLink value="#" onclick="GoNextPeriod()" title="{!$Label.kimbleone__nextperiod}">
+							<apex:image url="{!URLFOR($Resource.AssignmentImages, 'NextButtonSquare.png')}"
+								alt="{!$Label.kimbleone__nextperiod}" width="30" height="30" />
+						</apex:outputLink>
+						<div id="toolbar-container">
+							<div class="toolbar">
+								<div id="nav-bar" class="control-cell no-select">
+									<apex:outputLink value="javascript:void(0);" onclick="jQuery('#FilterPopup').show();" title="{!$Label.kimbleone__filter}"><div class="toolbar-button bigger-btn filter-button"><i class="fa fa-filter"></i></div></apex:outputLink>
+								</div>
+							</div>
+						</div>
+-->
+
+						</div>
+
+					</div>
+					<apex:pageBlock title="{!$Label.kimbleone__periodsummarylabel} ({!timePeriod.BusinessUnitGroup__r.CurrencyISOCode})">
+						<table cellpadding="0" cellspacing="0" border="0" width="100%">
+							<tr>
+								<td valign="top" class="summary-cell uncommitted-revenues">
+									<div id="divForUncommittedRevenueGraph" class="summary-bars"></div>
+								</td>
+								<td valign="top" class="summary-cell unrecognised-revenues">
+									<div id="divForUnRecognisedRevenuesGraph" class="summary-bars"></div>
+								</td>
+								<td valign="top" class="summary-cell unplanned-recognised-revenues">
+									<div id="divForUnplannedRecognisedRevenuesGraph" class="summary-bars"></div>
+								</td>
+								<td valign="top" class="summary-cell unrecognised-costs">
+									<div id="divForUnRecognisedCostsGraph" class="summary-bars"></div>
+								</td>
+								<td valign="top" class="summary-cell time-adjustments">
+									<div id="divForIncompleteTimeAdjustmentGraph" class="summary-bars"></div>
+								</td>
+								<apex:outputPanel layout="none" rendered="{!MultipleBUG}">
+									<td valign="top" class="summary-cell">
+										<div id="divForOtherBUGUsageSummaryGraph" class="summary-bars"></div>
+									</td>
+								</apex:outputPanel>
+							</tr>
+						</table>
+
+					</apex:pageBlock>
+					<style>
+			div[class^='graphLabel'], div[class^='graphValuedivFor'] {
+				font-size: 10px;
+				white-space: none;
+				font-weight: bold;
+				color: #4A4A56;
+			}
+			div[class^='graphLabeldivFor'] {
+				height:40px;
+			}
+			div[id^='graphHolder'] {
+				width: auto !important;
+			}
+			div[class^="graphLabel"] a,div[class^="graphLabel"] span {
+				white-space: normal;
+				text-overflow: ellipsis;
+				overflow: hidden;
+				display: -webkit-box;
+				-webkit-line-clamp: 3;
+				-webkit-box-orient: vertical;
+				text-align: center;
+				-moz-webkit-box-orient: vertical;
+			}
+			/* IE10+ specific styles */
+			@media screen and (-ms-high-contrast: active), screen and (-ms-high-contrast: none) {
+				div[class^="graphLabel"] a,div[class^="graphLabel"] span {
+					white-space: nowrap;
+					display: block;
+				}
+			}
+			.summary-bars {
+				margin-right: 6px;
+			}
+			.graphTitle {
+				font-size: 12px;
+				height: 28px;
+				font-weight: bold;
+				color: #4A4A56;
+				margin-bottom:4px;
+			    margin-top: 4px;
+			    margin-left: 1px;
+			    margin-right: 1px;
+			}
+			.summary-cell {
+				background-color:#FFF;
+				border-right: 9px solid #F8F8F8;
+			}
+			.time-adjustments {
+		  		 width: 120px;
+			}
+		</style>
+					<script>
+
+	 	$(document).ready(function(){
+ 			initialiseFilter('{!JSENCODE($Page.ForecastingPeriodClose)}?id={!JSENCODE($CurrentPage.parameters.id)}&filterid={!JSENCODE($CurrentPage.parameters.filterid)}');
+		 	var summaryData = jQuery.parseJSON('<apex:outputText value="{!JSENCODE(ThePeriodSummaryJson)}"/>');
+
+		 	var uncommittedRevenueGraphData = new Array(
+		   		 [summaryData.UncommittedRevenueSales,'<a title="' + summaryData.UncommittedSalesOpportunitiesCount + ' {!$ObjectType.KimbleOne__Proposal__c.LabelPlural}" id="uncommittedRevenueProposals" href="javascript:void(0)" onclick="changeView(\'UncommittedRevenueSales\')">' + summaryData.UncommittedSalesOpportunitiesCount + ' {!$ObjectType.KimbleOne__Proposal__c.LabelPlural}</a>','#B42D34'],
+		   	 	 [summaryData.UncommittedRevenueDeliveryGroup,'<a title="' + summaryData.UncommittedDeliveryGroupsCount + ' {!$ObjectType.KimbleOne__DeliveryGroup__c.LabelPlural}" id="uncommittedRevenueDeliveryGroup" href="javascript:void(0)" onclick="changeView(\'UncommittedRevenueDeliveryGroup\')">' + summaryData.UncommittedDeliveryGroupsCount + ' {!$ObjectType.KimbleOne__DeliveryGroup__c.LabelPlural}</a>','#E58E1A'],
+		   	 	 [summaryData.UncommittedRevenueDeliveryElement,'<a title="' + summaryData.UncommittedDeliveryElementsCount + ' {!$ObjectType.KimbleOne__DeliveryElement__c.LabelPlural}" id="uncommittedRevenueDeliveryElement" href="javascript:void(0)" onclick="changeView(\'UncommittedRevenueDeliveryElement\')">' + summaryData.UncommittedDeliveryElementsCount + ' {!$ObjectType.KimbleOne__DeliveryElement__c.LabelPlural}</a>','#E58E1A']);
+
+		 	$('#divForUncommittedRevenueGraph').jqBarGraph({ data: uncommittedRevenueGraphData,title: '<div class="graphTitle">{!$Label.UncommittedRevenueLabel}</div>', height:170, width:260, animate: false, barSpace: 6});
+
+		 	jQuery.each($('div.graphValuedivForUncommittedRevenueGraph'),function(i,obj){
+		 		$(obj).text($.formatNumber($(obj).text(), {format: "#,##0", locale:kimble.locale, isFullLocale:false}));
+		 	});
+
+		 	var unrecognisedRevenuesGraphData = new Array(
+		   		 [summaryData.UnrecognisedMilestoneRevenues,'<a title="' + summaryData.UnrecognisedMilestoneRevenuesCount + ' {!$ObjectType.Milestone__c.LabelPlural}" id="unrecognisedRevenuesMilestones" href="javascript:void(0)" onclick="changeView(\'UnrecognisedMilestoneRevenue\')">' + summaryData.UnrecognisedMilestoneRevenuesCount + ' {!$ObjectType.Milestone__c.LabelPlural}</a>','#729BC7'],
+		   	 	 [summaryData.UnrecognisedPeriodRevenues,'<a title="' + summaryData.UnrecognisedPeriodRevenuesCount + ' {!$ObjectType.KimbleOne__PeriodRevenue__c.LabelPlural}" id="unrecognisedRevenuesPeriodRevenues" href="javascript:void(0)" onclick="changeView(\'UnrecognisedPeriodRevenue\')">' + summaryData.UnrecognisedPeriodRevenuesCount + ' {!$ObjectType.KimbleOne__PeriodRevenue__c.LabelPlural}</a>','#729BC7']);
+
+		 	$('#divForUnRecognisedRevenuesGraph').jqBarGraph({ data: unrecognisedRevenuesGraphData,title: '<div class="graphTitle">{!$Label.UnrecognisedRevenueLabel}</div>', height:170, width:190, animate: false, barSpace: 6});
+
+		 	jQuery.each($('div.graphValuedivForUnRecognisedRevenuesGraph'),function(i,obj){
+		 		$(obj).text($.formatNumber($(obj).text(), {format: "#,##0", locale:kimble.locale, isFullLocale:false}));
+		 	});
+
+			if (summaryData.UnplannedRecognisedPerElementRevenuesCount > 0){
+				var unplannedRecognisedRevenuesGraphData = new Array(
+					 [summaryData.UnplannedRecognisedPerElementRevenues,'<a title="' + summaryData.UnplannedRecognisedPerElementRevenuesCount + ' {!$ObjectType.KimbleOne__DeliveryElement__c.LabelPlural}" id="unplannedRecognisedRevenuesElements" href="javascript:void(0)" onclick="changeView(\'UnplannedRecognisedPerElementRevenue\')">' + summaryData.UnplannedRecognisedPerElementRevenuesCount + ' {!$ObjectType.KimbleOne__DeliveryElement__c.LabelPlural}</a>','#729BC7']);
+
+				$('#divForUnplannedRecognisedRevenuesGraph').jqBarGraph({ data: unplannedRecognisedRevenuesGraphData,title: '<div class="graphTitle">{!$Label.ConfigurationSetting12}</div>', height:170, width:140, animate: false, barSpace: 6});
+
+				jQuery.each($('div.graphValuedivForUnplannedRecognisedRevenuesGraph'),function(i,obj){
+					$(obj).text($.formatNumber($(obj).text(), {format: "#,##0", locale:kimble.locale, isFullLocale:false}));
+				});
+			}
+			else {
+				$('.summary-cell.unplanned-recognised-revenues').hide();
+			}
+
+		 	var unrecognisedCostsGraphData = new Array(
+		   		 [summaryData.UnrecognisedMilestoneCosts,'<a title="' + summaryData.UnrecognisedMilestoneCostsCount + ' {!$ObjectType.Milestone__c.LabelPlural}" id="unrecognisedRevenuesMilestoneCosts" href="javascript:void(0)" onclick="changeView(\'UnrecognisedMilestoneCost\')">' + summaryData.UnrecognisedMilestoneCostsCount + ' {!$ObjectType.Milestone__c.LabelPlural}</a>','#729BC7'],
+		   	 	 [summaryData.UnrecognisedPeriodCosts,'<a title="' + summaryData.UnrecognisedPeriodCostsCount + ' {!$ObjectType.KimbleOne__PeriodCost__c.LabelPlural}" id="unrecognisedRevenuesPeriodCosts" href="javascript:void(0)" onclick="changeView(\'UnrecognisedPeriodCost\')">' + summaryData.UnrecognisedPeriodCostsCount + ' {!$ObjectType.KimbleOne__PeriodCost__c.LabelPlural}</a>','#729BC7'],
+		   	 	 [summaryData.UnactualisedElementExpensesCost,'<a title="' + summaryData.UnactualisedElementExpensesCostCount + ' {!$ObjectType.KimbleOne__PerformanceAnalysis__c.Fields.KimbleOne__P3Unactualised__c.Label} {!$Label.kimbleone__expenseslabel}" id="unactualisedElementCosts" href="javascript:void(0)" onclick="changeView(\'UnactualisedExpensesCost\')">' + summaryData.UnactualisedElementExpensesCostCount + ' {!$ObjectType.PerformanceAnalysis__c.Fields.P3Unactualised__c.Label} </br> {!$Label.ExpensesLabel}</a>','#729BC7']);
+
+		 	$('#divForUnRecognisedCostsGraph').jqBarGraph({ data: unrecognisedCostsGraphData,title: '<div class="graphTitle">{!$Label.UnrecognisedCostsLabel}</div>', height:170, width:250, animate: false, barSpace: 6});
+
+		 	jQuery.each($('div.graphValuedivForUnRecognisedCostsGraph'),function(i,obj){
+		 		$(obj).text($.formatNumber($(obj).text(), {format: "#,##0", locale:kimble.locale, isFullLocale:false}));
+		 	});
+
+		 	var incompleteTimeAdjustmentsGraphData = new Array(
+		   		 [summaryData.IncompleteTimeAdjustmentRevenues,'<a title="' + summaryData.IncompleteTimeAdjustmentCount + ' {!$ObjectType.KimbleOne__TimeAdjustment__c.LabelPlural} {!$Label.kimbleone__pendingapprovalhoursgraphheading}" id="incompleteTimeAdjRev" href="javascript:void(0)" onclick="changeView(\'IncompleteTimeAdjustment\')">' + summaryData.IncompleteTimeAdjustmentCount + ' {!$ObjectType.KimbleOne__TimeAdjustment__c.LabelPlural}<br/>{!$Label.PendingApprovalHoursGraphHeading}</a>','#729BC7'],
+		   		  [summaryData.DraftTimeAdjustmentRevenues,'<a title="' + summaryData.DraftTimeAdjustmentCount + ' {!$ObjectType.KimbleOne__TimeAdjustment__c.LabelPlural}" id="incompleteDraftTimeAdj" href="javascript:void(0)" onclick="changeView(\'DraftTimeAdjustment\')">' + summaryData.DraftTimeAdjustmentCount + ' {!$ObjectType.KimbleOne__TimeAdjustment__c.LabelPlural}</a>','#729BC7']);
+
+		 	$('#divForIncompleteTimeAdjustmentGraph').jqBarGraph({ data: incompleteTimeAdjustmentsGraphData,title: '<div class="graphTitle">{!$Label.IncompleteTimeAdjustments}</div>', height:170, width:200, animate: false, barSpace: 6});
+
+		 	jQuery.each($('div.graphValuedivForIncompleteTimeAdjustmentGraph'),function(i,obj){
+		 		$(obj).text($.formatNumber($(obj).text(), {format: "#,##0", locale:kimble.locale, isFullLocale:false}));
+		 	});
+
+			var OtherBUGUsageGraphData = new Array(
+		 		[summaryData.OtherBUGRemainingUsageHours, '<a title="{!$Label.OtherBUGroup}" href="javascript:void(0)" onclick="changeView(\'OtherBUGroupForecastUsage\')">{!$Label.OtherBUGroup}</a>', '#BBB']
+		 	);
+			<apex:outputPanel layout="none" rendered="{!MultipleBUG}">
+				$('#divForOtherBUGUsageSummaryGraph').jqBarGraph({ data: OtherBUGUsageGraphData,title: '<div class="graphTitle">{!$Label.OtherBUGroupRemaining}</div>', height:170, width:114, animate: false, barSpace: 6});
+
+				jQuery.each($('div.graphValuedivForOtherBUGUsageSummaryGraph'),function(i,obj){
+					$(obj).text($.formatNumber($(obj).text(), {format: "#,##0", locale:kimble.locale, isFullLocale:false}));
+				});
+		 	</apex:outputPanel>
+
+			initialisePageTips();
+		 });
+
+		/* Tooltips */
+		var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+		var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+		var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+		var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+		var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+		var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+	
+		function initialisePageTips()
+		{
+			ApplyTipAttributes();
+			initialiseTips();
+		}
+		
+		// add tip attributes to elements
+		function ApplyTipAttributes()
+		{
+			if(enableTips)
+			{
+				jQuery('.time-adjustments').attr('kimble-tip','IncompleteTimeAdjRevenue').attr('kimble-tip-help-link','CloseForecastingPeriodHelpLink');
+				jQuery('[id$="incompleteTimeAdjRev"]').parent().parent().attr('kimble-tip','TimeAdjustments').attr('kimble-tip-extended-text','TimeAdjustmentsExtendedText').attr('kimble-tip-help-link','CloseForecastingPeriodHelpLink');
+				jQuery('[id$="incompleteDraftTimeAdj"]').parent().parent().attr('kimble-tip','TimeAdjPendingApproval').attr('kimble-tip-extended-text','TimeAdjPendingApprovalExtendedText').attr('kimble-tip-help-link','CloseForecastingPeriodHelpLink');
+				
+				jQuery('.uncommitted-revenues').attr('kimble-tip','UncommittedRevenue').attr('kimble-tip-help-link','CloseForecastingPeriodHelpLink');
+				jQuery('[id$="uncommittedRevenueDeliveryGroup"]').parent().parent().attr('kimble-tip','UCR_DeliveryEngagements').attr('kimble-tip-help-link','CloseForecastingPeriodHelpLink');
+				jQuery('[id$="uncommittedRevenueDeliveryElement"]').parent().parent().attr('kimble-tip','UCR_Elements').attr('kimble-tip-help-link','CloseForecastingPeriodHelpLink');
+				jQuery('[id$="uncommittedRevenueProposals"]').parent().parent().attr('kimble-tip','UCR_Proposals').attr('kimble-tip-help-link','CloseForecastingPeriodHelpLink');
+				
+				jQuery('.unrecognised-costs').attr('kimble-tip','UnrecognisedCosts').attr('kimble-tip-help-link','CloseForecastingPeriodHelpLink');
+				jQuery('[id$="unrecognisedRevenuesMilestoneCosts"]').parent().parent().attr('kimble-tip','URC_Milestones').attr('kimble-tip-help-link','CloseForecastingPeriodHelpLink');
+				jQuery('[id$="unrecognisedRevenuesPeriodCosts"]').parent().parent().attr('kimble-tip','URC_PeriodCosts').attr('kimble-tip-help-link','CloseForecastingPeriodHelpLink');
+				
+				jQuery('.unrecognised-revenues').attr('kimble-tip','UnrecognisedRevenues').attr('kimble-tip-help-link','CloseForecastingPeriodHelpLink');
+				jQuery('[id$="unrecognisedRevenuesMilestones"]').parent().parent().attr('kimble-tip','URR_Milestones').attr('kimble-tip-help-link','CloseForecastingPeriodHelpLink');
+				jQuery('[id$="unrecognisedRevenuesPeriodRevenues"]').parent().parent().attr('kimble-tip','URR_PeriodRevenues').attr('kimble-tip-help-link','CloseForecastingPeriodHelpLink');
+
+				jQuery('.unplanned-recognised-revenues').attr('kimble-tip','UnplannedRecognisedRevenues').attr('kimble-tip-help-link','CloseForecastingPeriodHelpLink');
+				jQuery('[id$="unplannedRecognisedRevenuesElements"]').parent().parent().attr('kimble-tip','UPR_DeliveryElements').attr('kimble-tip-help-link','CloseForecastingPeriodHelpLink');
+			}
+		}
+		
+		function updateTipsConfigSetting(newTipSetting)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+				newTipSetting,
+					function(result, event){
+						if (event.status)
+						{
+							var data = {};
+							data.results = result;
+							loadGuidance();
+						}
+						else
+						{
+							alert(event.message);
+						}
+				},
+				{escape: false, timeout: 60000}
+			);
+		}
+
+		function SetupDatePicker()
+		{
+		    jQuery('.kimbleDatePicker').datepicker({
+					   	dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+						showOtherMonths: true,
+						selectOtherMonths: true
+					});
+  		}
+
+
+	</script>
+					<apex:actionStatus id="ViewLoadingStatus">
+						<apex:facet name="start">
+							<div style="margin-top:20px; margin-bottom:20px;margin-left:12px">
+								<span style="font-weight: bold;color: #4A4A56;font-size: 91%;"><img src="{!URLFOR($Resource.KimbleOne__LoadingImage)}" style="margin-right: 8px;position: relative;top: 2px;"/>{!$Label.kimbleone__loading}</span>
+							</div>
+						</apex:facet>
+						<apex:facet name="stop">
+
+							<apex:pageBlock id="TheViews" rendered="{!TheSelectedView != ''}">
+								<apex:outputPanel layout="none" rendered="{!TheSelectedView = UncommittedRevenueSales}">
+
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$ObjectType.KimbleOne__Proposal__c.LabelPlural}" ></apex:pageBlockSection>
+
+									<apex:pageBlockTable value="{!ThePagedUncommittedRevenueSales.TheRecords}" var="record">
+										<apex:column value="{!record.Proposal.KimbleOne__Account__c}"/>
+										<apex:column headerValue="{!$ObjectType.KimbleOne__Proposal__c.Fields.Name.Label}">
+											<apex:outputLink value="/{!record.Proposal.Id}" >{!record.Proposal.Name}</apex:outputLink>
+										</apex:column>
+										<apex:column value="{!record.Proposal.KimbleOne__AcceptanceDate__c}" />
+										<apex:column value="{!record.Proposal.KimbleOne__ForecastStatus__c}" />
+										<apex:column value="{!record.ContractRevenue.KimbleOne__InputCurrency__c}" headerValue="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ContractRevenue__c.Label}"/>
+										<apex:column value="{!record.Proposal.OwnerId}" />
+									</apex:pageBlockTable>
+
+									<div style="float:left; margin-top:15px;">
+										<apex:outputText value="{!ThePagedUncommittedRevenueSales.CurrentPageDescription}"/>
+									</div>
+									<div style="float: right; margin-right: 15px; margin-top:15px;">
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedUncommittedRevenueSales.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedUncommittedRevenueSales.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										&nbsp;|&nbsp;
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedUncommittedRevenueSales.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedUncommittedRevenueSales.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+									</div>
+									<div style="clear:both;"></div>
+
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheSelectedView = UncommittedRevenueDeliveryGroup}">
+
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$ObjectType.KimbleOne__DeliveryGroup__c.LabelPlural}" ></apex:pageBlockSection>
+
+									<apex:pageBlockTable value="{!ThePagedUncommittedRevenueDeliveryGroup.TheRecords}" var="record">
+										<apex:column value="{!record.DeliveryGroup__r.KimbleOne__Account__c}" headerValue="{!$ObjectType.Account.Fields.Name.Label}"/>
+										<apex:column headerValue="{!$ObjectType.KimbleOne__Proposal__c.Fields.Name.Label}">
+											<apex:outputField value="{!record.KimbleOne__Proposal__c}" rendered="{!!ISBLANK(record.KimbleOne__Proposal__c)}"/>
+											<apex:outputField value="{!record.DeliveryGroup__r.KimbleOne__Proposal__c}" rendered="{!ISBLANK(record.KimbleOne__Proposal__c)}"/>
+										</apex:column>
+										<apex:column headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.Name.Label}">
+											<apex:outputLink value="/{!record.KimbleOne__DeliveryGroup__c}" >{!record.DeliveryGroup__r.Name}</apex:outputLink>
+										</apex:column>
+
+										<apex:column value="{!record.DeliveryGroup__r.OwnerId}" headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.OwnerId.Label}"/>
+										<apex:column value="{!record.KimbleOne__ContractRevenue__c}" headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__ContractRevenue__c.Label}"/>
+										<apex:column value="{!record.KimbleOne__StartDate__c}" headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__ExpectedStartDate__c.Label}"/>
+									</apex:pageBlockTable>
+
+									<div style="float:left; margin-top:15px;">
+										<apex:outputText value="{!ThePagedUncommittedRevenueDeliveryGroup.CurrentPageDescription}"/>
+									</div>
+									<div style="float: right; margin-right: 15px; margin-top:15px;">
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedUncommittedRevenueDeliveryGroup.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedUncommittedRevenueDeliveryGroup.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										&nbsp;|&nbsp;
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedUncommittedRevenueDeliveryGroup.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedUncommittedRevenueDeliveryGroup.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+									</div>
+									<div style="clear:both;"></div>
+
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheSelectedView = UncommittedRevenueDeliveryElement}">
+
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$ObjectType.KimbleOne__DeliveryElement__c.LabelPlural}" ></apex:pageBlockSection>
+
+									<apex:pageBlockTable value="{!ThePagedUncommittedRevenueDeliveryElement.TheRecords}" var="record">
+										<apex:column value="{!record.DeliveryGroup__r.KimbleOne__Account__c}" headerValue="{!$ObjectType.Account.Fields.Name.Label}"/>
+										<apex:column headerValue="{!$ObjectType.KimbleOne__Proposal__c.Fields.Name.Label}">
+											<apex:outputField value="{!record.KimbleOne__Proposal__c}" rendered="{!!ISBLANK(record.KimbleOne__Proposal__c)}"/>
+											<apex:outputField value="{!record.DeliveryGroup__r.KimbleOne__Proposal__c}" rendered="{!ISBLANK(record.KimbleOne__Proposal__c)}"/>
+										</apex:column>
+										<apex:column headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.Name.Label}">
+											<apex:outputLink value="/{!record.KimbleOne__DeliveryGroup__c}" >{!record.DeliveryGroup__r.Name}</apex:outputLink>
+										</apex:column>
+										<apex:column headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.Name.Label}">
+											<apex:outputText value="{!record.Name}" />
+										</apex:column>
+
+										<apex:column value="{!record.DeliveryGroup__r.OwnerId}" headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.OwnerId.Label}"/>
+										<apex:column value="{!record.KimbleOne__ContractRevenue__c}" headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__ContractRevenue__c.Label}"/>
+										<apex:column value="{!record.KimbleOne__StartDate__c}" headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__ExpectedStartDate__c.Label}"/>
+									</apex:pageBlockTable>
+
+									<div style="float:left; margin-top:15px;">
+										<apex:outputText value="{!ThePagedUncommittedRevenueDeliveryElement.CurrentPageDescription}"/>
+									</div>
+									<div style="float: right; margin-right: 15px; margin-top:15px;">
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedUncommittedRevenueDeliveryElement.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedUncommittedRevenueDeliveryElement.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										&nbsp;|&nbsp;
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedUncommittedRevenueDeliveryElement.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedUncommittedRevenueDeliveryElement.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+									</div>
+									<div style="clear:both;"></div>
+
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheSelectedView = UnrecognisedMilestoneRevenue}">
+
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$Label.kimbleone__revenue} {!$ObjectType.KimbleOne__Milestone__c.LabelPlural}" ></apex:pageBlockSection>
+
+									<apex:pageBlockTable value="{!ThePagedUnrecognisedMilestoneRevenues.TheRecords}" var="record">
+										<apex:column value="{!record.Milestone.DeliveryElement__r.DeliveryGroup__r.KimbleOne__Account__c}" headerValue="{!$ObjectType.Account.Fields.Name.Label}"/>
+										<apex:column headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.Name.Label}">
+											<apex:outputLink value="{!$Page.KimbleOne__DeliveryGroupMilestones}?id={!record.Milestone.DeliveryElement__r.KimbleOne__DeliveryGroup__c}" >{!record.Milestone.DeliveryElement__r.DeliveryGroup__r.Name}</apex:outputLink>
+										</apex:column>
+										<apex:column value="{!record.Milestone.Name}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.Name.Label}"/>
+										<apex:column value="{!record.Milestone.KimbleOne__MilestoneDate__c}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneDate__c.Label}"/>
+										<apex:column value="{!record.Milestone.KimbleOne__MilestoneValue__c}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneValue__c.Label}"/>
+										<apex:column value="{!record.Milestone.KimbleOne__MilestoneStatus__c}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneStatus__c.Label}"/>
+										<apex:column value="{!record.Milestone.KimbleOne__ApprovalStatus__c}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__ApprovalStatus__c.Label}"/>
+										<apex:column value="{!record.PendingStep.ActorId}"/>
+									</apex:pageBlockTable>
+
+									<div style="float:left; margin-top:15px;">
+										<apex:outputText value="{!ThePagedUnrecognisedMilestoneRevenues.CurrentPageDescription}"/>
+									</div>
+									<div style="float: right; margin-right: 15px; margin-top:15px;">
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedUnrecognisedMilestoneRevenues.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedUnrecognisedMilestoneRevenues.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										&nbsp;|&nbsp;
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedUnrecognisedMilestoneRevenues.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedUnrecognisedMilestoneRevenues.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+									</div>
+									<div style="clear:both;"></div>
+
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheSelectedView = UnrecognisedMilestoneCost}">
+
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$Label.kimbleone__cost} {!$ObjectType.KimbleOne__Milestone__c.LabelPlural}" ></apex:pageBlockSection>
+
+									<apex:pageBlockTable value="{!ThePagedUnrecognisedMilestoneCosts.TheRecords}" var="record">
+										<apex:column value="{!record.Milestone.DeliveryElement__r.DeliveryGroup__r.KimbleOne__Account__c}" headerValue="{!$ObjectType.Account.Fields.Name.Label}"/>
+										<apex:column headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.Name.Label}">
+											<apex:outputLink value="{!$Page.KimbleOne__DeliveryGroupMilestones}?id={!record.Milestone.DeliveryElement__r.KimbleOne__DeliveryGroup__c}" >{!record.Milestone.DeliveryElement__r.DeliveryGroup__r.Name}</apex:outputLink>
+										</apex:column>
+										<apex:column value="{!record.Milestone.Name}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.Name.Label}"/>
+										<apex:column value="{!record.Milestone.KimbleOne__MilestoneDate__c}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneDate__c.Label}"/>
+										<apex:column value="{!record.Milestone.KimbleOne__MilestoneValue__c}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneValue__c.Label}"/>
+										<apex:column value="{!record.Milestone.KimbleOne__MilestoneStatus__c}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneStatus__c.Label}"/>
+										<apex:column value="{!record.Milestone.KimbleOne__ApprovalStatus__c}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__ApprovalStatus__c.Label}"/>
+										<apex:column value="{!record.PendingStep.ActorId}"/>
+									</apex:pageBlockTable>
+
+									<div style="float:left; margin-top:15px;">
+										<apex:outputText value="{!ThePagedUnrecognisedMilestoneCosts.CurrentPageDescription}"/>
+									</div>
+									<div style="float: right; margin-right: 15px; margin-top:15px;">
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedUnrecognisedMilestoneCosts.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedUnrecognisedMilestoneCosts.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										&nbsp;|&nbsp;
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedUnrecognisedMilestoneCosts.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedUnrecognisedMilestoneCosts.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+									</div>
+									<div style="clear:both;"></div>
+
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheSelectedView = UnrecognisedPeriodRevenue}">
+
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$ObjectType.KimbleOne__PeriodRevenue__c.LabelPlural}" ></apex:pageBlockSection>
+
+									<apex:pageBlockTable value="{!ThePagedUnrecognisedPeriodRevenues.TheRecords}" var="record">
+										<apex:column value="{!record.PeriodRevenue.DeliveryElement__r.DeliveryGroup__r.KimbleOne__Account__c}" headerValue="{!$ObjectType.Account.Fields.Name.Label}"/>
+										<apex:column value="{!record.PeriodRevenue.DeliveryElement__r.KimbleOne__DeliveryGroup__c}" headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.Name.Label}"/>
+										<apex:column value="{!record.PeriodRevenue.KimbleOne__ForecastUnits__c}" headerValue="{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__ForecastUnits__c.Label}"/>
+										<apex:column value="{!record.PeriodRevenue.KimbleOne__ForecastRevenue__c}"  headerValue="{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__ForecastRevenue__c.Label}"/>
+										<apex:column value="{!record.PeriodRevenue.Status__r.Name}"  headerValue="{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__Status__c.Label}"/>
+										<apex:column value="{!record.PeriodRevenue.KimbleOne__ApprovalStatus__c}"  headerValue="{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__ApprovalStatus__c.Label}"/>
+										<apex:column value="{!record.PendingStep.ActorId}"/>
+									</apex:pageBlockTable>
+
+									<div style="float:left; margin-top:15px;">
+										<apex:outputText value="{!ThePagedUnrecognisedPeriodRevenues.CurrentPageDescription}"/>
+									</div>
+									<div style="float: right; margin-right: 15px; margin-top:15px;">
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedUnrecognisedPeriodRevenues.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedUnrecognisedPeriodRevenues.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										&nbsp;|&nbsp;
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedUnrecognisedPeriodRevenues.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedUnrecognisedPeriodRevenues.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+									</div>
+									<div style="clear:both;"></div>
+
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheSelectedView = UnrecognisedPeriodCost}">
+
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$ObjectType.KimbleOne__PeriodCost__c.LabelPlural}" ></apex:pageBlockSection>
+
+									<apex:pageBlockTable value="{!ThePagedUnrecognisedPeriodCosts.TheRecords}" var="record">
+										<apex:column value="{!record.PeriodCost.DeliveryElement__r.DeliveryGroup__r.KimbleOne__Account__c}" headerValue="{!$ObjectType.Account.Fields.Name.Label}"/>
+										<apex:column value="{!record.PeriodCost.DeliveryElement__r.KimbleOne__DeliveryGroup__c}" headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.Name.Label}"/>
+										<apex:column value="{!record.PeriodCost.KimbleOne__ForecastUnits__c}" headerValue="{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__ForecastUnits__c.Label}"/>
+										<apex:column value="{!record.PeriodCost.KimbleOne__ForecastCost__c}" headerValue="{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__ForecastCost__c.Label}"/>
+										<apex:column value="{!record.PeriodCost.Status__r.Name}" headerValue="{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__Status__c.Label}"/>
+										<apex:column value="{!record.PeriodCost.KimbleOne__ApprovalStatus__c}" headerValue="{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__ApprovalStatus__c.Label}"/>
+										<apex:column value="{!record.PendingStep.ActorId}"/>
+									</apex:pageBlockTable>
+
+									<div style="float:left; margin-top:15px;">
+										<apex:outputText value="{!ThePagedUnrecognisedPeriodCosts.CurrentPageDescription}"/>
+									</div>
+									<div style="float: right; margin-right: 15px; margin-top:15px;">
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedUnrecognisedPeriodCosts.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedUnrecognisedPeriodCosts.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										&nbsp;|&nbsp;
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedUnrecognisedPeriodCosts.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedUnrecognisedPeriodCosts.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+									</div>
+									<div style="clear:both;"></div>
+
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheSelectedView = UnactualisedExpensesCost}">
+
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$ObjectType.KimbleOne__PerformanceAnalysis__c.Fields.KimbleOne__P3Unactualised__c.Label} {!$Label.kimbleone__expenseslabel}" ></apex:pageBlockSection>
+
+									<apex:pageBlockTable value="{!ThePagedUnactualisedExpensesCosts.TheRecords}" var="record">
+										<apex:column value="{!record.TheCostAnalysis.DeliveryGroup__r.KimbleOne__Account__c}" headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__Account__c.Label}"/>
+										<apex:column value="{!record.TheCostAnalysis.KimbleOne__DeliveryGroup__c}" headerValue="{!$ObjectType.KimbleOne__PerformanceAnalysis__c.Fields.KimbleOne__DeliveryGroup__c.Label}"/>
+										<apex:column headerValue="{!$ObjectType.KimbleOne__PerformanceAnalysis__c.Fields.KimbleOne__DeliveryElement__c.Label}">
+											<a class="undecorated-link" href="{!$Page.KimbleOne__ActivityExpenseCategoryProfiles + '?id=' + record.TheCostAnalysis.KimbleOne__DeliveryGroup__c}">
+												{!record.TheCostAnalysis.DeliveryElement__r.Name}
+											</a>
+										</apex:column>
+										<apex:column value="{!record.TheCostAnalysis.KimbleOne__P3Unactualised__c}" headerValue="{!$ObjectType.KimbleOne__PerformanceAnalysis__c.Fields.KimbleOne__P3Unactualised__c.Label} {!$Label.kimbleone__expenseslabel}"/>
+									</apex:pageBlockTable>
+
+									<div style="float:left; margin-top:15px;">
+										<apex:outputText value="{!ThePagedUnactualisedExpensesCosts.CurrentPageDescription}"/>
+									</div>
+									<div style="float: right; margin-right: 15px; margin-top:15px;">
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedUnactualisedExpensesCosts.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedUnactualisedExpensesCosts.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										&nbsp;|&nbsp;
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedUnactualisedExpensesCosts.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedUnactualisedExpensesCosts.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+									</div>
+									<div style="clear:both;"></div>
+
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheSelectedView = UnplannedRecognisedPerElementRevenue}">
+
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$ObjectType.KimbleOne__DeliveryElement__c.LabelPlural}" ></apex:pageBlockSection>
+
+									<apex:pageBlockTable value="{!ThePagedUnplannedRecognisedPerElementRevenues.TheRecords}" var="record">
+										<apex:column value="{!record.DeliveryElement.DeliveryGroup__r.KimbleOne__Account__c}" headerValue="{!$ObjectType.Account.Fields.Name.Label}"/>
+										<apex:column value="{!record.DeliveryElement.KimbleOne__DeliveryGroup__c}" headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.Name.Label}"/>
+										<apex:column value="{!record.DeliveryElement.Name}" headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.Name.Label}"/>
+										<apex:column value="{!record.DeliveryElement.KimbleOne__ContractRevenue__c}" headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ContractRevenue__c.Label}"/>
+										<apex:column headerValue="{!$Label.kimbleone__genericlabel16}">
+											<apex:inputCheckbox value="{!record.HasAssignments}" disabled="true"/>
+										</apex:column>
+									</apex:pageBlockTable>
+
+									<div style="float:left; margin-top:15px;">
+										<apex:outputText value="{!ThePagedUnplannedRecognisedPerElementRevenues.CurrentPageDescription}"/>
+									</div>
+									<div style="float: right; margin-right: 15px; margin-top:15px;">
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedUnplannedRecognisedPerElementRevenues.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedUnplannedRecognisedPerElementRevenues.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										&nbsp;|&nbsp;
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedUnplannedRecognisedPerElementRevenues.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedUnplannedRecognisedPerElementRevenues.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+									</div>
+									<div style="clear:both;"></div>
+
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheSelectedView = IncompleteTimeAdjustment}">
+
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$ObjectType.KimbleOne__TimeAdjustment__c.LabelPlural} {!$Label.kimbleone__pendingapprovalhoursgraphheading}" ></apex:pageBlockSection>
+
+									<apex:pageBlockTable value="{!ThePagedIncompleteTimeAdjustments.TheRecords}" var="record">
+										<apex:column headerValue="{!$ObjectType.KimbleOne__Timesheet__c.Fields.Name.Label}">
+											<apex:outputLink value="/{!record.Id}">
+												<apex:outputText value="{!record.Name} - " />
+												<apex:outputText value="{!record.ResourcedActivity__r.Name}"/>
+
+												<apex:variable var="Counter" value="{!1}"/>
+												<apex:repeat value="{!record.TimeEntries__r}" var="entry">
+													<apex:outputText value=" ({!entry.TimePeriod__r.Name}" rendered="{!(Counter == 1)}"/>
+													<apex:outputText value="    --   {!entry.TimePeriod__r.Name} )"  rendered="{!(Counter == record.TimeEntries__r.size)}"/>
+													<apex:variable var="Counter" value="{!Counter+1}"/>
+												</apex:repeat>
+
+											</apex:outputLink>
+										</apex:column>
+										<apex:column value="{!record.KimbleOne__Resource__c}" headerValue="{!$ObjectType.KimbleOne__Resource__c.Fields.Name.Label}"/>
+										<apex:column value="{!record.ResourcedActivity__r.Name}"  headerValue="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.Name.Label}"/>
+										<apex:column value="{!record.KimbleOne__Approver1User__c}" headerValue="{!$ObjectType.KimbleOne__Timesheet__c.Fields.KimbleOne__Approver1User__c.Label}"/>
+										<apex:column value="{!record.KimbleOne__Approver2User__c}" headerValue="{!$ObjectType.KimbleOne__Timesheet__c.Fields.KimbleOne__Approver2User__c.Label}"/>
+									</apex:pageBlockTable>
+
+									<div style="float:left; margin-top:15px;">
+										<apex:outputText value="{!ThePagedIncompleteTimeAdjustments.CurrentPageDescription}"/>
+									</div>
+									<div style="float: right; margin-right: 15px; margin-top:15px;">
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedIncompleteTimeAdjustments.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedIncompleteTimeAdjustments.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										&nbsp;|&nbsp;
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedIncompleteTimeAdjustments.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedIncompleteTimeAdjustments.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+									</div>
+									<div style="clear:both;"></div>
+
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheSelectedView = DraftTimeAdjustment}">
+
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$ObjectType.KimbleOne__TimeAdjustment__c.LabelPlural}" ></apex:pageBlockSection>
+
+									<apex:pageBlockTable value="{!ThePagedDraftTimeAdjustments.TheRecords}" var="record">
+										<apex:column headerValue="{!$ObjectType.KimbleOne__Timesheet__c.Label}">
+											<apex:outputLink value="{!$Page.KimbleOne__Timesheet}?id={!record.KimbleOne__Resource__c}&periodId={!record.KimbleOne__TrackingTimePeriod__c}">
+												<apex:outputText value="{!record.Resource__r.Name}" />	-
+												<apex:outputText value="{!record.TrackingTimePeriod__r.Name}" />
+											</apex:outputLink>
+										</apex:column>
+										<apex:column value="{!record.ActivityAssignment__r.ResourcedActivity__r.KimbleOne__FullName__c}"  headerValue="{!$ObjectType.KimbleOne__ResourcedActivity__c.Label}"/>
+
+									</apex:pageBlockTable>
+
+									<div style="float:left; margin-top:15px;">
+										<apex:outputText value="{!ThePagedDraftTimeAdjustments.CurrentPageDescription}"/>
+									</div>
+									<div style="float: right; margin-right: 15px; margin-top:15px;">
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedDraftTimeAdjustments.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedDraftTimeAdjustments.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+										&nbsp;|&nbsp;
+										<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedDraftTimeAdjustments.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+										<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedDraftTimeAdjustments.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+									</div>
+									<div style="clear:both;"></div>
+
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheSelectedView = OtherBUGroupForecastUsage}">
+
+
+									<apex:outputPanel rendered="{!ThePagedOtherBUGroupForecastUsage.CanGoPrevious || ThePagedOtherBUGroupForecastUsage.CanGoNext}">
+										<div  style="margin: 5px 1px;">
+											<div style="text-align:left; width:50%; display:inline-block;">
+												<apex:outputText value="{!ThePagedOtherBUGroupForecastUsage.CurrentPageDescription}"/>
+											</div>
+											<div style="text-align:right; width:50%; display:inline-block;">
+												<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedOtherBUGroupForecastUsage.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+												<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedOtherBUGroupForecastUsage.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+												&nbsp;|&nbsp;
+												<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedOtherBUGroupForecastUsage.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+												<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedOtherBUGroupForecastUsage.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+											</div>
+										</div>
+									</apex:outputPanel>
+
+									<apex:pageBlockTable value="{!ThePagedOtherBUGroupForecastUsage.TheRecords}" var="itm">
+										<apex:column headerValue="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.Name.Label}">
+											<apex:outputLink value="{!$Page.KimbleOne__ActivityAssignmentsDelivery}?id={!itm.TheActivity.DeliveryElement__r.KimbleOne__DeliveryGroup__c}&filterid={!itm.TheActivity.Id}" rendered="{!!ISBLANK(itm.TheActivity.KimbleOne__DeliveryElement__c)}"><apex:outputText value="{!itm.TheActivity.KimbleOne__FullName__c}"/></apex:outputLink>
+											<apex:outputLink value="{!$Page.KimbleOne__BidTeamAssignments}?id={!itm.TheActivity.Id}" rendered="{!!ISBLANK(itm.TheActivity.KimbleOne__Proposal__c)}"><apex:outputText value="{!itm.TheActivity.KimbleOne__FullName__c}"/></apex:outputLink>
+											<apex:outputLink value="{!$Page.KimbleOne__ActivityAssignmentsOther}?id={!itm.TheActivity.Id}" rendered="{!ISBLANK(itm.TheActivity.KimbleOne__DeliveryElement__c) && ISBLANK(itm.TheActivity.KimbleOne__Proposal__c)}"><apex:outputText value="{!itm.TheActivity.KimbleOne__FullName__c}"/></apex:outputLink>
+										</apex:column>
+										<apex:column value="{!itm.TheActivity.KimbleOne__BusinessUnit__c}"/>
+										<apex:column value="{!itm.TheActivity.OwnerId}"/>
+										<apex:column headerValue="{!$Label.kimbleone__remainingusageheading}">
+											<apex:pageBlockTable value="{!itm.ActivityPeriodAssignments}" var="apa">
+												<apex:column value="{!apa.TrackingPeriodAssignment.KimbleOne__Resource__c}" style="width:115px"/>
+												<apex:column headerValue="{!$ObjectType.KimbleOne__TimePeriod__c.Fields.KimbleOne__TrackingTimePeriod__c.Label}">
+													<apex:outputLink value="{!$Page.KimbleOne__TrackingPeriodClose}?filterid={!apa.TrackingPeriodAssignment.TimePeriod__r.TrackingTimePeriod__r.Id}"><apex:outputText value="{!apa.TrackingPeriodAssignment.TimePeriod__r.TrackingTimePeriod__r.Name}"/></apex:outputLink>
+												</apex:column>
+												<apex:column value="{!apa.TrackingPeriodAssignment.ActivityAssignment__r.KimbleOne__ActivityRole__c}" style="width:115px"/>
+												<apex:column headerValue="{!$Label.kimbleone__remaininghoursheading}" value="{!apa.RemainingUsageInHours.KimbleOne__InputDecimal__c}" style="width:25px"/>
+											</apex:pageBlockTable>
+										</apex:column>
+									</apex:pageBlockTable>
+
+									<div style="margin: 5px 0px 0px 1px;">
+										<div style="text-align:left; width:50%; display:inline-block;">
+											<apex:outputText value="{!ThePagedOtherBUGroupForecastUsage.CurrentPageDescription}"/>
+										</div>
+										<div style="text-align:right; width:50%; display:inline-block;">
+											<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedOtherBUGroupForecastUsage.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+											<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedOtherBUGroupForecastUsage.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+											&nbsp;|&nbsp;
+											<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedOtherBUGroupForecastUsage.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+											<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedOtherBUGroupForecastUsage.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+										</div>
+									</div>
+
+								</apex:outputPanel>
+
+							</apex:pageBlock>
+
+						</apex:facet>
+					</apex:actionStatus>
+
+					<apex:pageBlock >
+						<apex:commandButton rendered="{!CanClosePeriod && HasPermission['CloseForecastingPeriod']}" id="closeForecastingPeriodBtn" onclick="var d = confirmDelete();if(!d) return false;" action="{!closePeriod}" value="{!$Label.kimbleone__close}" oncomplete="SetFilterOptions();"/>
+						<apex:commandButton rendered="{!CanReOpenPeriod && HasPermission['RevertClosedForecastingPeriod']}" id="reOpenForecastingPeriodBtn" onclick="var d = confirmDelete();if(!d) return false;" action="{!reOpenPeriod}" value="{!$Label.kimbleone__reopenbutton}"/>
+
+					</apex:pageBlock>
+					<apex:actionFunction action="{!ChangeView}" name="changeView" rerender="ViewLoadingStatus" Status="ViewLoadingStatus">
+						<apex:param name="viewName" value="" />
+					</apex:actionFunction>
+					<apex:actionFunction action="{!GoPreviousPeriod}" name="GoPreviousPeriod" />
+					<apex:actionFunction action="{!GoNextPeriod}" name="GoNextPeriod" />
+					<apex:actionFunction action="{!SetFilterOptions}" name="SetFilterOptions" />
+
+					<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+					<div style="display:none;" kimble-tip="null"></div>
+				</apex:form>
+
+			</div>
+		</apex:define>
+
+	</apex:composition>
+
+</apex:page>

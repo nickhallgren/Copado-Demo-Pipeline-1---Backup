@@ -1,0 +1,252 @@
+<apex:page standardcontroller="KimbleOne__SalesOpportunity__c" extensions="KimbleOne.SalesOppEditController" sidebar="false" >
+ 
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+	<c:Menu DefaultHelpPage="CreateSalesOpportunityDisconnect.html" MenuContextType="Proposal" MenuContextId="{!KimbleOne__SalesOpportunity__c.KimbleOne__Proposal__c}" MenuContextName="{!KimbleOne__SalesOpportunity__c.Name}" rendered="{!!ISBLANK(SalesOpportunity__c.Id) }"/>
+</apex:define>
+    
+<apex:define name="Content">
+
+	<apex:form id="TheForm">  
+	
+		<apex:outputPanel layout="none" rendered="{!KimbleOne__SalesOpportunity__c.Id == null}">
+			<apex:sectionHeader title="{!$Label.kimbleone__kimblesalesheader}" subtitle="{!$Label.kimbleone__new} {!$ObjectType.KimbleOne__SalesOpportunity__c.label}"/>
+		</apex:outputPanel>
+       
+		<apex:outputPanel id="Error-panel" layout="none">
+			<apex:pagemessages escape="false"/>
+		</apex:outputPanel>
+
+		<apex:variable value="{!$ObjectType.KimbleOne__SalesOpportunity__c.Fields.KimbleOne__ResponseRequiredDate__c.Name}" var="responseRequiredDateFieldName" />        	
+		<apex:pageBlock mode="edit" >
+		        
+		<apex:pageBlockSection title="{!$Label.kimbleone__opportunitydetailsheader}">
+
+			<apex:pageBlockSectionItem rendered="{!!IsChangeOrder}">
+	        	<apex:outputLabel value="{!$ObjectType.KimbleOne__SalesOpportunity__c.Fields.KimbleOne__Account__c.Label}" />
+	        	<apex:actionRegion >
+	        		<apex:inputField id="accountName" value="{!KimbleOne__SalesOpportunity__c.KimbleOne__Account__c}" required="true">
+						<apex:actionSupport event="onchange" action="{!AccountChanged}" rerender="proposalDetailsNewPanel,proposalBusinessUnit" />
+           			</apex:inputField>
+				</apex:actionRegion>  
+			</apex:pageBlockSectionItem>
+
+			<apex:pageBlockSectionItem rendered="{!IsChangeOrder}">
+				<apex:outputLabel value="{!$ObjectType.KimbleOne__SalesOpportunity__c.Fields.KimbleOne__Account__c.Label}" />
+				<apex:outputField value="{!KimbleOne__SalesOpportunity__c.KimbleOne__Account__c}" />
+			</apex:pageBlockSectionItem>
+
+			<apex:inputField id="endCustomer" value="{!KimbleOne__SalesOpportunity__c.KimbleOne__CustomerAccount__c}" rendered="{!theProposalAction=='CREATENEW'}"/>
+
+			<apex:inputField id="opportunityName" value="{!KimbleOne__SalesOpportunity__c.Name}" required="true"/>
+			<apex:pageBlockSectionItem /> 
+			
+			<apex:pageBlockSectionItem rendered="{!IsInProgress}">
+	            <apex:outputLabel value="{!$ObjectType.KimbleOne__SalesOpportunity__c.Fields.KimbleOne__ForecastStatus__c.Label}" />   
+	            <apex:selectList id="opportunityForecastStatus" value="{!KimbleOne__SalesOpportunity__c.KimbleOne__ForecastStatus__c}" size="1" required="true" >
+					<apex:selectOptions value="{!TheForecastStatuses}" />
+				</apex:selectList>
+          	</apex:pageBlockSectionItem>
+			<apex:pageBlockSectionItem rendered="{!!IsInProgress}">
+	            <apex:outputLabel value="{!$ObjectType.KimbleOne__SalesOpportunity__c.Fields.KimbleOne__ForecastStatus__c.Label}" />   
+	            <apex:outputLabel value="{!KimbleOne__SalesOpportunity__c.ForecastStatus__r.Name}" />
+          	</apex:pageBlockSectionItem>
+			<apex:pageBlockSectionItem rendered="{!ISBLANK(KimbleOne__SalesOpportunity__c.Id)}">
+	            <apex:outputLabel value="{!$ObjectType.KimbleOne__SalesOpportunity__c.Fields.KimbleOne__OpportunityStage__c.Label}" />   
+	            <apex:selectList id="opportunityStage" value="{!KimbleOne__SalesOpportunity__c.KimbleOne__OpportunityStage__c}" size="1" required="true" >
+					<apex:selectOptions value="{!TheOpportunityStages}" />
+				</apex:selectList>
+          	</apex:pageBlockSectionItem>
+          	<apex:pageBlockSectionItem rendered="{!!ISBLANK(KimbleOne__SalesOpportunity__c.Id)}" />
+	        
+			<apex:inputfield id="opportunityResponseRequiredDate" value="{!KimbleOne__SalesOpportunity__c.KimbleOne__ResponseRequiredDate__c}" styleClass="kimbleDatePicker" rendered="{!showResponseRequiredDate}"/>
+			<apex:inputfield id="opportunityCloseDate" value="{!KimbleOne__SalesOpportunity__c.KimbleOne__CloseDate__c}" styleClass="kimbleDatePicker" required="true" rendered="{!IsInprogress}"/>
+			<apex:outputfield value="{!KimbleOne__SalesOpportunity__c.KimbleOne__CloseDate__c}" rendered="{!!IsInprogress}"/>
+			<apex:pageBlockSectionItem rendered="{!!showResponseRequiredDate}"/> 
+			
+			<apex:pageBlockSectionItem >
+	            <apex:outputLabel value="{!$ObjectType.KimbleOne__OpportunitySource__c.Fields.Name.Label}" />   
+	            <apex:selectList id="opportunitySource" value="{!KimbleOne__SalesOpportunity__c.KimbleOne__OpportunitySource__c}" size="1" required="true" >
+					<apex:selectOptions value="{!TheOpportunitySources}" />
+				</apex:selectList>
+          	</apex:pageBlockSectionItem>
+	        <apex:pageBlockSectionItem />
+
+			<apex:inputfield id="opportunityDescription" style="width: 500px;" value="{!KimbleOne__SalesOpportunity__c.KimbleOne__Description__c}"/>          
+			<apex:pageBlockSectionItem /> 
+			
+         	<apex:repeat value="{!$ObjectType.KimbleOne__SalesOpportunity__c.FieldSets.KimbleOne__SalesOpportunityDetails}" var="f">
+   				<apex:inputField value="{!KimbleOne__SalesOpportunity__c[f]}" required="{!f.Required}" styleClass="{!IF(AND($ObjectType.KimbleOne__SalesOpportunity__c.Fields[f].type == 'date',$ObjectType.KimbleOne__SalesOpportunity__c.Fields[f].updateable),'kimbleDatePicker','')}" rendered="{!f != responseRequiredDateFieldName && !CONTAINS(f.FieldPath,'.')}"/>
+				<apex:outputField value="{!KimbleOne__SalesOpportunity__c[f]}"  rendered="{!f != responseRequiredDateFieldName && CONTAINS(f.FieldPath,'.')}"/>
+   			</apex:repeat>
+   			
+		</apex:pageBlockSection>
+
+		<apex:variable value="{!TheProposals.Size > 1}" var="hasProposals" />
+
+		<apex:outputPanel id="proposalDetailsNewPanel" layout="none" rendered="{!ISBLANK(KimbleOne__SalesOpportunity__c.Id)}">
+
+			<apex:pageBlockSection title="{!$Label.kimbleone__proposaldetailslabel}" >
+				<apex:pageBlockSectionItem rendered="{!hasProposals}">
+		        	<apex:actionRegion >
+			        	<apex:selectRadio styleClass="proposal-action-radio-buttons" value="{!theProposalAction}">
+			            	<apex:selectOptions value="{!TheProposalActions}"/>
+			            	<apex:actionSupport event="onchange" action="{!RefreshProposalDetails}" rerender="proposalDetailsNewPanel"/>
+			            </apex:selectRadio>
+		            </apex:actionRegion>
+				</apex:pageBlockSectionItem>  	
+				<apex:pageBlockSectionItem rendered="{!hasProposals}"/>
+				
+				<apex:pageBlockSectionItem rendered="{!theProposalAction=='CREATENEW'}">
+	            	<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__BusinessUnit__c.Label}" />            
+					<apex:outputPanel layout="none">
+						<div class="requiredInput" id="businessUnit-reqd">
+							<div class="requiredBlock"></div>
+							<apex:actionRegion >
+								<apex:selectList id="proposalBusinessUnit" value="{!Proposal.KimbleOne__BusinessUnit__c}" size="1" required="true" rendered="{!!UseBusinessUnitEnhancedLookup}">
+									<apex:selectOptions value="{!TheBusinessUnits}" />
+									<apex:actionSupport event="onchange" rerender="proposalProposition"/>
+								</apex:selectList>
+							</apex:actionRegion>
+																					
+							<apex:actionRegion >
+								<apex:outputPanel id="businessunit-panel">
+									<apex:inputField id="enhanced-input-businessunit" value="{!Proposal.KimbleOne__BusinessUnit__c}" styleclass="kimbleSearch " html-data-typename="ActiveOperatingBusinessUnit" rendered="{!UseBusinessUnitEnhancedLookup}">
+										<apex:actionSupport onsubmit="disableButtons();" event="onchange" rerender="businessunit-panel, proposalProposition, Error-panel" oncomplete="enableButtons();"/>
+									</apex:inputField>
+								</apex:outputPanel>
+							</apex:actionRegion>							
+						</div>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>  	        
+
+				<apex:pageBlockSectionItem rendered="{!theProposalAction=='CREATENEW'}"> 
+					<apex:outputLabel for="proposalProposition" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__Proposition__c.Label}" />      
+					<apex:outputPanel layout="none">
+						<div class="requiredInput" id="proposition-reqd">
+							<div class="requiredBlock"></div>
+							<apex:selectList id="proposalProposition" label="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__Proposition__c.Label}" value="{!theProposition}" size="1" required="true" >
+								<apex:selectOptions value="{!ThePropositions}" />
+							</apex:selectList>          
+						</div>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+				
+				<apex:pageBlockSectionItem rendered="{!theProposalAction=='USEEXISTING'}">
+           			<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.Name.Label}" />            
+					<apex:outputPanel layout="none">
+						<div class="requiredInput" id="proposal-reqd">
+							<div class="requiredBlock"></div>
+						<apex:selectList id="opportunityProposal" styleClass="existing-proposal-field" value="{!KimbleOne__SalesOpportunity__c.KimbleOne__Proposal__c}" size="1" required="false" >
+							<apex:selectOptions value="{!TheProposals}" />
+						</apex:selectList>
+						</div>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+			</apex:pageBlockSection>
+		
+		</apex:outputPanel>
+
+		<apex:outputPanel id="proposalDetailsEditPanel" layout="none" rendered="{!!ISBLANK(KimbleOne__SalesOpportunity__c.Id)}">
+
+			<apex:pageBlockSection title="{!$Label.kimbleone__proposaldetailslabel}" >
+
+				<apex:pageBlockSectionItem >
+	            	<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__BusinessUnit__c.Label}" />            
+					<apex:outputPanel layout="none">
+						<div class="requiredInput" id="businessUnit-reqd">
+							<div class="requiredBlock"></div>
+							<apex:selectList id="proposalBusinessUnit" value="{!Proposal.KimbleOne__BusinessUnit__c}" size="1" required="true" rendered="{!!UseBusinessUnitEnhancedLookup}">
+								<apex:selectOptions value="{!TheBusinessUnits}" />
+							</apex:selectList>
+																					
+							<apex:actionRegion >
+								<apex:outputPanel id="businessunit-panel">
+									<apex:inputField id="enhanced-input-businessunit" value="{!Proposal.KimbleOne__BusinessUnit__c}" styleclass="kimbleSearch " html-data-typename="ActiveOperatingBusinessUnit" rendered="{!UseBusinessUnitEnhancedLookup}">
+										<apex:actionSupport onsubmit="disableButtons();" event="onchange" rerender="businessunit-panel, Error-panel" oncomplete="enableButtons();"/>
+									</apex:inputField>
+								</apex:outputPanel>
+							</apex:actionRegion>							
+						</div>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>  	        
+
+				<apex:pageBlockSectionItem rendered="{!!IsChangeOrder}"> 
+					<apex:outputLabel for="proposalProposition" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__Proposition__c.Label}" />      
+					<apex:outputPanel layout="none">
+						<div class="requiredInput" id="proposition-reqd">
+							<div class="requiredBlock"></div>
+							<apex:selectList id="proposalProposition" label="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__Proposition__c.Label}" value="{!Proposal.KimbleOne__Proposition__c}" size="1" required="true" >
+								<apex:selectOptions value="{!ThePropositions}" />
+							</apex:selectList>          
+						</div>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+
+			</apex:pageBlockSection>
+		
+		</apex:outputPanel>
+
+		<apex:pageBlockButtons location="bottom" styleclass="ButtonPanel">
+			<input id="save" class="btn " type="button" onclick="DisableButtonPanel('ButtonPanel','',[]);saveForm()" value="{!$Label.Save}" />
+		</apex:pageBlockButtons>
+		
+		</apex:pageBlock>
+		
+		<apex:actionFunction action="{!SaveAndRedirect}" name="saveForm" rerender="TheForm" onComplete="getReferenceData(); initialiseItems();" />
+		
+	</apex:form>
+	
+	<style>
+	
+		table.proposal-action-radio-buttons {
+			text-align: left;
+			font-size: 12px;
+			font-weight: bold;
+			margin-bottom: 10px;
+		}
+		
+		table.proposal-action-radio-buttons label {
+		   vertical-align: bottom;
+		}
+	
+	</style>
+	
+	<script>
+		function disableButtons() {
+			jQuery('[id$="save"]').prop('disabled', true).addClass('btnDisabled');
+			
+		}
+		
+		function enableButtons() {
+			jQuery('[id$="save"]').prop('disabled', false).removeClass('btnDisabled');
+		}
+
+		jQuery(window).load(function()
+		{
+			initialiseItems();
+		});
+
+		function initialiseItems()
+		{
+		    SetupDatePicker();
+  		}
+
+		function SetupDatePicker()
+		{
+			//dateFormat: 'yy-mm-dd',
+			jQuery('.kimbleDatePicker').datepicker({
+					dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true,
+					selectOtherMonths: true,
+					changeMonth: true,
+					changeYear: true});
+		}
+	</script>
+  
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

@@ -1,0 +1,298 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.ActivityAssignmentsDeliveryController,KimbleOne.ActivityAssignmentRemoteActions,KimbleOne.TooltipsController"  showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__DeliveryGroup__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+     	
+     	<c:Menu DefaultHelpPage="ViewAssignments.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryGroup__c.Id}" MenuContextName="{!KimbleOne__DeliveryGroup__c.Name}" />
+     	 
+    </apex:define>
+    
+    <apex:define name="Content">
+    	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+		<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'InsightStyle.css')}"/>
+
+		<!-- Kimble Guidance -->
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+		<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+		<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/ActivityAssignmentsDeliveryNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+			<apex:outputPanel layout="none" rendered="{!ActivityAssignmentsDeliveryTipOverrideEnabled}">
+				<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+			</apex:outputPanel>
+		</apex:outputPanel>
+		
+		<style>
+			/* Insight */
+			th.average-margin-header {
+			    text-align: right;
+			}
+			.resource-type-margin-insight-tooltip {
+				font-size: 10.5px;
+			}
+			/* Kimble Tooltips - custom */
+			.p-tip-qtip div.qtip-content {
+				padding: 5px 9px !important;
+			}
+			/* Kimble Tooltips - custom - END*/
+		</style>		
+
+		<apex:outputPanel layout="none" rendered="{!ShowResourceTypeMarginInsight && $ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__TemporalForecastCostRate__c.Accessible}">
+			<apex:variable value="{!KimbleOne__DeliveryGroup__c.KimbleOne__Account__c}" var="theAccount"/>
+			<div class="insight-container resource-type-margin insight-collapsed insight-hidden" account-id="{!JSENCODE(theAccount)}" display-currency="{!JSENCODE(TheDeliveryContext.BaseCurrencyISOCode)}">
+				<div class="docked-insight-container docked-offset">
+					<div class="docked-insight"></div>
+				</div>
+				<div class="insight-item">
+					<span class="miniCardIcon cardIconInfo fa fa-lightbulb-o"></span>
+				</div>
+			</div>
+		</apex:outputPanel>
+		
+    	<c:ActivityAssignments ComponentContext="{!TheDeliveryContext}"/>
+    	
+		<apex:form >
+			<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+			<div style="display:none;" kimble-tip="null"></div>
+		</apex:form>
+		
+    	<script>
+
+		var resourceTypeMarginInsightHeaderLabel = '<apex:outputText value="{!$Label.kimbleone__averagemarginbyresourcetypeheading}"/>';
+		var resourceTypeLabel = '<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__ResourceType__c.Label}"/>';
+		var thisEngagementAverageMarginLabel = '<apex:outputText value="{!$Label.kimbleone__thisengagementheading}"/>';
+		var averageMarginLabel = '<apex:outputText value="{!$Label.kimbleone__accountaverageheading}"/>';
+    	
+ 		function formatCurrencyValue(theValue)
+		{
+			theValue = (theValue == undefined || theValue == null || theValue == '' ? '0' : theValue);
+			
+			return kimble.formatNumber(theValue, '#,##0.00');
+		}
+		
+    	jQuery(document).ready(function()
+		{
+			initialiseResourceTypeAverageMarginInsights();
+			initialisePageTips();
+		});
+    	
+    	var resourceTypeMarginInsight = {};
+		
+		function initialiseResourceTypeAverageMarginInsights()
+		{
+			if(jQuery('.insight-container.resource-type-margin').length)
+			{
+				if(Object.keys(resourceTypeMarginInsight).length == 0)
+				{
+					accountId = jQuery(jQuery('.insight-container.resource-type-margin')[0]).attr('account-id');
+					baseCurrency = jQuery(jQuery('.insight-container.resource-type-margin')[0]).attr('display-currency');
+					 
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.GetResourceTypeMarginInsightsForDeliveryGroup}',
+								accountId, '<apex:outputText value="{!KimbleOne__DeliveryGroup__c.Id}"/>', baseCurrency, 
+							function(result, event){		  
+								if (event.status) 
+								{
+									resourceTypeMarginInsight = result;
+									
+									if(resourceTypeMarginInsight.OrderedResourceTypeIds.length)
+									{
+										initialiseResourceTypeAverageMarginInsightActions();
+									}
+								} 
+								else if (event.type === 'exception') 
+								{
+									alert(event.message);
+								} 
+								else 
+								{
+									alert(event.message);
+								}
+						}, 
+						{escape: true, timeout: 60000}
+					);
+				}
+				else if(resourceTypeMarginInsight.OrderedResourceTypeIds.length)
+				{
+					initialiseResourceTypeAverageMarginInsightActions();
+				}
+			}
+		}
+		
+		function initialiseResourceTypeAverageMarginInsightActions()
+		{
+			jQuery('.insight-container.resource-type-margin').removeClass('insight-hidden');
+			
+			jQuery('div.resource-type-margin .insight-item').qtip('destroy', true);
+			jQuery('div.resource-type-margin .insight-item').qtip({
+					content: {
+						text: function(event, api) {		           
+							return generateResourceTypeAverageMarginInsightTipHtml();
+						}, 
+						title: resourceTypeMarginInsightHeaderLabel
+ 					},
+		            position: { 
+						my: 'middle right',
+						at: 'middle left',
+						adjust: { method: 'flip flip'},
+						viewport: $(window)
+					},
+					style: {
+						classes: 'qtip-light qtip-shadow qtip-rounded insight-tool-tip'
+					}
+				});
+							
+			//jQuery(document).off('click', 'div.resource-type-margin .insight-item').on('click', 'div.resource-type-margin .insight-item', dockInsight);
+			//jQuery(document).off('click', 'div.resource-type-margin .collapse-docked-insight').on('click', 'div.resource-type-margin .collapse-docked-insight', collapseInsight);			
+		}
+					
+		function generateResourceTypeAverageMarginInsightTipHtml()
+		{
+			var tipHtml = '<div class="resource-type-margin-insight-tooltip">';
+
+			tipHtml += '<table border="0" cellpadding="0" cellspacing="0" class="list insight-entries">';
+			tipHtml += '<thead class="headerRow">';
+			tipHtml += '<th>' + resourceTypeLabel + '</th>';
+			tipHtml += '<th class="average-margin-header">' + thisEngagementAverageMarginLabel + ' (%)</th>';
+			tipHtml += '<th class="average-margin-header">' + averageMarginLabel + ' (%)</th>';
+			tipHtml += '</thead>';
+			tipHtml += '<tbody>';
+							
+			for(var counter=0; counter < resourceTypeMarginInsight.OrderedResourceTypeIds.length; counter++)
+			{						
+				var resourceTypeMarginDetails = resourceTypeMarginInsight.TheResourceTypeAverageMarginInsightMap[resourceTypeMarginInsight.OrderedResourceTypeIds[counter]];
+				
+				tipHtml += '<tr>';
+				tipHtml += '<td class="resource-type-field">' + resourceTypeMarginDetails.ResourceTypeName + '</td>';
+				tipHtml += '<td class="average-cost-field">' + (resourceTypeMarginDetails.Benchmark != undefined ? formatCurrencyValue(resourceTypeMarginDetails.Benchmark.AverageMargin) : '-') + '</td>';
+				tipHtml += '<td class="average-cost-field">' + formatCurrencyValue(resourceTypeMarginDetails.AverageMargin) + '</td>';
+				tipHtml += '</tr>';
+			}
+			
+			tipHtml += '</tbody>';
+			tipHtml += '</table>';
+			tipHtml += '</div>';
+			
+			return tipHtml;
+		}		
+		
+		/* Tooltips */
+		var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+		var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+		var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+		var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+		var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+		var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+	
+		function initialisePageTips()
+		{
+			ApplyTipAttributes();
+			initialiseTips();
+		}
+		
+		// add tip attributes to elements
+		function ApplyTipAttributes()
+		{
+			if(enableTips)
+			{
+			    // Assignment Rates			
+			    var earTips = '[id$="ActivityAssignmentRates"]:visible';
+			    if(jQuery(earTips).length)
+			    {
+					jQuery(earTips).find('[id$="output-cost-rate"]').attr('kimble-tip','AR_CostRate').attr('kimble-tip-extended-text','AR_CostRateExtendedText').addClass('tip-right');
+					jQuery(earTips).find('[id$="cost-rate-header"]').attr('kimble-tip','AR_CostRateTable').attr('kimble-tip-help-link','MaintainRateBandsHelpLink');
+					jQuery(earTips).find('[id$="rate-overridden"]').attr('kimble-tip','AR_IsOverridden').attr('kimble-tip-extended-text','AR_IsOverriddenExtendedText');
+					jQuery(earTips).find('[id$="rate-name"]').attr('kimble-tip','AR_RateBand').attr('kimble-tip-extended-text','AR_RateBandExtendedText').attr('kimble-tip-help-link','MaintainRateBandsHelpLink');
+					jQuery(earTips).find('[id$="output-resource"]').attr('kimble-tip','AR_Resource').addClass('tip-right');
+					jQuery(earTips).find('[id$="output-revneue-rate"]').attr('kimble-tip','AR_RevenueRate').attr('kimble-tip-extended-text','AR_RevenueRateExtendedText').addClass('tip-right');
+					jQuery(earTips).find('[id$="revenue-rate-header"]').attr('kimble-tip','AR_RevenueRateTable').attr('kimble-tip-help-link','MaintainRateBandsHelpLink');
+					jQuery(earTips).find('[id$="output-role"]').attr('kimble-tip','AR_Role').addClass('tip-right');
+				}
+				
+				// Edit Activity Assignment Pop-up
+				var eapuTips = '[id$="edit-assignment-container"]:visible';
+				if(jQuery(eapuTips).length)
+				{
+					jQuery(eapuTips).find('.standard-resource').children('span:visible').attr('kimble-tip','AA_Resource').attr('kimble-tip-extended-text','AA_ResourceExtendedText').addClass('tip-right');
+					jQuery(eapuTips).find('.standard-resource').children('select:visible').attr('kimble-tip','AA_Resource').attr('kimble-tip-extended-text','AA_ResourceExtendedText').addClass('tip-right');
+					jQuery(eapuTips).find('[id$="location-row"]').children('span:visible').attr('kimble-tip','AA_Location').attr('kimble-tip-extended-text','AA_LocationExtendedText').addClass('tip-right');
+					jQuery(eapuTips).find('[id$="simple-input-role"]').attr('kimble-tip','AA_Role').attr('kimble-tip-extended-text','AA_RoleExtendedText').addClass('tip-right');
+					jQuery(eapuTips).find('[id$="revenue-rate"]').attr('kimble-tip','AA_RevenueRate').addClass('tip-right').attr('kimble-tip-extended-text','AA_RevenueRateExtendedText');
+					jQuery(eapuTips).find('[id$="cost-rate"]').attr('kimble-tip','AA_CostRate').addClass('tip-right').attr('kimble-tip-extended-text','AA_CostRateExtendedText');
+					jQuery(eapuTips).find('[id$="start-date-row"]').children('span:visible').attr('kimble-tip','AA_StartDate').addClass('tip-right');
+					jQuery(eapuTips).find('[id$="usage-behaviour-row"]').attr('kimble-tip','AA_UsageBehaviour').attr('kimble-tip-help-link','AssignAResourceHelpLink').addClass('tip-right');
+					jQuery(eapuTips).find('[id$="remaining-usage-row"]').children('input').attr('kimble-tip','AA_RemainingEffort').addClass('tip-right');
+					jQuery(eapuTips).find('[id$="utilisation-row"]').children('input').attr('kimble-tip','AA_UtilisationPct').attr('kimble-tip-extended-text','AA_UtilisationPctExtendedText').addClass('tip-right');
+					jQuery(eapuTips).find('[id$="end-date-row"]').children('span:visible').attr('kimble-tip','AA_EndingOn').addClass('tip-right');
+					jQuery(eapuTips).find('[id$="assignment-margin"]').attr('kimble-tip','AA_MarginPct').addClass('tip-right');
+					jQuery(eapuTips).find('[id$="is-framework-assignment"]').attr('kimble-tip','AA_IsFramework').attr('kimble-tip-extended-text','AA_IsFrameworkExtendedText').addClass('tip-right').attr('kimble-tip-help-link','FrameworkHelpLink');
+    				jQuery(eapuTips).find('.model-resource').children('span:visible').attr('kimble-tip','AA_ResourceModel').attr('kimble-tip-extended-text','AA_ResourceModelExtendedText').addClass('tip-right').attr('kimble-tip-help-link','ModelHelpLink');
+					jQuery(eapuTips).find('.model-resource').children('select:visible').attr('kimble-tip','AA_ResourceModel').attr('kimble-tip-extended-text','AA_ResourceModelExtendedText').addClass('tip-right').attr('kimble-tip-help-link','ModelHelpLink');
+					jQuery(eapuTips).find('[id$="num-ftes"]').attr('kimble-tip','NumOfAssignments').addClass('tip-right').attr('kimble-tip-help-link','ModelHelpLink');
+    			}
+    			
+    			// Calendar
+				var eacTips = '[id$="assignmentCalendarPopup"]:visible';
+				if(jQuery(eacTips).length)
+				{
+    				jQuery(eacTips).find('[id$="calendarResourceOutput"]').attr('kimble-tip','AC_Resource').attr('kimble-tip-extended-text','AC_ResourceExtendedText').addClass('tip-right');
+    				jQuery(eacTips).find('[id$="Utilisation-calendar"]').attr('kimble-tip','AC_Utilisation').attr('kimble-tip-extended-text','AC_UtilisationExtendedText').addClass('tip-right');
+    				jQuery(eacTips).find('[id$="calendarUBROutput"]').attr('kimble-tip','AC_UsageBehaviour').attr('kimble-tip-help-link','AssignAResourceHelpLink').addClass('tip-right');
+    				jQuery(eacTips).find('[id$="calendarStartDateOutput"]').attr('kimble-tip','AC_StartDate').addClass('tip-right');
+    				jQuery(eacTips).find('[id$="EndDate-calendar"]').attr('kimble-tip','AC_EndingOn').addClass('tip-right');
+    				jQuery(eacTips).find('[id$="RemainingUsage-calendar"]').attr('kimble-tip','AC_RemainingEffort').addClass('tip-right');
+    				jQuery(eacTips).find('[id$="calendarRoleOutput"]').attr('kimble-tip','AC_Role').addClass('tip-right');
+    				
+    				jQuery(eacTips).find('[id$="percentToggle"]').attr('kimble-tip','AC_AtPctUtilisation').addClass('tip-right');
+    				jQuery(eacTips).find('[id$="usageForecastFormat"]').parent().attr('kimble-tip','AC_AtnHours').addClass('tip-right');
+    				jQuery(eacTips).find('[id$="previousPeriodBtn"]').attr('kimble-tip','AC_LeftArrow').addClass('tip-right');
+    				jQuery(eacTips).find('[id$="blankToggle"]').attr('kimble-tip','AC_AtOff').addClass('tip-right');
+    				jQuery(eacTips).find('[id$="nextPeriodBtn"]').attr('kimble-tip','AC_RightArrow').addClass('tip-right');
+    				jQuery(eacTips).find('.schedule-time-calendar').attr('kimble-tip','AC_ScheduleDays').attr('kimble-tip-help-link','ProfileAssignmentUsageHelpLink');
+    			}    
+				
+				// Main Page Table
+				var aTips = '[id$="grid-header-container"]:visible';
+				if(jQuery(aTips).length)
+				{
+    				jQuery(aTips).find('[id$="resourceNameRole"]').attr('kimble-tip','A_ResourceNameRole').addClass('tip-right');
+    				jQuery(aTips).find('[id$="actualHeader"]').attr('kimble-tip','A_Actual');
+    				jQuery(aTips).find('[id$="baselineHeader"]').attr('kimble-tip','A_Baseline').attr('kimble-tip-help-link','EngagementTimelineHelpLink');
+    				jQuery(aTips).find('[id$="endDateHeader"]').attr('kimble-tip','A_EndDate');
+    				jQuery(aTips).find('[id$="forecastCostHeader"]').attr('kimble-tip','A_ForecastCost').attr('kimble-tip-extended-text','A_ForecastCostExtendedText');
+    				jQuery(aTips).find('[id$="forecastRevenueHeader"]').attr('kimble-tip','A_ForecastRevenue').attr('kimble-tip-extended-text','A_ForecastRevenueExtendedText');
+    				jQuery(aTips).find('[id$="projectedHeader"]').attr('kimble-tip','A_Projected');
+    				jQuery(aTips).find('[id$="remainingHeader"]').attr('kimble-tip','A_Remaining');
+    				jQuery(aTips).find('[id$="revenueRateHeader"]').attr('kimble-tip','A_RevenueRate');
+    				jQuery(aTips).find('[id$="startDateHeader"]').attr('kimble-tip','A_StartDate');
+    				jQuery('[id$="gantt-view-button"]').parent().attr('kimble-tip','A_Gantt').attr('kimble-tip-help-link','A_GanttHelpLink').attr('tip-y-offset',98).addClass('tip-bottom');
+    				jQuery('[id$="usage-view-button"]').parent().attr('kimble-tip','A_Usage').attr('kimble-tip-extended-text','A_UsageExtendedText').attr('kimble-tip-help-link','A_UsageHelpLink').attr('tip-y-offset',98).addClass('tip-bottom');
+    				jQuery('[id$="monthly-profile-button"]').attr('kimble-tip','A_Monthly').attr('kimble-tip-extended-text','A_MonthlyExtendedText').attr('kimble-tip-help-link','A_MonthlyHelpLink').addClass('tip-bottom');
+    				jQuery('[id$="chatter-view-button"]').attr('kimble-tip','A_ViewFeed').attr('kimble-tip-extended-text','A_ViewFeedExtendedText').addClass('tip-bottom');
+				}
+			}
+		}
+		
+		function updateTipsConfigSetting(newTipSetting)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+				newTipSetting,
+					function(result, event){
+						if (event.status)
+						{
+							var data = {};
+							data.results = result;
+							loadGuidance();
+						}
+						else
+						{
+							alert(event.message);
+						}
+				},
+				{escape: false, timeout: 60000}
+			);
+		}
+    	</script>
+    </apex:define>
+</apex:composition>
+
+</apex:page>

@@ -1,0 +1,157 @@
+<apex:page standardController="KimbleOne__InterfaceRun__c" extensions="KimbleOne.PaymentCardStatementHomeController,KimbleOne.FilesAndAttachmentsController" showHeader="true" sidebar="false" standardStylesheets="true">
+<apex:composition template="KimbleOne__SiteMaster">
+    	<apex:define name="Menu"></apex:define> 
+    
+    	<apex:define name="Content">
+    		<apex:form id="TheForm">
+	    		<div id="pageErrors">
+	    			<apex:pageMessages escape="false"/>
+				</div>
+				<apex:pageBlock title="{!$Label.kimbleone__paymentcardstatementheading}" mode="edit">
+					
+					<apex:pageBlockButtons location="top">
+	           			<apex:commandButton action="{!Delete}" value="{!$Label.kimbleone__deletebutton}" rendered="{!CompletedLinesCount.KimbleOne__InputInteger__c = 0}"/>
+	           			<apex:commandButton action="{!Confirm}" value="{!$Label.kimbleone__confirmbutton}" rendered="{!KimbleOne__InterfaceRun__c.KimbleOne__Status__c = AwaitingConfirmationId}" rerender="TheForm"/>	            				           			
+          			</apex:pageBlockButtons>
+  			      	
+  			      	<apex:pageBlockSection columns="2" collapsible="false" showheader="true" title="{!$Label.kimbleone__filedetailsheading}">
+			      		
+			      		<apex:outputField value="{!KimbleOne__InterfaceRun__c.KimbleOne__Status__c}"/>
+			      		<apex:outputField value="{!KimbleOne__InterfaceRun__c.KimbleOne__NumberOfRecords__c}"/>
+			      		
+			      		<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$Label.kimbleone__numberofignoredlineslabel}" />
+							<apex:outputField value="{!IgnoredLinesCount.KimbleOne__InputInteger__c}"/> 
+			      		</apex:pageBlockSectionItem>
+			      		
+			      		<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$Label.kimbleone__numberoferroredlineslabel}" />
+							<apex:outputField value="{!ErroredLinesCount.KimbleOne__InputInteger__c}"/> 
+			      		</apex:pageBlockSectionItem>
+			      		
+			      		<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$Label.kimbleone__numberofcompletedlineslabel}" />
+							<apex:outputField value="{!CompletedLinesCount.KimbleOne__InputInteger__c}"/> 
+			      		</apex:pageBlockSectionItem>
+			      		
+			      		<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$Label.kimbleone__numberofreadylineslabel}" />
+							<apex:outputField value="{!ReadyLinesCount.KimbleOne__InputInteger__c}"/> 
+			      		</apex:pageBlockSectionItem>
+			      		
+			      	</apex:pageBlockSection>
+			    	
+			    	<apex:pageBlockSection columns="1" collapsible="false" showheader="false">
+			    	
+			    		<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$Label.kimbleone__filterbystatuslabel}" />
+							<apex:selectList id="ActivityList" value="{!FilterStatusId}"  size="1">
+								<apex:actionSupport event="onchange" action="{!UpdateLines}" rerender="TheForm"/>
+								<apex:selectOptions value="{!TheLineStates}" />
+							</apex:selectList>
+			      		</apex:pageBlockSectionItem>
+			    		<apex:inputHidden value="{!TheCurrentPageNumber}"/>
+			    	 
+			    		<apex:pageBlockTable value="{!ThePagedMatchingLines}" var="line">
+			    		<apex:column headervalue="{!$Label.kimbleone__actionlinksheader}" style="text-align:center;" styleclass="actionColumn" width="60px">
+      						<apex:outputPanel layout="block" rendered="{!line.Status__r.KimbleOne__Enum__c != 'Ignored' && line.Status__r.KimbleOne__Enum__c != 'Completed'}">
+      							<apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="$(this).closest('tr').find('.loadingImage').show();$(this).parent().hide();ignoreItem('{!JSINHTMLENCODE(line.id)}')" >{!$Label.kimbleone__ignorelink}</apex:outputLink>&nbsp;|&nbsp;
+      							<apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#LinePopup', '{!$ObjectType.KimbleOne__PaymentCardStatementLine__c.Label}');viewItem('{!JSINHTMLENCODE(line.id)}')">{!$Label.kimbleone__view}</apex:outputLink>	
+      						</apex:outputPanel>
+      						<apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="$(this).next().show();$(this).hide();reinstateItem('{!JSINHTMLENCODE(line.id)}')" rendered="{!line.Status__r.KimbleOne__Enum__c = 'Ignored'}">{!$Label.kimbleone__reinstatelink}</apex:outputLink>
+      						
+      						<apex:outputLink styleclass="actionLink" value="/{!line.ExpenseItem__r.KimbleOne__ExpenseClaim__c}" rendered="{!line.Status__r.KimbleOne__Enum__c = 'Completed'}">{!$Label.kimbleone__viewclaimlink}</apex:outputLink>
+      						
+      						<span class="loadingImage" style="display:none;"><img src="{!URLFOR($Resource.LoadingImage)}" /></span>
+      						
+      					</apex:column>
+      					<apex:column value="{!line.KimbleOne__LineNumber__c}" title="{!line.KimbleOne__TransactionIdentifier__c}"/>
+      					<apex:column value="{!line.KimbleOne__PaymentCard__c}"/>
+      					<apex:column headervalue="{!$ObjectType.KimbleOne__PaymentCardStatementLine__c.Fields.KimbleOne__Resource__c.Label}">
+      						<apex:outputField value="{!line.KimbleOne__Resource__c}" />
+      					</apex:column>
+      					<apex:column value="{!line.KimbleOne__IncurredDate__c}"/>
+      					<apex:column headervalue="{!$Label.kimbleone__incurredamount}">
+      						<apex:outputField value="{!line.KimbleOne__IncurredCurrencyIsoCode__c}"/>&nbsp;<apex:outputField value="{!line.KimbleOne__IncurredCurrencyGrossAmount__c}"/>
+      					</apex:column>
+      					<apex:column headervalue="{!$ObjectType.KimbleOne__PaymentCardStatementLine__c.Fields.KimbleOne__TransactionAmount__c.Label}">
+      						<apex:outputField value="{!line.KimbleOne__TransactionAmount__c}"/>
+      					</apex:column>
+      					<apex:column value="{!line.KimbleOne__Category__c}"/>
+      					<apex:column value="{!line.KimbleOne__ErrorMessage__c}"/>
+      					
+			    	</apex:pageBlockTable>
+			    	</apex:pageBlockSection>
+			    	<div style="float: right; margin-right: 15px; margin-bottom:15px;">
+			    		<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rendered="{!CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+			    		<apex:outputText styleclass="greyedLink" rendered="{!!CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+			    		&nbsp;|&nbsp;
+			    		<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rendered="{!CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+			    		<apex:outputText styleclass="greyedLink" rendered="{!!CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+		
+			    	</div>
+			    	<div style="clear:both;"></div>
+				</apex:pageBlock>
+				
+				<apex:actionFunction action="{!ViewItem}" name="viewItem" oncomplete="showModalBoxy();" rerender="LineDetails">
+					<apex:param name="lineId" value=""/>
+				</apex:actionFunction>
+				
+				<apex:actionFunction action="{!IgnoreItem}" name="ignoreItem" rerender="TheForm">
+					<apex:param name="lineId" value=""/>
+				</apex:actionFunction>
+				<apex:actionFunction action="{!ReinstateItem}" name="reinstateItem" rerender="TheForm">
+					<apex:param name="lineId" value=""/>
+				</apex:actionFunction>
+				 </apex:form>
+				 
+				<div id="LinePopup" style="display: none;">
+					<apex:outputPanel id="LineDetails">
+						<apex:form >
+						<div id="errors">
+							<apex:pageMessages escape="false" />
+						</div>
+						<apex:pageBlock title="{!$Label.kimbleone__lineheading} {!TheCurrentLine.KimbleOne__LineNumber__c}" mode="edit">
+							<apex:pageBlockButtons location="bottom">
+	           					<apex:commandButton value="{!$Label.kimbleone__save}" action="{!SaveItem}" styleclass="DisableButtonWhileBusy" rendered="{!TheCurrentLine.Status__r.KimbleOne__Enum__c = 'Ready'}" rerender="LineDetails, TheForm" oncomplete="hideModalBoxyWithErrorCheck('#errors');"/>
+	           					<apex:commandButton value="{!$Label.kimbleone__ignorebutton}" action="{!IgnoreCurrentItem}" styleclass="DisableButtonWhileBusy" rendered="{!TheCurrentLine.Status__r.KimbleOne__Enum__c != 'Ignored' && TheCurrentLine.Status__r.KimbleOne__Enum__c != 'Completed'}" rerender="TheForm" oncomplete="hideModalBoxyWithErrorCheck('#errors');"/>
+	           					<input type="button" onclick="hideModalBoxy()" class="btn" value="{!$Label.Cancel}" />         				           			
+          					</apex:pageBlockButtons>
+          					<apex:pageBlockSection columns="1" collapsible="false" showheader="false">
+          						<apex:outputField value="{!TheCurrentLine.KimbleOne__TransactionIdentifier__c}"/>
+          						<apex:outputField value="{!TheCurrentLine.KimbleOne__Status__c}"/>
+          						<apex:outputField value="{!TheCurrentLine.KimbleOne__IncurredDate__c}"/>
+          						<apex:pageBlockSectionItem >
+									<apex:outputLabel value="{!$Label.kimbleone__incurredamount}" />
+									<apex:outputPanel layout="none"><apex:outputField value="{!TheCurrentLine.KimbleOne__IncurredCurrencyIsoCode__c}"/>&nbsp;<apex:outputField value="{!TheCurrentLine.KimbleOne__IncurredCurrencyGrossAmount__c}"/></apex:outputPanel>
+								</apex:pageBlockSectionItem>	
+          						<apex:outputField value="{!TheCurrentLine.KimbleOne__TransactionAmount__c}"/>
+          						<apex:outputField value="{!TheCurrentLine.KimbleOne__PaymentCard__c}"/>
+          						<apex:inputField styleclass="kimbleSearch" value="{!TheCurrentLine.KimbleOne__Resource__c}" rendered="{!TheCurrentLine.Status__r.KimbleOne__Enum__c = 'Ready'}"/>
+          						<apex:outputField value="{!TheCurrentLine.KimbleOne__Resource__c}" rendered="{!TheCurrentLine.Status__r.KimbleOne__Enum__c != 'Ready'}"/>
+          						<apex:outputField value="{!TheCurrentLine.KimbleOne__Category__c}"/>
+          						
+          						<apex:pageBlockSectionItem >
+									<apex:outputLabel value="{!$ObjectType.KimbleOne__PaymentCardStatementLine__c.Fields.KimbleOne__RawData__c.Label}" />
+									<apex:outputPanel layout="block" style="width:400px;overflow:auto;"><apex:outputField value="{!TheCurrentLine.KimbleOne__RawData__c}" /></apex:outputPanel>
+								</apex:pageBlockSectionItem>	
+          						
+          						<apex:outputField value="{!TheCurrentLine.KimbleOne__ErrorMessage__c}" />
+          						
+          					</apex:pageBlockSection>
+						</apex:pageBlock>
+						</apex:form>
+					</apex:outputPanel>
+				</div>
+   				
+   			
+	   	  	<apex:relatedList list="CombinedAttachments" rendered="{!AttachmentsEnabled}"/>
+			<apex:relatedList subject="{!KimbleOne__InterfaceRun__c}" list="AttachedContentDocuments" rendered="{!FilesEnabled}"/>
+			<script>
+				jQuery(document).ready(function() {
+					if(isSFLightning()) jQuery('input[name="newNote"],input[name="attachFile"]').hide();
+				});
+			</script>
+		</apex:define>
+	</apex:composition>
+</apex:page>

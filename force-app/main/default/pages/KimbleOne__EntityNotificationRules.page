@@ -1,0 +1,434 @@
+<apex:page controller="KimbleOne.EntityNotificationRulesController" sidebar="false" tabStyle="KimbleOne__ReferenceData__c">
+ 
+<apex:composition template="KimbleOne__SiteMaster">
+<apex:define name="Menu"> 
+
+	<c:Menu MenuContextName="{!$ObjectType.KimbleOne__EntityNotificationRule__c.LabelPlural}"/>
+
+</apex:define>
+
+<apex:define name="Content">
+	<style type="text/css">
+		/* Json Editor Styles */
+		.formContents h3, .formContents th {
+			padding-top: 3px;
+			padding-bottom: 3px;
+			border-bottom-width: 0px;
+			border-bottom: medium none;
+			color: #4A4A56;
+			border-color: #ECECEC;
+			white-space: normal;
+			position: relative;
+			padding: 2px 10px 2px 2px;
+		}
+
+		.formContents h3 {
+			text-align: left;
+		}
+
+		.formContents select {
+			vertical-align: middle;
+			margin-right: 0.25em;
+			text-align: left;
+		}
+
+		.formContents div {
+			border: 0;
+		}
+		.formContents button {
+		    margin-left: 3px;
+		    margin-right: 3px;
+		    margin: 0px 2px;
+		    font-size: 0.9em;
+		    vertical-align: middle;
+		    cursor: pointer;
+		    display: inline;
+		    border-spacing: 0px;
+		}
+
+		/* SELECT 2 STYLING */
+		.select2-results li {margin-left:0px;}
+		.select2-container-multi .select2-choices
+		{
+			border: 2px solid rgb(224,224,224);
+			background-image:none;
+		}
+		.select2-container-multi .select2-choices .select2-search-choice {
+		    border: 1px solid #aaaaaa;
+		    border-radius: 4px;
+		    padding: 5px 20px 5px 5px;
+			background-image:none;
+		}
+
+		.select2-container-multi .select2-search-choice-close {
+			background-image:  url({!URLFOR($Resource.KimbleOne__AssignmentImages, 'assignmentSprite.png')});
+			background-position: -2px -29px;
+			background-repeat: no-repeat;
+			left:auto;
+		}
+
+		.select2-container-multi .select2-choices .select2-search-choice .select2-search-choice-close:hover {
+			background-position: -2px -1px;
+		}
+    	</style>
+
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JsonEditor, 'script.js')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JsonEditor, 'style.css')}"/>
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__CustomObjects)}"/>
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+	<!-- Hidden fields for use by EntityNotificationService -->
+	<apex:outputText value="{!$Label.kimbleone__timesheetsubmissiondays}" rendered="False"/>
+	<apex:outputText value="{!$Label.kimbleone__timesheetsubmissionresources}" rendered="False"/>
+	<apex:outputText value="{!$Label.kimbleone__entitynotificationconfig1}" rendered="False"/>
+	<apex:outputText value="{!$Label.kimbleone__entitynotificationconfig2}" rendered="False"/>
+	<apex:outputText value="{!$Label.kimbleone__entitynotificationconfig3}" rendered="False"/>
+	<apex:outputText value="{!$Label.kimbleone__entitynotificationconfig4}" rendered="False"/>
+	<apex:outputText value="{!$Label.kimbleone__entitynotificationconfig5}" rendered="False"/>
+	
+	<apex:form >
+    	<div id="EntityNotificationRulesErrors">
+        	<apex:pageMessages escape="false"/>
+        </div>
+		<apex:outputPanel id="EntityNotificationRulesMainPanel" > 
+		    	<apex:pageBlock id="EntityNotificationRulesBlock">  
+		    	    <apex:pageBlockButtons location="top">						
+						<apex:commandButton action="{!NewRule}" value="{!$Label.kimbleone__new} {!$ObjectType.KimbleOne__EntityNotificationRule__c.label}" reRender="EntityNotificationRulePopUpPanel" oncomplete=" ENRPage.showBoxy();"/>
+					</apex:pageBlockButtons>
+		    	
+					<apex:pageBlockTable value="{!TheRules}" var="rule">
+		       			<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+		       				<apex:outputLink value="#" onclick="editEntityNotificationRule('{!JSINHTMLENCODE(rule.id)}');" styleClass="{! IF(rule.EventType__c == TimesheetReminderEmailTypeId,'TimesheetReminder','')} {! IF(rule.EventType__c == MilestoneReminderEmailTypeId,'MilestoneReminder','')}  ">{!$Label.kimbleone__edit}</apex:outputLink> &nbsp;|&nbsp;
+							<apex:outputLink value="#" onclick="var d = confirmDelete();if(!d) return; deleteEntityNotificationRule('{!JSINHTMLENCODE(rule.id)}');">{!$Label.kimbleone__delete}</apex:outputLink>
+						</apex:column>				
+						<apex:column value="{!rule.Name}" headerValue="{!$ObjectType.KimbleOne__EntityNotificationRule__c.Fields.Name.Label}"/>
+						<apex:column headerValue="{!$ObjectType.KimbleOne__EntityNotificationRule__c.Fields.KimbleOne__EventType__c.Label}">
+							<apex:outputLabel value="{!rule.EventType__r.Name}" />
+						</apex:column>
+						<apex:column headerValue="{!$Label.kimbleone__resourcegrouplabel}">
+							<apex:outputText value="{!TheResourceGroupsMap[rule.KimbleOne__Resource__c].Name}" rendered="{!!ISBLANK(rule.KimbleOne__Resource__c)}"/>
+						</apex:column>
+						<apex:column value="{!rule.KimbleOne__NotificationText__c}" />						
+					</apex:pageBlockTable>
+		    	</apex:pageBlock>
+		</apex:outputPanel> 
+
+		<apex:actionFunction action="{!DeleteRule}"  name="deleteEntityNotificationRule" rerender="EntityNotificationRulesMainPanel" oncomplete="">
+       		<apex:param name="ruleId" value="" />
+       	</apex:actionFunction>
+ 
+		<apex:actionFunction action="{!ReadRule}" name="editEntityNotificationRule" rerender="EntityNotificationRulePopUpPanel" oncomplete="if(jQuery(this).hasClass('TimesheetReminder')) ENRPage.showBoxy('TimesheetReminder');else if(jQuery(this).hasClass('MilestoneReminder')) ENRPage.showBoxy('MilestoneReminder');else ENRPage.showBoxy();">
+       		<apex:param name="ruleId" value="" />
+       	</apex:actionFunction>
+    
+    </apex:form>
+
+	<div class='EntityNotificationRulePopUp'>
+  		<div class='formContents' style="{!JSENCODE(HiddenElementStyle)}">
+			<apex:outputPanel id="EntityNotificationRulePopUpPanel" > 
+	
+  				<apex:form >
+	           		<div id="EntityNotificationRulesPopupErrors">
+		        		<apex:pageMessages escape="false"/>
+		        	</div>
+	           		
+	           		<apex:pageBlock >
+	            		<apex:pageBlockButtons location="bottom">
+							<input class="btn" type="button" onclick="ENRPage.saveBoxy();" value="{!$Label.Save}"/>
+							<input class="btn" type="button" onclick="ENRPage.hideBoxy();" value="{!$Label.Close}"/>
+						</apex:pageBlockButtons>
+	             		<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+							<apex:inputText value="{!TheContactsJson}" styleclass="TheContactsJson" style="display:none"/>
+							<apex:inputField value="{!TheRuleToEdit.Name}" required="true"/>
+	             			<apex:pageblockSectionItem >
+								<apex:outputLabel value="{!$Label.kimbleone__resourcegrouplabel}"/>
+								<apex:selectList id="GroupsList" value="{!TheRuleToEdit.KimbleOne__Resource__c}"  size="1" required="true">
+									<apex:selectOptions value="{!TheResourceGroupOptions}" />
+								</apex:selectList>
+	               			</apex:pageblockSectionItem>
+	               		</apex:pageblockSection>
+	               		
+	               		<apex:pageblockSection collapsible="false" showheader="false" columns="1" id="EventTypePanel">	
+	             			<apex:pageblockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__EntityNotificationRule__c.Fields.KimbleOne__EventType__c.Label}"/>
+								<apex:actionRegion >
+									<apex:selectList styleClass="EventTypesSelect" value="{!TheRuleToEdit.KimbleOne__EventType__c}"  size="1">
+										<apex:actionSupport event="onchange" action="{!EventTypeChange}" rerender="EventTypePanel" oncomplete="if('{!JSINHTMLENCODE(TheRuleToEdit.KimbleOne__EventType__c)}' == '{!JSINHTMLENCODE(TimesheetReminderEmailTypeId)}') ENRPage.init('TimesheetReminder'); if('{!JSINHTMLENCODE(TheRuleToEdit.KimbleOne__EventType__c)}' == '{!JSINHTMLENCODE(MilestoneReminderEmailTypeId)}') ENRPage.init('MilestoneReminder')"/>
+										<apex:selectOptions value="{!TheEventTypes}" />
+									</apex:selectList>
+								</apex:actionRegion>						          			               	
+	               			</apex:pageblockSectionItem>
+	               			
+		              		<apex:pageblockSectionItem rendered="{!TheRuleToEdit.KimbleOne__EventType__c != NewAssignmentEmailTypeId && TheRuleToEdit.KimbleOne__EventType__c != ResourceUnavailableEmailId && TheRuleToEdit.KimbleOne__EventType__c != TimesheetReminderEmailTypeId}">
+		               			<apex:outputLabel value="{!$ObjectType.KimbleOne__EntityNotificationRule__c.Fields.KimbleOne__NotificationText__c.Label}" />
+		               			<apex:inputTextarea value="{!TheRuleToEdit.KimbleOne__NotificationText__c}" />
+		                	</apex:pageblockSectionItem>
+		                	<apex:pageblockSectionItem rendered="{!TheRuleToEdit.KimbleOne__EventType__c = NewAssignmentEmailTypeId}">
+		               			<apex:outputLabel value="{!$ObjectType.KimbleOne__EntityNotificationRule__c.Fields.KimbleOne__NotificationText__c.Label}" />
+		               			<apex:inputTextarea value="{!TheRuleToEdit.KimbleOne__NotificationText__c}" />
+		                	</apex:pageblockSectionItem>
+		                	<apex:pageblockSectionItem rendered="{!TheRuleToEdit.KimbleOne__EventType__c = NewAssignmentEmailTypeId}">
+		               			<apex:outputLabel value="{!$ObjectType.KimbleOne__EntityNotificationRule__c.Fields.KimbleOne__Group__c.Label}" />
+		               			<apex:inputTextarea value="{!TheRuleToEdit.KimbleOne__Group__c}" />
+		                	</apex:pageblockSectionItem>
+		                	<apex:pageblockSectionItem rendered="{!TheRuleToEdit.KimbleOne__EventType__c = ResourceUnavailableEmailId}">
+		               			<apex:outputLabel value="{!$ObjectType.KimbleOne__EntityNotificationRule__c.Fields.KimbleOne__NotificationText__c.Label}" />
+		               			<apex:inputTextarea value="{!TheRuleToEdit.KimbleOne__NotificationText__c}" />
+		                	</apex:pageblockSectionItem>
+		              		<apex:pageblockSectionItem rendered="{!TheRuleToEdit.KimbleOne__EventType__c = TimesheetReminderEmailTypeId || TheRuleToEdit.KimbleOne__EventType__c = MilestoneReminderEmailTypeId}">
+		               			<apex:outputLabel value="{!$ObjectType.KimbleOne__EntityNotificationRule__c.Fields.KimbleOne__NotificationText__c.Label}" />
+		               			<apex:outputPanel layout="none">
+		               				<apex:inputText style="display:none" html-class="notificationTextInput" value="{!TheRuleToEdit.KimbleOne__NotificationText__c}"/>
+			               			<div id='notificationEditor'/>
+								</apex:outputPanel>
+		                	</apex:pageblockSectionItem>
+	              			
+			            </apex:pageBlockSection>
+	                    		            
+		        	</apex:pageBlock>
+	
+					<apex:actionFunction name="saveRule" action="{!SaveRule}" reRender="EntityNotificationRulePopUpPanel, EntityNotificationRulesMainPanel" oncomplete="ENRPage.hideBoxyCheckErrors();"/>
+         		</apex:form>
+  			</apex:outputPanel> 
+		</div>
+	</div>
+
+	<script>
+
+	function setSelectedContacts(){
+	    var selectedContacts = '';
+	    var i = 0;
+		$('#dynamicContacts').select2('data').forEach(function(contact) {
+		    if(i > 0)
+		    	selectedContacts = selectedContacts + ',' + contact.id;
+		    else
+		    	selectedContacts = selectedContacts + contact.id;
+		    i++;
+		 });
+		 var currentValue = ENRPage.emailReminderEditor.getValue();
+		 currentValue.ccContactIds = selectedContacts;
+		 ENRPage.emailReminderEditor.setValue(currentValue);
+ 	}
+
+	function loadDynamicContacts(){
+		//hide contact cc field and show a new select 2 control instead
+
+		jQuery('.container-ccContactIds>div.form-control').append(jQuery('<input>').attr('type','text').attr('id','dynamicContacts').attr('style','width: 300px'));
+
+	    jQuery('#dynamicContacts').show();
+		jQuery('#dynamicContacts').select2({
+			minimumInputLength: 2,
+			multiple: true,
+			query: function (params) {
+				var find = function() {findContacts(params);};
+				find();
+			},
+			initSelection : function (element, callback) {
+				var data = {id: element.val(), text: element.attr('data-name')};
+				callback(data);
+			}
+		});
+
+		var json = jQuery('.TheContactsJson').val();
+		var data = [];
+		if(json != '')
+			data = JSON.parse(json);
+
+		jQuery('#dynamicContacts').select2('data',data);
+		jQuery('#dynamicContacts').on('change.select2', function (e) {
+			setSelectedContacts();
+		});
+		$('.container-ccContactIds>div>input').hide();
+
+	}
+
+	function findContacts(params) {
+
+		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.EntityNotificationRulesController.FindContacts}',
+			params.term,
+			function(result, event){
+				if (event.status)
+				{
+					var data = {};
+					data.results = result;
+					params.callback(data);
+				}
+				else if (event.type === 'exception')
+				{
+					alert(event.message);
+				}
+				else
+				{
+					alert(event.message);
+				}
+			},
+			{escape: false, timeout: 60000}
+		);
+
+	}
+
+	JSONEditor.defaults.custom_validators.push(function(schema, value, path) {
+		var errors = [];
+		if(schema.format==="integer") {
+		    if(isNaN(value) || value % 1 != 0) {
+		    	errors.push({
+		        	path: path,
+		        	property: 'format',
+		        	message: '{!JSENCODE($Label.PleaseEnterIntegerValue)}'
+		    	});
+		    }
+		}
+		return errors;
+	});
+
+	var timesheetReminderCommercialDocumentsArray;
+	
+	<apex:outputPanel layout="none" rendered="{!!ISBLANK(TimesheetReminderCommercialDocumentsJson)}">
+		timesheetReminderCommercialDocumentsArray = {!TimesheetReminderCommercialDocumentsJson};
+	</apex:outputPanel>
+
+	var milestoneReminderCommercialDocumentsArray;
+	<apex:outputPanel layout="none" rendered="{!!ISBLANK(MilestoneReminderCommercialDocumentsJson)}">
+		milestoneReminderCommercialDocumentsArray = {!MilestoneReminderCommercialDocumentsJson};
+	</apex:outputPanel>
+
+	var ENRPage = new STDPage();
+	jQuery.extend(ENRPage, {
+		formContents : null,
+		init: function(eventType) {
+
+			ENRPage.formContents = jQuery('.formContents');
+			ENRPage.eventType = eventType;
+			jQuery('#dynamicContacts').hide();
+			if(eventType == 'TimesheetReminder'){
+		        ENRPage.formContents.find('#notificationEditor').each(function(i, editorTag){
+					jQuery(editorTag).html('');
+					var select2 = window.jQuery.fn.select2;
+					window.jQuery.fn.select2 = null;
+					ENRPage.emailReminderEditor = new JSONEditor(editorTag, {schema: ENRPage.timesheetReminderSchema});
+					window.jQuery.fn.select2 = select2;
+					loadDynamicContacts();
+				});
+			}
+      		else if(eventType == 'MilestoneReminder'){
+      			ENRPage.formContents.find('#notificationEditor').each(function(i, editorTag){
+				    jQuery(editorTag).html('');
+					ENRPage.emailReminderEditor = new JSONEditor(editorTag, {schema: ENRPage.milestoneReminderSchema});
+				});
+        	}
+        	else{
+        	    //initialise when ENRPage.init is called with null
+        		ENRPage.formContents.find('#notificationEditor').each(function(i, editorTag){
+					ENRPage.emailReminderEditor = new JSONEditor(editorTag, {schema: undefined});
+					$editorTag = jQuery(editorTag);
+					$editorTag.find('div').css('border', '0');
+					$editorTag.find('table').css('border', '0');
+					$editorTag.find('label').attr('style', '');
+				});
+         	}
+			if (ENRPage.emailReminderEditor)
+			{
+				try {
+					ENRPage.emailReminderEditor.setValue(kimble.parseJSON(ENRPage.formContents.find('.notificationTextInput').val()));
+					ENRPage.emailReminderEditor.validate();
+				} catch(e){}
+				ENRPage.formContents.find('.notificationTextInput').val(JSON.stringify(ENRPage.emailReminderEditor.getValue())).change();
+			}
+ 			showModalBoxy();
+        },
+        showBoxy : function(eventType) {
+        	initialiseModalBoxy(ENRPage.formContents, '{!JSENCODE($Label.EditNotificationRule)}', '.EntityNotificationRulePopUp');
+        	
+        	ENRPage.init(eventType);
+			
+		},
+		saveBoxy : function() {
+			if(ENRPage.emailReminderEditor && !ENRPage.emailReminderEditor.validate().length) {
+			   	ENRPage.formContents.find('.notificationTextInput').val(JSON.stringify(ENRPage.emailReminderEditor.getValue()));
+				saveRule();
+			}
+			else {
+				saveRule();
+			}
+		},
+		hideBoxyCheckErrors : function() {
+			ENRPage.init(ENRPage.eventType);
+			hideModalBoxyWithErrorCheck('#EntityNotificationRulesPopupErrors');
+		},
+		hideBoxy : function() {
+			hideModalBoxy();
+			ENRPage.formContents.find(':input').val('');
+		},
+		timesheetReminderSchema : {
+	        title: '{!JSENCODE($Label.TimesheetNotification)}',
+	        type: "object",
+        	options: {
+            	collapsed : false,
+            },
+            format: 'table',
+            remove_empty_properties: true,
+			properties : {
+				CommercialDocumentName: {
+					title: '{!JSENCODE($Label.TemplateName)}',
+					type: 'string',
+					format: 'select',
+					enum: timesheetReminderCommercialDocumentsArray,
+				},
+				Offset: {
+					title: '{!JSENCODE($Label.Offset)}',
+					type: 'string',
+					format: 'integer',
+					default: '0',
+				},
+				DayOfWeek: {
+					title: '{!JSENCODE($Label.DayOfWeek)}',
+					type: 'string',
+					format: 'select',
+					enum: ['{!JSENCODE($Label.Monday)}', '{!JSENCODE($Label.Tuesday)}', '{!JSENCODE($Label.Wednesday)}', '{!JSENCODE($Label.Thursday)}', '{!JSENCODE($Label.Friday)}', '{!JSENCODE($Label.Saturday)}', '{!JSENCODE($Label.Sunday)}'],
+					default: '{!JSENCODE($Label.Monday)}',
+				},
+				ccManager: {
+					title: '{!JSENCODE($Label.CCManager)}',
+					type: 'boolean',
+					format: 'checkbox',
+					default: false,
+				},
+				ccContactIds: {
+					title: '{!JSENCODE($Label.CCContacts)}',
+					type: 'string',
+					default: '',
+				},
+		    }
+		},
+		milestoneReminderSchema : {
+	        title: 'Milestone Notification',
+	        type: "object",
+        	options: {
+            	collapsed : false,
+            },
+            format: 'table',
+            remove_empty_properties: true,
+			properties : {
+				CommercialDocumentName: {
+					title: '{!JSENCODE($Label.TemplateName)}',
+					type: 'string',
+					format: 'select',
+					enum: milestoneReminderCommercialDocumentsArray,
+				},
+				Offset: {
+					title: '{!JSENCODE($Label.Offset)}',
+					type: 'string',
+					format: 'integer',
+					default: '0',
+				},
+			}
+		},
+	});
+
+	ENRPage.init();
+	</script>
+
+</apex:define>
+</apex:composition>
+
+</apex:page>

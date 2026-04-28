@@ -1,0 +1,232 @@
+<apex:page standardController="KimbleOne__OutboundInterfaceRun__c" extensions="KimbleOne.OutboundInterfaceRunNewController" showHeader="true" sidebar="false" standardStylesheets="true">
+<apex:composition template="KimbleOne__SiteMaster">
+    	<apex:define name="Menu"></apex:define>
+    	<apex:define name="Content">
+				
+    			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+				<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+				
+    			<apex:form id="theForm">
+    			<div style="vertical-align: top;" id="left-container">
+    			<div id="filterContainer" style="width:203px;float:left;height:auto;margin-right:10px;">
+		
+					<div class="handlebarContainer" id="handlebarContainer">
+						<div class="indicator" id="pinIndicator"></div>
+						<div class="indicator" id="pinIndicator2"></div>
+						<div class="pinBox" id="handle">&nbsp;</div>
+					</div>
+					
+					<div id="sidebarDiv"  class="fixed">
+							<div style="position:relative;" class="sidebarModuleHeader"><h2>{!$Label.Filter}&nbsp;<a style="color: white;position: absolute;right: 8px;" href="javascript:void(0);" onclick="findItemsToExport()">{!$Label.GoButton}</a></h2></div>
+							<br/>
+							<apex:outputPanel id="TheSearchCriteria">
+								<apex:repeat value="{!TheSearchCriteria}" var="criterion">								
+								<div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;" class="search-criterion"><apex:outputText value="{!criterion.Name}"/></div>
+								
+<!-- If the list to be presented in a select input is small enough just use a normal select input. -->
+<!-- If the select needs to be populated dynamically, due to the contained list being too large, use a text input. -->
+
+								<apex:outputPanel layout="none" rendered="{!!criterion.isLarge}">
+
+									<apex:selectList value="{!criterion.SelectedValues}" styleclass="select-short select2-filter" size="1" multiselect="true" style="width:100%">
+										<apex:selectOptions value="{!criterion.TheOptions}" />
+									</apex:selectList>
+								
+								</apex:outputPanel>	
+																		
+								<apex:outputPanel layout="none" rendered="{!criterion.isLarge}">
+
+									<apex:inputText value="{!criterion.SelectedValuesJson}" styleclass="{!JSINHTMLENCODE(criterion.Id)}-select-long select2-filter" style="width:100%"/> 
+									
+								</apex:outputPanel>	
+								</apex:repeat>	
+																		
+<!-- Convert the inputs into jQuery select2 inputs. Create a dynamic lookup for the inputs with large result sets.							 -->
+								<script>
+								
+									jQuery('.select-short').select2();
+									
+									<apex:repeat value="{!TheSearchCriteria}" var="criterion">								
+									<apex:outputPanel layout="none" rendered="{!criterion.isLarge}">
+									jQuery(".{!JSENCODE(criterion.Id)}-select-long").select2({
+					            		minimumInputLength: 2,
+					            		multiple: true,
+					            		query: function (params) {
+					            			var find = function() {findLookupValues('{!JSENCODE(criterion.Id)}', params);};        		
+					        				find();
+					            		}
+				        			});
+									</apex:outputPanel>	
+									</apex:repeat>	
+
+								
+								</script>
+							</apex:outputPanel>
+					</div><!-- sidebarDiv End -->
+				</div><!-- filterContainer End -->
+				</div>
+				<apex:actionFunction action="{!FindItemsToExport}" name="findItemsToExport" rerender="TheItemsToExport" oncomplete="enableExport();showFilters();"></apex:actionFunction>
+				
+    			<apex:outputPanel id="pageErrors">
+    				<apex:pageMessages escape="false" />
+				</apex:outputPanel>
+				<div style="overflow-x: auto;" id="right-container">
+				<c:PageHeader PageTitle="{!$ObjectType.KimbleOne__OutboundInterfaceRun__c.Label}" PageSubtitle="{!$Label.kimbleone__new}" />
+    			
+    			<apex:outputPanel id="TheMainPage">
+    			
+    			<apex:pageBlock >
+    				<apex:pageblockSection collapsible="false" showheader="false" columns="2" >
+							<apex:pageBlockSectionItem >
+           						<apex:outputLabel value="{!$ObjectType.KimbleOne__OutboundInterfaceRun__c.Fields.KimbleOne__InterfaceType__c.Label}"/>
+           						<apex:selectList id="MapList" value="{!TheSelectedInterfaceTypeId}" size="1">
+           							<apex:actionSupport event="onchange" action="{!InterfaceTypeChange}" rerender="TheSearchCriteria, TheMainPage" oncomplete="enableExport();showFilters();"/>
+									<apex:selectOptions value="{!TheOutboundInterfaceTypes}" />
+								</apex:selectList>
+           					</apex:pageBlockSectionItem>
+           					
+           					<apex:pageBlockSectionItem >
+           						<apex:outputLabel value="{!$ObjectType.KimbleOne__InterfaceRun__c.Fields.KimbleOne__Notes__c.Label}"/>
+           						<apex:inputTextArea value="{!Notes}"/>
+           					</apex:pageBlockSectionItem>        					
+					</apex:pageblockSection>
+    			</apex:pageBlock>
+    			
+    			<apex:pageBlock >
+    				<apex:pageBlockButtons location="top">
+    					<apex:commandButton id="export-button" action="{!InitialiseExport}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__exportlabel}"  reRender="theForm" rendered="{!!ISBLANK(TheSelectedInterfaceTypeId)}"/>
+    				</apex:pageBlockButtons>   		
+					
+					<apex:outputPanel id="TheItemsToExport">
+					<apex:repeat value="{!TheInterfaceType.TheInterfaceSourcesMap}" var="sourceId">
+						
+						<apex:pageBlockSection collapsible="false" showheader="true" title="{!TheInterfaceType.TheInterfaceSourcesMap[sourceId].Name}" columns="1"></apex:pageBlockSection>
+						
+							<table class="list" border="0" cellpadding="0" cellspacing="0">
+								<thead>
+									<tr class="headerRow">
+										<th><input type="checkbox" onclick="toggleCheckboxes(this)"/></th>
+										<apex:repeat value="{!TheInterfaceType.TheResultFieldsMap[sourceId]}" var="fld">
+											<th><h2><apex:outputText value="{!fld.Name}"/></h2></th>
+										</apex:repeat>
+									</tr>
+								</thead>
+								<tbody>
+									<apex:repeat value="{!TheExportableScope[sourceId]}" var="itm">
+									<tr class="dataRow">
+										<td><apex:inputField value="{!TheSelectedItemsMap[sourceId][itm.Request.Id].InputCheckbox__c}" styleclass="export-item" onchange="enableExport();"/></td>
+										<apex:repeat value="{!TheInterfaceType.TheResultFieldsMap[sourceId]}" var="fld">
+											<td>
+												<apex:outputField value="{!itm.RelatedObject[fld.FieldName__c]}" rendered="{!fld.FieldName__c != 'Name'}"/>
+												<apex:outputLink value="/{!itm.RelatedObject.Id}" rendered="{!fld.FieldName__c = 'Name'}"><apex:outputText value="{!itm.RelatedObject[fld.FieldName__c]}"/></apex:outputLink>												
+											</td>
+										</apex:repeat>
+									</tr>
+									</apex:repeat>
+								</tbody>				
+							</table>						
+					</apex:repeat>    				
+    			
+    				</apex:outputPanel>
+    			</apex:pageBlock>
+    			
+    			</apex:outputPanel>
+    			</div>
+    			
+    			</apex:form>
+		       
+		       <script>
+		       
+		       jQuery(document).ready(function() {
+			
+					jQuery('#handlebarContainer').click(function(){
+						jQuery(this).parent().toggleClass('sidebarCollapsed');
+					})
+					.mouseenter(function(){jQuery(this).toggleClass('hover');})
+					.mouseleave(function(){jQuery(this).toggleClass('hover');});
+					
+					showFilters();
+					
+					enableExport();
+				});
+		       	
+		       	function showFilters()
+		       	{
+		       		if (jQuery('.search-criterion').size() == 0) 
+		       			jQuery('#handlebarContainer').parent().addClass('sidebarCollapsed');
+		       		else
+		       			jQuery('#handlebarContainer').parent().removeClass('sidebarCollapsed');
+		       	}
+		       	
+		       	function toggleCheckboxes(obj)
+		       	{
+		       		var o = jQuery(obj);
+		       		o.closest('table').find('input').prop('checked', o.prop('checked'));
+		       		enableExport();
+		       	}
+		       	
+		       	function enableExport()
+		       	{
+		       		if (jQuery('input:checked.export-item').length > 0) 
+		       			jQuery('[id$="export-button"]').prop('disabled', false).removeClass('btnDisabled').addClass('btn');
+		       		else
+		       			jQuery('[id$="export-button"]').prop('disabled', true).addClass('btnDisabled').removeClass('btn');
+		       	}
+		       	
+		       	// Called by select2 to dynamically populate selects with large lists 
+				function findLookupValues(queryString, params)
+				{
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.OutboundInterfaceRunNewController.FindLookupValues}',
+			       		queryString, params.term,
+			      			function(result, event){          
+			             		if (event.status) 
+					            {
+					             	var data = {};
+					             	data.results = result;
+					             	params.callback(data);
+					         	} 
+					         	else if (event.type === 'exception') 
+					         	{
+					             	alert(event.message);
+					         	} 
+					         	else 
+					         	{
+					             	alert(event.message);
+					         	}
+			         	}, 
+			         	{escape: true, timeout: 60000}
+			     	);
+				}
+		
+		       </script>
+		       <style>
+		       	/* SELECT 2 STYLING */
+					.select2-results li {margin-left:0px;}
+					.select2-container-multi .select2-choices
+					{
+						border: 2px solid rgb(224,224,224);
+						background-image:none;
+					}
+					.select2-container-multi .select2-choices .select2-search-choice {
+					    border: 1px solid #aaaaaa;
+					    border-radius: 4px;
+					    padding: 5px 20px 5px 5px;
+						background-image:none;
+					}
+					
+					.select2-container-multi .select2-search-choice-close {
+						background-image:  url({!URLFOR($Resource.AssignmentImages, 'assignmentSprite.png')});
+						background-position: -2px -29px;
+						background-repeat: no-repeat;
+						left:auto;
+					}
+					
+					.select2-container-multi .select2-choices .select2-search-choice .select2-search-choice-close:hover {
+						background-position: -2px -1px;
+					}
+		       
+		       </style>
+    	</apex:define>
+
+</apex:composition>
+</apex:page>

@@ -1,0 +1,3362 @@
+<apex:page Controller="KimbleOne.DeliveryElementProposalEditController" extensions="KimbleOne.ActivityAssignmentRemoteActions" showHeader="false" sidebar="false">
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__ActivityAssignmentUsagePattern)}" />
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'InsightStyle.css')}"/>
+
+	<div id="jobsPanel" style="display:none"></div>
+	
+	<apex:form id="TheProposalElementForm">
+	<apex:actionRegion >
+	
+	<div id="editProposalElementPopup" style="display:none">
+		 <apex:outputPanel id="PopupContent">
+		 <apex:actionStatus id="DeliveryLoadingStatus">
+                <apex:facet name="start">
+                    <div id="loadingIndicatorOuterContainer" class="loadingIndicator">
+                        <div id="loadingIndicatorInnerContainer">
+                            <img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+                        </div>
+                    </div>
+                </apex:facet>
+            </apex:actionStatus>
+			<div id="ProposalElementsErrorPanel"><apex:pageMessages id="MessagesPanel" escape="false" /></div>
+			<div id="assignment-error" style="display:none"><span><div class="message errorM3"><table border="0" cellpadding="0" cellspacing="0" class="messageTable" style="padding:0px;margin:0px;"><tbody><tr valign="top"><td><img alt="error" class="msgIcon" src="/s.gif" title="{!$Label.Error}"/></td><td class="messageCell"><div class="messageText" id="assignment-error-text"><br/></div></td></tr><tr><td></td><td></td></tr></tbody></table></div></span></div>
+			<div id="validationPageMessageContainer" style="display:none"><apex:pageMessage id="validationPageMessage" severity="error" strength="2" summary="{!$Label.kimbleone__targetmarginexceedsmaximum}"/></div>
+			<apex:outputPanel rendered="{!!ISBLANK(TheDeliveryElement)}">
+					
+					<apex:pageBlock mode="edit">				
+						
+						<apex:pageBlockButtons location="bottom" id="ButtonsBlock" styleclass="ButtonsBlock">
+							<input type="button" id="saveButton" onclick="saveTheElement();jQuery('#loadingIndicatorOuterContainerGroups').parent().show();" class="btn DisableButtonWhileBusy" value="{!$Label.SaveAndClose}" />
+                            <input type="button" id="saveAndReloadButton" onclick="saveAndReloadTheElement();" class="btn DisableButtonWhileBusy" value="{!$Label.Save}" />
+							<apex:outputPanel layout="none" rendered="{!TheDeliveryElement.CanDelete}">
+								<input type="button" id="deleteButton" onclick="deleteTheElement();" class="btn DisableButtonWhileBusy" value="{!$Label.DeleteButton}"/>
+							</apex:outputPanel>
+							<input type="button" id="CancelButton" onclick="hideStackedModalBoxy();" class="btn" value="{!$Label.Cancel}" />
+						</apex:pageBlockButtons>
+				
+						<apex:outputPanel id="ElementConfigurationContainer">
+
+						<apex:outputPanel layout="none" rendered="{!ShowExpenseInsight}">
+							<div class="insight-container expense-cat-average insight-collapsed insight-hidden" account-id="{!JSENCODE(TheDeliveryElement.TheDeliveryElement.DeliveryGroup__r.Account__c)}" display-currency="{!JSENCODE(TheDeliveryElement.TheDeliveryElement.CurrencyISOCode)}">
+								<div class="docked-insight-container docked-offset">
+									<div class="docked-insight"></div>
+								</div>
+								<div class="insight-item">
+									<span class="miniCardIcon cardIconInfo fa fa-lightbulb-o"></span>
+								</div>
+							</div>
+						</apex:outputPanel>
+
+						<apex:outputPanel layout="none" rendered="{!ShowResourceTypeMarginInsight && $ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__TemporalForecastCostRate__c.Accessible}">
+							<div class="insight-container resource-type-margin insight-collapsed insight-hidden" account-id="{!JSENCODE(TheDeliveryElement.TheDeliveryElement.DeliveryGroup__r.Account__c)}" display-currency="{!JSENCODE(TheDeliveryElement.TheDeliveryElement.CurrencyISOCode)}">
+								<div class="docked-insight-container docked-offset">
+									<div class="docked-insight"></div>
+								</div>
+								<div class="insight-item">
+									<span class="miniCardIcon cardIconInfo fa fa-lightbulb-o"></span>
+								</div>
+							</div>
+						</apex:outputPanel>
+								
+						<apex:pageblockSection id="headerFields" collapsible="false" showheader="false" columns="2">
+							
+							<apex:inputField value="{!TheDeliveryElement.TheDeliveryElement.KimbleOne__ShortName__c}"/>
+                            <apex:pageBlockSectionItem id="location-panel" rendered="{!ActivityLocationEnabled}">
+								<apex:outputLabel for="LocationList">
+									<apex:outputText value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__Location__c.Label}" />
+								</apex:outputLabel>
+							
+								<apex:outputPanel layout="none">
+									<apex:outputPanel layout="none" rendered="{!!UseLocationEnhancedLookup}">
+										<apex:selectList id="default-location-list" value="{!TheDeliveryElement.TheOperatingActivity.KimbleOne__Location__c}" size="1"  >
+											<apex:selectOptions value="{!TheLocationOptions}" />
+										</apex:selectList>
+									</apex:outputPanel>
+
+									<apex:outputPanel layout="none" rendered="{!UseLocationEnhancedLookup}">
+										<apex:actionRegion >
+											<apex:inputField id="default-location-field" styleclass="kimbleSearch " value="{!TheDeliveryElement.TheOperatingActivity.KimbleOne__Location__c}">
+											</apex:inputField>
+										</apex:actionRegion>
+									</apex:outputPanel>
+									<apex:outputPanel layout="none" rendered="{!TheDeliveryElement.IsLocationRequired}">
+										<div class="toolbar-button" title="{!$Label.kimbleone__label001}">
+											<i class="fa fa-arrow-down cascade-location-change" onclick="cascadeLocationChange();"/>
+										</div>
+									</apex:outputPanel>
+								</apex:outputPanel>
+
+							</apex:pageBlockSectionItem>
+                            							
+							<!-- TOP DOWN SERVICES EXPECTED REVENUE -->
+							<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.TheProduct.HasServicesRevenue && TheDeliveryElement.RevenueForecastMode = 'DeliveryElement'}">
+                                   <apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ServicesContractRevenue__c.Label} ({!TheDeliveryElement.TheDeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c})"/>
+                                   <apex:inputField id="element-expected-revenue" styleclass="kimble-number" value="{!TheDeliveryElement.TheDeliveryElement.KimbleOne__InvoicingCcyExpectedContractRevenue__c}" onchange="calculateAssignmentRevenuesAndCosts()"/>
+                            </apex:pageBlockSectionItem>
+                            
+                            <!-- TOP DOWN SERVICE GENERATED REVENUE -->
+							<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.TheProduct.HasServicesRevenue && TheDeliveryElement.TheProduct.RevenueMilestoneGenerated && TheDeliveryElement.RevenueForecastMode != 'DeliveryElement'}">
+                                   <apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ServicesContractRevenue__c.Label} ({!TheDeliveryElement.TheDeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c})"/>
+                                   <input type="text" id="element-generated-revenue" value="" class="kimble-number kimble-format-currency" readonly="readonly"/>
+                            </apex:pageBlockSectionItem>
+							
+							<!-- BOTTOM UP SERVICES REVENUE -->
+							<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.TheProduct.HasServicesRevenue && !TheDeliveryElement.TheProduct.RevenueMilestoneGenerated && TheDeliveryElement.RevenueForecastMode = 'RevenueItem'}">
+								   <apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ServicesContractRevenue__c.Label} ({!TheDeliveryElement.TheDeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c})"/>
+                                   <input type="text" id="element-services-revenue" value="" class="kimble-number kimble-format-currency" readonly="readonly"/>
+							</apex:pageBlockSectionItem>
+							
+							<!-- TOP DOWN SERVICES COST -->
+							<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.TheProduct.HasServicesCost && TheDeliveryElement.CostForecastMode == 'DeliveryElement'}">
+                                   <apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ServicesContractCost__c.Label} ({!TheDeliveryElement.TheDeliveryElement.CurrencyIsoCode})"/>
+                                   <apex:inputField id="element-expected-cost" styleclass="kimble-number" value="{!TheDeliveryElement.TheDeliveryElement.KimbleOne__ExpectedContractCost__c}" />
+                            </apex:pageBlockSectionItem>
+							
+							<!-- BOTTOM UP SERVICES COST -->
+							<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.TheProduct.HasServicesCost && TheDeliveryElement.CostForecastMode != 'DeliveryElement'}">
+								   <apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ServicesContractCost__c.Label} ({!TheDeliveryElement.TheDeliveryElement.CurrencyISOCode})"/>
+                                   <input type="text" id="element-services-cost" value="" class="kimble-number kimble-format-currency" readonly="readonly"/>
+							</apex:pageBlockSectionItem>
+							
+							<!-- BOTTOM UP OVERIDDEN SERVICES COST (includes formatting placeholder) -->
+							<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.TheProduct.HasServicesCost && TheDeliveryElement.CostForecastMode != 'DeliveryElement' && !ISBLANK(TheDeliveryElement.TheRateCardItemMap)}"></apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.TheProduct.HasServicesCost && TheDeliveryElement.CostForecastMode != 'DeliveryElement' && !ISBLANK(TheDeliveryElement.TheRateCardItemMap)}">
+								   <apex:outputText styleClass="cost-override"  value="{!$Label.kimbleone__standardlabel} {!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ServicesContractCost__c.Label} ({!TheDeliveryElement.TheDeliveryElement.CurrencyISOCode})"/>
+                                   <input type="text" id="element-services-cost-overriden" value="" class="kimble-number cost-override kimble-format-currency" readonly="readonly"/>
+							</apex:pageBlockSectionItem>
+							
+							<!-- TOP DOWN SERVICES MARGIN -->
+<!-- 							<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.TheProduct.HasServicesRevenue && TheDeliveryElement.TheProduct.HasServicesCost && TheDeliveryElement.CostForecastMode == 'DeliveryElement'}"> -->
+<!--                                    <apex:outputText value="Services Contract Margin (%)"/> -->
+<!--                                    <input type="text" id="element-expected-margin" value="" class="headline-margin-value" readonly="readonly"/> -->
+<!--                             </apex:pageBlockSectionItem> -->
+							
+							<!-- BOTTOM UP SERVICES MARGIN -->
+<!-- 							<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.TheProduct.HasServicesRevenue && TheDeliveryElement.TheProduct.HasServicesCost && TheDeliveryElement.CostForecastMode != 'DeliveryElement'}"> -->
+<!-- 								   <apex:outputText value="Services Contract Margin (%)"/> -->
+<!--                                    <input type="text" id="element-services-margin" value="" class="headline-margin-value" readonly="readonly"/> -->
+<!--                             </apex:pageBlockSectionItem> -->
+
+							<!-- BOTTOM UP EXPENSES REVENUE -->
+							<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.TheProduct.RevenueExpenseGenerated}">
+								   <apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ExpensesContractRevenue__c.Label} ({!TheDeliveryElement.TheDeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c})"/>
+                                   <input type="text" id="element-expenses-revenue" class="kimble-number kimble-format-currency" readonly="readonly"/>
+							</apex:pageBlockSectionItem>
+							
+							<!-- BOTTOM UP EXPENSES COST -->
+							<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.TheProduct.HasExpensesCost}">
+								   <apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ExpensesContractCost__c.Label} ({!TheDeliveryElement.TheDeliveryElement.CurrencyISOCode})"/>
+                                   <input type="text" id="element-expenses-cost" class="kimble-number kimble-format-currency" readonly="readonly"/>
+							</apex:pageBlockSectionItem>
+														
+							<!-- BOTTOM UP EXPENSES MARGIN -->
+<!-- 							<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.TheProduct.RevenueExpenseGenerated && TheDeliveryElement.TheProduct.HasExpensesCost}"> -->
+<!-- 								   <apex:outputText value="Expenses Contract Margin (%)"/> -->
+<!--                                    <input type="text" id="element-expenses-margin" class="headline-margin-value" readonly="readonly"/> -->
+<!-- 							</apex:pageBlockSectionItem> -->
+
+							<!-- DISCOUNT -->
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheDiscountScheme)}">
+								   <apex:outputText value="{!$ObjectType.KimbleOne__DiscountScheme__c.Label}"/>
+								   <apex:outputField value="{!TheDiscountScheme.Name}"/>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem />
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheDiscountScheme) && TheDiscountScheme.SchemeModel__r.SchemeRateType__r.KimbleOne__Enum__c = 'Flat'}">
+								   <apex:outputText value="{!$ObjectType.KimbleOne__DiscountScheme__c.Fields.KimbleOne__DiscountPercentage__c.Label}"/>
+								   <apex:outputField value="{!TheDiscountScheme.KimbleOne__DiscountPercentage__c}"/>
+							</apex:pageBlockSectionItem>
+														
+						</apex:pageblockSection>
+						
+						<script>
+                        	var showExpensesRevCol = {!IF(TheDeliveryElement.TheProduct.RevenueExpenseGenerated, 'true','false')};
+                        	var currencyConversionFactor = {!TheDeliveryElement.CurrencyConversionFactor};
+                        	var showRoles = {!IF(TheDeliveryElement.TheRoles.size > 1,'true','false')};
+                        	var earliestOpenDate = '{!JSENCODE(EarliestDate)}';
+							var currencyCode = '{!JSENCODE(TheDeliveryElement.TheDeliveryElement.CurrencyISOCode)}';
+							var invoicingCurrencyCode = '{!JSENCODE(TheDeliveryElement.TheDeliveryElement.InvoicingCurrencyISOCode__c)}';
+
+                        	var canModel = {!IF(TheDeliveryElement.TheOperatingActivity.AllowModelAssignment__c, 'true','false')};
+                        </script>
+						
+						<apex:outputPanel layout="none" rendered="{!TheDeliveryElement.ShowMilestonesPanel || TheDeliveryElement.ShowAnnuitiesPanel || TheDeliveryElement.TheProduct.RevenueUsageGenerated || TheDeliveryElement.TheProduct.CostUsageGenerated}">				
+                        <div class="ionTabs" id="config-tabs" data-name="config-group">
+                        	<ul class="ionTabs__head">
+                            	<apex:outputPanel rendered="{!TheDeliveryElement.ShowMilestonesPanel}" layout="none">
+                            		<li class="ionTabs__tab milestones-tab" data-target="milestone-config"><apex:outputText value="{!$ObjectType.KimbleOne__Milestone__c.LabelPlural}"/></li>
+                            	</apex:outputPanel>
+                            	<apex:outputPanel rendered="{!TheDeliveryElement.ShowAnnuitiesPanel}" layout="none">
+                            		<li class="ionTabs__tab annuities-tab" data-target="annuities-config"><apex:outputText value="{!$ObjectType.KimbleOne__Annuity__c.LabelPlural}"/></li>
+                            	</apex:outputPanel>
+                            	<apex:outputPanel rendered="{!TheDeliveryElement.TheProduct.RevenueUsageGenerated || TheDeliveryElement.TheProduct.CostUsageGenerated}" layout="none">						
+	                               
+                                   <li class="ionTabs__tab assignments-tab" data-target="assignment-config"><apex:outputText value="{!$Label.kimbleone__assignmentsheading}"/></li>
+                                   <apex:outputPanel layout="none" rendered="{!TheDeliveryElement.TheProduct.RevenueExpenseGenerated || TheDeliveryElement.TheProduct.CostExpenseGenerated}">
+                                       <li class="ionTabs__tab expenses-tab" data-target="expense-config"><apex:outputText value="{!$Label.kimbleone__expenseslabel}"/></li>
+                                   </apex:outputPanel>
+
+	                           </apex:outputPanel>
+							</ul>
+
+                            <div class="ionTabs__body" style="height:275px; overflow-y: auto;">
+                                    <apex:outputPanel id="ElementAnnuitiesContainer" rendered="{!TheDeliveryElement.ShowAnnuitiesPanel}" layout="none">
+                                   	<script>
+                                   		var annuityBehaviourRulesMap = kimble.parseJSON("{!JSENCODE(TheDeliveryElement.TheAnnuityBehaviourRulesJson)}");
+                                   	</script>
+                                   	<div class="ionTabs__item" data-name="annuities-config">
+                                   		<apex:variable value="{!0}" var="rowNum"/>
+
+											<apex:pageBlockTable id="annuity-config-table" var="annuity" value="{!TheDeliveryElement.TheAnnuities}">
+
+			                                   <apex:column >
+			                                   		<span class="fa fa-trash-o inline-btn" onclick="var d = confirmDelete();if(!d) return;removeAnnuity({!ROUND(rowNum,0)})"></span>
+			                                   </apex:column>
+
+			                                   <apex:column headerValue="{!$ObjectType.KimbleOne__Annuity__c.Label}">
+			                                       <apex:inputField value="{!annuity.TheAnnuity.Name}" style="width:100px"/>
+			                                   </apex:column>
+
+			                                   <apex:column headerValue="{!$ObjectType.KimbleOne__AnnuityBehaviourRule__c.Label}">
+			                                       <apex:selectList id="annuity-behaviour-rule" value="{!annuity.TheAnnuity.KimbleOne__AnnuityBehaviourRule__c}" size="1" onchange="annuityChange('{!TEXT(ROUND(rowNum,0))}')">
+				                                        <apex:selectOptions value="{!TheDeliveryElement.TheAnnuityBehaviours}"/>
+				                                    </apex:selectList>
+			                                   </apex:column>
+
+			                                   <apex:column headerValue="{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__StartDate__c.Label}">
+			                                       <apex:inputField id="annuity-start-date" value="{!annuity.TheAnnuity.KimbleOne__StartDate__c}" styleclass="kimbleDatePicker"  onchange="annuityStartDateChange(jQuery(this).closest('tr'));annuityChange('{!TEXT(ROUND(rowNum,0))}')"/>
+			                                   </apex:column>
+
+			                                   <apex:column headerValue="{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__NumberOfPeriods__c.Label}">
+			                                       <apex:inputField id="annuity-number-of-periods" style="width:72px" value="{!annuity.TheAnnuity.KimbleOne__NumberOfPeriods__c}" onchange="annuityNumberOfPeriodsChange(jQuery(this).closest('tr'));annuityChange('{!TEXT(ROUND(rowNum,0))}')"/>
+			                                   </apex:column>
+
+			                                   <apex:column headerValue="{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__EndDate__c.Label}">
+			                                       <apex:inputField id="annuity-end-date" value="{!annuity.TheAnnuity.KimbleOne__EndDate__c}" styleclass="kimbleDatePicker"  onchange="annuityEndDateChange(jQuery(this).closest('tr'));annuityChange('{!TEXT(ROUND(rowNum,0))}')"/>
+			                                   </apex:column>
+
+			                                   <apex:column rendered="{!TheDeliveryElement.TheProduct.RevenueAnnuityGenerated}">
+			                                       <apex:facet name="header">
+			                                       	<div>{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__InvoicingCurrencyRevenueRate__c.Label}</div>
+			                                       	<div class="tiny-label">{!IF(TheDeliveryElement.TheProduct.UnitGenerated, $Label.kimbleone__perunit, '')}</div>
+			                                       </apex:facet>
+			                                       <apex:inputField style="width:72px" value="{!annuity.TheAnnuity.KimbleOne__InvoicingCurrencyRevenueRate__c}" onchange="annuityRevenueChange('{!TEXT(ROUND(rowNum,0))}')"/>
+			                                       (<apex:outputText value="{!TheDeliveryElement.TheDeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c}"/>)
+			                                   </apex:column>
+
+			                                   <apex:column headervalue="{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__CostRateRule__c.Label}" rendered="{!TheDeliveryElement.TheProduct.CostAnnuityGenerated}">
+			                                       <apex:selectList id="annuity-cost-rate-rule" value="{!annuity.TheAnnuity.KimbleOne__CostRateRule__c}" size="1" onchange="annuityChange('{!TEXT(ROUND(rowNum,0))}')">
+				                                        <apex:selectOptions value="{!TheDeliveryElement.TheCostRateRules}"/>
+				                                    </apex:selectList>
+			                                   </apex:column>
+
+			                                    <apex:column rendered="{!TheDeliveryElement.TheProduct.CostAnnuityGenerated}">
+												   <apex:facet name="header">
+														<div>{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__CostRate__c.Label} </div>
+														<div class="tiny-label">{!IF(TheDeliveryElement.TheProduct.UnitGenerated, $Label.kimbleone__perunit, '')}</div>
+												   </apex:facet>
+												   <div id="row-num-container" data-row-num="{!TEXT(ROUND(rowNum,0))}"></div>
+												   <apex:outputPanel id="annuity-cost-panel">
+												   <apex:inputField style="width:72px" value="{!annuity.TheAnnuity.KimbleOne__CostRate__c}"  onchange="annuityCostChange(this)"  rendered="{!annuity.TheAnnuity.KimbleOne__CostRateRule__c = TheDeliveryElement.FixedCostRateId}"/>
+												   <apex:inputField style="width:72px" value="{!annuity.TheAnnuity.KimbleOne__CostRateFactor__c}"  onchange="annuityCostChange(this)"  rendered="{!annuity.TheAnnuity.KimbleOne__CostRateRule__c = TheDeliveryElement.CostFactorId}"/>
+												   (<apex:outputText value="{!TheDeliveryElement.TheDeliveryElement.CurrencyIsoCode}" rendered="{!annuity.TheAnnuity.KimbleOne__CostRateRule__c = TheDeliveryElement.FixedCostRateId}"/><apex:outputText value="%" rendered="{!annuity.TheAnnuity.KimbleOne__CostRateRule__c = TheDeliveryElement.CostFactorId}"/>)
+												   </apex:outputPanel>
+												</apex:column>
+
+			                                   <apex:column headerValue="{!$ObjectType.KimbleOne__UnitType__c.LabelPlural}" rendered="{!TheDeliveryElement.TheProduct.UnitGenerated}">
+			                                       <apex:selectList value="{!annuity.TheAnnuity.KimbleOne__UnitsUnitType__c}" size="1">
+				                                        <apex:selectOptions value="{!TheDeliveryElement.TheAnnuityUnitTypes}"/>
+				                                    </apex:selectList>
+			                                   </apex:column>
+
+			                                   <apex:column rendered="{!TheDeliveryElement.TheProduct.UnitGenerated}" headerValue="{!$Label.kimbleone__units}">
+			                                       <apex:inputField style="width:42px" value="{!annuity.TheAnnuity.KimbleOne__InitialNumberOfUnits__c}" onchange="annuityChange('{!TEXT(ROUND(rowNum,0))}')"/>
+			                                   </apex:column>
+
+			                                   <apex:column rendered="{!TheDeliveryElement.TheProduct.RevenueAnnuityGenerated}" headerValue="{!$Label.kimbleone__totalrevenuelabel}">
+			                                   		<apex:outputText value="{!TheDeliveryElement.TheDeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c}"/>&nbsp;
+			                                   		<apex:outputText id="annuity-total-revenue" value="{!annuity.InvoicingCurrencyTotalRevenue}" styleclass="kimble-format-currency"/>
+			                                   </apex:column>
+
+			                                   <apex:column rendered="{!TheDeliveryElement.TheProduct.CostAnnuityGenerated}" headerValue="{!$Label.kimbleone__totalcostlabel}">
+			                                       <apex:outputText value="{!TheDeliveryElement.TheDeliveryElement.CurrencyIsoCode}"/>&nbsp;
+			                                       <apex:outputText id="annuity-total-cost" value="{!annuity.TotalCost}" styleclass="kimble-format-currency"/>
+			                                   </apex:column>
+
+			                                   <apex:column >
+			                                   <apex:variable value="{!rowNum+1}" var="rowNum"/>
+			                                   </apex:column>
+
+			                                   <apex:facet name="footer"><span class="fa fa-plus-square"></span>&nbsp;<a href="javascript:addAnnuity();">{!$Label.Add}{!$ObjectType.KimbleOne__Annuity__c.Label}</a></apex:facet>
+
+			                               </apex:pageBlockTable>
+                                   	</div>
+                                   	</apex:outputPanel>
+                                   <apex:outputPanel rendered="{!TheDeliveryElement.ShowMilestonesPanel}" layout="none">
+                                   	<div class="ionTabs__item" data-name="milestone-config">
+
+                                   		<apex:outputPanel id="ElementRecurringMilestonesContainer" rendered="{!TheDeliveryElement.RevenueForecastMode = 'Recurring' || TheDeliveryElement.CostForecastMode = 'Recurring'}">
+											<apex:pageblockSection collapsible="false" showheader="false" columns="2">
+                            					<apex:pageBlockSectionItem >
+			                            			<apex:outputText value="{!$Label.kimbleone__recurringmilestonestartdate}"/>
+                                  					<apex:inputField value="{!TheDeliveryElement.RecurringMilestoneStartDate.KimbleOne__InputDate__c}" styleclass="kimbleDatePicker"/>
+                                  				</apex:pageBlockSectionItem>
+
+                                  				<apex:pageBlockSectionItem >
+			                            			<apex:outputText value="{!$Label.kimbleone__recurringmilestoneperiods}"/>
+                                  					<apex:inputField id="recurring-periods" value="{!TheDeliveryElement.RecurringMilestonePeriods.KimbleOne__InputInteger__c}" onchange="calculateRecurringMilestoneRevenueAndCosts();"/>
+                                  				</apex:pageBlockSectionItem>
+
+		                                		<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.TheProduct.CostMilestoneGenerated}">
+			                            			<apex:outputPanel layout="none">
+			                            				<apex:outputText value="{!$Label.kimbleone__costlabel}" />
+			                            				<apex:outputText value=" {!$Label.kimbleone__perunit}" rendered="{!TheDeliveryElement.TheProduct.UnitGenerated}" />
+			                            				<apex:outputText value=" ({!TheDeliveryElement.TheDeliveryElement.KimbleOne__SupplierInvoicingCurrencyIsoCode__c})"/>
+			                            			</apex:outputPanel>
+                                  					<apex:inputField id="recurring-cost" value="{!TheDeliveryElement.RecurringMilestoneSupplierInvoicingValue.KimbleOne__InputDecimal__c}"  onchange="calculateRecurringMilestoneRevenueAndCosts();"/>
+                                  				</apex:pageBlockSectionItem>
+
+                                  				<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.TheProduct.RevenueMilestoneGenerated}">
+			                            			<apex:outputPanel layout="none">
+			                            				<apex:outputText value="{!$Label.kimbleone__revenuelabel}" />
+			                            				<apex:outputText value=" {!$Label.kimbleone__perunit}" rendered="{!TheDeliveryElement.TheProduct.UnitGenerated}"/>
+			                            				<apex:outputText value=" ({!TheDeliveryElement.TheDeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c})"/>
+			                            			</apex:outputPanel>
+                                  					<apex:inputField id="recurring-revenue" value="{!TheDeliveryElement.RecurringMilestoneInvoicingValue.KimbleOne__InputDecimal__c}"  onchange="calculateRecurringMilestoneRevenueAndCosts();"/>
+                                  				</apex:pageBlockSectionItem>
+
+		                                		<apex:pageBlockSectionItem ></apex:pageBlockSectionItem>
+
+		                                		<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.TheProduct.UnitGenerated}">
+			                            			<apex:outputText value="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneUnits__c.Label}"/>
+                                  					<apex:inputField id="recurring-units" value="{!TheDeliveryElement.RecurringMilestoneNumberOfUnits.KimbleOne__InputInteger__c}"  onchange="calculateRecurringMilestoneRevenueAndCosts();"/>
+                                  				</apex:pageBlockSectionItem>
+
+                                  				<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.TheProduct.UnitGenerated && TheUnitTypes.size > 0}">
+			                            			<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__RevenueUnitType__c.Label}"/>
+                                  					<apex:selectList value="{!TheDeliveryElement.TheDeliveryElement.KimbleOne__RevenueUnitType__c}" size="1">
+				                                        <apex:selectOptions value="{!TheUnitTypes}"/>
+				                                    </apex:selectList>
+                                  				</apex:pageBlockSectionItem>
+
+
+                                   			</apex:pageblockSection>
+                            			</apex:outputPanel>
+
+                                   		<apex:outputPanel id="ElementMilestonesContainer" rendered="{!TheDeliveryElement.TheMilestoneTypes.size > 0}">
+
+											<apex:variable value="{!0}" var="rowNum"/>
+
+											<apex:pageBlockTable id="milestone-config-table" var="milestone" value="{!TheDeliveryElement.TheMilestones}">
+
+			                                   <apex:column >
+			                                   		<span class="fa fa-trash-o inline-btn" onclick="var d = confirmDelete();if(!d) return;removeMilestone({!ROUND(rowNum,0)})"></span>
+			                                   </apex:column>
+
+			                                   <apex:column headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneType__c.Label}">
+				                                    <apex:selectList value="{!milestone.KimbleOne__MilestoneType__c}" size="1" rendered="{!ISBLANK(milestone.KimbleOne__MilestoneType__c)}">
+				                                        <apex:selectOptions value="{!TheDeliveryElement.TheMilestoneTypes}"/>
+				                                        <apex:actionSupport event="onchange" rerender="ElementMilestonesContainer" oncomplete="initialiseProposalElementEdit()"/>
+				                                    </apex:selectList>
+				                                    <apex:outputField value="{!milestone.KimbleOne__MilestoneType__c}" rendered="{!!ISBLANK(milestone.KimbleOne__MilestoneType__c)}"/>
+
+				                                    <apex:variable value="{!rowNum+1}" var="rowNum"/>
+				                               </apex:column>
+
+			                                   <apex:column headerValue="{!$ObjectType.KimbleOne__Milestone__c.Label}">
+			                                       <apex:inputField value="{!milestone.Name}" rendered="{!!ISBLANK(milestone.KimbleOne__MilestoneType__c)}" onChange="milestoneNameChanged();"/>
+			                                   </apex:column>
+
+			                                   <apex:column headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneDate__c.Label}">
+			                                       <apex:inputField value="{!milestone.KimbleOne__MilestoneDate__c}" rendered="{!!ISBLANK(milestone.KimbleOne__MilestoneType__c)}" styleclass="kimbleDatePicker"/>
+			                                   </apex:column>
+
+			                                   <apex:column headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneValue__c.Label}" rendered="{!!TheDeliveryElement.TheProduct.UnitGenerated}">
+			                                       <apex:outputPanel html-milestone-type="Cost" rendered="{!milestone.KimbleOne__MilestoneType__c == CostMilestoneId}">
+			                                       		<apex:outputText value="{!TheDeliveryElement.TheDeliveryElement.KimbleOne__SupplierInvoicingCurrencyIsoCode__c}"/>&nbsp;<apex:inputField style="width:65px" id="milestone-cost-value" value="{!milestone.KimbleOne__SupplierInvoicingCurrencyMilestoneValue__c}" onchange="calculateMilestoneRevenuesAndCosts();"/>
+			                                       </apex:outputPanel>
+
+			                                       <apex:outputPanel html-milestone-type="Revenue" rendered="{!milestone.KimbleOne__MilestoneType__c == RevenueMilestoneId}">
+			                                       		<apex:outputText value="{!TheDeliveryElement.TheDeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c}"/>&nbsp;<apex:inputField style="width:65px" id="milestone-revenue-value" value="{!milestone.KimbleOne__InvoicingCurrencyMilestoneValue__c}" onchange="calculateMilestoneRevenuesAndCosts();" />
+			                                       </apex:outputPanel>
+			                                   </apex:column>
+
+			                                   <apex:column headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__UnitValue__c.Label}" rendered="{!TheDeliveryElement.TheProduct.UnitGenerated}">
+			                                       <apex:outputPanel html-milestone-type="Cost" rendered="{!milestone.KimbleOne__MilestoneType__c == CostMilestoneId}">
+			                                       		<apex:outputText value="{!TheDeliveryElement.TheDeliveryElement.KimbleOne__SupplierInvoicingCurrencyIsoCode__c}"/>&nbsp;<apex:inputField style="width:65px" id="milestone-cost-unit-value" value="{!milestone.KimbleOne__SupplierInvoicingCurrencyUnitValue__c}" onchange="calculateMilestoneRevenuesAndCosts();"/>
+			                                       </apex:outputPanel>
+
+			                                       <apex:outputPanel html-milestone-type="Revenue" rendered="{!milestone.KimbleOne__MilestoneType__c == RevenueMilestoneId}">
+			                                       		<apex:outputText value="{!TheDeliveryElement.TheDeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c}"/>&nbsp;<apex:inputField style="width:65px" id="milestone-revenue-unit-value" value="{!milestone.KimbleOne__InvoicingCurrencyUnitValue__c}" onchange="calculateMilestoneRevenuesAndCosts();" />
+			                                       </apex:outputPanel>
+			                                   </apex:column>
+
+			                                   <apex:column headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneUnits__c.Label}" rendered="{!TheDeliveryElement.TheProduct.UnitGenerated}">
+			                                   		<apex:inputField id="milestone-units" value="{!milestone.KimbleOne__MilestoneUnits__c}" rendered="{!!ISBLANK(milestone.KimbleOne__MilestoneType__c)}" onchange="calculateMilestoneRevenuesAndCosts();"/>
+			                                   </apex:column>
+
+			                                   <apex:facet name="footer"><span class="fa fa-plus-square"></span>&nbsp;<a href="javascript:addMilestone();">{!$Label.AddMilestoneButton}</a></apex:facet>
+
+			                               </apex:pageBlockTable>
+
+                           				</apex:outputPanel>
+                                   	</div>
+                                   </apex:outputPanel>
+
+                                   <apex:outputPanel layout="none" rendered="{!TheDeliveryElement.TheProduct.RevenueUsageGenerated || TheDeliveryElement.TheProduct.CostUsageGenerated}">
+
+                                  	<div class="ionTabs__item" data-name="assignment-config">
+                           			<script>
+							        	var showRevCol = {!IF(TheDeliveryElement.TheProduct.RevenueUsageGenerated || TheDeliveryElement.TheProduct.RevenueUsageIsNotional, 'true','false')};
+							        	var showAssignmentDiscount = {!ShowAssignmentDiscountPct};
+							        	var isFlatRateItemDiscount = {!IsFlatRateItemDiscount};
+
+							        </script>
+							        <apex:inputHidden id="element-usage-mode" value="{!TheDeliveryElement.UsageForecastMode}"/>
+
+									<apex:variable value="{!TheDeliveryElement.CanEditAllAssignments && (TheDeliveryElement.TargetMarginEnabled || TheDeliveryElement.ExpectedUsageEnabled || TheDeliveryElement.DerivedRevenueEnabled || TheDeliveryElement.UsageDerivedRevenueEnabled)}" var="showUFM"/>
+
+                           			<apex:pageblockSection collapsible="false" showheader="false" columns="2">
+                            			<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.TheProduct.HasExtensionProduct}">
+			                            	<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ProductExtension__c.Label}"/>
+                                  			<apex:outputpanel layout="none">
+                                  				<apex:inputField rendered="{!ExtensionProductEnhancedLookupEnabled}" value="{!TheDeliveryElement.TheDeliveryElement.KimbleOne__ProductExtension__c}" styleclass="kimbleSearch" html-data-typename="ProductExtension" html-data-filter="{!IF(!ISBLANK(TheDeliveryElement.TheDeliveryElement.DeliveryGroup__r.KimbleOne__Proposal__c), 'BusinessUnitId:' + TheDeliveryElement.TheDeliveryElement.DeliveryGroup__r.Proposal__r.KimbleOne__BusinessUnit__c + ';ProductId:' + TheDeliveryElement.TheDeliveryElement.KimbleOne__Product__c, '')}">
+                                  					<apex:actionSupport event="onchange" action="{!ChangeExtension}" rerender="ElementAssignmentsContainer" oncomplete="initialiseProposalElementEdit()"/>
+                                  				</apex:inputField>
+                                  				<apex:selectList rendered="{!!ExtensionProductEnhancedLookupEnabled}" value="{!TheDeliveryElement.TheDeliveryElement.KimbleOne__ProductExtension__c}" size="1">
+                                  					<apex:selectOptions value="{!TheExtensionProducts}"/>
+                                  					<apex:actionSupport event="onchange" action="{!ChangeExtension}" rerender="ElementAssignmentsContainer" oncomplete="initialiseProposalElementEdit()"/>
+                                  				</apex:selectList>
+                                  			</apex:outputpanel>
+		                                </apex:pageBlockSectionItem>
+
+                            			<apex:pageBlockSectionItem rendered="{!!TheDeliveryElement.IsProfiledUsage && !IsFlatRateItemDiscount && showUFM}">
+			                                   <apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__UsageForecastMode__c.Label}"/>
+			                                   <apex:outputPanel layout="none">
+			                                   <div id="usage-forecast-mode" class="usage-forecast-mode-toggle" selected-mode="{!JSENCODE(TheDeliveryElement.UsageForecastMode)}">
+												   <apex:outputPanel layout="inline" rendered="{!TheDeliveryElement.TargetMarginEnabled}" styleclass="{!IF(TheDeliveryElement.UsageForecastMode = 'TargetMargin', 'selected','')} "><span onclick="toggleUsageForecastMode(this, 'TargetMargin');" ><span class="toggleIcon fa fa-sort-amount-asc"></span><span style="font-weight: bold;font-size: 8px;position: relative;left: -6px;top: -3px;">%</span><span class="linkText"><apex:outputText value="{!TheDeliveryElement.TargetMarginName}"/></span></span></apex:outputPanel><apex:outputPanel layout="inline" rendered="{!TheDeliveryElement.ExpectedUsageEnabled}" styleclass="{!IF(TheDeliveryElement.UsageForecastMode = 'ExpectedUsage', 'selected','')} "><span  onclick="toggleUsageForecastMode(this, 'ExpectedUsage');"><span class="toggleIcon fa fa-sort-amount-asc"></span><span style="font-weight: bold;font-size: 8px;position: relative;left: -6px;top: -3px;">{!TheDeliveryElement.TheOperatingActivity.ForecastUnitType__r.Name}</span><span class="linkText"><apex:outputText value="{!TheDeliveryElement.ExpectedUsageName}"/></span></span></apex:outputPanel><apex:outputPanel layout="inline" rendered="{!TheDeliveryElement.DerivedRevenueEnabled}" styleclass="{!IF(TheDeliveryElement.UsageForecastMode = 'DerivedRevenue', 'selected','')} "><span onclick="toggleUsageForecastMode(this, 'DerivedRevenue');"><span class="toggleIcon fa fa-sort-amount-asc"></span><span style="font-weight: bold;font-size: 8px;position: relative;left: -6px;top: -3px;">{!TheDeliveryElement.TheOperatingActivity.ForecastUnitType__r.Name}</span><span class="linkText"><apex:outputText value="{!TheDeliveryElement.DerivedRevenueName}"/></span></span></apex:outputPanel><apex:outputPanel layout="inline" rendered="{!TheDeliveryElement.UsageDerivedRevenueEnabled}" styleclass="{!IF(TheDeliveryElement.UsageForecastMode = 'UsageDerivedRevenue', 'selected','')} "><span onclick="toggleUsageForecastMode(this, 'UsageDerivedRevenue');"><span class="toggleIcon fa fa-sort-amount-asc fa-rotate-180 fa-flip-vertical"></span><span style="font-weight: bold;font-size: 8px;position: relative;left: -4px;top: -3px;">{!TheDeliveryElement.TheOperatingActivity.ForecastUnitType__r.Name}</span><span class="linkText"><apex:outputText value="{!TheDeliveryElement.UsageDerivedRevenueName}"/></span></span></apex:outputPanel><apex:outputPanel layout="inline" rendered="{!TheDeliveryElement.UsageItemEnabled}" styleclass="{!IF(TheDeliveryElement.UsageForecastMode = 'UsageItem', 'selected','')} "><span onclick="toggleUsageForecastMode(this, 'UsageItem');"><span class="toggleIcon fa fa-sort-amount-asc fa-flip-vertical"></span><span class="linkText"><apex:outputText value="{!TheDeliveryElement.UsageItemName}"/></span></span></apex:outputPanel>
+						                      </div>
+						                      </apex:outputPanel>
+                            			</apex:pageBlockSectionItem>
+
+                            			<apex:pageBlockSectionItem rendered="{!!TheDeliveryElement.TheProduct.HasExtensionProduct}">
+                            			</apex:pageBlockSectionItem>
+
+                            			<apex:pageBlockSectionItem rendered="{!!TheDeliveryElement.IsProfiledUsage && !IsFlatRateItemDiscount && showUFM}">
+			                                   <apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__TargetMargin__c.Label} (%)"/>
+			                                   <apex:inputField id="element-target-margin" styleclass="kimble-number" value="{!TheDeliveryElement.TheDeliveryElement.KimbleOne__TargetMargin__c}" onchange="if(validateTargetMargin(this.value)){calculateAssignmentRevenuesAndCosts();}"/>
+			                            </apex:pageBlockSectionItem>
+
+			                            <apex:pageBlockSectionItem rendered="{!!TheDeliveryElement.IsProfiledUsage && !IsFlatRateItemDiscount && showUFM}">
+			                                   <apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ExpectedUsage__c.Label} ({!TheDeliveryElement.TheOperatingActivity.ForecastUnitType__r.Name})"/>
+			                                   <apex:inputField id="element-expected-usage" styleclass="kimble-number" value="{!TheDeliveryElement.TheDeliveryElement.KimbleOne__ExpectedUsage__c}" onchange="calculateAssignmentRevenuesAndCosts()"/>
+			                            </apex:pageBlockSectionItem>
+
+			                            <apex:pageBlockSectionItem rendered="{!!TheDeliveryElement.IsProfiledUsage && !IsFlatRateItemDiscount && TheDeliveryElement.RevenueForecastMode = 'RevenueItem' && showUFM}">
+			                                   <apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__InvoicingCcyExpectedContractRevenue__c.Label} ({!TheDeliveryElement.TheDeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c})"/>
+			                                   <apex:inputField id="element-expected-revenue" styleclass="kimble-number" value="{!TheDeliveryElement.TheDeliveryElement.KimbleOne__InvoicingCcyExpectedContractRevenue__c}" onchange="calculateAssignmentRevenuesAndCosts()"/>
+			                            </apex:pageBlockSectionItem>
+
+
+			                        </apex:pageblockSection>
+
+			                        <apex:outputPanel id="ElementAssignmentsContainer">
+			                        	<apex:variable value="{!0}" var="rowNum"/>
+			                        	<apex:variable value="{!0}" var="rowNumForMilestones"/>
+										<apex:variable var="HasAccess" value="{!'1'=='1'}"/>
+			                        	<apex:pageBlockTable id="assignment-config-table" var="assignment" value="{!TheDeliveryElement.TheAssignments}">
+                                               <apex:column >
+                                                   <div class="assignment-btns" style="white-space:nowrap" >
+                                                   	<apex:variable value="{! '1'=='1'}" var="IsPassedDeleteCriteria" />
+                                                   	<apex:variable value="{!TheDeliveryElement.TheAssignmentsThatPassedDeleteCriteria[assignment.id]}" var="IsPassedDeleteCriteria" rendered="{!assignment.id != null}"/>
+													<apex:variable value="{!!ISBLANK(assignment.KimbleOne__Resource__c) && OR(assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.ModelAssignmentTypeId, assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.AppliedModelAssignmentTypeId)}" var="canApplyModel"/>
+													<apex:variable value="{!!ISBLANK(assignment.KimbleOne__Resource__c) && assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.AppliedModelAssignmentTypeId}" var="canActivateModel"/>
+                                                  	<apex:variable var="HasAccess" value="{!ISBLANK(assignment.KimbleOne__Resource__c) || TheDeliveryElement.CanEditResourceAssignmentMap[assignment.KimbleOne__Resource__c]}"/>
+
+													   <apex:outputPanel layout="none" rendered="{!IsPassedDeleteCriteria}">
+                                                   		<span class="fa fa-trash-o inline-btn" onclick="var d = confirmDelete();if(!d) return;removeAssignment({!ROUND(rowNum,0)})"></span>
+                                                   	</apex:outputPanel>
+                                                   	<apex:outputPanel layout="none" rendered="{!NOT(IsPassedDeleteCriteria)}">
+                                                   		<span class="fa fa-trash-o inline-btn" onclick="initialiseStackedModalBoxy('#LostAssignmentPopup', '{!JSENCODE($Label.Remove)} {!$ObjectType.ActivityAssignment__c.label}', jQuery('form[id$=\'TheProposalElementForm\']'), true);loadAssignmentToLose('{!JSENCODE(assignment.id)}');"></span>
+                                                   	</apex:outputPanel>
+													<apex:outputPanel layout="none" rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c) && HasAccess}">
+														<span title="{!$Label.CloneAssignmentLabel}" class="fa fa-clone inline-btn" onclick="cloneAssignment({!ROUND(rowNum,0)})"></span>
+													</apex:outputPanel>
+													<apex:outputPanel layout="none" rendered="{!ShowAssignmentKeyFields}">
+												   		<span class="fa fa-comment inline-btn" onclick="initialiseStackedModalBoxy('#CustomFieldsPopup', '{!JSENCODE($Label.AssignmentKeyFields)}', jQuery('form[id$=\'TheProposalElementForm\']'), true);editAssignmentCustomFields({!ROUND(rowNum,0)})"></span>
+													</apex:outputPanel>
+	                                               <apex:outputPanel layout="none" rendered="{!TheDeliveryElement.TheProduct.RevenueMilestoneGenerated && !ISBLANK(assignment.KimbleOne__Resource__c) && AllowAssignmentToMilestoneLink && TheDeliveryElement.ShowMilestonesPanel  && !canApplyModel}">
+	                                               		<apex:variable value="{!!ISBLANK(TheDeliveryElement.AssignmentPositionToMilestonePositionMap[rowNumForMilestones]) && LEN(TheDeliveryElement.AssignmentPositionToMilestonePositionMap[rowNumForMilestones]) > 0}" var="hasMilestone"/>
+														<div title="{!IF(hasMilestone, $ObjectType.ActivityAssignment__c.Fields.Milestone__c.label + ': ' + TheDeliveryElement.MilestonePositionToMilestoneMap[TheDeliveryElement.AssignmentPositionToMilestonePositionMap[rowNumForMilestones]].Name, $Label.LinkWithMilestoneLabel)}" class="gantt-marker Revenue {!IF(hasMilestone, 'with-milestone ', '')}inline-btn assignment-milestone-btn"></div>
+														<div class="assignment-milestones hidden-item">
+														<ul class="assignment-milestone" assignment-pos="{!ROUND(rowNum,0)}">
+															<apex:repeat value="{!TheDeliveryElement.TheRevenueMilestones}" var="revMilestone">
+															<li milestone-pos="{!revMilestone.Value}" class="milestone-option {!IF(TheDeliveryElement.AssignmentPositionToMilestonePositionMap[rowNumForMilestones] = revMilestone.Value, 'selected','')}"><apex:outputText value="{!revMilestone.Label}"/></li>
+															</apex:repeat>
+														</ul>
+														<div class="assignment-milestone-cancel"><i class="fa fa-times"></i></div>
+														</div>
+														<apex:variable value="{!rowNumForMilestones+1}" var="rowNumForMilestones"/>
+	                                               </apex:outputPanel>
+												   <apex:outputPanel layout="none" rendered="{!canApplyModel}">
+													   <span title="{!$Label.ApplyModelAssignment}" class="fa fa-plus-circle inline-btn" onclick="applyProposalModelAssignmentClick(this, {!ROUND(rowNum,0)})"></span>
+												   </apex:outputPanel>
+												   <apex:outputPanel layout="none" rendered="{!canActivateModel}">
+                                                       <span title="{!$Label.RevertAppliedModelAssignment}" class="fa fa-minus-circle inline-btn" onclick="revertAppliedProposalModelAssignmentClick(this, {!ROUND(rowNum,0)})"></span>
+													   <span title="{!$Label.ActivateModelAssignment}" class="fa fa-toggle-off inline-btn" onclick="activateProposalModelAssignmentClick(this, {!ROUND(rowNum,0)})"></span>
+												   </apex:outputPanel>
+												   <apex:outputPanel layout="none" rendered="{!assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.FrameworkAssignmentTypeId}">
+													   <span title="{!$label.FrameworkAssignment}" class="fa fa-share-alt"></span>
+												   </apex:outputPanel>
+												   <apex:outputPanel layout="none" rendered="{!!ISBLANK(assignment.KimbleOne__ActivityAssignment__c)}">
+													   <span title="{!$label.ChildAssignmentLabel}" class="fa indent-child-assignment"></span>
+												   </apex:outputPanel>
+                                                   </div>
+                                                   <apex:outputPanel id="assignment-panel" styleclass="requiredInput" layout="block" rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c)}" html-resource-id="{!assignment.KimbleOne__Resource__c}" html-activity-id="{!TheDeliveryElement.TheScopingActivity.Id}" html-usage-behaviour-rule-id="{!assignment.KimbleOne__UsageBehaviourRule__c}" html-is-model="{!assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.ModelAssignmentTypeId}" html-is-applied-model="{!assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.AppliedModelAssignmentTypeId}"  html-is-activated-model="{!assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.ActivatedModelAssignmentTypeId}" html-usage-pattern="{!assignment.KimbleOne__UsagePattern__c}" html-hours-per-day="{!assignment.KimbleOne__HoursPerDay__c}" html-inv-ccy="{!assignment.KimbleOne__InvoicingCurrencyIsoCode__c}" html-is-drawdown-assignment="{!assignment.KimbleOne__ActivityAssignment__c != null && assignment.ActivityAssignment__r.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.FrameworkAssignmentTypeId}"/>
+
+                                               </apex:column>
+
+                                               <apex:column rendered="{!!TheDeliveryElement.IsLocationRequired}" headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__Resource__c.Label}">
+                                                   <apex:inputField required="false" styleclass="assignment-resource kimbleSearch" value="{!assignment.KimbleOne__Resource__c}" html-data-typename="{!IF(OR(assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.ModelAssignmentTypeId, assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.AppliedModelAssignmentTypeId, assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.ActivatedModelAssignmentTypeId),'LookupObjectModelResource','')}" onchange="assignmentResourceChange({!ROUND(rowNum,0)})"/>
+                                               </apex:column>
+
+												<apex:column rendered="{!TheDeliveryElement.IsLocationRequired}" headerValue="{!$ObjectType.KimbleOne__Resource__c.Fields.Name.Label} & {!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ActivityRole__c.Label}">
+													<apex:inputField required="false" styleclass="assignment-resource kimbleSearch" value="{!assignment.KimbleOne__Resource__c}" html-data-typename="{!IF(OR(assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.ModelAssignmentTypeId, assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.AppliedModelAssignmentTypeId, assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.ActivatedModelAssignmentTypeId),'LookupObjectModelResource','')}" onchange="assignmentResourceChange({!ROUND(rowNum,0)})"/>
+													<div style="padding-top:6px;">
+														<apex:selectList rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c) && !TheDeliveryElement.IsRoleRequired}" value="{!assignment.KimbleOne__ActivityRole__c}" size="1">
+															<apex:selectOptions value="{!TheDeliveryElement.TheRoles}"/>
+														</apex:selectList>
+														<apex:outputPanel styleclass="requiredInput" layout="block" rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c) && TheDeliveryElement.IsRoleRequired}" >
+															<div class="requiredBlock"></div>
+															<apex:selectList value="{!assignment.KimbleOne__ActivityRole__c}" size="1" onchange="{!IF(TheDeliveryElement.IsRoleRequired, 'assignmentRoleChange(' & TEXT(ROUND(rowNum,0)) & ')','')}">
+																<apex:selectOptions value="{!TheDeliveryElement.TheRoles}"/>
+															</apex:selectList>
+														</apex:outputPanel>
+													</div>
+												</apex:column>
+
+												<apex:column id="assignment-model" headerClass="model-field" headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__NumberOfActivityAssignments__c.Label}" >
+													<apex:inputField id="assignment-model-num" styleclass="kimble-number model-field" rendered="{!OR(assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.ModelAssignmentTypeId, assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.AppliedModelAssignmentTypeId, assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.ActivatedModelAssignmentTypeId) && !ISBLANK(assignment.KimbleOne__Resource__c) && TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'TaskUsage' && !assignment.KimbleOne__IsUsageProfiled__c}"  style="width:45px" value="{!assignment.KimbleOne__NumberOfActivityAssignments__c}" onchange="calculateAssignmentRevenuesAndCosts()"/>
+													<apex:outputText id="assignment-model-num-text" styleclass="kimble-number" rendered="{!OR(assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.ModelAssignmentTypeId, assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.AppliedModelAssignmentTypeId, assignment.KimbleOne__ActivityAssignmentType__c = TheDeliveryElement.ActivatedModelAssignmentTypeId) && !ISBLANK(assignment.KimbleOne__Resource__c) && TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'TaskUsage' && assignment.KimbleOne__IsUsageProfiled__c}"  style="width:65px" value="{!assignment.KimbleOne__NumberOfActivityAssignments__c}" />
+												</apex:column>
+
+												<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ActivityRole__c.Label}" rendered="{!!TheDeliveryElement.IsLocationRequired && TheDeliveryElement.TheRoles.size > 1}">
+												   <apex:selectList rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c) && !TheDeliveryElement.IsRoleRequired}" value="{!assignment.KimbleOne__ActivityRole__c}" size="1">
+													   <apex:selectOptions value="{!TheDeliveryElement.TheRoles}"/>
+												   </apex:selectList>
+												   <apex:outputPanel styleclass="requiredInput" layout="block" rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c) && TheDeliveryElement.IsRoleRequired}" >
+													   <div class="requiredBlock"></div>
+													   <apex:selectList id="assignment-activity-role" value="{!assignment.KimbleOne__ActivityRole__c}" size="1" onchange="{!IF(TheDeliveryElement.IsRoleRequired, 'assignmentRoleChange(' & TEXT(ROUND(rowNum,0)) & ')','')}">
+														   <apex:selectOptions value="{!TheDeliveryElement.TheRoles}"/>
+													   </apex:selectList>
+												   </apex:outputPanel>
+
+												</apex:column>
+
+												<apex:column rendered="{!TheDeliveryElement.IsLocationRequired}" headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__Location__c.Label}">
+													<apex:outputPanel styleclass="requiredInput" layout="block" rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c)}" >
+														<div class="requiredBlock"></div>
+														<apex:selectList rendered="{!!UseLocationEnhancedLookup}" id="assignment-location-list" value="{!assignment.KimbleOne__Location__c}" size="1" onchange="{!'assignmentLocationChange(' & TEXT(ROUND(rowNum,0)) & ')'}">
+															<apex:selectOptions value="{!TheLocationOptions}"/>
+														</apex:selectList>
+														<apex:inputField id="assignment-location-field" rendered="{!UseLocationEnhancedLookup}" value="{!assignment.KimbleOne__Location__c}" required="true" onchange="{!'assignmentLocationChange(' & TEXT(ROUND(rowNum,0)) & ')'}"/>
+													</apex:outputPanel>
+
+												</apex:column>
+
+												<apex:column id="assignment-pct-col" styleclass="kimble-number" style="width:54px">
+													<apex:facet name="header">
+														<div class="table-cell-right">%</div>
+													</apex:facet>
+													<apex:outputField styleclass="kimble-number" rendered="{!assignment.KimbleOne__IsUsageProfiled__c || !HasAccess}" value="{!assignment.KimbleOne__AssignmentPercentage__c}"></apex:outputField>
+												   <apex:inputField id="assignment-percentage" styleclass="kimble-number" style="width:45px" value="{!assignment.KimbleOne__AssignmentPercentage__c}" rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c) && !assignment.KimbleOne__IsUsageProfiled__c && HasAccess}" onchange="calculateAssignmentRevenuesAndCosts()"/>
+												</apex:column>
+
+												<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__IsUsageProfiled__c.Label}" rendered="{!TheDeliveryElement.IsProfiledUsage && HasAccess}" id="profiled-usage-col">
+													<apex:inputField required="false"  value="{!assignment.KimbleOne__IsUsageProfiled__c}" onchange="assignmentChange({!ROUND(rowNum,0)});" rendered="{!assignment.KimbleOne__IsUsageProfiled__c}"/>
+												</apex:column>
+
+												<apex:column >
+												<apex:outputPanel layout="none" rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c) && !assignment.KimbleOne__IsUsageProfiled__c && HasAccess}">
+													<div class="assignment-usage-behaviours" assignment-pos="{!ROUND(rowNum,0)}" title="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UsageBehaviourRule__c.Label}: {!TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].Name}" onclick="showUBR({!ROUND(rowNum,0)})">
+													<i class="fa fa-sliders inline-btn usage-behaviour-btn"></i>
+													<div class="assignment-usage-behaviours-select hidden-item">
+														<i class="fa fa-spin fa-circle-o-notch working-ind hidden-item" title="{!$label.Loading}"></i>
+														<i class="fa fa-window-close inline-btn usage-behaviour-cancel-btn" title="{!$label.Close}" onclick="hideUBR({!ROUND(rowNum,0)});"></i>
+														<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UsageBehaviourRule__c.Label}"/>
+														<apex:selectList id="assignment-usage-behaviour-rule" value="{!assignment.KimbleOne__UsageBehaviourRule__c}" size="1" onchange="assignmentUBRSelect({!ROUND(rowNum,0)});" rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c) && !assignment.KimbleOne__IsUsageProfiled__c}">
+														<apex:selectOptions value="{!TheDeliveryElement.TheUsageBehaviourRules}"/>
+														</apex:selectList>
+														<apex:outputText id="assignment-usage-behaviour-rule-text" rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c) && assignment.KimbleOne__IsUsageProfiled__c}"  value="{!TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].Name}" />
+													</div>
+													</div>
+												</apex:outputPanel>
+												<apex:outputPanel layout="none" rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c) && assignment.KimbleOne__IsUsageProfiled__c && HasAccess}">
+													<div class="assignment-usage-behaviours" title="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UsageBehaviourRule__c.Label}: {!assignment.UsageBehaviourRule__r.Name}">
+														<i class="fa fa-sliders"></i>
+													</div>
+												</apex:outputPanel>
+												</apex:column>
+
+												<apex:column styleclass="kimble-number" style="width:54px">
+													<apex:facet name="header">
+														<div class="table-cell-right">{!$Label.kimbleone__usagelabel}<span class="assignment-table-units">({!TheDeliveryElement.TheOperatingActivity.ForecastUnitType__r.Name})</span></div>
+													</apex:facet>
+													<apex:outputPanel rendered="{!!(assignment.KimbleOne__ActivityAssignmentType__c == TheDeliveryElement.FrameworkAssignmentTypeId) && HasAccess}">
+														<apex:inputField id="assignment-usage" styleclass="kimble-number {!IF(!ISBLANK(assignment.KimbleOne__Resource__c) && TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'DerivedUsage'  && TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'TaskUsage' && !assignment.KimbleOne__IsUsageProfiled__c && TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'NoForecast','','hidden-item')}" style="width:45px" value="{!assignment.KimbleOne__EntryRemainingUsage__c}" onchange="calculateAssignmentRevenuesAndCosts()"/>
+													</apex:outputPanel>
+													<apex:outputPanel rendered="{!(assignment.KimbleOne__ActivityAssignmentType__c == TheDeliveryElement.FrameworkAssignmentTypeId)}">
+														<apex:inputField id="assignment-usage-2" styleclass="kimble-number {!IF(!ISBLANK(assignment.KimbleOne__Resource__c) && TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'DerivedUsage'  && TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'TaskUsage' && !assignment.KimbleOne__IsUsageProfiled__c,'','hidden-item')}" style="width:45px" value="{!assignment.KimbleOne__FrameworkUsage__c}" onchange="calculateAssignmentRevenuesAndCosts()"/>
+													</apex:outputPanel>
+													
+													<apex:outputPanel styleClass="{!IF(!ISBLANK(assignment.KimbleOne__Resource__c)  && (!HasAccess || assignment.KimbleOne__IsUsageProfiled__c || TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c = 'DerivedUsage' || TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c = 'TaskUsage' || TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c = 'NoForecast'),'','hidden-item')}">
+														<apex:outputField id="assignment-usage-text" styleclass="kimble-number" style="width:45px" value="{!assignment.KimbleOne__EntryRemainingUsage__c}"  rendered="{!!(assignment.KimbleOne__ActivityAssignmentType__c == TheDeliveryElement.FrameworkAssignmentTypeId)}"/>
+														<apex:outputField id="assignment-usage-text-2" styleclass="kimble-number" style="width:45px" value="{!assignment.KimbleOne__FrameworkUsage__c}"  rendered="{!(assignment.KimbleOne__ActivityAssignmentType__c == TheDeliveryElement.FrameworkAssignmentTypeId)}"/>
+													</apex:outputPanel>
+												</apex:column>
+
+											   <apex:column styleclass="kimble-number" headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__MaximumUsage__c.Label}" rendered="{!TheDeliveryElement.ShowMaxUsageField}" id="max-usage-col">
+												    <apex:inputField id="assignment-max-usage" styleclass="kimble-number" rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c) && TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].PreserveUsageUpToMaximumUsage__c}"  style="width:45px" value="{!assignment.KimbleOne__MaximumUsage__c}" onchange="calculateAssignmentRevenuesAndCosts()"/>
+												</apex:column>
+
+											<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__StartDate__c.Label}" style="width:78px;">
+												<apex:inputField id="assignment-start-date" styleclass="kimbleDatePicker"  style="width:65px" value="{!assignment.KimbleOne__StartDate__c}"  onchange="assignmentChange({!ROUND(rowNum,0)});" rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c) && TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'TaskUsage' && HasAccess}"/>
+												<apex:outputField id="assignment-start-date-text" rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c) && (TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c = 'TaskUsage' || !HasAccess)}"  style="width:65px" value="{!assignment.KimbleOne__StartDate__c}"  />
+											</apex:column>
+
+												<apex:column headerValue="{!$Label.kimbleone__enddatelabel}" style="width:78px;">
+                                                   <apex:inputField id="assignment-end-date" styleclass="kimbleDatePicker {!IF(!ISBLANK(assignment.KimbleOne__Resource__c) && HasAccess && TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'DerivedEndDate' && TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'TaskUsage' && !assignment.KimbleOne__IsUsageProfiled__c,'','hidden-item')}" style="width:65px" value="{!assignment.KimbleOne__ForecastP3EndDate__c}"  onchange="calculateAssignmentRevenuesAndCosts()" />
+													<apex:outputPanel styleClass="{!IF(!ISBLANK(assignment.KimbleOne__Resource__c) && (!HasAccess || TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c = 'DerivedEndDate' || TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c = 'TaskUsage' || assignment.KimbleOne__IsUsageProfiled__c),'','hidden-item')}">
+													<apex:outputField id="assignment-end-date-text" style="width:65px" value="{!assignment.KimbleOne__ForecastP3EndDate__c}"  />
+													</apex:outputPanel>
+                                                   <apex:variable value="{!rowNum+1}" var="rowNum"/>
+                                               </apex:column>
+
+                                               <apex:column styleclass="kimble-number" style="width:56px;">
+												   <apex:facet name="header">
+													   <div class="table-cell-right">{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UtilisationPercentage__c.Label}<span class="assignment-table-units">(%)</span></div>
+												   </apex:facet>
+                                                   <apex:inputField id="assignment-utilisation" styleclass="kimble-number {!IF(!ISBLANK(assignment.KimbleOne__Resource__c) && HasAccess && TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'DerivedUtilisation' && TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'TaskUsage' && TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'NoForecast' && !assignment.KimbleOne__IsUsageProfiled__c,'','hidden-item')}" style="width:65px" value="{!assignment.KimbleOne__BaselineUtilisationPercentage__c}"  onchange="calculateAssignmentRevenuesAndCosts()"/>
+                                                   <apex:outputText id="assignment-utilisation-text" styleclass="kimble-number {!IF(!ISBLANK(assignment.KimbleOne__Resource__c) && (!HasAccess || TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c = 'DerivedUtilisation' || TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c = 'TaskUsage' || TheUsageBehaviourRules[assignment.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c = 'NoForecast' || assignment.KimbleOne__IsUsageProfiled__c),'','hidden-item')}" style="width:65px" value="{!assignment.KimbleOne__BaselineUtilisationPercentage__c}" />
+                                               </apex:column>
+
+                                               <apex:column styleclass="kimble-number" style="width:76px;">
+												   <apex:facet name="header">
+													   <div class="table-cell-right">{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__CostRate__c.Label}<span class="assignment-table-units">({!TheDeliveryElement.TheDeliveryElement.CurrencyISOCode} / {!TheDeliveryElement.TheOperatingActivity.InvoicingUnitType__r.Name})</span></div>
+												   </apex:facet>
+												  <apex:inputHidden id="assignment-cost-summary" html-data-is-new="{!ISBLANK(assignment.Id)}" html-data-orig-value="{!assignment.KimbleOne__TemporalForecastCostRate__c}" value="{!assignment.KimbleOne__TemporalForecastCostRate__c}" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__TemporalForecastCostRate__c.Accessible}" html-data-readonly="{!!TheDeliveryElement.CanEditAssignmentCost}"/>
+
+												   <apex:inputHidden id="assignment-cost-basis-summary" value="{!assignment.KimbleOne__TemporalCostRateBasis__c}" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__TemporalForecastCostRate__c.Accessible}" html-data-readonly="{!!TheDeliveryElement.CanEditAssignmentCost}" />
+                                                  <apex:inputHidden id="assignment-cost-exchange-rate-summary" value="{!assignment.KimbleOne__TemporalCostExchangeRate__c}" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__TemporalForecastCostRate__c.Accessible}" html-data-readonly="{!!TheDeliveryElement.CanEditAssignmentCost}" />
+
+                                                  <apex:inputHidden id="assignment-cost-rate" value="{!assignment.KimbleOne__ForecastCostRate__c}" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ForecastCostRate__c.Accessible && !ISBLANK(assignment.KimbleOne__TemporalCostRateBasis__c) && assignment.KimbleOne__TemporalCostRateBasis__c != ''}" html-data-readonly="{!!TheDeliveryElement.CanEditAssignmentCost}" />
+												   <span style="position:relative"><span class="fa fa-calendar assignment-cost-rate-effective-date-container"  style="display:none;cursor:pointer" title="{!$ObjectType.ActivityAssignment__c.Fields.ForecastCostRateEffectiveDate__c.Label}"><apex:inputField onchange="jQuery(this).closest('td').find('.cost-rate-input').trigger('change');" id="assignment-cost-rate-effective-date" styleclass="kimbleDatePicker" value="{!assignment.KimbleOne__ForecastCostRateEffectiveDate__c}" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ForecastCostRate__c.Accessible && TheDeliveryElement.CanEditAssignmentCost}" html-data-readonly="{!!TheDeliveryElement.CanEditAssignmentCost}" /></span></span>
+                                               </apex:column>
+
+                                               <apex:column styleclass="kimble-number" style="width:76px;" rendered="{!TheDeliveryElement.TheProduct.RevenueUsageGenerated || TheDeliveryElement.TheProduct.RevenueUsageIsNotional}">
+                                                   <apex:facet name="header">
+													   <div class="table-cell-right">{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__RevenueRate__c.Label}<span class="assignment-table-units">({!TheDeliveryElement.TheDeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c} / {!TheDeliveryElement.RevenueUnitType.Name})</span></div>
+												   </apex:facet>
+												   <apex:inputHidden id="assignment-exchange-rate-summary" value="{!assignment.KimbleOne__TemporalRevenueExchangeRate__c}" rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c)}"  />
+                                                   <apex:inputHidden id="assignment-revenue-rate" value="{!assignment.KimbleOne__InvoicingCurrencyForecastRevenueRate__c}" rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c)}"/>
+												   <apex:inputHidden id="assignment-default-revenue-rate" value="{!assignment.KimbleOne__InvoicingCurrencyDefaultRevenueRate__c}" rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c)}"/>
+
+                                                   <apex:outputPanel layout="none" rendered="{!(ShowAssignmentDiscountPct || IsFlatRateItemDiscount) && !ISBLANK(assignment.KimbleOne__Resource__c)}"><span class="fa fa-info-circle default-revenue-rate"/></apex:outputPanel>
+                                               </apex:column>
+
+                                               <apex:column styleclass="kimble-number disc-field" headerClass="disc-field" headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__DiscountPercentage__c.Label}" rendered="{!ShowAssignmentDiscountPct}">
+
+												   <apex:inputField id="assignment-discount" styleclass="discount-pct-input" value="{!assignment.KimbleOne__DiscountPercentage__c}" rendered="{!!ISBLANK(assignment.KimbleOne__Resource__c)}" />
+                                               </apex:column>
+
+                                           </apex:pageBlockTable>
+
+                                           <!--  must reset the counter as otherwise the re-renders performed by SF don't correctly reset this before using it -->
+                                           <apex:variable value="{!0}" var="rowNumForMilestones"/>
+
+                                           <script>
+                                           	var resourceAvailabilityMap = kimble.parseJSON("{!JSENCODE(TheDeliveryElement.TheResourceAvailabilityMapJson)}");
+                                           	var usageBehaviourRulesMap = kimble.parseJSON("{!JSENCODE(TheUsageBehaviourRulesJson)}");
+                                           	var forecastUnitType = '{!JSENCODE(TheDeliveryElement.ForecastUnits)}';
+                                           	var invoiceUnitType = '{!JSENCODE(TheDeliveryElement.InvoicingUnits)}';
+                                           	var revenueUnitTypeEnum = '{!JSENCODE(TheDeliveryElement.RevenueUnitsEnum)}';
+                                           	var averageDaysPerMonth = {!TheDeliveryElement.AverageDaysPerMonth};
+
+                                           	var hasRealRevenue = {!IF(TheDeliveryElement.TheProduct.RevenueUsageGenerated, 'true', 'false')};
+                                           	var costRateForecastFactor = {!TheDeliveryElement.CostRateForecastFactor};
+											var canEditAllAssignments = {!TheDeliveryElement.CanEditAllAssignments};
+                                           </script>
+			                        </apex:outputPanel>
+                                   </div>
+
+                                   </apex:outputPanel>
+                                   <apex:outputPanel layout="none" rendered="{!TheDeliveryElement.TheProduct.RevenueExpenseGenerated || TheDeliveryElement.TheProduct.CostExpenseGenerated}">
+                                    <div class="ionTabs__item" data-name="expense-config">
+                                       <apex:outputPanel id="ElementExpensesContainer">
+
+                                       <apex:variable value="{!0}" var="rowNum"/>
+			                        	<script>
+							        		var canAddEditExpense = {!IF(TheDeliveryElement.TheDeliveryElement.ResourcedActivity__r.ActivityStatus__r.Enum__c != 'Active', 'true','false')};
+							        	</script>
+			                        	<apex:pageBlockTable id="expenses-config-table" var="expense" value="{!TheDeliveryElement.TheExpenseProfiles}">
+
+                                               <apex:column >
+                                                   <apex:outputPanel layout="none" rendered="{!TheDeliveryElement.TheDeliveryElement.ResourcedActivity__r.ActivityStatus__r.KimbleOne__Enum__c != 'Active'}">
+                                                   	<span class="fa fa-trash-o inline-btn delete-expense-line" onclick="var d = confirmDelete();if(!d) return;removeExpense({!ROUND(rowNum,0)})"></span>
+                                                   </apex:outputPanel>
+                                               </apex:column>
+
+                                               <apex:column headerValue="{!$ObjectType.KimbleOne__ActivityExpenseCategoryProfile__c.Fields.KimbleOne__ExpenseCategory__c.Label}">
+                                                   <apex:selectList id="expense-category-id" value="{!expense.CategoryId}" size="1" onchange="refreshExpenseCostInsight(jQuery(this), true);">
+                                                       <apex:selectOptions value="{!TheDeliveryElement.TheExpenseCategories}"/>
+                                                   </apex:selectList>
+                                              	</apex:column>
+
+                                              	<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityExpenseCategoryProfile__c.Fields.KimbleOne__BusinessUnit__c.Label}">
+                                                   <apex:selectList id="business-unit-id" value="{!expense.BusinessUnitId}" size="1">
+                                                       <apex:selectOptions value="{!TheBusinessUnits}"/>
+                                                   </apex:selectList>
+                                              	</apex:column>
+
+                                               <apex:column headerValue="{!$ObjectType.KimbleOne__ActivityExpenseCategoryProfile__c.Fields.Name.Label}">
+                                                   <apex:inputText id="expense-name" style="width:125px" value="{!expense.Description}" />
+                                               </apex:column>
+
+                                               <apex:column styleclass="kimble-number insight-anchor" headerValue="{!$Label.kimbleone__netamount} ({!TheDeliveryElement.TheDeliveryElement.CurrencyISOCode})">
+                                                   <apex:inputField id="expense-net-amount" styleclass="kimble-number" style="width:65px" value="{!expense.NetAmount.KimbleOne__InputDecimal__c}" onchange="calculateExpenseRevenuesAndCosts(true, {!ROUND(rowNum,0)})"/>
+                                                   <span class="expense-cost-insight-ind hidden-item fa fa-lightbulb-o"/>
+                                               </apex:column>
+
+                                               <apex:column styleclass="kimble-number" headerValue="{!$Label.kimbleone__units}">
+                                                   <apex:inputField id="expense-units" styleclass="kimble-number" style="width:65px" value="{!expense.Units.KimbleOne__InputInteger__c}" onchange="calculateExpenseRevenuesAndCosts(true, {!ROUND(rowNum,0)})"/>
+                                               </apex:column>
+
+                                               <apex:column styleclass="kimble-number" headerValue="{!$ObjectType.KimbleOne__ActivityExpenseCategoryProfile__c.Fields.KimbleOne__ForecastRemainingCost__c.Label} ({!TheDeliveryElement.TheDeliveryElement.CurrencyISOCode})">
+                                                   <apex:inputField id="expense-remaining-cost" styleclass="kimble-number" style="width:65px" value="{!expense.RemainingCost.KimbleOne__InputDecimal__c}" />
+                                                   <apex:variable value="{!rowNum+1}" var="rowNum"/>
+                                               </apex:column>
+
+                                               <apex:column styleclass="kimble-number" headerValue="{!$ObjectType.KimbleOne__ActivityExpenseCategoryProfile__c.Fields.KimbleOne__InvoicingCcyForecastRemainingRevenue__c.Label} ({!TheDeliveryElement.TheDeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c})" rendered="{!TheDeliveryElement.TheProduct.RevenueExpenseGenerated}">
+                                                   <apex:inputField id="expense-remaining-revenue" styleclass="kimble-number" style="width:65px" value="{!expense.RemainingRevenue.KimbleOne__InputDecimal__c}" onchange="calculateExpenseRevenuesAndCosts(false)"/>
+                                               </apex:column>
+
+
+                                           </apex:pageBlockTable>
+                                           </apex:outputPanel>
+
+                                    </div>
+                                   </apex:outputPanel>
+                                   <div class="ionTabs__preloader"></div>
+                               </div>
+                        </div>
+
+						</apex:outputPanel>
+						<!-- Only show this if RateCard is not blank -->
+						<apex:outputPanel rendered="{!!ISBLANK(TheDeliveryElement.TheRateCardItemMap)}">
+
+							<table id="element-rates-table" border="0" class="list" cellpadding="0" cellspacing="0">
+								<thead>
+								<tr class="headerRow">
+									<th class="headerRow"><apex:outputText value="{!$ObjectType.KimbleOne__RateCardItem__c.Fields.Name.Label}"/></th>
+									<th class="headerRow"><apex:outputText value="{!$Label.kimbleone__overridelabel}"/></th>
+									<th class="headerRow"><apex:outputText value="{!$ObjectType.KimbleOne__RateCardItem__c.Fields.KimbleOne__Rate__c.Label}"/></th>
+									<th class="headerRow"><apex:outputText value="{!$Label.kimbleone__valuelabel}"/></th>
+								</tr>
+								</thead>
+								<apex:repeat value="{!TheDeliveryElement.TheRateCardItemMap}" var="itm">
+									<tr>
+										<td><apex:outputText value="{!TheDeliveryElement.TheRateCardItemMap[itm].TheRateCardItem.Name}"/></td>
+										<td><apex:inputField value="{!TheDeliveryElement.TheRateCardItemMap[itm].Overridden.InputCheckbox__c}" onchange="calculateContactCostFromRates();"/></td>
+										<td>
+											<div class="override-rates">
+												<apex:inputField styleclass="kimble-number" value="{!TheDeliveryElement.TheRateCardItemMap[itm].Rate.InputCurrency__c}" rendered="{!!ISBLANK(TheDeliveryElement.TheRateCardItemMap[itm].Rate)}" onchange="calculateContactCostFromRates();"/>
+												<apex:inputField styleclass="kimble-number" value="{!TheDeliveryElement.TheRateCardItemMap[itm].RateFactor.InputDecimal__c}" rendered="{!!ISBLANK(TheDeliveryElement.TheRateCardItemMap[itm].RateFactor)}" onchange="calculateContactCostFromRates();"/>
+											</div>
+											<div class="standard-rates">
+												<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheDeliveryElement.TheRateCardItemMap[itm].Rate)}">
+													<input type="text" class="kimble-number kimble-format-currency" value="{!TheDeliveryElement.TheRateCardItemMap[itm].TheRateCardItem.Rate__c}" readonly="readonly"/>
+												</apex:outputPanel>
+												<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheDeliveryElement.TheRateCardItemMap[itm].RateFactor)}">
+													<input type="text" class="kimble-number kimble-format-currency" value="{!TheDeliveryElement.TheRateCardItemMap[itm].TheRateCardItem.RateFactor__c}" readonly="readonly"/>
+												</apex:outputPanel>
+											</div>
+										</td>
+
+										<td><input type="text" class="kimble-number kimble-format-currency source-value" value="{!TheDeliveryElement.TheRateCardItemMap[itm].SourceValue}" readonly="readonly"/></td>
+									</tr>
+								</apex:repeat>
+							</table>
+
+						</apex:outputPanel>
+
+						</apex:outputPanel>
+
+					</apex:pageBlock>
+
+			</apex:outputPanel>
+
+		</apex:outputPanel>
+	</div>
+
+		<apex:actionFunction action="{!LoadTheDeliveryElement}" name="loadTheElement2" rerender="PopupContent" oncomplete="initialiseProposalElementEdit();">
+     		<apex:param name="deliveryElementId" value="" />
+     	</apex:actionFunction>
+
+		<apex:actionFunction action="{!LoadTheDeliveryElement}" name="loadTheElement" rerender="PopupContent" oncomplete="initialiseProposalElementEdit();showStackedModalBoxy();">
+     		<apex:param name="deliveryElementId" value="" />
+     	</apex:actionFunction>
+
+		<apex:actionFunction action="{!SaveTheDeliveryElement}" name="saveTheElement" rerender="PopupContent" oncomplete="saveProposalElementComplete();" status="DeliveryLoadingStatus">
+		</apex:actionFunction>
+
+        <apex:actionFunction action="{!SaveAndReloadTheDeliveryElement}" name="saveAndReloadTheElement" rerender="PopupContent" oncomplete="initialiseProposalElementEdit();showStackedModalBoxy();" status="DeliveryLoadingStatus">
+        </apex:actionFunction>
+
+        <apex:actionFunction action="{!DeleteTheDeliveryElement}" name="deleteTheElement" rerender="PopupContent" oncomplete="saveProposalElementComplete();" status="DeliveryLoadingStatus">
+     	</apex:actionFunction>
+
+     	<apex:actionFunction action="{!RemoveAssignment}" name="removeAssignment" rerender="ElementAssignmentsContainer, MessagesPanel" oncomplete="initialiseProposalElementEdit();" status="DeliveryLoadingStatus">
+     		<apex:param name="pos" value=""/>
+     	</apex:actionFunction>
+
+     	<apex:actionFunction action="{!Refresh}" name="refreshElementAssignmentContainer" rerender="ElementAssignmentsContainer" oncomplete="initialiseProposalElementEdit();">
+     		<apex:param name="pos" value=""/>
+     	</apex:actionFunction>
+
+     	<apex:actionFunction action="{!CloneAssignment}" name="cloneAssignment" rerender="ElementAssignmentsContainer, MessagesPanel" oncomplete="initialiseProposalElementEdit();" status="DeliveryLoadingStatus">
+     		<apex:param name="pos" value=""/>
+     	</apex:actionFunction>
+
+		<apex:actionFunction action="{!AddAssignment}" name="addAssignment" rerender="ElementAssignmentsContainer" oncomplete="initialiseProposalElementEdit();" status="DeliveryLoadingStatus"/>
+		<apex:actionFunction action="{!AddModelAssignment}" name="addModelAssignment" rerender="ElementAssignmentsContainer" oncomplete="initialiseProposalElementEdit();" status="DeliveryLoadingStatus"/>
+
+     	<apex:actionFunction name="rerenderAssignments" rerender="ElementAssignmentsContainer" oncomplete="initialiseProposalElementEdit();" />
+
+     	<apex:actionFunction action="{!AssignmentResourceChange}" name="assignmentResourceChange" rerender="ElementAssignmentsContainer, MessagesPanel" oncomplete="initialiseProposalElementEdit()" status="DeliveryLoadingStatus">
+     		<apex:param name="pos" value=""/>
+     	</apex:actionFunction>
+
+     	<apex:actionFunction action="{!AssignmentChange}" name="assignmentChange" rerender="ElementAssignmentsContainer, MessagesPanel" oncomplete="initialiseProposalElementEdit()" status="DeliveryLoadingStatus">
+     		<apex:param name="pos" value=""/>
+     	</apex:actionFunction>
+
+     	<apex:actionFunction action="{!AssignmentRoleChange}" name="assignmentRoleChange" rerender="ElementAssignmentsContainer, MessagesPanel" oncomplete="initialiseProposalElementEdit()" status="DeliveryLoadingStatus">
+     		<apex:param name="pos" value=""/>
+     	</apex:actionFunction>
+
+		<apex:actionFunction action="{!AssignmentLocationChange}" name="assignmentLocationChange" rerender="ElementAssignmentsContainer, MessagesPanel" oncomplete="initialiseProposalElementEdit()" status="DeliveryLoadingStatus">
+			<apex:param name="pos" value=""/>
+		</apex:actionFunction>
+
+        <apex:actionFunction action="{!ApplyProposalModelAssignment}" name="applyProposalModelAssignment" rerender="PopupContent" oncomplete="initialiseProposalElementEdit();showStackedModalBoxy();" status="DeliveryLoadingStatus">
+            <apex:param name="pos" value=""/>
+        </apex:actionFunction>
+
+        <apex:actionFunction action="{!RevertAppliedProposalModelAssignment}" name="revertAppliedProposalModelAssignment" rerender="PopupContent" oncomplete="initialiseProposalElementEdit();showStackedModalBoxy();" status="DeliveryLoadingStatus">
+            <apex:param name="pos" value=""/>
+        </apex:actionFunction>
+
+		<apex:actionFunction action="{!ActivateProposalModelAssignment}" name="activateProposalModelAssignment" rerender="PopupContent" oncomplete="initialiseProposalElementEdit();showStackedModalBoxy();" status="DeliveryLoadingStatus">
+			<apex:param name="pos" value=""/>
+		</apex:actionFunction>
+
+		<apex:actionFunction action="{!LinkAssignmentToMilestone}" name="linkAssignmentToMilestone" rerender="ElementAssignmentsContainer, MessagesPanel" oncomplete="initialiseProposalElementEdit()">
+     		<apex:param name="asspos" value=""/>
+     		<apex:param name="milepos" value=""/>
+     	</apex:actionFunction>
+
+     	<apex:actionFunction action="{!RemoveExpense}" name="removeExpense" rerender="ElementExpensesContainer" oncomplete="initialiseProposalElementEdit();">
+     		<apex:param name="pos" value=""/>
+     	</apex:actionFunction>
+
+     	<apex:actionFunction action="{!AddExpense}" name="addExpense" rerender="ElementExpensesContainer" oncomplete="initialiseProposalElementEdit();" />
+
+     	<apex:actionFunction action="{!RemoveMilestone}" name="removeMilestone" rerender="ElementMilestonesContainer" oncomplete="milestoneRerenderComplete();">
+     		<apex:param name="pos" value=""/>
+     	</apex:actionFunction>
+
+     	<apex:actionFunction action="{!AddMilestone}" name="addMilestone" rerender="ElementMilestonesContainer" oncomplete="milestoneRerenderComplete();" />
+
+     	<apex:actionFunction action="{!RemoveAnnuity}" name="removeAnnuity" rerender="ElementAnnuitiesContainer" oncomplete="initialiseProposalElementEdit();">
+     		<apex:param name="pos" value=""/>
+     	</apex:actionFunction>
+
+     	<apex:actionFunction action="{!AddAnnuity}" name="addAnnuity" rerender="ElementAnnuitiesContainer" oncomplete="initialiseProposalElementEdit();" />
+
+     	<apex:actionFunction action="{!AnnuityChange}" name="annuityChange" rerender="annuity-cost-panel, annuity-total-revenue, annuity-total-cost, MessagesPanel" oncomplete="initialiseProposalElementEdit()">
+     		<apex:param name="pos" value=""/>
+     	</apex:actionFunction>
+     	<apex:actionFunction action="{!AnnuityRevenueChange}" name="annuityRevenueChange" rerender="annuity-total-revenue, annuity-total-cost, MessagesPanel" oncomplete="initialiseProposalElementEdit()">
+     		<apex:param name="pos" value=""/>
+     	</apex:actionFunction>
+
+     	<apex:actionFunction action="{!LoadActivityAssignmentToLose}" name="loadAssignmentToLose" rerender="ActivityAssignmentLost" oncomplete="showStackedModalBoxy();">
+            <apex:param name="assignmentId" value="" />
+        </apex:actionFunction>
+
+		<apex:actionFunction action="{!GetAssignmentCustomFields}" name="editAssignmentCustomFields" reRender="AssignmentCustomFieldsPanel" oncomplete="showStackedModalBoxy();SetupDatePicker();">
+			<apex:param name="pos" value=""/>
+		</apex:actionFunction>
+    </apex:actionRegion>
+
+		<div id="CustomFieldsPopup" style="display:none">
+			<apex:outputPanel id="AssignmentCustomFieldsPanel">
+				<div id="AssignmentCustomFieldsErrors">
+					<apex:pageMessages escape="false"/>
+				</div>
+				<apex:pageBlock mode="edit" rendered="{!!ISBLANK(TheAssignmentCustomFields)}">
+
+					<apex:pageBlockSection collapsible="false" showheader="false" columns="1">
+
+						<apex:repeat value="{!$ObjectType.KimbleOne__ActivityAssignment__c.FieldSets.KimbleOne__AssignmentKeyFields}" var="f" >
+							<apex:inputField rendered="{!!CONTAINS(f.FieldPath,'.')}" value="{!TheAssignmentCustomFields[f]}" required="{!f.Required}" styleClass="{!IF(AND($ObjectType.KimbleOne__ActivityAssignment__c.Fields[f].type == 'date',$ObjectType.KimbleOne__ActivityAssignment__c.Fields[f].updateable),'kimbleDatePicker','')}"/>
+							<apex:outputField rendered="{!CONTAINS(f.FieldPath,'.')}" value="{!TheAssignmentCustomFields[f]}"/>
+						</apex:repeat>
+
+					</apex:pageBlockSection>
+					<apex:pageBlockButtons location="bottom">
+						<apex:actionFunction action="{!SaveActivityAssignmentCustomFields}" name="saveActivityAssignmentCustomFields" rerender="AssignmentCustomFieldsPanel, ElementAssignmentsContainer, MessagesPanel" oncomplete="if(hideStackedModalBoxyWithErrorCheck('#AssignmentCustomFieldsErrors')) initialiseProposalElementEdit();"/>
+
+						<apex:outputpanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.updateable}">
+							<input class="btn DisableButtonWhileBusy" type="button" onclick="jQuery('#loadingIndicatorOuterContainer').parent().show(); saveActivityAssignmentCustomFields()" id="save" value="{!$Label.Ok}" />
+						</apex:outputpanel>
+						<input class="btn" type="button" onclick="hideStackedModalBoxy();" value="{!$Label.Cancel}" />
+					</apex:pageBlockButtons>
+				</apex:pageBlock>
+			</apex:outputPanel>
+		</div>
+
+		<div id="LostAssignmentPopup" style="display: none">
+			<apex:outputPanel id="ActivityAssignmentLost">
+
+
+				<div id="LostAssignmentErrors">
+					<apex:pageMessages escape="false"/>
+				</div>
+				<apex:pageBlock mode="edit" rendered="{!!ISBLANK(ActivityAssignmentToLose)}">
+
+					<apex:pageBlockSection collapsible="false" showheader="false" columns="1">
+
+						<apex:inputField value="{!ActivityAssignmentToLose.KimbleOne__LostReason__c}"  required="true"/>
+
+						<apex:pageBlockSectionItem >
+							<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__LostReasonNarrative__c.Label}" />
+							<apex:outputPanel layout="none">
+								<apex:outputPanel layout="block" styleClass="requiredInput">
+									<apex:outputPanel layout="block" styleClass="requiredBlock"/>
+									<apex:inputTextarea rows="4" cols="95" value="{!ActivityAssignmentToLose.KimbleOne__LostReasonNarrative__c}" required="true" style="margin-top: 2px; margin-bottom: 0px; height: 60px; margin-left: 2px; margin-right: 2px; width: 502px; " />
+
+								</apex:outputPanel>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+
+					</apex:pageBlockSection>
+					<apex:pageBlockButtons location="bottom">
+
+						<apex:actionFunction action="{!RemoveAssignmentToLose}" name="SaveActivityAssignmentToLose" rerender="ActivityAssignmentLost, ElementAssignmentsContainer, MessagesPanel" oncomplete="if(hideStackedModalBoxyWithErrorCheck('#LostAssignmentErrors')) initialiseProposalElementEdit();"/>
+						<apex:outputpanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.updateable}">
+							<input class="btn DisableButtonWhileBusy" type="button" onclick="jQuery('#loadingIndicatorOuterContainer').parent().show(); SaveActivityAssignmentToLose()" id="save" value="{!$Label.RemoveButton}" />
+						</apex:outputpanel>
+						<input class="btn" type="button" onclick="hideStackedModalBoxy();" value="{!$Label.Cancel}" />
+					</apex:pageBlockButtons>
+				</apex:pageBlock>
+
+			</apex:outputPanel>
+		</div>
+
+	</apex:form>
+
+
+
+
+
+
+       	<script>
+
+		var allowAssignmentToMilestoneLink = {!AllowAssignmentToMilestoneLink};
+
+		var pageLabels = {};
+		pageLabels['NewCostEffectiveFromMessage'] = '{!JSENCODE($Label.NewCostEffectiveFromMessage)}';
+
+       	function initialiseProposalElementEdit()
+       	{
+       		jQuery(document).off('mouseover','.default-revenue-rate');
+       		jQuery(document).on('mouseover', '.default-revenue-rate', function(event) {
+       		    var j = jQuery(this);
+
+			 	var tipHtml = '';
+			 	var $row = j.closest('tr');
+
+			 	var usageConversionFactor = 1;
+
+                var hrsPerDay = $row.find('[id$="assignment-panel"]').attr('hours-per-day');
+               	if(forecastUnitType != invoiceUnitType)
+               	{
+               		//Day -> Hour
+               		if (forecastUnitType == 'Day')
+               			usageConversionFactor = hrsPerDay;
+               		else //Hour -> Day
+               			usageConversionFactor = 1/hrsPerDay;
+               	}
+
+                var rate = $row.find('[id$="assignment-default-revenue-rate"]').val();
+
+                var formattedMesage = $row.find('[id$="assignment-panel"]').attr('inv-ccy') + ' ' + (kimble.formatNumber(rate / usageConversionFactor, '#,##0.00'));
+
+                tipHtml += '<div class="default-revenue-message">' + formattedMesage + '</div>';
+
+			 	//tooltips
+	            j.qtip('destroy', true);
+
+			 	j.qtip({
+		            overwrite: true,
+					show: {
+		                solo:true,
+		                ready: true // Show immediately - important!
+		            },
+					style: {
+						classes: 'qtip-light qtip-shadow'
+			        },
+					content: {
+						text: tipHtml,
+						title: '{!$ObjectType.Resource__c.Fields.StandardRevenue__c.Label}'
+					},
+			        position: {
+					   	my: 'top left',
+						at: 'bottom right',
+					   	target: jQuery(this)
+					}
+		        });
+            });
+
+			jQuery(document).on('click','.assignment-cost-rate-effective-date-container', function(e) {
+				jQuery(this).closest('td').find('[id$="assignment-cost-rate-effective-date"]').trigger('focus');
+   			});
+
+       		jQuery(document).on('mouseover', '.future-cost-change', function (event) {
+			 	var j = jQuery(this);
+
+			 	var costs = JSON.parse(j.closest('td').find('[id$="assignment-cost-summary"]').val());
+			 	var tipHtml = '';
+			 	var $row = j.closest('tr');
+
+			 	var usageConversionFactor = 1;
+
+                var hrsPerDay = $row.find('[id$="assignment-panel"]').attr('hours-per-day');
+               	if(forecastUnitType != invoiceUnitType)
+               	{
+               		//Day -> Hour
+               		if (forecastUnitType == 'Day')
+               			usageConversionFactor = hrsPerDay;
+               		else //Hour -> Day
+               			usageConversionFactor = 1/hrsPerDay;
+               	}
+
+			 	for(var i=0; i<costs.length;i++)
+				{
+					var formattedMesage = pageLabels['NewCostEffectiveFromMessage'].format(kimble.formatNumber(costs[i].R / usageConversionFactor, '#,##0.00'), kimble.formatDate(costs[i].D));
+					tipHtml += '<div class="cost-change-message">' + formattedMesage + '</div>';
+				}
+
+            	//tooltips
+	            j.qtip('destroy', true);
+
+			 	j.qtip({
+		            overwrite: true,
+					show: {
+		                solo:true,
+		                ready: true // Show immediately - important!
+		            },
+					style: {
+						classes: 'qtip-light qtip-shadow'
+			        },
+					content: {
+						text: tipHtml,
+						title: 'Costs'
+					},
+			        position: {
+					   	my: 'top left',
+						at: 'bottom right',
+					   	target: jQuery(this)
+					}
+		        });
+		       });
+
+       		kimble.formatCurrencies();
+
+       		if (jQuery('#config-tabs').length > 0)
+       		{
+       			jQuery.ionTabs('#config-tabs', {type: 'none'});
+
+                if (jQuery('.ionTabs__tab_state_active').length == 0)
+                {
+                	if (jQuery('.expenses-tab').length != 0) jQuery.ionTabs.setTab("config-group", "expense-config");
+
+                	if (jQuery('.assignments-tab').length != 0) jQuery.ionTabs.setTab("config-group", "assignment-config");
+
+                	if (jQuery('.milestones-tab').length != 0) jQuery.ionTabs.setTab("config-group", "milestone-config");
+
+                	if (jQuery('.annuities-tab').length != 0) jQuery.ionTabs.setTab("config-group", "annuities-config");
+                }
+                else if(jQuery('.assignments-tab.ionTabs__tab_state_active').length)
+                {
+                	initialiseResourceTypeAverageMarginInsights();
+                }
+                else if(jQuery('.expenses-tab.ionTabs__tab_state_active').length)
+                {
+                	initialiseExpenseCategoryAverageInsights();
+                }
+            }
+
+       		jQuery('.usage-forecast-mode-switch-container').each(function() {
+				jQuery(this).qtip({
+					content:{
+						text:jQuery(this).children('.tool-tip-content'),
+						title:jQuery(this).children('.tool-tip-content').children('.tool-tip-content-container').attr('title'),
+						button: 'Close'
+					},
+					position: {
+			            adjust: {
+			                method: 'flip flip'
+			            },
+			            viewport: $(window)
+			        },
+			        show: {
+      					event: 'click',
+      					solo: true
+   					},
+   					hide: false,
+					style: {classes: 'qtip-light qtip-shadow qtip-rounded'}})
+			});
+
+       		applyUsageMode(jQuery('[id$="element-usage-mode"]').val());
+
+       		calculateAllRevenuesCosts();
+
+       		jQuery('.kimbleDatePicker:not(.hasDatepicker)').datepicker({
+                    dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+                    minDate: earliestOpenDate.toDate(),
+                    showOtherMonths: true,
+                    selectOtherMonths: true});
+
+       		jQuery(document).on('change','[id$="element-expected-revenue"]', function(event) {
+       			var j = jQuery(this);
+       			j.val(kimble.formatNumber(kimble.parseNumber(j.val()), '#,##0.00'));
+
+       		});
+
+       		jQuery(document).on('change', '.revenue-rate-input', function (event) {
+
+				var $row = jQuery(this).closest('tr');
+
+				var hrsPerDay = $row.find('[id$="assignment-panel"]').attr('hours-per-day');
+				var revConversionFactor;
+
+               	$row.find('[id$="assignment-revenue-rate"]').val(kimble.parseNumber(jQuery(this).val()) * convertRate(revenueUnitTypeEnum, forecastUnitType, hrsPerDay));
+
+				calculateAssignmentRevenuesAndCosts()
+			});
+
+			jQuery(document).on('change', '.cost-rate-input', function (event) {
+
+				var $row = jQuery(this).closest('tr');
+
+				if($row.length == 0) return;
+
+				var usageConversionFactor = 1;
+				var hrsPerDay = $row.find('[id$="assignment-panel"]').attr('hours-per-day');
+				if(forecastUnitType != invoiceUnitType)
+				{
+					//Day -> Hour
+					if (forecastUnitType == 'Day')
+						usageConversionFactor = hrsPerDay;
+					else //Hour -> Day
+						usageConversionFactor = 1/hrsPerDay;
+				}
+
+				var newCostSummary = [];
+				var latestAdded = false;
+
+				var isNewAssignment = $row.find('[id$="assignment-cost-summary"]').data('isNew');
+
+				if (isNewAssignment) {
+				    newCostSummary = $row.find('[id$="assignment-cost-summary"]').data('origValue');
+				    newCostSummary[0].R = kimble.parseNumber(jQuery(this).val()) * usageConversionFactor;
+    			}
+    			else {
+
+
+					var latestCost = {D:kimble.parseDate($row.find('[id$="assignment-cost-rate-effective-date"]').val()), R:kimble.parseNumber(jQuery(this).val()) * usageConversionFactor};
+
+					$row.find('[id$="assignment-cost-summary"]').data('origValue').forEach(function(cost) {
+						if (!latestAdded) {
+							if (cost.D.toDate().valueOf() < latestCost.D.toDate().valueOf()) {
+								newCostSummary.push(cost);
+							}
+							else {
+								latestAdded = true;
+								newCostSummary.push(latestCost);
+							}
+						}
+					});
+
+					if (!latestAdded) newCostSummary.push(latestCost);
+				}
+
+				$row.find('[id$="assignment-cost-summary"]').val(JSON.stringify(newCostSummary));
+
+				var costRateSummary = newCostSummary;
+				$row.find('[id$="assignment-cost-summary"]').val(JSON.stringify(costRateSummary));
+				$row.find('[id$="assignment-cost-rate"]').val(kimble.parseNumber(jQuery(this).val()) * usageConversionFactor);
+
+				if (!isNewAssignment) {
+					$row.find('.assignment-cost-rate-effective-date-container').show();
+					$row.find('[id$="assignment-cost-rate-effective-date"]').trigger('focus');
+				}
+
+				calculateAssignmentRevenuesAndCosts()
+			});
+
+            jQuery(document).off('change', '.discount-pct-input');
+       		jQuery(document).on('change', '.discount-pct-input', function (event) {
+
+				var $row = jQuery(this).closest('tr');
+
+                //need to set revenue-rate-input - then call .change()
+                var defaultRate = $row.find('[id$="assignment-default-revenue-rate"]').val(); //in revenue entry units
+
+                $row.find('[id$="assignment-revenue-rate"]').val(defaultRate - (kimble.parseNumber(jQuery(this).val())/100 * defaultRate));
+
+				calculateAssignmentRevenuesAndCosts()
+			});
+
+			jQuery(document).on('click', '.ionTabs__tab.assignments-tab', function (event) {
+				initialiseResourceTypeAverageMarginInsights();
+			});
+
+			jQuery(document).on('click', '.ionTabs__tab.expenses-tab', function (event) {
+				initialiseExpenseCategoryAverageInsights();
+			});
+
+			jQuery(document).on('click', '.ionTabs__tab:not(.expenses-tab)', function (event) {
+				jQuery('.insight-container.expense-cat-average').addClass('insight-hidden');
+			});
+
+			jQuery(document).on('click', '.ionTabs__tab:not(.assignments-tab)', function (event) {
+				jQuery('.insight-container.resource-type-margin').addClass('insight-hidden');
+			});
+
+			if(allowAssignmentToMilestoneLink)
+			{
+				jQuery(document).off('click', '.assignment-milestone-btn').on('click', '.assignment-milestone-btn', showMilestoneLinks);
+				jQuery(document).off('click', '.assignment-milestone-cancel').on('click', '.assignment-milestone-cancel', hideMilestoneLinks);
+				jQuery(document).off('click', '.milestone-option').on('click', '.milestone-option', linkMilestone);
+			}
+			refreshExpenseCostInsights();
+
+			disableAppliedModelRows();
+
+			//resize containers
+			jQuery('.ionTabs__body').height(jQuery('#editProposalElementPopup').height() - 113 - jQuery('[id$="headerFields"]').height());
+
+			jQuery('#loadingIndicatorOuterContainer').parent().hide();
+       	}
+
+		function convertRate(fromUnitType, toUnitType, hoursPerDay) {
+
+		if (fromUnitType == toUnitType) return 1;
+
+		if (fromUnitType == 'Month' || toUnitType == 'Month') {
+
+			//This must be a decimal so that division below works
+			if (toUnitType == 'Month') {
+				if (fromUnitType == 'Day')
+					return averageDaysPerMonth;
+				else
+				    return hoursPerDay * averageDaysPerMonth;
+			}
+
+			if (fromUnitType == 'Month') {
+				if (toUnitType == 'Day')
+					return 1 / averageDaysPerMonth;
+				else
+					return 1 / averageDaysPerMonth / hoursPerDay;
+			}
+		}
+
+		//Day to hour
+		if (toUnitType == 'Hour') return 1 / hoursPerDay;
+
+		//convert Hour to day
+		return hoursPerDay;
+	}
+
+       	function toggleUsageForecastMode(obj, newMode)
+       	{
+       		if (jQuery(obj).parent().hasClass('selected')) return;
+
+       		jQuery('#usage-forecast-mode').find('.selected').removeClass('selected');
+       		jQuery(obj).parent().addClass('selected');
+       		jQuery('#usage-forecast-mode').attr('selected-mode',newMode);
+
+       		jQuery('[id$="element-usage-mode"]').val(newMode);
+
+       		applyUsageMode(newMode);
+
+       		calculateAssignmentRevenuesAndCosts();
+
+			disableAppliedModelRows();
+
+			validateTargetMargin(jQuery('[id$="element-target-margin"]').val());
+       	}
+
+       	function applyUsageMode(newMode)
+       	{
+       		if (newMode == 'UsageItem')
+       		{
+       			if (hasRealRevenue) jQuery('[id$="element-expected-revenue"]').closest('tr').hide();
+       			jQuery('[id$="element-target-margin"]').prop('readonly', true);
+       			jQuery('[id$="element-expected-usage"]').prop('readonly', true);
+       		}
+       		else
+       		{
+       			jQuery('[id$="element-expected-revenue"]').closest('tr').show();
+
+       			jQuery('[id$="element-expected-revenue"]').prop('readonly', newMode == 'DerivedRevenue' || newMode == 'UsageDerivedRevenue');
+       			jQuery('[id$="element-target-margin"]').prop('readonly', newMode == 'ExpectedUsage');
+       			jQuery('[id$="element-expected-usage"]').prop('readonly', newMode == 'TargetMargin' || newMode == 'UsageDerivedRevenue');
+       		}
+       	}
+
+       	function cancelUsageForecastModePopup()
+		{
+			jQuery('.usage-forecast-mode-switch-container').qtip("hide");
+		}
+
+       	function saveProposalElementComplete()
+       	{
+       		if(hideStackedModalBoxyWithErrorCheck('#ProposalElementsErrorPanel'))
+       			jQuery.publish('kimble.proposalElementUpdated');
+       		else
+       			initialiseProposalElementEdit();
+       	}
+
+       	function calculateAllRevenuesCosts()
+       	{
+       		calculateRecurringMilestoneRevenueAndCosts();
+
+       		calculateMilestoneRevenuesAndCosts();
+
+       		calculateContactCostFromRates();
+
+       		calculateAssignmentRevenuesAndCosts();
+
+       		calculateExpenseRevenuesAndCosts(false);
+
+       		calculateAnnuityRevenuesAndCosts();
+
+       		calculateMargins();
+       	}
+
+       	function calculateMargins()
+       	{
+       		//currencyConversionFactor
+       	}
+
+       	function addMonths(dateObj, num)
+		{
+		    var newDate = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate(), 0, 0, 0, 0);
+		    var currentMonth = newDate.getMonth();
+
+		    newDate.setMonth(newDate.getMonth() + num)
+
+		    if (newDate.getMonth() != ((currentMonth + num) % 12)){
+		        newDate.setDate(0);
+		    }
+
+		    return newDate;
+		}
+
+		function annuityNumberOfPeriodsChange(row)
+		{
+			var numberOfMonths = kimble.parseNumber(row.find('[id$="number-of-periods"]').val());
+
+			row.find('[id$="annuity-end-date"]').val(kimble.formatDate(calculateAnnuityEndDate(kimble.parseDate(row.find('[id$="annuity-start-date"]').val(), true), numberOfMonths).toKimbleUTC()));
+		}
+
+		function annuityStartDateChange(row)
+		{
+			//setAnnuityAnniversaryDay(row);
+		}
+
+		function annuityEndDateChange(row)
+		{
+			//setAnnuityAnniversaryDay(row);
+		}
+
+		function annuityCostChange(obj)
+		{
+			var j = jQuery(obj);
+
+			annuityChange(j.closest('tr').find('#row-num-container').attr('data-row-num'));
+		}
+
+		function calculateAnnuityEndDate(startDate, num)
+		{
+		    var endDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0, 0);
+
+		    var currentMonth = endDate.getMonth();
+		    endDate.setMonth(endDate.getMonth() + num)
+
+		    if (endDate.getMonth() != ((currentMonth + num) % 12)){
+		        endDate.setDate(0);
+		    }
+
+		    return new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() -1, 0, 0, 0, 0);
+		}
+
+		/*function setAnnuityAnniversaryDay(row)
+		{
+			var startDate = kimble.parseDate(row.find('[id$="annuity-start-date"]').val(), true);
+
+			if (startDate == null) return;
+
+			var mode = annuityBehaviourRulesMap[row.find('[id$="annuity-behaviour-rule"]').val()];
+
+			if (mode)
+			{
+				var numberOfMonths = kimble.parseNumber(row.find('[id$="number-of-periods"]').val());
+
+				if (numberOfMonths == null || numberOfMonths == 0) numberOfMonths = 1;
+
+				row.find('[id$="annuity-end-date"]').val(kimble.formatDate(calculateAnnuityEndDate(kimble.parseDate(row.find('[id$="annuity-start-date"]').val(), true), numberOfMonths).toKimbleUTC()));
+
+				row.find('[id$="annuity-anniversary-day"]').val(kimble.parseDate(row.find('[id$="annuity-start-date"]').val(), true).getDate());
+			}
+			else
+			{
+				row.find('[id$="annuity-anniversary-day"]').val(addDays(kimble.parseDate(row.find('[id$="annuity-end-date"]').val(), true),1).getDate());
+			}
+		}*/
+
+       	function addDays(dte, days)
+    	{
+    		return new Date(dte.getFullYear(), dte.getMonth(), dte.getDate() + days, 0, 0, 0, 0);
+    	}
+
+       	function calculateAnnuityRevenuesAndCosts()
+       	{
+       		var totalAnnuityCost = 0;
+            var totalAnnuityRev = 0;
+
+            var annuitiesConfigTable = jQuery('[id$="annuity-config-table"]');
+
+            if (annuitiesConfigTable.length == 0) return;
+
+       		var hasRev = false;
+       		var hasCost = false;
+
+            jQuery.each(annuitiesConfigTable.find('tbody>tr'), function (i, row) {
+
+                var $row = jQuery(row);
+
+            	if ($row.find('[id$="annuity-total-cost"]').length == 1)
+            	{
+            		totalAnnuityCost += kimble.parseNumber($row.find('[id$="annuity-total-cost"]').text());
+            		hasCost = true;
+            	}
+
+				if ($row.find('[id$="annuity-total-revenue"]').length == 1)
+            	{
+            		totalAnnuityRev += kimble.parseNumber($row.find('[id$="annuity-total-revenue"]').text());
+            		hasRev = true;
+            	}
+            });
+
+            if (hasRev) jQuery('[id$="element-services-revenue"]').val(kimble.formatNumber(totalAnnuityRev, '#,##0.00'));
+            if (hasCost) jQuery('[id$="element-services-cost"]').val(kimble.formatNumber(totalAnnuityCost, '#,##0.00'));
+
+       	}
+
+       	function calculateContactCostFromRates()
+       	{
+       		//update contract cost by multiplying the Source Cost by the inputted rate
+       		//element-cost = rate * expected-element-cost
+       		var ratesTable = jQuery('#element-rates-table');
+
+       		if (ratesTable.length == 0) return;
+
+       		var contractCost = 0;
+       		var overriddenContractCost = 0;
+       		var rateOverride = false;
+
+       		jQuery.each(ratesTable.find('tbody>tr'), function (i, row) {
+
+       			var $row = jQuery(row);
+       			//multiply two inputs together
+       			var rate;
+       			var standardRate;
+
+       			if ($row.find('input:checked').length == 0)
+       			{
+       				$row.find('.override-rates').hide();
+       				//$row.find('.standard-rates').show();
+       				rate = kimble.parseNumber($row.find('.standard-rates>input').val());
+       				rateOverride = false;
+       				jQuery('.cost-override').hide();
+       			}
+       			else
+       			{
+       				//$row.find('.standard-rates').hide();
+       				$row.find('.override-rates').show();
+       				rate = kimble.parseNumber($row.find('.override-rates>input').val());
+       				standardRate = kimble.parseNumber($row.find('.standard-rates>input').val());
+       				rateOverride = true;
+       				jQuery('.cost-override').show();
+       			}
+
+       			var val = kimble.parseNumber($row.find('.source-value').val());
+
+       			contractCost += (rate * val);
+
+       			if(rateOverride)
+       			{
+       				overriddenContractCost += (standardRate * val);
+       			}
+
+       		});
+
+       		jQuery('#element-services-cost').val(kimble.formatNumber(contractCost, '#,##0.00'));
+
+       		if(rateOverride)
+       		{
+       			jQuery('#element-services-cost-overriden').val(kimble.formatNumber(overriddenContractCost, '#,##0.00'))
+       		}
+       	}
+
+       	function calculateRecurringMilestoneRevenueAndCosts()
+       	{
+       		var totalMilestoneCost = kimble.parseNumber(jQuery('[id$="recurring-periods"]').val()) * kimble.parseNumber(jQuery('[id$="recurring-cost"]').val());
+       		var totalMilestoneRev = kimble.parseNumber(jQuery('[id$="recurring-periods"]').val()) * kimble.parseNumber(jQuery('[id$="recurring-revenue"]').val());
+
+       		if(jQuery('[id$="recurring-units"]').length > 0)
+       		{
+       			totalMilestoneCost = totalMilestoneCost * kimble.parseNumber(jQuery('[id$="recurring-units"]').val());
+       			totalMilestoneRev = totalMilestoneRev * kimble.parseNumber(jQuery('[id$="recurring-units"]').val());
+       		}
+
+       		if (jQuery('[id$="recurring-cost"]').length == 1)
+            	jQuery('[id$="element-services-cost"]').val(kimble.formatNumber(totalMilestoneCost, '#,##0.00'));
+
+            if (jQuery('[id$="recurring-revenue"]').length == 1)
+            	jQuery('[id$="element-generated-revenue"]').val(kimble.formatNumber(totalMilestoneRev, '#,##0.00'));
+       	}
+
+       	function calculateMilestoneRevenuesAndCosts()
+       	{
+
+       		var totalMilestoneCost = 0;
+            var totalMilestoneRev = 0;
+
+            var milestonesConfigTable = jQuery('[id$="milestone-config-table"]');
+
+            if (milestonesConfigTable.length == 0) return;
+
+            var hasCost = false;
+            var hasRev = false;
+
+            jQuery.each(milestonesConfigTable.find('tbody>tr'), function (i, row) {
+
+                var $row = jQuery(row);
+
+            	if ($row.find('[milestone-type="Cost"]').length == 1)
+            	{
+            		if ($row.find('[id$="milestone-units"]').length == 1)
+            		{
+            			totalMilestoneCost += (kimble.parseNumber($row.find('[milestone-type="Cost"] input').val()) * kimble.parseNumber($row.find('[id$="milestone-units"]').val()));
+            		}
+            		else
+            		{
+            			totalMilestoneCost += kimble.parseNumber($row.find('[milestone-type="Cost"] input').val());
+            		}
+            		hasCost = true;
+            	}
+            	else
+            	{
+            		if ($row.find('[id$="milestone-units"]').length == 1)
+            		{
+            			totalMilestoneRev += (kimble.parseNumber($row.find('[milestone-type="Revenue"] input').val()) * kimble.parseNumber($row.find('[id$="milestone-units"]').val()));
+            		}
+            		else
+            		{
+            			totalMilestoneRev += kimble.parseNumber($row.find('[milestone-type="Revenue"] input').val());
+            		}
+            		hasRev = true;
+            	}
+            });
+
+            if(hasCost) jQuery('[id$="element-services-cost"]').val(kimble.formatNumber(totalMilestoneCost, '#,##0.00'));
+            if(hasRev) jQuery('[id$="element-generated-revenue"]').val(kimble.formatNumber(totalMilestoneRev, '#,##0.00'));
+       	}
+
+       	function calculateExpenseRevenuesAndCosts(updateRevenue, rowIndex)
+       	{
+       		var totalExpenseCost = 0;
+            var totalExpenseRev = 0;
+
+            var expensesConfigTable = jQuery('[id$="expenses-config-table"]');
+
+            if (expensesConfigTable.length == 0) return;
+
+            expensesConfigTable.find('.summary-cell').remove();
+
+            var addExpenseHtml = '';
+
+            if (canAddEditExpense)
+            	addExpenseHtml = '<span class="fa fa-plus-square"></span><a href="javascript:addExpense()" class="add-link undecorated-link" style="padding-left: 4px;">{!$Label.AddExpenseButton}</a>';
+
+            jQuery.each(expensesConfigTable.find('tbody>tr'), function (i, row) {
+
+                var $row = jQuery(row);
+
+                if (!canAddEditExpense)
+                {
+                	$row.find('SELECT').prop('disabled', true);
+                	$row.find('INPUT').prop('readonly', true);
+                }
+
+                var expenseCategoryId = $row.find('[id$="expense-category-id"]').val()
+                var units = kimble.parseNumber($row.find('[id$="expense-units"]').val());
+                var netAmount = kimble.parseNumber($row.find('[id$="expense-net-amount"]').val());
+
+                var costPerUnit = netAmount;
+                var revPerUnit = netAmount;
+
+                $row.find('[id$="expense-remaining-cost"]').val(kimble.formatNumber(costPerUnit * units, '#,##0.00'));
+
+                totalExpenseCost += kimble.parseNumber($row.find('[id$="expense-remaining-cost"]').val());
+
+                if (showExpensesRevCol && updateRevenue && rowIndex == i)
+                {
+                	//currencyConversionFactor
+                	$row.find('[id$="expense-remaining-revenue"]').val(kimble.formatNumber(revPerUnit * units * currencyConversionFactor, '#,##0.00'));
+                }
+
+                if (showExpensesRevCol)
+                	totalExpenseRev += kimble.parseNumber($row.find('[id$="expense-remaining-revenue"]').val());
+
+                $row.find('[id$="expense-remaining-cost"]').prop('readonly', true);
+            });
+
+            var summaryRow = '<tr class="summary-cell summary-row dataRow"><td colspan="6">' + addExpenseHtml + '</td><td class="kimble-number">' + kimble.formatNumber(totalExpenseCost, '#,##0.00') + '</td>';
+
+            if (showExpensesRevCol)
+            {
+            	summaryRow += '<td class="kimble-number">' + kimble.formatNumber(totalExpenseRev, '#,##0.00') + '</td>';
+            }
+
+            summaryRow += '</tr>';
+
+            jQuery(summaryRow).insertAfter(expensesConfigTable.find('thead'));
+
+           	jQuery('[id$="element-expenses-cost"]').val(kimble.formatNumber(totalExpenseCost, '#,##0.00'));
+            jQuery('[id$="element-expenses-revenue"]').val(kimble.formatNumber(totalExpenseRev, '#,##0.00'));
+            jQuery('[id$="element-expenses-notional"]').val(kimble.formatNumber(totalExpenseRev, '#,##0.00'));
+
+       	}
+
+       	function getNumeric(id)
+       	{
+
+       	}
+
+	    function cascadeLocationChange(obj) {
+	    	var $o = jQuery('[id$="default-location-list"]');
+
+			if ($o.length == 0) $o = jQuery('[id$="default-location-field_lkid"]');
+
+	    	var v = $o.val();
+
+			var assignmentConfigTable = jQuery('[id$="assignment-config-table"]');
+
+			if (assignmentConfigTable.length == 0) return;
+
+	    	jQuery.each(assignmentConfigTable.find('tbody>tr'), function (i, row) {
+	    	   var $row = jQuery(row);
+
+			   $row.find('[id$="assignment-location-list"]').val(v);
+			   $row.find('[id$="assignment-location-field_lkid"]').val(v);
+
+	    	});
+
+	    	assignmentLocationChange();
+    	}
+
+       function calculateAssignmentRevenuesAndCosts()
+        {
+            var assignmentConfigTable = jQuery('[id$="assignment-config-table"]');
+            jQuery('#assignment-error').hide();
+
+            var summaryCost = 0;
+            var summaryRev = 0;
+
+            if (assignmentConfigTable.length == 0) return;
+
+            var usageForecastMode = jQuery('[id$="element-usage-mode"]').val();
+
+            var modeConfig = {mode:usageForecastMode, showPctCol:usageForecastMode != 'UsageItem' && usageForecastMode != 'UsageDerivedRevenue', editRevenue:usageForecastMode == 'UsageItem', editUsage:usageForecastMode == 'UsageItem' || usageForecastMode == 'UsageDerivedRevenue', canModel:canModel};
+
+            if (isFlatRateItemDiscount)
+            {
+                modeConfig.mode = 'UsageItem';
+                modeConfig.editRevenue = false;
+            }
+
+            assignmentConfigTable.find('.summary-cell').remove();
+
+            // add columns for usage, cost, revenue
+
+            var headerCells = '';
+
+            headerCells += '<th class="headerRow summary-cell" scope="col" colspan="1" width="76px"><div class="table-cell-right">{!$Label.kimbleone__totalcostlabel}<span class="assignment-table-units">(' + currencyCode + ')</span></div></th>';
+
+            if (showRevCol)
+            {
+            	headerCells += '<th class="headerRow summary-cell" scope="col" colspan="1" width="76px"><div class="table-cell-right">{!$Label.kimbleone__totalrevenuelabel}<span class="assignment-table-units">(' + invoicingCurrencyCode + ')</span></div></th>';
+            	headerCells += '<th class="headerRow summary-cell" scope="col" colspan="1" width="50px;"><div class="table-cell-middle">{!$Label.MarginLabel}<span class="assignment-table-units">(%)</span></div></th>';
+            }
+
+            jQuery(headerCells).appendTo(assignmentConfigTable.find('thead>tr'));
+
+            var forecastUsageInput = jQuery('[id$="element-expected-usage"]');
+
+            // localise
+            var totalUsage = 0;
+
+            var summaryUsage = 0;
+            var summaryPct = 0;
+
+        	if (modeConfig.showPctCol)
+        		jQuery('[id*="assignment-pct-col"]').show();
+        	else
+        		jQuery('[id*="assignment-pct-col"]').hide();
+
+			var hasModelAssignments = false;
+			jQuery('[id*="assignment-model"]').hide();
+
+            if (modeConfig.mode == 'TargetMargin' || modeConfig.mode == 'ExpectedUsage')
+        	{
+        		var expectedRevenue;
+
+	        	if(jQuery('[id$="element-expected-revenue"]').length == 1)
+	        	{
+	        		expectedRevenue = jQuery('[id$="element-expected-revenue"]').val();
+	        	}
+	        	else
+	        	{
+	        		expectedRevenue = jQuery('[id$="element-generated-revenue"]').val();
+	        	}
+
+        		var expectedRev = kimble.parseNumber(expectedRevenue) / currencyConversionFactor;
+
+        		if (modeConfig.mode == 'TargetMargin' && jQuery('[id$="element-target-margin"]').val() != '' && expectedRev != 0) //defaults revenue rate and calcs totalUsage
+	        	{
+	        		var targetMargin = kimble.parseNumber(jQuery('[id$="element-target-margin"]').val());
+
+	        		var costFactor = 0;
+
+	        		//Set assignment revenue rate and calc total usage
+	        		jQuery.each(assignmentConfigTable.find('tbody>tr'), function (i, row) {
+	        			var $row = jQuery(row);
+	        			if ($row.find('[id$="assignment-panel"]').length == 1)
+        				{
+		        			var costRateSummary = kimble.parseJSON($row.find('[id$="assignment-cost-summary"]').val().replace(/"CostRate"/g, '"R"').replace(/"FromDate"/g, '"D"'));
+		        			var costRate = costRateSummary[0].R; //forecasting units
+
+			                costFactor += (kimble.parseNumber($row.find('[id$="assignment-percentage"]').val()) * costRate / 100);
+		        			var revRate = (targetMargin >= 100 ? 0 : (100 * costRate) / (100 - targetMargin));
+
+		        			$row.find('[id$="assignment-revenue-rate"]').val(revRate * currencyConversionFactor);
+		        		}
+	        		});
+
+	        		var derivedCost = (targetMargin >= 100 ? 0 : (expectedRev * (100 - targetMargin) / 100));
+
+	        		if (costFactor != 0) totalUsage = derivedCost / costFactor;
+
+	        		forecastUsageInput.val(kimble.formatNumber(totalUsage, '#,##0.##'));
+
+	        		// Set Assignment Usage
+	        		jQuery.each(assignmentConfigTable.find('tbody>tr'), function (i, row) {
+	        			var $row = jQuery(row);
+        				if ($row.find('[id$="assignment-panel"]').length == 1)
+        				{
+        					var pct = 0;
+
+	        				if ($row.find('[id$="assignment-percentage"]').length > 0)
+		                	{
+		                    	pct =  kimble.parseNumber($row.find('[id$="assignment-percentage"]').val());
+		                	}
+
+							if ($row.find('[id$="assignment-model-num"]').length > 0)
+							{
+							    var numAssignments = kimble.parseNumber($row.find('[id$="assignment-model-num"]').val());
+
+							    if (numAssignments > 0)
+							    	pct = pct / numAssignments;
+       						}
+
+		        			var usage = totalUsage * pct / 100;
+	                    	$row.find('[id$="assignment-usage"]:visible,[id$="assignment-usage-2"]:visible').val(kimble.formatNumber(usage, '#,##0.##'));
+	                    }
+                    });
+	        	}
+	        	else
+	        	{
+	        		var totalUsage = kimble.parseNumber(forecastUsageInput.val());
+	        		var totalCost = 0;
+	        		var pct = 0;
+
+        			// Set assignment usage and calc total cost
+        			jQuery.each(assignmentConfigTable.find('tbody>tr'), function (i, row) {
+	        			var $row = jQuery(row);
+
+        				if ($row.find('[id$="assignment-panel"]').length == 1)
+        				{
+		        			if ($row.find('[id$="assignment-percentage"]').length > 0)
+		                	{
+		                    	pct =  kimble.parseNumber($row.find('[id$="assignment-percentage"]').val());
+		                	}
+
+							var costRateSummary = kimble.parseJSON($row.find('[id$="assignment-cost-summary"]').val().replace(/"CostRate"/g, '"R"').replace(/"FromDate"/g, '"D"'));
+		        			var costRate = costRateSummary[0].R; //forecasting units
+							var numAssignments = 1;
+
+							if ($row.find('[id$="assignment-model-num"]').length > 0)
+							{
+							   var numAssignmentsVal = kimble.parseNumber($row.find('[id$="assignment-model-num"]').val());
+							   if (numAssignmentsVal > 0) numAssignments = numAssignmentsVal;
+       						}
+
+							pct = pct / numAssignments;
+		        			var usage = totalUsage * pct / 100;
+
+	                    	totalCost += (costRate * usage * numAssignments);
+
+	                    	$row.find('[id$="assignment-usage"]:visible,[id$="assignment-usage-2"]:visible').val(kimble.formatNumber(usage, '#,##0.##'));
+	                    }
+                    });
+
+                    var margin = 0;
+
+        			if(expectedRev != 0)
+        			{
+        				margin = 100 * (expectedRev - totalCost) / expectedRev;
+        			}
+
+        			if (modeConfig.mode != 'TargetMargin') jQuery('[id$="element-target-margin"]').val(kimble.formatNumber(margin,'#,##0.##'));
+
+                    // Set assignment rev rate
+                    jQuery.each(assignmentConfigTable.find('tbody>tr'), function (i, row) {
+	        			var $row = jQuery(row);
+
+	        			var costRateSummary = kimble.parseJSON($row.find('[id$="assignment-cost-summary"]').val().replace(/"CostRate"/g, '"R"').replace(/"FromDate"/g, '"D"'));
+		        		var costRate = costRateSummary[0].R; //forecasting units
+						//costRate is per assignment
+                    	var revRate = totalCost == 0 ? 0 : (costRate / totalCost) * expectedRev;
+
+                    	$row.find('[id$="assignment-revenue-rate"]').val(revRate * currencyConversionFactor);
+                    });
+	        	}
+
+        	}
+
+			if (modeConfig.mode == 'UsageDerivedRevenue')
+			{
+				var targetMargin = kimble.formatNumber(jQuery('[id$="element-target-margin"]').val(),'#,##0.##');
+				if (targetMargin == 100) targetMargin = 0;
+
+				// Set assignment rev rate
+				jQuery.each(assignmentConfigTable.find('tbody>tr'), function (i, row) {
+					var $row = jQuery(row);
+
+					var costRateSummary = kimble.parseJSON($row.find('[id$="assignment-cost-summary"]').val().replace(/"CostRate"/g, '"R"').replace(/"FromDate"/g, '"D"'));
+					var costRate = costRateSummary[0].R; //forecasting units
+
+					var revRate = (costRate / (1 - targetMargin / 100));
+
+					$row.find('[id$="assignment-revenue-rate"]').val(revRate * currencyConversionFactor);
+				});
+   			}
+
+        	if (modeConfig.mode == 'DerivedRevenue')
+        	{
+        		var totalUsage = kimble.parseNumber(forecastUsageInput.val());
+	        	var totalCost = 0;
+	        	var pct = 0;
+
+        		// Set assignment usage and calc total cost
+       			jQuery.each(assignmentConfigTable.find('tbody>tr'), function (i, row) {
+        			var $row = jQuery(row);
+
+       				if ($row.find('[id$="assignment-panel"]').length == 1)
+       				{
+	        			if ($row.find('[id$="assignment-percentage"]').length > 0)
+	                	{
+	                    	pct =  kimble.parseNumber($row.find('[id$="assignment-percentage"]').val());
+	                	}
+
+						var numAssignments = 1;
+
+						if ($row.find('[id$="assignment-model-num"]').length > 0)
+						{
+						   var numAssignmentsVal = kimble.parseNumber($row.find('[id$="assignment-model-num"]').val());
+						   if (numAssignmentsVal > 0) numAssignments = numAssignmentsVal;
+						}
+
+	        			var usage = totalUsage * pct / numAssignments / 100;
+
+                    	var costRateSummary = kimble.parseJSON($row.find('[id$="assignment-cost-summary"]').val().replace(/"CostRate"/g, '"R"').replace(/"FromDate"/g, '"D"'));
+	        			var costRate = costRateSummary[0].R; //forecasting units
+
+                    	totalCost += (costRate * usage * numAssignments);
+
+                    	$row.find('[id$="assignment-usage"]:visible,[id$="assignment-usage-2"]:visible').val(kimble.formatNumber(usage, '#,##0.##'));
+                    }
+                   });
+
+                var targetMargin = kimble.parseNumber(jQuery('[id$="element-target-margin"]').val());
+
+        		if (targetMargin == 100) targetMargin = 0;
+
+        		expectedRev = (totalCost / (1 - (targetMargin/100)));
+
+        		jQuery('[id$="element-expected-revenue"]').val(kimble.formatNumber(expectedRev * currencyConversionFactor, '#,##0.00'));
+
+                    // Set assignment rev rate
+                    jQuery.each(assignmentConfigTable.find('tbody>tr'), function (i, row) {
+	        			var $row = jQuery(row);
+
+	        			var costRateSummary = kimble.parseJSON($row.find('[id$="assignment-cost-summary"]').val().replace(/"CostRate"/g, '"R"').replace(/"FromDate"/g, '"D"'));
+		        		var costRate = costRateSummary[0].R; //forecasting units
+
+                    	var revRate = totalCost == 0 ? 0 : (costRate / totalCost) * expectedRev;
+
+                    	$row.find('[id$="assignment-revenue-rate"]').val(revRate * currencyConversionFactor);
+                    });
+
+        	}
+
+        	var minStartDate;
+        	var maxEndDate;
+
+            jQuery.each(assignmentConfigTable.find('tbody>tr'), function (i, row) {
+
+                var $row = jQuery(row);
+
+                var pct = 0;
+                var usage = 0;
+                var ftes = 1;
+                if ($row.find('[id$="assignment-percentage"]').length > 0)
+                {
+                    pct =  kimble.parseNumber($row.find('[id$="assignment-percentage"]').val());
+                }
+
+                var usageConversionFactor = 1;
+                var hrsPerDay = $row.find('[id$="assignment-panel"]').attr('hours-per-day');
+
+                var includeInRollup = ($row.find('[id$="assignment-panel"]').attr('is-applied-model') == 'false' && $row.find('[id$="assignment-panel"]').attr('is-activated-model') == 'false');
+
+              	if (!hasModelAssignments) hasModelAssignments = ($row.find('[id$="assignment-panel"]').attr('is-model') == 'true' || $row.find('[id$="assignment-panel"]').attr('is-applied-model') == 'true' || $row.find('[id$="assignment-panel"]').attr('is-activated-model') == 'true');
+	        	if (hasModelAssignments) jQuery('[id*="assignment-model"]').show();
+
+               	if(forecastUnitType != invoiceUnitType)
+               	{
+               		//Day -> Hour
+               		if (forecastUnitType == 'Day')
+               			usageConversionFactor = hrsPerDay;
+               		else //Hour -> Day
+               			usageConversionFactor = 1/hrsPerDay;
+               	}
+
+               	if ($row.find('[id$="assignment-max-usage"]').length > 0)
+               	{
+               		var mx = $row.find('[id$="assignment-max-usage"]');
+
+               		if (mx.val() == '' || kimble.parseNumber(mx.val()) == 0)
+               		{
+               			var u = kimble.parseNumber($row.find('[id$="assignment-usage"]:visible,[id$="assignment-usage-2"]:visible').val());
+               			var p = 100;
+
+               			mx.val(kimble.formatNumber(u + (u * p / 100), '#,###.00'));
+               		}
+                }
+
+                //TODO:Rates - cost rate summary maybe completely hidden if user not have access to costs?
+                var $costRateSummary = $row.find('[id$="assignment-cost-summary"]');
+                var costRateSummary = kimble.parseJSON($costRateSummary.val().replace(/"CostRate"/g, '"R"').replace(/"FromDate"/g, '"D"'));
+
+                // display the first cost rate
+                $row.find('.cost-rate-input').remove();
+                $row.find('.future-cost-change').remove();
+
+                var $costRateInput = jQuery('<input type="text" class="cost-rate-input"></input>');
+
+				$costRateInput.prop('readonly', $costRateSummary.attr('data-readonly') == 'true');
+
+               	$costRateSummary.after($costRateInput);
+
+                if (costRateSummary.length > 0) {
+                	$costRateInput.val(kimble.formatNumber(costRateSummary[costRateSummary.length-1].R / usageConversionFactor,'#,##0.00'));
+
+					if ($costRateSummary.attr('data-readonly') != 'true') {
+						$row.find('[id$="assignment-cost-rate"]').val(kimble.parseNumber($costRateInput.val()) * usageConversionFactor).trigger('change');
+					}
+				}
+
+                if (costRateSummary.length > 1)
+                {
+                	var $futureCostChange = jQuery('<span class="fa fa-info-circle future-cost-change"/>');
+                	$futureCostChange.data('costs', costRateSummary);
+
+                	//can edit
+                	if($costRateSummary.attr('data-readonly') != 'true') $futureCostChange.on('click', function(){jQuery(this).closest('td').find('[id$="assignment-cost-rate-effective-date"]').trigger('focus');});
+
+                	$costRateInput.after($futureCostChange);
+                }
+
+                // display the first rev rate
+                $row.find('.revenue-rate-input').remove();
+
+				var $revRateInput = jQuery('<input type="text" class="revenue-rate-input"></input>');
+
+				$revRateInput.val(kimble.formatNumber($row.find('[id$="assignment-revenue-rate"]').val() *  convertRate(forecastUnitType, revenueUnitTypeEnum, hrsPerDay),'#,##0.00'));
+
+                $revRateInput.prop('readonly', !modeConfig.editRevenue);
+
+               	$row.find('[id$="assignment-revenue-rate"]').after($revRateInput);
+
+                if (showAssignmentDiscount)
+				{
+				    //calc discount
+				   var defaultRevRate =  $row.find('[id$="assignment-default-revenue-rate"]').val();
+				   var discount;
+
+				   if (defaultRevRate == 0)
+				   {
+				   		discount = 0;
+       			   }
+				   else
+				   {
+                    	discount = 100 - ($row.find('[id$="assignment-revenue-rate"]').val() / defaultRevRate * 100);
+				   }
+
+				   $row.find('[id$="assignment-discount"]').val(kimble.formatNumber(discount, '0.000'));
+
+				   $row.find('[id$="assignment-discount"]').prop('readonly', modeConfig.mode != 'UsageItem');
+                }
+
+                if ($row.find('[id$="assignment-model-num-text"]').length == 1)
+                {
+                	ftes = kimble.parseNumber($row.find('[id$="assignment-model-num-text"]').text());
+                }
+                else if ($row.find('[id$="assignment-model-num"]').length == 1)
+                {
+                	ftes = kimble.parseNumber($row.find('[id$="assignment-model-num"]').val());
+                }
+
+                if ($row.find('[id$="assignment-usage-text"]:visible,[id$="assignment-usage-text-2"]:visible').length == 1)
+                {
+                	usage = kimble.parseNumber($row.find('[id$="assignment-usage-text"],[id$="assignment-usage-text-2"]').text());
+                }
+                else
+                {
+                	usage = kimble.parseNumber($row.find('[id$="assignment-usage"],[id$="assignment-usage-2"]').val());
+                }
+
+                $row.find('[id$="assignment-usage"]:visible,[id$="assignment-usage-2"]:visible').prop('readonly', !modeConfig.editUsage);
+
+                var endDate;
+                if ($row.find('[id$="assignment-end-date-text"]:visible').length == 1)
+                {
+                	endDate = kimble.parseDate($row.find('[id$="assignment-end-date-text"]').text());
+                }
+                else
+                {
+                	endDate = kimble.parseDate($row.find('[id$="assignment-end-date"]').val());
+                }
+
+                var utilisation;
+                if ($row.find('[id$="assignment-utilisation-text"]:visible').length == 1)
+                {
+                	utilisation = kimble.parseNumber($row.find('[id$="assignment-utilisation-text"]').text());
+                }
+                else
+                {
+                	utilisation = kimble.parseNumber($row.find('[id$="assignment-utilisation"]').val());
+                }
+
+                var startDate;
+                if ($row.find('[id$="assignment-start-date-text"]').length == 1)
+                {
+                	startDate = kimble.parseDate($row.find('[id$="assignment-start-date-text"]').text());
+                }
+                else
+                {
+                	startDate = kimble.parseDate($row.find('[id$="assignment-start-date"]').val());
+                }
+                var assignment = {ResourceId: $row.find('[id$="assignment-panel"]').attr('resource-id'),
+              					  StartDate: startDate,
+              					  UsageBehaviourRuleId: $row.find('[id$="assignment-panel"]').attr('usage-behaviour-rule-id'),
+              					  IsUsageProfiled: $row.find('[id$="profiled-usage-col"] input').prop('checked'),
+              					  UsagePattern: $row.find('[id$="assignment-panel"]').attr('usage-pattern'),
+              					  Utilisation: utilisation,
+              					  RemainingUsage: usage,
+              					  EndDate: endDate,
+              					  CostRateBasis: kimble.parseJSON($row.find('[id$="assignment-cost-basis-summary"]').val().replace(/"Rate"/g, '"R"').replace(/"FromDate"/g, '"D"')),
+              					  CostExchangeRate: kimble.parseJSON($row.find('[id$="assignment-cost-exchange-rate-summary"]').val().replace(/"Rate"/g, '"R"').replace(/"FromDate"/g, '"D"')),
+              					  CostSummary: kimble.parseJSON($row.find('[id$="assignment-cost-summary"]').val().replace(/"Rate"/g, '"R"').replace(/"FromDate"/g, '"D"')),
+              					  ForecastToHourConversionFactor: forecastUnitType == 'Day' ? hrsPerDay : 1};
+
+              	var resource = {AvailabilityPattern: resourceAvailabilityMap[assignment.ResourceId], ForecastToHourConversionFactor: (forecastUnitType == 'Day' ? hrsPerDay : 1)};
+
+                var assignmentUsagePattern;
+
+                try
+                {
+                    assignmentUsagePattern = recalculateUsage(assignment, resource , usageBehaviourRulesMap, hrsPerDay, null, true);
+                }
+                catch(e){
+
+					var errorMessage = e;
+					var sObjectResource = sforce.connection.query("SELECT Id, Name FROM " + KimbleNamespaceWithUnderscores + "Resource__c WHERE Id = '" + assignment.ResourceId + "'");
+
+					if (sObjectResource.records != null)
+                    {
+						errorMessage += ' (' + sObjectResource.records.Name + ')';
+                    }
+
+                    jQuery('#assignment-error').show();
+					jQuery('#assignment-error-text').text(errorMessage);
+                }
+
+                usage = assignment.RemainingUsage;
+
+                //var entrySpecification = usageBehaviourRulesMap[assignment.UsageBehaviourRuleId].EntrySpecification;
+
+                //if (entrySpecification == "DerivedEndDate" || entrySpecification == "TaskUsage")
+               		$row.find('[id$="assignment-end-date-text"]').text(kimble.formatDate(assignment.EndDate));
+               		$row.find('[id$="assignment-end-date"].hidden-item').val(kimble.formatDate(assignment.EndDate));
+
+                //if (entrySpecification == "DerivedUsage" || entrySpecification == "TaskUsage")
+                	$row.find('[id$="assignment-usage-text"],[id$="assignment-usage-text-2"]').text(kimble.formatNumber(assignment.RemainingUsage, '#,##0.##'));
+                	$row.find('[id$="assignment-usage"].hidden-item,[id$="assignment-usage-2"].hidden-item').val(kimble.formatNumber(assignment.RemainingUsage, '#,##0.##'));
+
+                //if (entrySpecification == "DerivedUtilisation" || entrySpecification == "TaskUsage")
+                	$row.find('[id$="assignment-utilisation-text"]').text(kimble.formatNumber(assignment.Utilisation,'#,##0.##'));
+                	$row.find('[id$="assignment-utilisation"].hidden-item').val(kimble.formatNumber(assignment.Utilisation,'#,##0.##'));
+
+                if (minStartDate == null || minStartDate > assignment.StartDate.toDate()) minStartDate = assignment.StartDate.toDate();
+
+                if (maxEndDate == null || maxEndDate < assignment.EndDate.toDate()) maxEndDate = assignment.EndDate.toDate();
+
+                var totalCost = 0;
+                var totalRev = 0;
+
+                if (assignmentUsagePattern != null)
+                {
+                	totalCost = calculateAssignmentTotalCost(assignment, assignmentUsagePattern, resource.ForecastToHourConversionFactor) * ftes;
+                	totalRev = assignmentUsagePattern.getUsageInHoursForDateRange(assignment.StartDate, assignment.EndDate) / resource.ForecastToHourConversionFactor * ($row.find('[id$="assignment-revenue-rate"]').val()) * ftes;
+				}
+
+				// don't include Models which have been activated or applied
+				if(includeInRollup)
+				{
+					summaryCost += totalCost;
+					summaryRev += totalRev;
+					summaryPct += pct;
+
+					if ($row.find('[id$="assignment-model-num"]').length == 1) {
+						summaryUsage += (usage * kimble.parseNumber($row.find('[id$="assignment-model-num"]').val()));
+     				}
+     				else {
+     					summaryUsage += usage;
+         			}
+                }
+
+                var bodyCells = '';
+
+                bodyCells += '<td class="dataCell summary-cell kimble-number">' + kimble.formatNumber(totalCost, '#,##0.00') + '</td>';
+
+                if (showRevCol)
+                {
+                	bodyCells += '<td class="dataCell summary-cell kimble-number">' + kimble.formatNumber(totalRev, '#,##0.00') + '</td>';
+
+                	var baseRev = (totalRev) / currencyConversionFactor;
+
+                	bodyCells += '<td class="dataCell summary-cell kimble-number"  style="text-align:center">' + kimble.formatNumber(baseRev > 0 ? (baseRev- (totalCost)) / baseRev * 100 : 0, '#,##0.##') + '</td>';
+                }
+
+                jQuery(bodyCells).appendTo($row);
+
+            });
+
+            // add summary summing %, usage, cost, revenue
+
+            var summaryRow = '<tr class="summary-cell summary-row dataRow">';
+
+            summaryRow += '<td colspan="2" class="simple-dd-container">';
+
+            if(!modeConfig.canModel)
+            {
+            	summaryRow += '<span class="fa fa-plus-square"></span><a href="javascript:addAssignment()" class="add-link undecorated-link" style="padding-left: 4px;">{!$Label.AddAssigmentLabel}</span>';
+            }
+            else
+            {
+                summaryRow += '<a href="javascript:void(0);" class="hover-mutton undecorated-link">';
+                summaryRow += '<div class="simple-dd-btn" title="{!JSENCODE($Label.AddAssigmentLabel)}"><i class="fa fa-plus-square"></i><span class="add-link undecorated-link" style="padding-left: 4px;">{!$Label.AddAssigmentLabel}</span>';
+                summaryRow += '<ul class="simple-dd-menu">';
+                summaryRow += '<li class="add-assignment" onclick="addAssignment();"><i class="fa fa-plus-square"></i>{!JSENCODE($Label.AddAssigmentLabel)}</li>';
+                summaryRow += '<li class="add-model-assignment" onclick="addModelAssignment()"><i class="fa fa-list-alt"></i>{!JSENCODE($Label.AddModelAssignment)}</li>';
+                summaryRow += '</ul>';
+                summaryRow += '</div>';
+                summaryRow += '</a>';
+            }
+
+            summaryRow += '</td>';
+
+			if (hasModelAssignments) summaryRow += '<td class="model-field"></td>';
+
+			if(showRoles) summaryRow += '<td></td>';
+
+            if (modeConfig.showPctCol) summaryRow += '<td class="kimble-number">' + kimble.formatNumber(summaryPct, '#,##0.##')  + '</td>';
+
+			summaryRow += '<td></td>';  // usage behaviour edit
+
+            if (jQuery('[id$="profiled-usage-col"]').length > 0) summaryRow += '<td></td>';
+
+            summaryRow += '<td class="kimble-number">' + kimble.formatNumber(summaryUsage, '#,##0.##') + '</td>';
+
+			if (jQuery('[id$="max-usage-col"]').length > 0) summaryRow += '<td></td>';
+
+            summaryRow += '<td id="minStartDateCell"><input id="minStartDate" type="text" class="kimbleDatePicker" style="width:65px" onchange="updateStartDates(this)"/></td>';
+            summaryRow += '<td id="maxEndDateCell"><input id="maxEndDate" type="text" class="kimbleDatePicker" style="width:65px" onchange="updateEndDates(this)"/></td>'
+            summaryRow += '<td></td><td></td>';
+
+            if (showRevCol) summaryRow += '<td></td>';
+
+            if (showAssignmentDiscount) summaryRow += '<td class="disc-field"></td>';
+
+            summaryRow += '<td class="kimble-number">' + kimble.formatNumber(summaryCost, '#,##0.00') + '</td>';
+
+            if (showRevCol)
+            {
+            	summaryRow += '<td class="kimble-number">' + kimble.formatNumber(summaryRev, '#,##0.00') + '</td>';
+            	var baseRev = summaryRev / currencyConversionFactor;
+            	summaryRow += '<td class="kimble-number" style="text-align:center">' + kimble.formatNumber(baseRev > 0 ? (baseRev-summaryCost) / baseRev * 100 : 0, '#,##0.##') + '</td>';
+            }
+
+            summaryRow += '</tr>';
+
+            jQuery(summaryRow).insertAfter(assignmentConfigTable.find('thead'));
+
+            if (minStartDate != null) jQuery('[id$="minStartDate"]').val(kimble.formatDate(minStartDate.toKimbleUTC()));
+            if (maxEndDate != null) jQuery('[id$="maxEndDate"]').val(kimble.formatDate(maxEndDate.toKimbleUTC()));
+
+            jQuery('[id$="element-services-cost"]').val(kimble.formatNumber(summaryCost, '#,##0.00'));
+            jQuery('[id$="element-services-revenue"]').val(kimble.formatNumber(summaryRev, '#,##0.00'));
+            jQuery('[id$="element-notional-revenue"]').val(kimble.formatNumber(summaryRev, '#,##0.00'));
+
+            if (modeConfig.mode == 'UsageItem')
+        	{
+        		forecastUsageInput.val(kimble.formatNumber(summaryUsage, '#,##0.##'));
+
+        		var margin = 0;
+
+        		if (summaryRev != 0)
+        		{
+        			var baseCurRev = summaryRev / currencyConversionFactor;
+
+        			margin = 100 * (baseCurRev - summaryCost) / baseCurRev;
+        		}
+
+        		jQuery('[id$="element-target-margin"]').val(kimble.formatNumber(margin,'#,##0.##'));
+        	}
+        	if (modeConfig.mode == 'ExpectedUsage')
+        	{
+        		var expectedRev = kimble.parseNumber(expectedRevenue) / currencyConversionFactor;
+
+        		/*var margin = 0;
+
+        		if(expectedRev != 0)
+        		{
+        			margin = 100 * (expectedRev - summaryCost) / expectedRev;
+        		}
+
+        		jQuery('[id$="element-target-margin"]').val(kimble.formatNumber(margin,'#,##0.##'));*/
+        	}
+
+			if (modeConfig.mode == 'UsageDerivedRevenue')
+			{
+			    forecastUsageInput.val(kimble.formatNumber(summaryUsage, '#,##0.##'));
+			    jQuery('[id$="element-expected-revenue"]').val(kimble.formatNumber(summaryRev, '#,##0.00'));
+			}
+
+        	jQuery('.kimbleDatePicker:not(.hasDatepicker)').datepicker({
+                    dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+                    minDate: earliestOpenDate.toDate(),
+                    showOtherMonths: true,
+                    selectOtherMonths: true});
+        }
+
+        function calculateAssignmentTotalCost(assignment, usagePattern, convFactor)
+        {
+        	var costRates = [];
+
+        	if (assignment.CostSummary != null && assignment.CostSummary.length > 0)
+        	{
+        		costRates = assignment.CostSummary;
+        	}
+        	else
+        	{
+        		if (assignment.CostRateBasis == null || assignment.CostRateBasis.length == 0) return;
+
+        		var combinedDates = {};
+
+				assignment.CostExchangeRate.forEach(function(rate) {
+					var dte = rate.D;
+					if (dte.toDate() < assignment.StartDate.toDate()) dte = assignment.StartDate;
+
+					combinedDates[dte] = {};
+				})
+
+				assignment.CostRateBasis.forEach(function(rate) {
+					var dte = rate.D;
+					if (dte.toDate() < assignment.StartDate.toDate()) dte = assignment.StartDate;
+
+					combinedDates[dte] = {};
+				})
+
+				Object.keys(combinedDates).sort(function(a, b) {return a.toDate() > b.toDate()}).forEach(function(d){
+
+				  var matchingExRates = assignment.CostExchangeRate.filter(function(x){return x.D.toDate() <= d.toDate()});
+				  var matchingBasisRates = assignment.CostRateBasis.filter(function(x){return x.D.toDate() <= d.toDate()});
+
+				  costRates.push({D:d, R:matchingExRates[matchingExRates.length-1].R * matchingBasisRates[matchingBasisRates.length-1].R * costRateForecastFactor});
+				})
+			}
+
+        	var totalCost = 0;
+
+            for (var i=0; i<costRates.length; i++)
+			{
+				var rate = costRates[i];
+				var fromDate = rate.D.toDate()
+				var toDate;
+
+				if (costRates.length > i + 1)
+					toDate = costRates[i+1].D.toDate().kimbleAddDays(-1);
+				else
+					toDate = assignment.EndDate.toDate();
+
+				var remainingUsage = usagePattern.getUsageInHoursForDateRange(fromDate, toDate);
+
+				totalCost += remainingUsage / convFactor * rate.R;
+			}
+
+        	return totalCost;
+        }
+
+       	function updateStartDates(obj)
+       	{
+       		if (jQuery('[id$="assignment-start-date"]').length == 0) return;
+
+       		//update all assignment start dates to this
+       		jQuery.each(jQuery('[id$="assignment-start-date"]'), function (i, ass) {
+       			jQuery(ass).val(jQuery(obj).val());
+       		});
+
+       		assignmentChange();
+       	}
+
+       	function updateEndDates(obj)
+       	{
+       		if (jQuery('[id$="assignment-end-date"]:visible').length == 0) return;
+
+       		jQuery.each(jQuery('[id$="assignment-end-date"]:visible'), function (i, ass) {
+       			jQuery(ass).val(jQuery(obj).val());
+       		});
+
+       		calculateAssignmentRevenuesAndCosts()
+       	}
+
+       	function assignmentUBRSelect(pos)
+       	{
+       	    jQuery('.assignment-usage-behaviours[assignment-pos="' + pos + '"] .assignment-usage-behaviours-select .working-ind').removeClass('hidden-item');
+       	    jQuery('.assignment-usage-behaviours[assignment-pos="' + pos + '"] .assignment-usage-behaviours-select .usage-behaviour-cancel-btn').addClass('hidden-item');
+       	    jQuery('.assignment-usage-behaviours[assignment-pos="' + pos + '"] .assignment-usage-behaviours-select').addClass('hidden-item');
+       	    event.stopPropagation();
+       	    assignmentChange(pos);
+        }
+
+       	function showUBR(pos)
+       	{
+       	    jQuery('.assignment-usage-behaviours-select:not(.hidden-item)').addClass('hidden-item');
+       	    jQuery('.assignment-usage-behaviours[assignment-pos="' + pos + '"] .assignment-usage-behaviours-select').removeClass('hidden-item');
+       	    event.stopPropagation();
+        }
+
+        function hideUBR(pos)
+        {
+       	    jQuery('.assignment-usage-behaviours-select:not(.hidden-item)').addClass('hidden-item');
+       	    event.stopPropagation();
+        }
+
+       	function editProposalElement(elementId)
+		{
+			initialiseStackedModalBoxy('#editProposalElementPopup', '{!JSENCODE($Label.Edit)}  {!$ObjectType.DeliveryElement__c.label}', jQuery('form[id$=\'TheProposalElementForm\']'));
+			loadTheElement(elementId);
+
+			jQuery('#editProposalElementPopup').resizable({minHeight: 460, minWidth: 760, alsoResize: '.ionTabs__body'});
+		}
+
+		/* Insight */
+		var expCatInsightHeaderLabel = '<apex:outputText value="{!$Label.kimbleone__expenseaveragecostheading}"/>';
+		var categoryLabel = '<apex:outputText value="{!$ObjectType.KimbleOne__ActivityExpenseCategoryProfile__c.Fields.KimbleOne__ExpenseCategory__c.Label}"/>';
+		var numberOfInstanceLabel = '<apex:outputText value="{!$Label.kimbleone__totalnumberofexpenseitems}"/>';
+		var averageCostLabel = '<apex:outputText value="{!$Label.kimbleone__averagecost}"/>';
+		var inlineExpenseCostInsightLabel = '<apex:outputText value="{!$Label.kimbleone__expenseinsightnarrative}"/>';
+
+		var resourceTypeMarginInsightHeaderLabel = '<apex:outputText value="{!$Label.kimbleone__averagemarginbyresourcetypeheading}"/>';
+		var resourceTypeLabel = '<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__ResourceType__c.Label}"/>';
+		var thisProposalAverageMarginLabel = '<apex:outputText value="{!$Label.kimbleone__thisproposalheading}"/>';
+		var averageMarginLabel = '<apex:outputText value="{!$Label.kimbleone__accountaverageheading}"/>';
+
+		function formatCurrencyValue(theValue)
+		{
+			theValue = (theValue == undefined || theValue == null || theValue == '' ? '0' : theValue);
+
+			return kimble.formatNumber(theValue, '#,##0.00');
+		}
+
+		function formatNumericValue(theValue)
+		{
+			theValue = (theValue == undefined || theValue == null || theValue == '' ? '0' : theValue);
+
+			return kimble.formatNumber(theValue, '#,##0');
+		}
+
+		var expenseInsight = {};
+		var baseCurrency;
+		var accountId;
+
+		function initialiseExpenseCategoryAverageInsights()
+		{
+			if(jQuery('.insight-container.expense-cat-average').length)
+			{
+				if(Object.keys(expenseInsight).length == 0)
+				{
+					accountId = jQuery(jQuery('.insight-container.expense-cat-average')[0]).attr('account-id');
+					baseCurrency = jQuery(jQuery('.insight-container.expense-cat-average')[0]).attr('display-currency');
+
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.GetExpenseInsights}',
+								accountId, baseCurrency,
+							function(result, event){
+								if (event.status)
+								{
+									expenseInsight = result;
+
+									if(expenseInsight.OrderedExpenseCategoryIds.length)
+									{
+										initialiseExpenseCategoryAverageInsightActions();
+									}
+								}
+								else if (event.type === 'exception')
+								{
+									alert(event.message);
+								}
+								else
+								{
+									alert(event.message);
+								}
+						},
+						{escape: true, timeout: 60000}
+					);
+				}
+				else if(expenseInsight.OrderedExpenseCategoryIds.length)
+				{
+					initialiseExpenseCategoryAverageInsightActions();
+				}
+			}
+		}
+
+		function initialiseExpenseCategoryAverageInsightActions()
+		{
+			jQuery('.insight-container.expense-cat-average').removeClass('insight-hidden');
+
+			jQuery('div.expense-cat-average .insight-item').qtip('destroy', true);
+			jQuery('div.expense-cat-average .insight-item').qtip({
+					content: {
+						text: function(event, api) {
+							return generateExpenseCategoryAverageInsightTipHtml();
+						},
+						title: expCatInsightHeaderLabel
+ 					},
+		            position: {
+						my: 'middle right',
+						at: 'middle left',
+						adjust: { method: 'flip flip'},
+						viewport: $(window)
+					},
+					style: {
+						classes: 'qtip-light qtip-shadow qtip-rounded insight-tool-tip'
+					}
+				});
+
+			jQuery(document).off('click', 'div.expense-cat-average .insight-item').on('click', 'div.expense-cat-average .insight-item', dockInsight);
+			jQuery(document).off('click', 'div.expense-cat-average .collapse-docked-insight').on('click', 'div.expense-cat-average .collapse-docked-insight', collapseInsight);
+
+			jQuery(document).off('click', '.expense-cost-insight-ind').on('click', '.expense-cost-insight-ind', populateExpenseRemainingCostFromInsight);
+
+			refreshExpenseCostInsights();
+		}
+
+		function generateExpenseCategoryAverageInsightTipHtml()
+		{
+			var tipHtml = '<div class="expense-insight-tooltip">';
+
+			tipHtml += '<table border="0" cellpadding="0" cellspacing="0" class="list insight-entries">';
+			tipHtml += '<thead class="headerRow">';
+			tipHtml += '<th>' + categoryLabel + '</th>';
+			tipHtml += '<th class="instances-header">' + numberOfInstanceLabel + '</th>';
+			tipHtml += '<th class="average-cost-header">' + averageCostLabel + ' (' + baseCurrency + ')</th>';
+			tipHtml += '</thead>';
+			tipHtml += '<tbody>';
+
+			for(var counter=0; counter < expenseInsight.OrderedExpenseCategoryIds.length; counter++)
+			{
+				var expenseCategoryDetails = expenseInsight.TheExpenseCategoryAverageInsightMap[expenseInsight.OrderedExpenseCategoryIds[counter]];
+
+				tipHtml += '<tr>';
+				tipHtml += '<td class="category-field">' + expenseCategoryDetails.ExpenseCategoryName + '</td>';
+				tipHtml += '<td class="instances-field">' + expenseCategoryDetails.InstanceCount + '</td>';
+				tipHtml += '<td class="average-cost-field">' + formatCurrencyValue(expenseCategoryDetails.ExpenseAverage) + '</td>';
+				tipHtml += '</tr>';
+			}
+
+			tipHtml += '</tbody>';
+			tipHtml += '</table>';
+			tipHtml += '</div>';
+
+			return tipHtml;
+		}
+
+		var resourceTypeMarginInsight = {};
+
+		function initialiseResourceTypeAverageMarginInsights()
+		{
+			if(jQuery('.insight-container.resource-type-margin').length)
+			{
+				if(Object.keys(resourceTypeMarginInsight).length == 0)
+				{
+					var proposalId = getQueryVariable('id');
+					accountId = jQuery(jQuery('.insight-container.resource-type-margin')[0]).attr('account-id');
+					baseCurrency = jQuery(jQuery('.insight-container.resource-type-margin')[0]).attr('display-currency');
+
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.GetResourceTypeMarginInsightsForProposal}',
+								accountId, proposalId, baseCurrency,
+							function(result, event){
+								if (event.status)
+								{
+									resourceTypeMarginInsight = result;
+
+									if(resourceTypeMarginInsight.OrderedResourceTypeIds.length)
+									{
+										initialiseResourceTypeAverageMarginInsightActions();
+									}
+								}
+								else if (event.type === 'exception')
+								{
+									alert(event.message);
+								}
+								else
+								{
+									alert(event.message);
+								}
+						},
+						{escape: true, timeout: 60000}
+					);
+				}
+				else if(resourceTypeMarginInsight.OrderedResourceTypeIds.length)
+				{
+					initialiseResourceTypeAverageMarginInsightActions();
+				}
+			}
+		}
+
+		function initialiseResourceTypeAverageMarginInsightActions()
+		{
+			jQuery('.insight-container.resource-type-margin').removeClass('insight-hidden');
+
+			jQuery('div.resource-type-margin .insight-item').qtip('destroy', true);
+			jQuery('div.resource-type-margin .insight-item').qtip({
+					content: {
+						text: function(event, api) {
+							return generateResourceTypeAverageMarginInsightTipHtml();
+						},
+						title: resourceTypeMarginInsightHeaderLabel
+ 					},
+		            position: {
+						my: 'middle right',
+						at: 'middle left',
+						adjust: { method: 'flip flip'},
+						viewport: $(window)
+					},
+					style: {
+						classes: 'qtip-light qtip-shadow qtip-rounded insight-tool-tip'
+					}
+				});
+
+			jQuery(document).off('click', 'div.resource-type-margin .insight-item').on('click', 'div.resource-type-margin .insight-item', dockInsight);
+			jQuery(document).off('click', 'div.resource-type-margin .collapse-docked-insight').on('click', 'div.resource-type-margin .collapse-docked-insight', collapseInsight);
+		}
+
+		function generateResourceTypeAverageMarginInsightTipHtml()
+		{
+			var tipHtml = '<div class="resource-type-margin-insight-tooltip">';
+
+			tipHtml += '<table border="0" cellpadding="0" cellspacing="0" class="list insight-entries">';
+			tipHtml += '<thead class="headerRow">';
+			tipHtml += '<th>' + resourceTypeLabel + '</th>';
+			tipHtml += '<th class="average-margin-header">' + thisProposalAverageMarginLabel + ' (%)</th>';
+			tipHtml += '<th class="average-margin-header">' + averageMarginLabel + ' (%)</th>';
+			tipHtml += '</thead>';
+			tipHtml += '<tbody>';
+
+			for(var counter=0; counter < resourceTypeMarginInsight.OrderedResourceTypeIds.length; counter++)
+			{
+				var resourceTypeMarginDetails = resourceTypeMarginInsight.TheResourceTypeAverageMarginInsightMap[resourceTypeMarginInsight.OrderedResourceTypeIds[counter]];
+
+				tipHtml += '<tr>';
+				tipHtml += '<td class="resource-type-field">' + resourceTypeMarginDetails.ResourceTypeName + '</td>';
+				tipHtml += '<td class="average-cost-field">' + (resourceTypeMarginDetails.Benchmark != undefined ? formatCurrencyValue(resourceTypeMarginDetails.Benchmark.AverageMargin) : '-') + '</td>';
+				tipHtml += '<td class="average-cost-field">' + formatCurrencyValue(resourceTypeMarginDetails.AverageMargin) + '</td>';
+				tipHtml += '</tr>';
+			}
+
+			tipHtml += '</tbody>';
+			tipHtml += '</table>';
+			tipHtml += '</div>';
+
+			return tipHtml;
+		}
+
+		function dockInsight(event)
+		{
+			var headerLabel = '';
+			var insightContainerSelector = '';
+
+			var insightHeaderHtml = '';
+			var insightBodyHtml = '';
+
+			if(jQuery(this).parent('div.expense-cat-average').length)
+			{
+				headerLabel = expCatInsightHeaderLabel;
+				insightContainerSelector = '.expense-cat-average';
+				insightBodyHtml += generateExpenseCategoryAverageInsightTipHtml();
+			}
+			if(jQuery(this).parent('div.resource-type-margin').length)
+			{
+				headerLabel = resourceTypeMarginInsightHeaderLabel;
+				insightContainerSelector = '.resource-type-margin';
+				insightBodyHtml += generateResourceTypeAverageMarginInsightTipHtml();
+			}
+
+			insightHeaderHtml = '<div class="insight-header">' + headerLabel + '</div><div class="collapse-docked-insight"><span class="cardIconInfo fa fa-lightbulb-o"></span><span class="cardIconInfo fa fa-angle-double-right"></span></div>';
+
+			jQuery(this).hide();
+			jQuery(this).closest('div.insight-container' + insightContainerSelector).removeClass('insight-collapsed');
+			jQuery(this).closest('div.insight-container' + insightContainerSelector).find('.docked-insight').html(insightHeaderHtml + insightBodyHtml);
+			jQuery(this).closest('div.insight-container' + insightContainerSelector).find('.docked-insight').show('fade');
+		}
+
+		function collapseInsight(event)
+		{
+			jQuery(this).parent('.docked-insight').hide();
+
+			var insightContainerSelector = '';
+			if(jQuery(this).parent('div.expense-cat-average').length)
+			{
+				insightContainerSelector = '.expense-cat-average';
+			}
+			if(jQuery(this).parent('div.resource-type-margin').length)
+			{
+				insightContainerSelector = '.resource-type-margin';
+			}
+
+			jQuery(this).closest('div.insight-container' + insightContainerSelector).addClass('insight-collapsed');
+			jQuery(this).closest('div.insight-container' + insightContainerSelector).find('.insight-item').show();
+		}
+
+		function refreshExpenseCostInsights()
+		{
+			if(Object.keys(expenseInsight).length > 0)
+			{
+				jQuery('.expense-cost-insight-ind').each(function () {
+					refreshExpenseCostInsight(jQuery(this));
+				});
+			}
+		}
+
+		function refreshExpenseCostInsight(obj, forceUpdate)
+		{
+			var expenseCategoryId = obj.closest('tr').find('[id$="expense-category-id"]').val();
+
+			if(expenseInsight != undefined && expenseInsight.OrderedExpenseCategoryIds != undefined && expenseInsight.OrderedExpenseCategoryIds.length && expenseInsight.TheExpenseCategoryAverageInsightMap[expenseCategoryId] != undefined && (forceUpdate || obj.parent('td').find('[id$="expense-net-amount"]').val() == ''))
+			{
+				var instanceCountDisplay = formatNumericValue(expenseInsight.TheExpenseCategoryAverageInsightMap[expenseCategoryId].InstanceCount);
+				var expenseAverageDisplay = formatCurrencyValue(expenseInsight.TheExpenseCategoryAverageInsightMap[expenseCategoryId].ExpenseAverage) + ' (' + baseCurrency + ')';
+
+				var theTooltip = inlineExpenseCostInsightLabel.format(instanceCountDisplay, expenseAverageDisplay);
+				obj.closest('tr').find('.expense-cost-insight-ind').attr('title', theTooltip);
+				obj.closest('tr').find('.expense-cost-insight-ind').attr('avg-amt', formatCurrencyValue(expenseInsight.TheExpenseCategoryAverageInsightMap[expenseCategoryId].ExpenseAverage));
+				obj.closest('tr').find('.expense-cost-insight-ind').qtip('destroy', true);
+				obj.closest('tr').find('.expense-cost-insight-ind').qtip({
+		            position: {
+						adjust: { method: 'flip flip'},
+						viewport: $(window)
+					},
+					style: {
+						classes: 'qtip-light qtip-shadow qtip-rounded'
+					}
+				});
+				obj.closest('tr').find('.expense-cost-insight-ind').removeClass('hidden-item');
+				obj.closest('tr').find('.expense-cost-insight-ind').fadeOut(500).fadeIn(500);
+			}
+			else
+			{
+				obj.closest('tr').find('.expense-cost-insight-ind').addClass('hidden-item');
+			}
+		}
+
+		function populateExpenseRemainingCostFromInsight()
+		{
+			var insightTip = jQuery(this);
+			var averageAmt = insightTip.attr('avg-amt');
+
+			insightTip.parent().find('[id$="expense-net-amount"]').val(averageAmt).change();
+		}
+
+		function showMilestoneLinks()
+		{
+			jQuery('.assignment-milestones').addClass('hidden-item');
+			jQuery(this).next('.assignment-milestones').removeClass('hidden-item');
+		}
+
+		function hideMilestoneLinks()
+		{
+			jQuery('.assignment-milestones').addClass('hidden-item');
+		}
+
+		function linkMilestone()
+		{
+			var selectedItem = jQuery(this);
+			linkAssignmentToMilestone(selectedItem.parent('.assignment-milestone').attr('assignment-pos'), selectedItem.attr('milestone-pos'));
+
+			hideMilestoneLinks();
+		}
+
+		function milestoneRerenderComplete()
+		{
+			// if milestone linking is enabled then we need to rerender the assignments panel too (which in-turn will call initialiseProposalElementEdit)
+			if(allowAssignmentToMilestoneLink)
+			{
+				rerenderAssignments();
+			}
+			else
+			{
+				initialiseProposalElementEdit();
+			}
+		}
+
+		function milestoneNameChanged()
+		{
+			if(allowAssignmentToMilestoneLink) rerenderAssignments();
+		}
+
+		function applyProposalModelAssignmentClick(obj, rowNum)
+		{
+			var j = jQuery(obj);
+
+			var $row = j.closest('tr');
+
+			if($row.find('[id$="assignment-panel"]').attr('is-applied-model') == "true")
+			{
+				var d = confirm('<apex:outputText value="{!$Label.kimbleone__genericlabel19}"/>');
+				if(!d) return;
+			}
+
+  		    applyProposalModelAssignment(rowNum);
+  		}
+
+		function revertAppliedProposalModelAssignmentClick(obj, rowNum)
+		{
+			var j = jQuery(obj);
+
+			var $row = j.closest('tr');
+
+            var d = confirm('<apex:outputText value="{!$Label.kimbleone__genericlabel18}"/>');
+            if(!d) return;
+
+  		    revertAppliedProposalModelAssignment(rowNum);
+  		}
+
+  		function activateProposalModelAssignmentClick(obj, rowNum)
+  		{
+  		    var d = confirmDelete();
+  		    if(!d) return;
+
+  		    activateProposalModelAssignment(rowNum);
+    	}
+        function disableAppliedModelRows()
+        {
+            disableRows('div[is-applied-model="true"]');
+        }
+        function disableRows(selector)
+        {
+            var appliedRows = jQuery(selector).closest('tr');
+
+            appliedRows.find('input, select').prop('disabled', 'disabled');
+            appliedRows.find('a.assignment-resource').hide();
+            appliedRows.find('.summary-cell').css('opacity','0.4');
+        }
+
+        var invalidTargetMargin = false;
+
+        function validateTargetMargin(inputMargin)
+        {
+            var maxTargetMargin = 100;
+            var isValid = inputMargin >= maxTargetMargin ? false : true;
+            var usageMode = jQuery('[id$="element-usage-mode"]').val();
+
+            if(!isValid && usageMode == 'UsageDerivedRevenue')
+            {
+                invalidTargetMargin = true;
+                jQuery('#saveButton').prop('disabled',true);
+                jQuery('#saveAndReloadButton').prop('disabled',true);
+                jQuery('#validationPageMessageContainer').show();
+                return false;
+            }
+            else
+            {
+            	if(invalidTargetMargin)
+            	{
+            	    invalidTargetMargin = false;
+					jQuery('#saveButton').prop('disabled',false);
+                	jQuery('#saveAndReloadButton').prop('disabled',false);
+					jQuery('#validationPageMessageContainer').hide();
+             	}
+             	return true;
+            }
+        }
+       	</script>
+       	<style>
+       		.dateFormat {display: none;}
+       		.bPageBlock .detailList .labelCol {white-space: nowrap;}
+			.lookupHoverDetail {z-index: 9999 !important;}
+       	</style>
+	<script>
+// Ion.Tabs
+// version 1.0.2 Build: 17
+// https://github.com/IonDen/ion.tabs
+(function(a,w,g,n){if(!a.ionTabs){var h={},q={},k={},b,d,r,v=a(g),t=function(){try{if(g.localStorage&&null!==g.localStorage)return{save:function(b,a){"object"===typeof a&&(a=JSON.stringify(a));try{localStorage.setItem(b,a)}catch(c){"QUOTA_EXCEEDED_ERR"===c&&(localStorage.clear(),localStorage.setItem(b,a))}},load:function(a){try{return JSON.parse(localStorage.getItem(a))}catch(b){return localStorage.getItem(a)}},del:function(a){localStorage.removeItem(a)}}}catch(b){return{save:function(){return null},load:function(){return null},del:function(){return null}}}return null}(),u=function(a){this.container=a};u.prototype={init:function(){var c=this.container,m=c.find(".ionTabs__tab"),d=c.find(".ionTabs__item"),s=c.find(".ionTabs__preloader"),l,f=c.data("name"),e;m.each(function(){l=a(this);e="Button__"+f+"__"+l.data("target");l.prop("id",e)});d.each(function(){l=a(this);e="Tab__"+f+"__"+l.data("name");l.prop("id",e)});m.on("click.ionTabs",function(b){b.preventDefault();s[0].style.display="block";p(a(this).data("target"))});var p=function(c){c=decodeURIComponent(c);e="#Button__"+f+"__"+c;a(e).addClass("ionTabs__tab_state_active").siblings().removeClass("ionTabs__tab_state_active");e="#Tab__"+f+"__"+c;a(e).addClass("ionTabs__item_state_active").siblings().removeClass("ionTabs__item_state_active");s[0].style.display="none";var d;k[f]=c;b="tabs";for(d in k)k.hasOwnProperty(d)&&(b+="|"+encodeURIComponent(d)+":"+encodeURIComponent(k[d]));"hash"===h.type&&(n.hash=b);"storage"===h.type&&t.save(n.hostname+"__ionTabsPosition",b);v.trigger("ionTabsChange",{group:f,tab:c,tabId:e});if("function"===typeof h.onChange)h.onChange({group:f,tab:c,tabId:e})};k[f]?p(k[f]):p(m.eq(0).data("target"));this.setTab=function(a){p(a)}}};a.ionTabs=function(c,m){if(c){var g;h=a.extend({type:"hash",onChange:null},m);"hash"===h.type&&(b=n.hash);"storage"===h.type&&(b=t.load(n.hostname+"__ionTabsPosition"));if(b){b=b.split("|");if(1<b.length)for(d=1;d<b.length;d+=1)r=b[d].split(":"),k[decodeURIComponent(r[0])]=decodeURIComponent(r[1]);b=""}a(c).each(function(){g=a(this);var b=encodeURIComponent(g.data("name"));q[b]=new u(g);q[b].init()})}};a.ionTabs.setTab=function(a,b){q[a].setTab(b)}}})(jQuery,document,window,location);
+</script>
+<style>
+
+/* Insight */
+th.average-margin-header {
+    text-align: right;
+}
+
+	.cost-rate-input, .revenue-rate-input, .discount-pct-input {
+    	width: 65px;
+    	text-align: right;
+	}
+
+/*********** Usage Forecast MODE*****************/
+.usage-forecast-mode-toggle
+{
+	white-space: nowrap;
+	margin-top:-4px;
+	cursor:pointer;
+}
+.usage-forecast-mode-toggle>span
+{
+	-webkit-background-clip: border-box;
+	-webkit-background-origin: padding-box;
+	-webkit-background-size: auto;
+	background-attachment: scroll;
+	background-clip: border-box;
+	background-color: rgb(232, 232, 233);
+	background-image: url(/img/alohaSkin/togglePill_bg.png);
+	background-origin: padding-box;
+	background-size: auto;
+	display: inline-block;
+	padding-bottom: 4px;
+	padding-left: 2px;
+	padding-right: 5px;
+	padding-top: 4px;
+	border-top-color: rgb(181, 181, 181);
+	border-top-style: solid;
+	border-top-width: 1px;
+	border-bottom-color: rgb(181, 181, 181);
+	border-bottom-style: solid;
+	border-bottom-width: 1px;
+	border-left-color: rgb(181, 181, 181);
+	border-left-style: solid;
+	border-left-width: 1px;
+	border-collapse: separate;
+	
+	display: inline-block;
+}
+.usage-forecast-mode-toggle > span:last-child
+{
+	
+	border-right-color: rgb(181, 181, 181);
+	border-right-style: solid;
+	border-right-width: 1px;		
+	border-bottom-right-radius: 3px;
+	border-top-right-radius: 3px;		
+}
+.usage-forecast-mode-toggle > span:first-child
+{				
+	border-bottom-left-radius: 3px;
+	border-top-left-radius: 3px;
+}
+.usage-forecast-mode-toggle span.selected
+{
+	background-color: rgb(232, 232, 233);
+	background-image: url(/img/alohaSkin/togglePill_bg.png);
+	background-position: 0% -120px;
+	background-size: auto;
+	color:#FFF;
+}
+.usage-forecast-mode-toggle > span > span
+{
+	display: inline-block;	
+	white-space:nowrap;			
+}
+.toggleIcon
+{
+	background-color: rgba(0, 0, 0, 0);
+	display: inline-block;
+	margin-left: 6px;
+	padding-right: 5px;
+}
+.toggleLink, .linkText
+{
+	background-color: rgba(0, 0, 0, 0);
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 11px;
+	font-weight: bold;
+	height: 14px;
+	margin-top: 1px;
+	padding-right: 5px;
+	white-space: nowrap;
+}		
+
+.kimble-number
+{
+	text-align:right;
+}
+
+.summary-row {
+	background-color: #F8F8F8;
+    font-weight: bold;
+}
+
+.assignment-usage-behaviours {
+    position: relative;
+}
+.assignment-usage-behaviours-select {
+    position: absolute;
+    background-color: white;
+    z-index: 999;
+    top: -27px;
+    left: 17px;
+    padding: 10px;
+    border: 1px solid #e0e3e5;
+    border-radius: 4px;
+    font-weight: bold;
+}
+.assignment-usage-behaviours-select select {
+    margin-top: 5px;
+    padding: 2px;
+}
+i.usage-behaviour-cancel-btn {
+    position: absolute;
+    right: 6px;
+    top: 4px;
+    font-size: 16px;
+    color: #888;
+}
+.assignment-usage-behaviours-select i.working-ind {
+    position: absolute;
+    font-size: 20px;
+    right: 6px;
+    top: 3px;
+    color: #888888;
+}
+.inline-btn:hover {
+    color: #005fb2;
+}
+td[id$="profiled-usage-col"] {
+    text-align: center;
+}
+/*Modelling*/
+td[id$='assignment-model'] {
+    text-align: right;
+}
+
+tr.summary-row td.kimble-number.model-field {
+    padding-right: 8px;
+}
+
+/* Simple DD Mutton - applies no styling to the parent button suiting it to use a .fa icon as a trigger */
+.hover-mutton {
+	display: inline-block;
+	position: relative;
+}
+
+td.simple-dd-container {
+	overflow: inherit !important;
+}
+.simple-dd-btn:hover {
+	background-color: #f4f6f9;
+}
+.simple-dd-menu {
+	position: absolute;
+	top: 10px;
+	left: 0px;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	padding: 0;
+	margin: 2px 0 0 0;
+	box-shadow: 0 0 6px 0 rgba(0,0,0,0.1);
+	background-color: #ffffff;
+	list-style-type: none;
+	text-align: left;
+	z-index: 99;
+	color: #015ba7;
+	font-style: normal;
+	font-weight: normal;
+}
+.simple-dd-menu li.disabled {
+	color: lightgray;
+	cursor: default;
+}
+.simple-dd-btn > .simple-dd-menu {
+	display: none;
+}
+.simple-dd-btn:hover > .simple-dd-menu {
+	display: block;
+}
+.simple-dd-btn:hover .add-link {
+    opacity: 0;
+}
+.simple-dd-menu li {
+	padding: 10px;
+	cursor: pointer;
+	white-space: nowrap;
+	margin-left: 0px;
+}
+.simple-dd-menu li .fa {
+	font-size: 14px;
+	margin-right: 6px;
+}
+.simple-dd-menu li:hover {
+	background-color: #f4f6f9;
+}
+
+.add-link {
+    font-weight: normal;
+}
+
+.inline-btn {
+	cursor: pointer;
+}
+
+div#ui-datepicker-div {
+    z-index: 9999 !important;
+}
+
+/* Ion.Tabs
+// css version 1.0.0
+// by Denis Ineshin | ionden.com
+// ===================================================================================================================*/
+
+/* =====================================================================================================================
+// Ion.Tabs: Base */
+
+.ionTabs {
+    position: relative;
+}
+    .ionTabs__head {
+        position: relative; display: block;
+        list-style-type: none;
+        margin: 0; padding: 0;
+        z-index: 1;
+    }
+    .ionTabs__head:before, .ionTabs__head:after {content: ""; display: table;}
+    .ionTabs__head:after {clear: both;}
+    .ionTabs__head {zoom: 1;}
+
+        .ionTabs__tab {
+            position: relative;
+            display: block; float: left;
+            list-style-type: none;
+            background: none;
+            margin: 0; padding: 0;
+            cursor: pointer;
+        }
+            .ionTabs__tab.ionTabs__tab_state_active {
+                cursor: default;
+            }
+
+    .ionTabs__body {
+        position: relative;
+        z-index: 2;
+    }
+
+    .ionTabs__item {
+        position: relative;
+        display: none;
+    }
+        .ionTabs__item.ionTabs__item_state_active {
+            display: block;
+        }
+
+    .ionTabs__preloader {
+        position: relative;
+    }
+    
+
+.ionTabs {
+    margin: 0 0 8px;
+}
+    .ionTabs__head {
+        border-bottom: 1px solid #cecece;
+    }
+
+    .ionTabs__tab {
+        font-size: 11px; line-height: 13px;
+        background: #ededed;
+        border: 1px solid #cecece;
+        border-bottom: none;
+        padding: 7px 25px 7px;
+        margin-right: 10px;
+        color: #484848;
+        margin-top: 10px;
+        text-align: center;
+        min-width: 50px;
+    }
+        .ionTabs__tab:hover {
+            background: #e5e5e5;
+        }
+        .ionTabs__tab.ionTabs__tab_state_active {
+            top: 7px;
+            margin-top: 0;
+            padding: 5px 25px 11px;
+            background: #fff;
+            color: #4a4a56;
+            border-top-color: #60AFDD;
+            border-bottom: 1px solid #fff;
+        }
+
+    .ionTabs__body {
+        background: #fff;
+        border: 1px solid #cecece;
+        border-top: none;
+    }
+
+    .ionTabs__item {
+        padding: 1px 6px;
+    }
+
+    .ionTabs__preloader {
+        height: 50px;
+        background: url(../img/preloader-flat.gif) no-repeat 25px 50%;
+    }
+    
+    .headline-margin-value {
+        width: 50px;
+    }
+
+	.future-cost-change {
+	    font-size: 14px;
+	    color: #428BCA;
+	    margin-left: -2px;
+	    position: absolute;
+	    margin-top: -4px;
+	    cursor: pointer;
+	}
+
+	input.kimbleDatePicker {
+    	width: 70px !important;
+	}
+
+	span.fa.fa-calendar.assignment-cost-rate-effective-date-container {
+    	position: absolute;
+    	left: -1px;
+    	top: 7px;
+	}
+	input[id$="assignment-cost-rate-effective-date"] {
+		border: 0px;
+		width: 0px !important;
+	}
+
+    .default-revenue-rate {
+        font-size: 16px;
+        color: #428BCA;
+        margin-left: 2px;
+        margin-top: 1px;
+        cursor: pointer;
+    }
+	.assignment-table-units {
+		font-size: 0.9em;
+    	color: #4a4a56;
+    	display:block;
+	}
+	thead th.headerRow {
+    	vertical-align: top;
+	}
+
+	.table-cell-right {
+		text-align: right;
+ 	}
+ 	.table-cell-middle {
+		text-align: center;
+  	}
+	.tiny-label {
+    font-size: .85em;
+    font-weight:normal;
+	}
+	[id$="annuity-config-table"] {
+    	white-space: nowrap;
+	}
+	.assignment-btns {
+		position: relative;
+	}
+	.assignment-milestones {
+		position: absolute;
+	    z-index: 99;
+	    left: 35px;
+	    top: 5px;	    
+	}
+	ul.assignment-milestone {
+	    min-width: 160px;
+	    max-width: 300px;
+	    list-style: none;
+	    background: #FFF;
+	    border: solid 1px #DDD;
+	    border: solid 1px rgba(0, 0, 0, .2);
+	    border-radius: 6px;
+	    box-shadow: 0 5px 10px rgba(0, 0, 0, .2);
+	    overflow: visible;
+	    padding: 4px 0;
+	    margin: 0;
+	}
+	li.milestone-option {
+	    list-style: none;
+	    margin: 0;
+	    line-height: 18px;
+	    padding: 3px 15px;
+	    cursor: pointer;
+	}
+	li.milestone-option.selected {
+	    background-color: #888888;
+	    color: white;
+	}
+	li.milestone-option:hover {
+	    background-color: #08C;
+	    color: #FFF;
+	}
+	.assignment-milestone-cancel {
+	    position: absolute;
+	    top: -4px;
+	    right: -4px;
+	    background-color: #f2f3f3;
+	    padding: 2px;
+	    border-radius: 2px;
+	    font-size: 16px;
+	    color: #888888;
+	    cursor: pointer;
+	}
+	.assignment-milestone-cancel:hover {
+	    color: black; 
+	}	
+	.gantt-marker.Revenue {
+	    margin-left: 2px;
+	    border: 1px solid black;
+	    width: 7px;
+	    height: 7px;
+	    -o-transform: rotate(-45deg);
+	    -webkit-transform: rotate(-45deg);
+	    transform: rotate(-45deg);
+	    background-color: white;
+	    display: inline-block;
+	}
+	.gantt-marker.Revenue.with-milestone {
+	    background-color: gold;
+	}	
+	.loadingIndicator {
+	   top:0;
+	   right:0;
+	   width:100%;
+	   height:100%;
+	   font-weight: bold;
+	   position:absolute;
+	   text-align:center;
+	   /* IE filter */
+	   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+	   -moz-opacity:0.7;    /* Mozilla extension */
+	   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+	   opacity:0.7; /* CSS3 */
+	   z-index:1000;
+	   background-color:white;
+	}
+	
+	.loadingIndicator img {
+	    margin-right:9px;
+	}
+	
+	#loadingIndicatorInnerContainer, #loadingIndicatorInnerContainerGroups { 
+	    position:absolute; 
+	    top:50%;
+	    height:10em; 
+	    margin-top:-2em;
+	    width:100%;
+	}
+	.indent-child-assignment {
+	    background-image: url({!URLFOR($Resource.TaskGanttIcons, 'arrows.gif')});
+	    background-position: 43px, 0px;
+		display: inline-block;
+		width: 8px;
+		height: 8px;
+		margin-right: 2px;
+ 	}
+    .toolbar-button {
+        display: inline-block;
+        padding: 4px 8px 4px 8px;
+        background-color: white;
+        border: 1px solid #ccc;
+        border-radius: 2px;
+        cursor: pointer;
+    }
+
+    .toolbar-button:hover {
+        background-color: #f4f6f9;
+    }
+</style>
+</apex:page>

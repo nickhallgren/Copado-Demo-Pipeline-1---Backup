@@ -1,0 +1,288 @@
+<apex:page standardController="KimbleOne__Calendar__c" extensions="KimbleOne.CalendarNewController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__Calendar__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+      
+</apex:define>
+    
+<apex:define name="Content">
+
+	<style>
+		.ui-progressbar
+		{
+			position: relative;
+			margin-top: 5px;
+		}
+		
+		.progress-label
+		{
+			position: absolute;
+			left: 50%;
+			top: 4px;
+			font-weight: bold;
+			text-shadow: 1px 1px 0 #fff;
+		}
+		.loading-message {
+		    margin-bottom: 10px;
+    		margin-top: 10px;
+    		font-weight: bold;
+    		font-size: 14px;
+		}
+		.error-message {
+			color: #f00;
+		    font-size: 16px;
+		    padding: 5px 0 5px 0;
+		    font-weight: bold;
+		}
+		.dateFormat {
+		    display:none;
+		}
+	</style>
+	
+	<apex:form id="TheForm">
+
+		<apex:inputCheckbox value="{!isDefault}" styleClass="hidden" id="is-default-checkbox"/>
+		<apex:inputField id="earliest-date" value="{!earliestDate.KimbleOne__InputDate__c}" styleClass="hidden"/>
+		<apex:inputField id="latest-date" value="{!latestDate.KimbleOne__InputDate__c}" styleClass="hidden"/>
+
+		<apex:outputPanel id="pageErrors">
+    		<apex:pageMessages escape="False" />
+		</apex:outputPanel>
+
+		<apex:pageBlock mode="edit" title="{!$Label.kimbleone__new} {!$ObjectType.KimbleOne__Calendar__c.Label}">
+			<apex:pageBlockButtons location="bottom">
+				<apex:commandButton id="cloneCalendarBtn" action="{!CloneCalendar}" value="{!$Label.kimbleone__clonelabel}" rerender="pageErrors, calendarIds" oncomplete="cloneCalendarMonths();"/>
+
+			</apex:pageBlockButtons>
+		<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+
+        <apex:inputField value="{!KimbleOne__Calendar__c.Name}" required="true"/>
+
+		<apex:inputField label="{!$Label.kimbleone__startdate}" value="{!StartDate.KimbleOne__InputDate__c}" id="theStartDate" styleClass="kimbleDatePicker" required="true" onChange="reCalculateNumberOfMonths();"/>
+
+        	<apex:pageBlockSectionItem >
+        		<apex:outputLabel value="{!$Label.kimbleone__clonefromlabel}"/>
+	       		<apex:selectList id="calendar-select" value="{!CalendarToClone}"  size="1" required="true" onChange="checkIsDefault(this.selectedIndex);">
+					<apex:selectOptions value="{!TheCalendars}"/>
+				</apex:selectList>
+          	</apex:pageBlockSectionItem>
+
+			<apex:outputPanel layout="none">
+				<div id="progressbar"><div class="progress-label"></div></div>
+			</apex:outputPanel>
+
+			<div id="LoadingPanel" style="display:none">
+				<div class="loading-message"><img src="{!URLFOR($Resource.LoadingImage)}" />Cloning...Do not navigate away from this page until the cloning process is complete!</div>
+			</div>
+
+          	<div id="logMessages" style="width: 100%;"></div>
+
+        </apex:pageblockSection>
+
+		</apex:pageBlock>
+
+		<apex:actionFunction action="{!CloneComplete}" name="cloneComplete" rerender="pageErrors"/>
+
+	<apex:outputPanel id="calendarIds">
+	<script>
+		var selectedCalendarId = '{!JSENCODE(CalendarToClone)}';
+		var newCalendarId = '{!JSENCODE(Calendar__c.Id)}';
+	</script>
+	</apex:outputPanel>
+
+	</apex:form>
+
+	<script>
+		var progressbar;
+		var numberOfMonths = {!NumberOfMonths};
+
+		jQuery(window).load(function()
+		{
+			progressbar = jQuery( "#progressbar" ),
+    		progressLabel = jQuery( ".progress-label" );
+
+		  	progressbar.progressbar({
+		    	value: false,
+		    	change: function() {
+		      		progressLabel.text( progressbar.progressbar( "value" ).toFixed(2) + "%" );
+		    	},
+		    	complete: function() {
+		      		progressLabel.text( "Done" );
+		    	}
+		  	});
+
+		  	resetProgressBar();
+		  	SetupDatePicker();
+		});
+
+		function SetupDatePicker()
+		{
+			jQuery('.kimbleDatePicker').datepicker({
+			dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+			showOtherMonths: true,
+			selectOtherMonths: true,
+			changeMonth: true,
+			changeYear: true,
+			minDate: jQuery('[id$="earliest-date"]').val(),
+			maxDate: jQuery('[id$="latest-date"]').val()
+			});
+		}
+
+		function reCalculateNumberOfMonths()
+		{
+		    var startDate = kimble.parseDate(jQuery('[id$="theStartDate"]').val());
+		    var endDate = kimble.parseDate(jQuery('[id$="latest-date"]').val());
+
+			Visualforce.remoting.Manager.invokeAction(
+			    '{!$RemoteAction.CalendarNewController.reCalculateNumberofMonths}',
+			    startDate, endDate,
+			    function(result, event)
+				{
+					if (event.status)
+					{
+						numberOfMonths = result;
+					}
+				},
+				{escape: true, buffer: false, timeout: 120000}
+   			);
+  		}
+
+		function checkIsDefault(indexVar)
+		{
+		    jQuery('[id$="is-default-checkbox"]').prop('checked', indexVar == 0);
+  		}
+		
+		function cloneCalendarMonths()
+		{
+			if(jQuery("span[id$='pageErrors']").find("div.message").length == 0)
+			{
+				jQuery(window).off('.has-changes').on('beforeunload.has-changes', function(){
+			        return "Calendar Clone in Progress!" + "\n\n" + "Navigating away from this page before clone complete will result in invalid org Calendar and Time Period Configuration"; 
+			    });
+			    
+				disableCloneBtn();
+				
+				cloneCalendarMonth(0);
+			}
+		}
+		
+		// recursive function that is first triggered from cloneTimePeriods
+		// and then re-triggered for each subsequent month via the remote action callback
+		function cloneCalendarMonth(monthOffset)
+		{
+			cloneCalendarMonthRemoteAction(monthOffset,
+				function(cloneCalendarMonthResult, monthOffsetCB)
+				{
+					logMessageToScreen(cloneCalendarMonthResult);
+
+					// counter is 0 based
+					if(monthOffsetCB == (numberOfMonths - 1))
+					{
+						logMessageToScreen('Calendar Clone complete');
+						enableCloneBtn(true);
+						completeProgressBar();
+						cloneComplete();
+					}
+					else
+					{
+						incrementProgressBar((100/numberOfMonths));
+						cloneCalendarMonth(monthOffsetCB + 1);
+					}
+				}
+			);
+		}
+		
+		function cloneCalendarMonthRemoteAction(monthOffset, callback)
+		{ 
+			var startDate = jQuery("input[id$='theStartDate']").val();
+			var isDefault =  jQuery('[id$="is-default-checkbox"]').prop('checked');
+			
+			// the date needs to be converted to UTC in order to pass to apex
+			var regionalDate = jQuery.datepicker.parseDate(kimble.regional.dateFormat, startDate);
+								
+			// add monthCounter to the date and pass into the remote action
+			var startDateUTC = new Date(regionalDate.getFullYear(), regionalDate.getMonth(), regionalDate.getDate(), 0, 0, 0, 0).toKimbleUTC();
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.CalendarNewController.CloneCalendarMonth}',
+		       			selectedCalendarId, newCalendarId, startDateUTC, monthOffset, numberOfMonths, isDefault,
+		      			function(result, event)
+		      			{          
+		             		if (event.status) 
+				            {
+				             	callback(result, monthOffset);		             								
+				         	} 
+				         	else if (event.type === 'exception') 
+				         	{
+				             	logErrorToScreen(event.message);
+				             	enableCloneBtn();
+				         	} 
+				         	else 
+				         	{
+				             	logErrorToScreen(event.message);
+				             	enableCloneBtn();
+				         	}
+			         	}, 
+			         	{escape: true, buffer: false, timeout: 120000});
+	    }
+	    
+	    function disableCloneBtn()
+	    {
+			jQuery("input[id$='cloneCalendarBtn']").prop('disabled', true).addClass('btnDisabled');
+			jQuery("input[id$='cloneCalendarBtn']").prop('value', 'Cloning Calendar...');
+			jQuery('#LoadingPanel').css('display','block');
+			initialiseProgressBar();
+	    }
+	    
+	    function enableCloneBtn(complete)
+	    {
+			jQuery("input[id$='cloneCalendarBtn']").prop('value', '{!JSENCODE($Label.CloneLabel)}');
+			jQuery("input[id$='cloneCalendarBtn']").prop('disabled', false).removeClass('btnDisabled');
+			jQuery('#LoadingPanel').css('display','none');
+			
+			jQuery(window).off('.has-changes');
+			
+			if(complete) jQuery("input[id$='cloneCalendarBtn']").hide();
+	    }
+	    
+	    function logErrorToScreen(errorMessage)
+	    {
+	    	jQuery('#logMessages').append( "<div class='error-message'>" + errorMessage + "</div>");
+	    	alert(errorMessage);
+	    	logMessageToScreen('Calendar Clone abandoned');
+	    }
+	    
+	    function logMessageToScreen(feedbackMessage)
+	    {
+	    	jQuery('#logMessages').append( "<div>" + feedbackMessage + "</div>");
+	    }
+
+		function incrementProgressBar(incrementValue)
+		{
+	 		var val = progressbar.progressbar( "value" ) || 0;
+	
+	    	progressbar.progressbar( "value",  val + incrementValue);
+	 	}
+
+	 	function initialiseProgressBar()
+	 	{
+	 		resetProgressBar();
+	 		jQuery('#progressbar').show();
+	 	}
+	 	
+	 	function resetProgressBar()
+	 	{
+	 		jQuery('#progressbar').hide();
+	 		progressbar.progressbar( "value",  0);
+	 	}
+	 	 	
+	 	function completeProgressBar()
+	 	{
+	 		progressbar.progressbar( "value",  100);
+	 	}	    
+	</script>
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

@@ -1,0 +1,395 @@
+<apex:page controller="KimbleOne.IssuesController" sidebar="false">
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+	<c:Menu DefaultHelpPage="Issues.html" MenuContextType="{!MenuContextType}" MenuContextId="{!MenuContextId}" MenuContextName="{!MenuContextName}"/>
+
+</apex:define>  
+   
+<apex:define name="Content">
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+
+	<apex:pagemessages escape="false"/>
+
+    <apex:form >
+		<apex:outputPanel id="IssuesManagerPanel" >
+		    	<apex:pageBlock id="IssuesManagerBlock">  
+		    		<div id="IssuesManagerErrors">
+           				<apex:pageMessages escape="false"/>
+           			</div>
+
+					<div class="toolbar-container">
+						<div class="toolbar">
+							<div id="toolbar-buttons">
+								<apex:outputPanel layout="none" rendered="true">
+								<label class="hover-mutton select-btn">
+										<a class="toolbar-button" rendered="{!($ObjectType.Issue__c.createable && idfromProposal) || ($ObjectType.Issue__c.createable && !idfromProposal && IssueDeliveryGroup.DeliveryStage__r.AllowNewIssues__c)}" onclick="newIssue();">{!$Label.New} {!$ObjectType.Issue__c.Label}</a>
+									</label>
+								</apex:outputPanel>
+
+								<a class="toolbar-button filterIssueButton" title="{!$Label.Filter} {!$ObjectType.Issue__c.Label}" onclick="jQuery('#IssuesFilterPopup').show();" href="javascript:void(0);"><i class="fa fa-filter"></i></a>
+
+								<apex:outputPanel rendered="{!NumberOfClosedIssues > 0 && ShowClosedIssues == true}">
+									<a class="show-hide-closed-issues" onclick="showHideClosedIssues();">
+										<apex:outputText escape="false" value="{!$Label.kimbleone__hideclosedissues}">
+											<apex:param value="{!NumberOfClosedIssues}"></apex:param>
+										</apex:outputText>
+									</a>
+								</apex:outputPanel>
+								<apex:outputPanel rendered="{!NumberOfClosedIssues > 0 && ShowClosedIssues == false}">
+									<a class="show-hide-closed-issues" onclick="showHideClosedIssues();">
+										<apex:outputText escape="false" value="{!$Label.kimbleone__showclosedissues}">
+											<apex:param value="{!NumberOfClosedIssues}"></apex:param>
+										</apex:outputText>
+									</a>
+								</apex:outputPanel>
+							</div>
+						</div>
+					</div>
+
+					<apex:pageBlockTable id="issuesListEnhanced" value="{!issuesList}" var="issueLine" styleClass="kimble-enhanced-table">
+		       			<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+							<apex:outputLink value="#" onclick="editIssue('{!JSINHTMLENCODE(issueLine.id)}');" rendered="{!($ObjectType.KimbleOne__Issue__c.updateable && idfromProposal) || ($ObjectType.KimbleOne__Issue__c.updateable && !idfromProposal && IssueDeliveryGroup.DeliveryStage__r.KimbleOne__AllowNewIssues__c)}">{!$Label.kimbleone__edit}</apex:outputLink> &nbsp;|&nbsp;
+			  				<apex:outputLink value="#" onclick="var d = confirmDelete();if(!d) return; deleteIssue('{!JSINHTMLENCODE(issueLine.id)}');" rendered="{!($ObjectType.KimbleOne__Issue__c.deletable && idfromProposal) || ($ObjectType.KimbleOne__Issue__c.deletable && !idfromProposal && IssueDeliveryGroup.DeliveryStage__r.KimbleOne__AllowNewIssues__c)}">{!$Label.kimbleone__delete}</apex:outputLink>
+						</apex:column>
+						<apex:column headerValue="{!$ObjectType.KimbleOne__Issue__c.Fields.Name.Label}" headerClass="sortable">
+							<apex:outputLink rendered="{!$ObjectType.KimbleOne__Issue__c.accessible}" styleClass="issue-reference-link" value="{!$Page.KimbleOne__IssueDetails}?id={!issueLine.Id}">
+								<apex:outputText value="{!issueLine.Name}"/>
+							</apex:outputLink>
+						</apex:column>								
+						<apex:column value="{!issueLine.KimbleOne__IsInternal__c}" headerValue="{!$ObjectType.KimbleOne__Issue__c.Fields.KimbleOne__IsInternal__c.Label}" headerClass="sortable"/>
+						<apex:column value="{!issueLine.KimbleOne__Summary__c}" headerValue="{!$ObjectType.KimbleOne__Issue__c.Fields.KimbleOne__Summary__c.Label}" headerClass="sortable"/>
+						<apex:column value="{!issueLine.KimbleOne__RaisedDate__c}" headerValue="{!$ObjectType.KimbleOne__Issue__c.Fields.KimbleOne__RaisedDate__c.Label}" headerClass="sortable" styleClass="date-sort"/>
+						<apex:column value="{!issueLine.KimbleOne__RaisedByContact__c}" headerValue="{!$ObjectType.KimbleOne__Issue__c.Fields.KimbleOne__RaisedByContact__c.Label}" headerClass="sortable"/>
+						<apex:column value="{!issueLine.KimbleOne__IssueImpact__c}" headerValue="{!$ObjectType.KimbleOne__Issue__c.Fields.KimbleOne__IssueImpact__c.Label}" headerClass="sortable" styleClass="disable-link"/>
+						<apex:column value="{!issueLine.KimbleOne__Status__c}" headerValue="{!$ObjectType.KimbleOne__Issue__c.Fields.KimbleOne__Status__c.Label}" headerClass="sortable" styleClass="disable-link"/>												
+					</apex:pageBlockTable>
+		    	</apex:pageBlock>
+		</apex:outputPanel>
+
+		<apex:actionStatus id="IssueListRefresh">
+			<apex:facet name="start">
+				<div id="loadingIndicatorOuterContainer" class="loadingIndicator">
+					<div id="loadingIndicatorInnerContainer">
+						<img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+					</div>
+				</div>
+			</apex:facet>
+		</apex:actionStatus>
+
+		<div id="IssuesFilterPopup" style="display:none;">
+			<div id="IssueFilters">
+
+				<div class="Issues-filter-header">{!$ObjectType.Issue__c.LabelPlural} {!$Label.Filter}<i onclick="jQuery('#IssuesFilterPopup').hide();" class="filter-collapse-btn fa fa-angle-double-up" title="{!$Label.Close}"></i></div>
+
+				<div class="filter-row">
+					<apex:outputLabel styleClass="filter-row-category" value="{!$ObjectType.KimbleOne__Issue__c.fields.KimbleOne__IssueImpact__c.label}"/>
+					<apex:selectList id="IssueImpactFilter" styleClass="issue-impact-filter" value="{!TheIssueImpactIds}" multiselect="true">
+						<apex:selectOptions value="{!IssueImpacts}"/>
+					</apex:selectList></div>
+
+				<div class="filter-row">
+					<apex:outputLabel styleClass="filter-row-category" value="{!$ObjectType.KimbleOne__Issue__c.fields.KimbleOne__IssueCategory__c.label}"/>
+					<apex:selectList id="IssueCategoryFilter" styleClass="issue-category-filter" value="{!TheIssueCategoryValues}" multiselect="true">
+						<apex:selectOptions value="{!IssueCategories}"/>
+					</apex:selectList></div>
+
+				<div class="filter-row">
+					<input class="btn" id="applyFilterButton" onclick="applyIssuesFilter();" type="Button" value="{!$Label.kimbleone__gobutton}"/>
+					<input class="btn" id="clearFilterButton" onclick="clearTheIssuesFilter();" type="Button" value="{!$Label.kimbleone__clearalllabel}"/>
+				</div>
+			</div>
+		</div>
+		
+		<apex:actionFunction action="{!deleteIssue}" name="deleteIssue" rerender="IssuesManagerPanel" oncomplete="RefreshIssues();">
+       		<apex:param name="iId" value="" />
+       	</apex:actionFunction>
+ 
+		<apex:actionFunction action="{!editIssue}" name="editIssue" rerender="" oncomplete="">
+       		<apex:param name="iId" value="" />
+       	</apex:actionFunction>
+       	
+		<apex:actionFunction action="{!detailIssue}" name="detailIssue" rerender="" oncomplete="">
+       		<apex:param name="iId" value="" />
+       	</apex:actionFunction>
+
+		<apex:actionFunction action="{!newIssue}" status="IssueListRefresh" name="newIssue" rerender="IssuesManagerPanel" oncomplete="">
+		</apex:actionFunction>
+
+		<apex:actionFunction action="{!ClearIssuesFilter}" status="IssueListRefresh" name="ClearIssuesFilter" rerender="issuesListEnhanced, IssuesManagerPanel, IssueFilters, IssuesFilterPopup" oncomplete="initialiseIssuesTable();">
+		</apex:actionFunction>
+
+		<apex:actionFunction action="{!ApplyIssuesFilter}" status="IssueListRefresh" name="RefreshIssues" rerender="issuesListEnhanced, IssuesManagerPanel, IssuesFilterPopup" oncomplete="initialiseIssuesTable();">
+		</apex:actionFunction>
+
+		<apex:actionFunction action="{!ShowHideClosedIssues}" name="showHideClosedIssues" rerender="IssuesManagerPanel" oncomplete="RefreshIssues();">
+			<apex:param name="iId" value="" />
+		</apex:actionFunction>
+       	
+     
+    </apex:form>
+	<script>
+		jQuery(document).ready(function()
+		{				
+			jQuery('.kimble-enhanced-table').enhancedTable();
+			jQuery('.issue-impact-filter').select2();
+			jQuery('.issue-category-filter').select2();
+		});
+		
+		jQuery(window).load(function()
+		{        
+			setupDateSort();
+			removeTableLinks();
+		});
+		
+		function setupDateSort()
+		{
+			jQuery.each(jQuery('.date-sort'), function(i, obj){
+				jQuery(obj).attr('data-sort-type','number').attr('data-sort-value',kimble.parseDate(jQuery(obj).text(), true).valueOf());
+			});
+		}
+		
+		function removeTableLinks()
+		{
+			jQuery.each(jQuery('.disable-link'), function(i, obj){
+				jQuery(obj).find('span').find('a').prop('style','color:black !important;');    
+			});
+		}
+                    
+    	function clearTheIssuesFilter()
+    	{
+    		jQuery('#IssuesFilterPopup').hide();
+    		
+            $('.filterIssueButton').removeClass('toolbar-button-selected');
+    	    jQuery('.hide-closed-checkbox').prop('checked',false);
+    	    
+			jQuery.each(jQuery('.select2-container-multi'), function(i, obj) {
+				jQuery(obj).select2('val', '');
+			});
+			
+    		ClearIssuesFilter();
+    	}
+
+    	function applyIssuesFilter()
+    	{
+    		jQuery('#IssuesFilterPopup').hide();
+    		RefreshIssues();
+    	}
+					
+		function initialiseIssuesTable()
+		{
+			jQuery('.kimble-enhanced-table').enhancedTable();  
+			InitialiseFilterHighlight();
+			setupDateSort();
+			removeTableLinks();
+		}
+    	
+    	function InitialiseFilterHighlight()
+    	{
+    	    $('.filterIssueButton').removeClass('toolbar-button-selected');
+    	    
+            if($('.hide-closed-checkbox').is(":checked")) 
+                $('.filterIssueButton').addClass('toolbar-button-selected');
+                
+            jQuery.each(jQuery('.select2-container-multi'), function(i, obj) {
+				if(jQuery(obj).select2('val').length > 0) $('.filterIssueButton').addClass('toolbar-button-selected');
+			});
+        }
+	</script>
+	<style>
+	
+		.loadingIndicator {
+		   top:0;
+		   right:0;
+		   width:100%;
+		   height:100%;
+		   font-weight: bold;
+		   position:absolute;
+		   text-align:center;
+		   /* IE filter */
+		   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+		   -moz-opacity:0.7;    /* Mozilla extension */
+		   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+		   opacity:0.7; /* CSS3 */
+		   z-index:1000;
+		   background-color:white;
+		}
+		
+		.loadingIndicator img {
+		    margin-right:9px;
+		}
+		
+		#loadingIndicatorInnerContainer { 
+		    position:absolute; 
+		    top:50%;
+		    height:10em; 
+		    margin-top:-2em;
+		    width:100%;
+		}
+		div#toolbar-buttons {
+		    display: table-cell;
+		    position: relative;
+		    padding-bottom: 6px;
+		}
+		.toolbar-container {
+			position: relative;
+		}
+		.toolbar-button {
+			display: inline-block;
+			padding: 6px 10px 6px 10px;
+			background-color: white;
+			margin-right: 4px;
+			border: 1px solid #ccc;
+			border-radius: 2px;
+			cursor: pointer;
+		}
+		.toolbar-button.active-toolbar-button {
+			color: white;
+			background-color: #888;
+		}
+		.toolbar-container {
+			position: relative;
+		}
+		.toolbar {
+			display: table;
+			width: 100%;
+		}
+            .hover-mutton {
+              display: inline-block;
+              position: relative;
+            }
+			div#toolbar-buttons {
+				display: table-cell;
+				position: relative;
+				padding-bottom: 6px;
+			}
+			span.gantt-display-mode {
+				position: absolute;
+				right: 10px;
+			}
+			.toolbar-button:hover, a.toolbar-button-selected {
+				text-decoration: none;
+				color: white;
+				background-color: #1A9EFF;
+			}
+			.toolbar-button.button-left {
+				border-top-right-radius: 0px;
+				border-bottom-right-radius: 0px;
+				margin-right: 0px;
+			}
+			.toolbar-button.button-right {
+				border-top-left-radius: 0px;
+				border-left: 0;
+				border-bottom-left-radius: 0px;
+			}
+			.toolbar-button .fa {font-size: 14px;}
+			.toolbar-button.disabled {background-color: #ccc;color: darkgray;}
+			.toolbar-button.disabled:hover {background-color: #ccc;color: darkgray;}
+            .Issues-filter-header {
+		    font-weight: bold;
+		    font-size: 14px;
+		    padding: 10px;
+		    background-color: #F5F5F5;
+		    border: 1px solid #DDD;
+		    border-radius: 4px;
+		    margin-left: 2px;
+		    margin-right: 2px;
+            }
+            i.filter-collapse-btn.fa.fa-angle-double-up {
+                color: #BBB;
+                cursor: pointer;
+                padding-right: 6px;
+                position: absolute;
+                right: 13px;
+                top: 13px;
+                font-size: 26px;
+            }
+            input#applyFilterButton {
+                margin-top: 10px;
+            }
+            div#IssuesFilterPopup {
+                position: absolute;
+                top: 51px;
+                padding: 5px;
+                width: auto;
+                max-width: 500px;
+                min-width: 350px;
+                height: auto;
+                z-index: 999;
+                border-color: #ddd;
+                border-style: solid;
+                border-width: 0px 1px 1px 1px;
+                background-color: #fff;
+                box-shadow: rgba(31, 31, 31, 0.16) 4px 3px 8px;
+                left: 219px;
+                overflow-y: auto;
+            }
+            .filter-row {
+                margin-top:8px;
+                margin-left:8px;
+                font-size: 1em;
+                font-weight: bold;
+                color: #4a4a56;
+                margin-bottom: 3px;
+            }
+            .filter-row-category {
+                margin-bottom: 0px;
+            }
+			/* SELECT 2 STYLING */
+			.select2-results li {margin-left:0px;}
+			.select2-container-multi .select2-choices
+			{
+				border: 2px solid rgb(224,224,224);
+				background-image:none;
+			}
+			.select2-container-multi .select2-choices .select2-search-choice {
+				border: 1px solid #aaaaaa;
+				border-radius: 4px;
+				padding: 5px 20px 5px 5px;
+				background-image:none;
+			}
+			
+			.select2-container-multi .select2-search-choice-close {
+				background-image:  url({!URLFOR($Resource.AssignmentImages, 'assignmentSprite.png')});
+				background-position: -2px -29px;
+				background-repeat: no-repeat;
+				left:auto;
+			}
+			
+			.select2-container-multi .select2-choices .select2-search-choice .select2-search-choice-close:hover {
+				background-position: -2px -1px;
+			}
+			.select2-container.select2-container-multi {
+			    width: auto !important;
+			    min-width: 301px;
+    			display: block;
+			    max-width: 400px;
+   			}
+   			table.issues-grid tr.dataRow:hover {
+				background-color: #e3feff;
+			}
+			.issue-reference-link {
+			    color: rgb(0, 95, 178) !important;
+				text-decoration: none;
+			}
+			.kimble-enhanced-table tr {
+				height: 28px !important;
+   			}
+			.show-hide-closed-issues {
+				color: rgb(0, 95, 178) !important;
+				cursor: pointer;
+            }
+            span .disable-link a {
+                pointer-events: none;
+                cursor: default;
+                color: black !important;
+                border-bottom: none !important;
+			}
+	
+	</style>
+    </apex:define>
+    </apex:composition>
+
+</apex:page>

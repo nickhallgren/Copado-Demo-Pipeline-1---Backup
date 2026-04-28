@@ -1,0 +1,197 @@
+<apex:page standardController="KimbleOne__OutboundInterfaceRun__c" extensions="KimbleOne.OutboundInterfaceRunHomeController,KimbleOne.FilesAndAttachmentsController" showHeader="true" sidebar="false" standardStylesheets="true">
+<apex:composition template="KimbleOne__SiteMaster">
+    	<apex:define name="Menu"></apex:define>
+    
+    	<apex:define name="Content">
+    	<apex:define name="Menu">
+			<c:Menu MenuContextName="{!IF(ISBLANK(KimbleOne__OutboundInterfaceRun__c.Id), $Label.kimbleone__new, KimbleOne__OutboundInterfaceRun__c.Name)}"/>
+		</apex:define>
+    	<apex:form id="TheForm">
+    	
+    	<apex:pageMessages escape="false"/>
+    	<apex:pageBlock id="TheMainPage">
+    		<apex:pageBlockButtons location="top">
+    			<!-- introduced to allow easier removal of export to enable re-export of related object possible -->
+    			<apex:commandButton id="DeleteButton" action="{!DeleteExport}" value="{!$Label.kimbleone__deletebutton}"  
+    				rendered="{!OR(OutboundInterfaceRun__c.InterfaceRun__r.Status__r.Enum__c == 'Completed', OutboundInterfaceRun__c.InterfaceRun__r.Status__r.Enum__c == 'Errored')
+    				&& $ObjectType.OutboundInterfaceRun__c.deletable}"/>
+    			<apex:commandButton id="ExportButton" action="{!ReRunExport}" value="{!$Label.kimbleone__exportlabel}"  rendered="{!OR(KimbleOne__OutboundInterfaceRun__c.InterfaceRun__r.Status__r.KimbleOne__Enum__c == 'Completed', KimbleOne__OutboundInterfaceRun__c.InterfaceRun__r.Status__r.KimbleOne__Enum__c == 'Errored') && $ObjectType.KimbleOne__OutboundInterfaceRun__c.updateable}"/>
+				<apex:commandButton id="PreGenerateButton" action="{!PreGenerateExportData}" value="{!$Label.kimbleone__label016}" rendered="{!KimbleOne__OutboundInterfaceRun__c.InterfaceRun__r.Status__r.KimbleOne__Enum__c == 'Errored' && $ObjectType.KimbleOne__OutboundInterfaceRun__c.updateable}"/>
+
+    		</apex:pageBlockButtons> 
+    			
+			<apex:pageblockSection collapsible="false" showheader="true" columns="2" title="{!$Label.kimbleone__summaryheading}">
+				<apex:outputField value="{!KimbleOne__OutboundInterfaceRun__c.InterfaceRun__r.KimbleOne__InterfaceType__c}"/>
+         		<apex:outputField value="{!KimbleOne__OutboundInterfaceRun__c.InterfaceRun__r.KimbleOne__Status__c}"/>
+         		<apex:outputField value="{!KimbleOne__OutboundInterfaceRun__c.KimbleOne__Started__c}"/>	
+         		<apex:outputField value="{!KimbleOne__OutboundInterfaceRun__c.KimbleOne__Finished__c}"/>	
+         		<apex:outputField value="{!KimbleOne__OutboundInterfaceRun__c.KimbleOne__Notes__c}"/>	
+			</apex:pageblockSection>
+			
+			<apex:outputPanel id="Errors">
+				<apex:pageblockSection collapsible="false" showheader="false" columns="1" rendered="{!!ISBLANK(KimbleOne__OutboundInterfaceRun__c.KimbleOne__Errors__c)}">
+					<apex:outputField value="{!KimbleOne__OutboundInterfaceRun__c.KimbleOne__Errors__c}"/>
+				</apex:pageblockSection>
+			</apex:outputPanel>
+			
+			<apex:outputPanel rendered="{!!ISBLANK(TheInterfaceType)}">
+			
+				<apex:repeat value="{!TheInterfaceType.TheInterfaceSourcesMap}" var="sourceId">
+					
+					<apex:pageBlockSection collapsible="false" showheader="true" title="{!TheInterfaceType.TheInterfaceSourcesMap[sourceId].Name}" columns="1"></apex:pageBlockSection>
+					
+						<table class="list" border="0" cellpadding="0" cellspacing="0">
+							<thead>
+								<tr class="headerRow">
+									<th></th>
+									<apex:repeat value="{!TheInterfaceType.TheResultFieldsMap[sourceId]}" var="fld">
+										<th><h2><apex:outputText value="{!fld.Name}"/></h2></th>
+									</apex:repeat>
+								</tr>
+							</thead>
+							<tbody>
+								<apex:repeat value="{!TheExportedItems[sourceId]}" var="itm">
+								<tr class="dataRow">
+									<td>
+										<apex:outputPanel layout="none" rendered="{!OR(KimbleOne__OutboundInterfaceRun__c.InterfaceRun__r.Status__r.KimbleOne__Enum__c == 'Completed', KimbleOne__OutboundInterfaceRun__c.InterfaceRun__r.Status__r.KimbleOne__Enum__c == 'Errored') && $ObjectType.KimbleOne__OutboundInterfaceRun__c.updateable}">
+											<i class="fa fa-trash" onclick="removeObjectFromExport(this, '{!JSINHTMLENCODE(itm.Request.Id)}');" title="{!$Label.ConfigurationSetting1}"></i>
+										</apex:outputPanel>
+
+										<apex:outputPanel layout="none" rendered="{!TheExportedItemsStatuses[itm.Request.Id].StatusEnum == 'Exported' && TheExportedItemsStatuses[itm.Request.Id].DataGenerated}">
+											<i class="fa fa-file-text-o" />
+										</apex:outputPanel>
+
+										<apex:outputPanel layout="none" rendered="{!TheExportedItemsStatuses[itm.Request.Id].StatusEnum == 'Exported' && !ISBLANK(TheExportedItemsStatuses[itm.Request.Id].Log)}">
+											<i class="fa fa-info-circle"/>
+										</apex:outputPanel>
+
+										<apex:outputPanel layout="none" rendered="{!TheExportedItemsStatuses[itm.Request.Id].StatusEnum == 'Failed'}">
+											<i class="fa fa-exclamation-circle" title="{!JSENCODE(TheExportedItemsStatuses[itm.Request.Id].Log)}"/>
+										</apex:outputPanel>
+										<div style="display:none">
+											<apex:outputText escape="false" value="{!TheExportedItemsStatuses[itm.Request.Id].Log}"/>
+										</div>
+									</td>
+									<apex:repeat value="{!TheInterfaceType.TheResultFieldsMap[sourceId]}" var="fld">
+										<td><apex:outputField value="{!itm.RelatedObject[fld.FieldName__c]}"/></td>
+									</apex:repeat>
+								</tr>
+								</apex:repeat>
+							</tbody>				
+						</table>						
+				</apex:repeat>
+			
+			</apex:outputPanel>    				
+    	</apex:pageBlock>
+    	
+    	<apex:variable value="{!KimbleOne__OutboundInterfaceRun__c.InterfaceRun__r.Status__r.KimbleOne__Enum__c != 'Completed' && KimbleOne__OutboundInterfaceRun__c.InterfaceRun__r.Status__r.KimbleOne__Enum__c != 'Errored'}" var="refreshNeeded"/>
+    	<apex:outputPanel layout="none" rendered="{!refreshNeeded}">
+    	<script>
+    		function refreshPage() {
+   				window.location = location.href;
+			}
+			
+    		jQuery(document).ready(function() {
+				if(isSFLightning()) jQuery('input[name="newNote"],input[name="attachFile"]').hide();
+    			setTimeout("refreshPage();", 1000);
+			});
+
+
+
+    	</script>
+    	</apex:outputPanel>
+    	
+    	<apex:outputPanel layout="none" rendered="{!!refreshNeeded}">
+    	<script>
+    		jQuery(document).ready(function() {
+				if(isSFLightning()) jQuery('input[name="newNote"],input[name="attachFile"]').hide();
+			});
+    	</script>
+    	</apex:outputPanel>
+    	
+    	</apex:form>
+    	<style>
+			i.fa.fa-trash {
+				font-size: 16px;
+				cursor: pointer;
+				margin-top: 1px;
+			}
+
+			.fa.fa-info-circle {
+			     font-size: 16px;
+				color: #428BCA;
+				margin-left: 2px;
+				margin-top: 1px;
+   			}
+
+			.fa-file-text-o {
+			     font-size: 16px;
+				color: #428BCA;
+				margin-left: 2px;
+				margin-top: 1px;
+   			}
+
+   			.fa-exclamation-circle{
+	    		font-size: 16px;
+	    		margin-left: 2px;
+	    		color: #B42E34;
+	    		margin-top: 1px;
+			}
+			.qtip-content {white-space:pre-line;}
+		</style>
+   	  	<apex:relatedList id="Attachments" list="CombinedAttachments" rendered="{!AttachmentsEnabled}"/>
+		<apex:relatedList subject="{!KimbleOne__OutboundInterfaceRun__c}" list="AttachedContentDocuments" rendered="{!FilesEnabled}"/>
+		<script>
+
+		jQuery(window).load(function() {
+
+			jQuery('.fa-info-circle, .fa-exclamation-circle').qtip({
+			    	content: {
+        						text: function(event, api) {
+									return jQuery(this).next().text();
+								}
+    				},
+    				style: {
+						classes: 'qtip-light qtip-shadow qtip-rounded'
+					}});
+
+		});
+
+		function removeObjectFromExport(obj, id)
+			{
+				if (confirmDelete())
+				{
+				    RemoveObjectFromExportRemoteAction(obj, id);
+				}
+   			}
+
+   			function RemoveObjectFromExportRemoteAction(obj, id) {
+   				//show deleting spinner
+   				jQuery(obj).removeClass('fa-trash').addClass('fa-spin fa-circle-o-notch');
+   				jQuery('.fa-trash').hide();
+
+   				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.OutboundInterfaceRunHomeController.RemoveObjectFromExport}',
+					id,
+						function(result, event){
+
+							if (event.status)
+							{
+								  //rerun export
+								  jQuery('[id$="ExportButton"').click();
+							}
+							else if (event.type === 'exception')
+							{
+								alert(event.message);
+							}
+							else
+							{
+								alert(event.message);
+							}
+
+				 },
+				 {escape: false, timeout: 60000});
+   			}
+		</script>
+    	</apex:define>
+</apex:composition>
+</apex:page>

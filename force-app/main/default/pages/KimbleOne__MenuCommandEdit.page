@@ -1,0 +1,263 @@
+<apex:page standardcontroller="KimbleOne__MenuCommand__c" extensions="KimbleOne.MenuCommandEditController" >
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+	<apex:define name="Menu">
+		<c:Menu DefaultHelpPage="" MenuContextName="{!KimbleOne__MenuCommand__c.Name}" BreadCrumbLink="/{!$ObjectType.KimbleOne__MenuCommand__c.KeyPrefix}" BreadCrumbName="{!$ObjectType.KimbleOne__MenuCommand__c.LabelPlural}"/>
+	</apex:define>
+
+<apex:define name="Content">
+
+<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+
+	<apex:form >
+	
+		<apex:outputPanel id="MenuCommandEditPanel" >
+								 		    	
+			<apex:pagemessages id="pageMessages" escape="false"/>
+
+		    <apex:pageBlock id="MenuCommandEditBlock" title="{!$ObjectType.KimbleOne__MenuCommand__c.Label}">    
+
+				<apex:pageBlockButtons location="bottom">
+					<apex:outputPanel id="buttonsPanel">
+						<apex:commandButton action="{!Save}" value="{!$Label.kimbleone__save}" styleClass="DisableButtonWhileBusy" reRender="pageMessages,buttonsPanel"/>
+						<apex:commandButton action="{!Cancel}" value="{!$Label.kimbleone__cancel}" styleClass="DisableButtonWhileBusy"/>
+					</apex:outputPanel>
+				</apex:pageBlockButtons>
+					
+				<apex:pageblockSection collapsible="false" showheader="false"  columns="2">
+
+					<apex:pageBlockSectionItem >
+							<apex:outputText value="{!$ObjectType.KimbleOne__MenuCommand__c.Fields.KimbleOne__MenuCommandType__c.Label}"/>
+							<apex:outputPanel layout="none">
+									<div class="requiredInput">
+										<apex:outputPanel layout="none"><div class="requiredBlock"></div></apex:outputPanel>
+										<apex:selectList value="{!KimbleOne__MenuCommand__c.KimbleOne__MenuCommandType__c}" required="true" size="1">
+											<apex:selectOptions value="{!MenuCommandTypes}"/>
+											<apex:actionSupport event="onchange" action="{!SelectedTypeChanged}" reRender="MenuCommandEditPanel" onComplete="initialiseItems();" />
+										</apex:selectList>
+										<apex:pageBlockSectionItem />
+									</div>
+							</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+
+					<apex:pageBlockSectionItem />
+
+					<apex:pageBlockSectionItem >
+						<apex:outputText value="{!$ObjectType.KimbleOne__MenuCommand__c.Fields.Name.Label}" />
+						<apex:outputPanel layout="none">
+							<div class="requiredInput">
+							<apex:outputPanel layout="none"><div class="requiredBlock" /></apex:outputPanel>
+								<apex:inputField id="menuCommandName" value="{!KimbleOne__MenuCommand__c.Name}"/>
+							</div>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+
+					<apex:pageBlockSectionItem rendered="{!InputType == 'TEXTAREA'}">
+						<apex:outputText value="{!CommandTextLabel}" />
+						<apex:outputPanel layout="none">
+							<div class="requiredInput">
+								<apex:outputPanel layout="none"><div class="requiredBlock"/></apex:outputPanel>
+                        		<apex:inputTextarea value="{!KimbleOne__MenuCommand__c.KimbleOne__CommandText__c}" styleClass="width:100%"/>
+							</div>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+
+					<apex:pageBlockSectionItem rendered="{!InputType == 'SELECT'}">
+						<apex:outputText value="{!CommandTextLabel}" />
+						<apex:outputPanel layout="none">
+							<div class="requiredInput">
+								<apex:outputPanel layout="none"><div class="requiredBlock"/></apex:outputPanel>
+								<apex:selectList value="{!KimbleOne__MenuCommand__c.KimbleOne__CommandText__c}" size="1" >
+									<apex:selectOptions value="{!AllPages}"/>
+								</apex:selectList>
+							</div>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+
+                    <apex:pageBlockSectionItem rendered="{!InputType == 'SEARCH'}">
+                        <apex:outputText value="{!CommandTextLabel}"/>
+						<apex:outputPanel layout="none">
+							<div class="requiredInput">
+								<apex:outputPanel layout="none"><div class="requiredBlock"/></apex:outputPanel>
+                        		<apex:inputText id="searchInput" value="{!KimbleOne__MenuCommand__c.KimbleOne__CommandText__c}" style="width:100%"/>
+							</div>
+						</apex:outputPanel>
+                    </apex:pageBlockSectionItem>
+
+					<apex:pageBlockSectionItem rendered="{!InputType == 'LABEL'}">
+						<apex:outputText value="{!CommandTextLabel}"/>
+						<apex:outputPanel layout="none">
+								<div class="requiredInput">
+									<apex:outputPanel layout="none"><div class="requiredBlock"/> </apex:outputPanel>
+									<apex:inputText id="labelInput" value="{!KimbleOne__MenuCommand__c.KimbleOne__CommandText__c}" onKeyUp="lookupLabel(jQuery(this).val());" onBlur="lookupLabel(jQuery(this).val())"/>
+								</div>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+
+					<apex:pageBlockSectionItem />
+
+					<apex:pageBlockSectionItem rendered="{!InputType == 'LABEL'}">
+						<apex:outputPanel />
+						<apex:outputPanel layout="none">
+							<div id="k-menu-container" style="width:200px;display:none" >
+								<ul>
+									<li>
+										<a id="menuPreviewContainer" class="not-selectable" href="javascript:void(0);">
+											<span id="menuPreviewIconContainer" class="fa fa-exclamation-triangle menu-message-indicator"></span>
+											<span id="menuPreviewText"></span>
+										</a>
+									</li>
+								</ul>
+							</div>
+							<div id="invalidLabel" style="display:none;">
+								<span>{!$Label.Label015}</span>
+							</div>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+				</apex:pageblockSection>
+	    	</apex:pageBlock>
+
+			<script>
+				function initialiseItems()
+				{
+					if('{!InputType}' == 'SEARCH'){loadReportSelect();}
+
+					if('{!InputType}' == 'LABEL')
+					{
+						applyPreviewStyling('{!KimbleOne__MenuCommand__c.KimbleOne__MenuCommandType__c}');
+					    preloadLabelIn();
+					}
+    			}
+			</script>
+
+		</apex:outputPanel>
+    </apex:form>
+    
+</apex:define>
+</apex:composition>
+
+<script>
+
+	jQuery(window).load(function()
+	{
+	    if('{!InputType}' == 'SEARCH'){loadReportSelect();}
+
+	    if('{!InputType}' == 'LABEL')
+	    {
+	        applyPreviewStyling('{!KimbleOne__MenuCommand__c.KimbleOne__MenuCommandType__c}');
+	        preloadLabelIn();
+		}
+ 	});
+
+	function preloadLabelIn()
+	{
+		var labelIn = jQuery('[id$="labelInput"]').val();
+		lookupLabel(labelIn);
+ 	}
+
+ 	function applyPreviewStyling(type)
+ 	{
+ 	    var container = jQuery('#menuPreviewContainer');
+ 	    var iconContainer = jQuery('#menuPreviewIconContainer');
+ 	    switch(type)
+ 	    {
+		case'{!alertId}':
+			jQuery(container).removeClass('menu-warning menu-info').addClass('menu-alert');
+			jQuery(iconContainer).removeClass('fa-exclamation-triangle fa-info-circle').addClass('fa-exclamation-circle');
+			break;
+		case'{!warnId}':
+			jQuery(container).removeClass('menu-alert menu-info').addClass('menu-warning');
+			jQuery(iconContainer).removeClass('fa-exclamation-circle fa-info-circle').addClass('fa-exclamation-triangle');
+			break;
+		case'{!infoId}':
+			jQuery(container).removeClass('menu-alert menu-warning').addClass('menu-info');
+			jQuery(iconContainer).removeClass('fa-exclamation-triangle fa-exclamation-circle').addClass('fa-info-circle');
+			break;
+      	}
+  	}
+
+	function loadReportSelect()
+	{
+		jQuery('[id$="searchInput"]').select2(
+			{
+				minimumInputLength: 1,
+				multiple: false,
+				query: function (query) {
+					var $t = this;
+					var find = function() {lookupReports(query);};
+					find();
+				},
+				initSelection: function(element,callback)
+				{
+					var data = '{!defaultSearchOption}'.length > 0 ? JSON.parse('{!defaultSearchOption}') : '';
+					callback(data);
+				}
+		});
+ 	}
+
+    function lookupReports(query)
+    {
+        Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.MenuCommandEditController.LookupReports}',
+                query.term,
+                function(result, event){
+					if (event.status)
+					{
+						var data = {};
+						data.results = result;
+						query.callback(data);
+					}
+					else if (event.type === 'exception')
+					{
+					alert(event.message);
+					}
+					else
+					{
+					alert(event.message);
+					}
+            },
+            {escape: false, timeout: 60000}
+        );
+    }
+
+    function lookupLabel(labelIn)
+    {
+        Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.MenuCommandEditController.GetLabel}',
+        	labelIn,
+        	function(result, event){
+        	    if(event.status)
+        	    {
+        	        var labelResult = JSON.parse(result);
+        	        updateLabelPreview(labelResult);
+             	}
+             	else
+             	{
+             	    alert(event.message);
+              	}
+         	},
+         	{escape: false, timeout: 60000}
+        );
+    }
+
+    function updateLabelPreview(lr)
+    {
+		if(lr.Success)
+		{
+			jQuery('#menuPreviewText').text(lr.ReturnedString);
+			jQuery('#invalidLabel').hide();
+			jQuery('#k-menu-container').show();
+
+  		}
+  		else
+  		{
+			jQuery('#menuPreviewText').text('');
+			jQuery('#k-menu-container').hide();
+			jQuery('#invalidLabel').show();
+    	}
+    }
+
+
+</script>
+
+</apex:page>

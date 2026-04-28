@@ -1,0 +1,117 @@
+<apex:page id="ActivityAssignmentResourcingDetails" controller="KimbleOne.ActivityAssignmentResourcingDetailCntrlr">
+
+    <style>
+
+    .resourcing-field-unavailable {
+        font-size: 16px;
+        color: #428BCA;
+        margin-left: 2px;
+        position: absolute;
+        margin-top: 1px;
+    }
+
+    div#ResourcingDetailsPopup label {
+        white-space: nowrap;
+    }
+
+    </style>
+
+    <div id="ResourcingDetailsPopup">
+        <apex:outputPanel id="ResourcingDetailsPanel">
+            <apex:form id="resourcingDetailsForm">
+
+                <apex:actionFunction action="{!LoadResourcingDetails}" name="loadResourcingDetails" rerender="ResourcingDetailsPanel" oncomplete="initialiseResourceDetailsPopup();jQuery(':focus').blur();">
+                    <apex:param name="assignmentId" value="" />
+                </apex:actionFunction>
+                <apex:actionFunction action="{!SaveResourcingDetails}" name="saveResourcingDetails" rerender="ResourcingDetailsPanel" oncomplete="hideModalBoxyWithErrorCheck('#ResourcingDetailsErrors');SetupDatePicker();jQuery.publish('kimble.assignmentChanged', {assignmentId:theResourcingDetailsAssignmentId});" >
+                    <apex:param name="assignmentId" value="" />
+                </apex:actionFunction>
+
+                <div id="ResourcingDetailsErrors">
+                    <apex:pageMessages escape="false"/>
+                </div>
+
+                <apex:pageBlock mode="edit" rendered="{!!ISBLANK(TheResourcingDetailsDemandAssignment)}">
+                    <apex:pageBlockSection collapsible="false" showheader="false" columns="1">
+
+                        <apex:pageBlockSectionItem datastyle="white-space: nowrap;" rendered="{!EnableResourcingStatus}">
+                            <apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityAssignmentDemand__c.fields.KimbleOne__ResourcingStatus__c.Label}"/>
+                            <apex:outputPanel layout="none">
+                                <apex:selectList id="ResourcingStatusList" value="{!TheResourcingDetailsDemandAssignment.KimbleOne__ResourcingStatus__c}"  size="1" rendered="{!ResourcingFields[$ObjectType.KimbleOne__ActivityAssignmentDemand__c.fields.KimbleOne__ResourcingStatus__c.Name]}" >
+                                    <apex:selectOptions value="{!TheResourcingStatuses}" />
+                                </apex:selectList>
+                                <apex:outputPanel layout="none" rendered="{!!ResourcingFields[$ObjectType.KimbleOne__ActivityAssignmentDemand__c.fields.KimbleOne__ResourcingStatus__c.Name]}"><span title="{!$label.ConfigurationSetting13}" class="fa fa-info-circle resourcing-field-unavailable"/></apex:outputPanel>
+                            </apex:outputPanel>
+                        </apex:pageBlockSectionItem>
+
+                        <apex:pageBlockSectionItem datastyle="white-space: nowrap;" rendered="{!EnableResourcingMgr && !ShowResourcingManagerDropdown}">
+                            <apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityAssignmentDemand__c.fields.KimbleOne__ResourcingUser__c.Label}"/>
+                            <apex:outputPanel layout="none">
+                                <apex:outputPanel layout="none" rendered="{!ResourcingFields[$ObjectType.KimbleOne__ActivityAssignmentDemand__c.fields.KimbleOne__ResourcingUser__c.Name]}">
+                                    <apex:inputText id="SelectUserId" value="{!TheResourcingDetailsDemandAssignment.ResourcingUser__r.Name}" required="false" styleclass="readonly"/>
+                                    <apex:inputHidden id="SelectUserId_lkid" value="{!TheResourcingDetailsDemandAssignment.KimbleOne__ResourcingUser__c}"/>
+                                    <a href="javascript:openLookup(KimbleLookupPage + '?lkfm=' + jQuery('[id$=\'resourcingDetailsForm\']').attr('id') + '&lknm=' + jQuery('[id$=\'SelectUserId\']').attr('id') + '&lktp={!$ObjectType.User.KeyPrefix}&typename=ResourcingManagerUserSearch',670,'1','&lksrch=')" class="kimbleSearch " onclick="setLastMousePosition(event)" ><img src="/s.gif" class="lookupIcon" onblur="this.className = 'lookupIcon';" onfocus="this.className = 'lookupIconOn';" onmouseout="this.className = 'lookupIcon';this.className = 'lookupIcon';" onmouseover="this.className = 'lookupIconOn';this.className = 'lookupIconOn';" /></a>
+                                </apex:outputPanel>
+                                <apex:outputPanel layout="none" rendered="{!!ResourcingFields[$ObjectType.KimbleOne__ActivityAssignmentDemand__c.fields.KimbleOne__ResourcingUser__c.Name]}"><span title="{!$label.ConfigurationSetting13}" class="fa fa-info-circle resourcing-field-unavailable"/></apex:outputPanel>
+                            </apex:outputPanel>
+                        </apex:pageBlockSectionItem>
+
+                        <apex:pageBlockSectionItem datastyle="white-space: nowrap;" rendered="{!EnableResourcingMgr && ShowResourcingManagerDropdown}">
+                            <apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityAssignmentDemand__c.fields.KimbleOne__ResourcingUser__c.Label}"/>
+                            <apex:outputPanel layout="none">
+                                <apex:selectList id="ResourcingMgrList" value="{!TheResourcingDetailsDemandAssignment.KimbleOne__ResourcingUser__c}"  size="1" rendered="{!ResourcingFields[$ObjectType.KimbleOne__ActivityAssignmentDemand__c.fields.KimbleOne__ResourcingUser__c.Name]}" >
+                                    <apex:selectOptions value="{!TheResourcingManagers}" />
+                                </apex:selectList>
+                                <apex:outputPanel layout="none" rendered="{!!ResourcingFields[$ObjectType.KimbleOne__ActivityAssignmentDemand__c.fields.KimbleOne__ResourcingUser__c.Name]}"><span title="{!$label.ConfigurationSetting13}" class="fa fa-info-circle resourcing-field-unavailable"/></apex:outputPanel>
+                            </apex:outputPanel>
+                        </apex:pageBlockSectionItem>
+
+                    </apex:pageBlockSection>
+
+                        <apex:pageBlockSection collapsible="false" showheader="false" columns="1" rendered="{!EnableAADResourcingAddDetails}">
+                            <apex:repeat value="{!$ObjectType.KimbleOne__ActivityAssignmentDemand__c.FieldSets.KimbleOne__ActivityAssignmentDemandResourcingDetail}" var="r">
+                                <apex:pageBlockSectionItem datastyle="white-space: nowrap;">
+                                    <apex:outputText value="{!r.Label}" />
+                                    <apex:outputPanel layout="none">
+                                        <apex:inputField required="{!r.Required}" value="{!TheResourcingDetailsDemandAssignment[r]}" rendered="{!ResourcingFields[r.FieldPath]}" styleClass="{!IF(AND($ObjectType.KimbleOne__ActivityAssignmentDemand__c.Fields[r].type == 'date',$ObjectType.KimbleOne__ActivityAssignmentDemand__c.Fields[r].updateable),'kimbleDatePicker','')}" />
+                                        <apex:outputField value="{!TheResourcingDetailsDemandAssignment[r]}" rendered="{!CONTAINS(r.FieldPath,'.') || !ResourcingFields[r.sObjectField]}"/>
+                                    </apex:outputPanel>
+                                </apex:pageBlockSectionItem>
+                            </apex:repeat>
+
+                        </apex:pageBlockSection>
+
+                    <apex:pageBlockButtons location="bottom">
+
+                        <apex:outputpanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityAssignmentDemand__c.updateable}">
+                            <input class="btn DisableButtonWhileBusy" type="button" onclick="saveResourcingDetails('{!TheResourcingDetailsDemandAssignment.ActivityAssignment__c}')" id="save" value="{!$Label.Save}" />
+                        </apex:outputpanel>
+                        <input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}" />
+                    </apex:pageBlockButtons>
+
+                </apex:pageBlock>
+
+            </apex:form>
+        </apex:outputPanel>
+    </div>
+    <script>
+
+    function initialiseResourceDetailsPopup()
+    {
+        jQuery('.readonly').prop('readonly', true);
+        showModalBoxy();
+        SetupDatePicker();
+    }
+
+    function SetupDatePicker()
+    {
+        //dateFormat: 'yy-mm-dd',
+        jQuery('.kimbleDatePicker').datepicker({
+                dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+                showOtherMonths: true,
+                selectOtherMonths: true,
+                changeMonth: true,
+                changeYear: true});
+    }
+    </script>
+</apex:page>

@@ -1,0 +1,737 @@
+<apex:page standardcontroller="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.RisksDeliveryController" sidebar="false" tabStyle="KimbleOne__DeliveryGroup__c">
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu"> 
+
+	<c:Menu DefaultHelpPage="Risks.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryGroup__c.Id}" MenuContextName="{!KimbleOne__DeliveryGroup__c.Name}"/>
+
+</apex:define>  
+   
+<apex:define name="Content">
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'RiskStyle.css')}"/>
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+
+	<!-- Hidden fields for use in controller -->
+	<apex:outputField value="{!KimbleOne__DeliveryGroup__c.KimbleOne__Account__c}" rendered="False"/>
+	<apex:variable var="IsProposalWon" value="{!KimbleOne__DeliveryGroup__c.ForecastStatus__r.ProbabilityCode__r.KimbleOne__Enum__c == P1ForecastStatusProbabilityCodeEnumValue}"/>
+
+    <apex:form id="TheForm">
+		<apex:outputPanel id="RisksManagerPanel" >
+				<div id="dashboardContainer" class="dashboardContainer">
+					<div id="riskDashboardSummaryContainer" context-id="{!KimbleOne__DeliveryGroup__c.Id}" pageSource="DeliveryGroupRiskSummaryCard" class="cardContainer"></div>
+				</div>
+		    	<apex:pageBlock id="RisksManagerBlock">  
+		    		<div id="RiskManagerErrors">
+           				<apex:pageMessages escape="false"/>
+           			</div>
+		    	  	<apex:outputLabel value="{!KimbleOne__DeliveryGroup__c.Name}" rendered="false"/>
+
+					<div class="toolbar-container">
+						<div class="toolbar">
+							<div id="toolbar-buttons">
+								<apex:outputPanel layout="none" rendered="{!IsProposalWon && KimbleOne__DeliveryGroup__c.DeliveryStage__r.KimbleOne__AllowNewRisks__c}">
+									<label class="hover-mutton select-btn">
+										<a class="toolbar-button" rendered="{!IsProposalWon && KimbleOne__DeliveryGroup__c.DeliveryStage__r.KimbleOne__AllowNewRisks__c}" onclick="newRisk();">{!$Label.New} {!$ObjectType.Risk__c.label}</a>
+									</label>
+								</apex:outputPanel>
+								<apex:outputPanel layout="none" rendered="{!IsProposalWon && RelatedItems.size > 1}">
+									<label class="hover-mutton select-btn">
+										<a class="toolbar-button" rendered="{!IsProposalWon && RelatedItems.size > 1}" onclick="ReinitialiseCopyRiskPopup();">{!$Label.CopyRisksFromRelatedLabel}</a>
+									</label>
+								</apex:outputPanel>
+
+								<a class="toolbar-button filterRiskButton" title="{!$Label.Filter} {!$ObjectType.Risk__c.Label}" onclick="jQuery('#RisksFilterPopup').show();" href="javascript:void(0);"><i class="fa fa-filter"></i></a>
+								
+								<apex:outputPanel rendered="{!NumberOfClosedRisks > 0 && ShowClosedRisks == true}">
+									<a class="show-hide-closed-risks" onclick="showHideClosedRisks();">
+										<apex:outputText escape="false" value="{!$Label.kimbleone__hideclosedrisks}">
+											<apex:param value="{!NumberOfClosedRisks}"></apex:param>
+										</apex:outputText>
+									</a>
+								</apex:outputPanel>
+								<apex:outputPanel rendered="{!NumberOfClosedRisks > 0 && ShowClosedRisks == false}">
+									<a class="show-hide-closed-risks" onclick="showHideClosedRisks();">
+										<apex:outputText escape="false" value="{!$Label.kimbleone__showclosedrisks}">
+											<apex:param value="{!NumberOfClosedRisks}"></apex:param>
+										</apex:outputText>
+									</a>
+								</apex:outputPanel>
+							</div>
+						</div>
+					</div>
+					
+	       			<apex:actionStatus id="RiskListRefresh">
+		                <apex:facet name="start">
+		                    <div id="loadingIndicatorOuterContainer" class="loadingIndicator">
+		                        <div id="loadingIndicatorInnerContainer">
+		                            <img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+		                        </div>
+		                    </div>
+		                </apex:facet>
+		            </apex:actionStatus>
+
+					<apex:pageBlockTable id="risksListEnhanced" value="{!risksList}" var="riskLine" styleClass="risks-grid kimble-enhanced-table">
+						<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}" rendered="{!IsProposalWon}">
+							<apex:outputLink rendered="{!KimbleOne__DeliveryGroup__c.DeliveryStage__r.KimbleOne__AllowNewRisks__c}" styleClass="actionLink risk-id-{!JSINHTMLENCODE(riskLine.id)}" value="javascript:void(0)" onclick="editRisk('{!JSINHTMLENCODE(riskLine.id)}');" title="{!$Label.kimbleone__edit}"><span class="fa fa-pencil"></span></apex:outputLink>
+							<apex:outputLink rendered="{!KimbleOne__DeliveryGroup__c.DeliveryStage__r.KimbleOne__AllowNewRisks__c}" styleClass="actionLink risk-id-{!JSINHTMLENCODE(riskLine.id)}" value="javascript:void(0)" onclick="deleteSelectedRisk('{!JSINHTMLENCODE(riskLine.id)}');" title="{!$Label.kimbleone__delete}"><span class="fa fa-trash second-action-link"></span></apex:outputLink>
+							<div class="Loading risk-id-{!JSINHTMLENCODE(riskLine.id)}" style="display:none"></div>
+						</apex:column>
+						<apex:column headerValue="{!$ObjectType.KimbleOne__Risk__c.Fields.Name.Label}" headerClass="sortable">
+							<apex:outputLink value="{!$Page.KimbleOne__RiskView}?id={!riskLine.Id}" styleClass="risk-reference-link"><apex:outputText value="{!riskLine.Name}"/></apex:outputLink>
+						</apex:column>
+						<apex:repeat value="{!$ObjectType.KimbleOne__Risk__c.FieldSets.KimbleOne__RiskSummaryDetails}" var="r">
+							<apex:column styleClass="risk-summary-column {!r}" value="{!riskLine[r]}" headerValue="{!r.Label}" headerClass="sortable"/>
+						</apex:repeat>
+					</apex:pageBlockTable>
+		    	</apex:pageBlock>
+		    	
+		    	<script>
+		    	var DefaultRiskCategory;
+			    	jQuery(document).ready(function()
+					{							
+						jQuery.each( jQuery('.dashboardContainer'), function(i, dashboardContainer) {
+								jQuery('div[pageSource]', dashboardContainer).each(function() {
+						   		loadDashboardComponent(jQuery( this ));					   			
+						   });
+						})			
+						
+						jQuery('.kimble-enhanced-table').enhancedTable();
+						
+						jQuery('.risk-cat-filter-dropdown').select2();
+						jQuery('.risk-severity-filter-dropdown').select2();
+						jQuery('.risk-impact-filter-dropdown').select2();
+						jQuery('.risk-probability-filter-dropdown').select2();
+						jQuery('.risk-status-filter-dropdown').select2();
+						
+						DefaultRiskCategory = '<apex:outputText value="{!TheRiskCategoryPageParam}"/>';
+						if(DefaultRiskCategory != null && DefaultRiskCategory != undefined && DefaultRiskCategory != '') 
+						{
+							$('.filterRiskButton').addClass('toolbar-button-selected');
+						}
+					});
+
+					jQuery(window).load(function()
+					{		
+                		setupDateSort();
+                		removeTableLinks();
+            		});
+					
+					function setupDateSort()
+					{
+						jQuery.each(jQuery('td[class*=RaisedDate__c]'), function(i, obj){
+							jQuery(obj).attr('data-sort-type','number').attr('data-sort-value',kimble.parseDate(jQuery(obj).text(), true).valueOf());
+						});
+					}
+					
+					function removeTableLinks()
+					{
+						jQuery.each(jQuery('td[class*=RiskCategory__c],td[class*=RiskStatus__c],td[class*=RiskSeverity__c],td[class*=RiskImpact__c],td[class*=RiskProbability__c]'), function(i, obj){
+							jQuery(obj).addClass('disable-link');
+							jQuery(obj).find('span').find('a').prop('style','color:black !important;');	
+						});
+					}
+					
+					function deleteSelectedRisk(riskLinkId)
+					{
+						var d = confirmDelete();if(!d) return;
+						
+						jQuery('.actionLink.risk-id-' + riskLinkId).hide();
+						jQuery('.Loading.risk-id-' + riskLinkId).show();
+						
+						deleteRisk(riskLinkId);
+					}
+					
+					function resetSearchInput()
+					{
+						jQuery('.kimble-enhanced-table').enhancedTable();  
+						
+						InitialiseFilterHighlight();
+                		setupDateSort();
+                		removeTableLinks();
+					}
+		    	</script>
+		</apex:outputPanel>
+
+		<apex:actionFunction action="{!deleteRisk}" name="deleteRisk" rerender="RisksManagerPanel" oncomplete="RefreshRisks();">
+       		<apex:param name="rId" value="" />
+       	</apex:actionFunction>
+
+		<apex:actionFunction action="{!ShowHideClosedRisks}" name="showHideClosedRisks" rerender="RisksManagerPanel" oncomplete="RefreshRisks();">
+			<apex:param name="rId" value="" />
+		</apex:actionFunction>
+
+		<apex:actionFunction action="{!editRisk}" name="editRisk" rerender="" oncomplete="">
+			<apex:param name="rId" value="" />
+		</apex:actionFunction>
+
+		<apex:actionFunction action="{!newRisk}" name="newRisk" rerender="RisksManagerPanel" oncomplete="">
+		</apex:actionFunction>
+
+        <apex:actionFunction action="{!ReinitialiseCopyRiskPopup}" name="ReinitialiseCopyRiskPopup" reRender="CopyRisksFromRelatedItems" oncomplete="copyRisksFromRelatedItem();copyRisksPopupLoadComplete();showModalBoxy();"/>
+        <apex:actionFunction action="{!RefreshRisks}" status="RiskListRefresh" name="RefreshRisks" reRender="risksListEnhanced, RisksManagerBlock" oncomplete="resetSearchInput();"/>
+        <apex:actionFunction action="{!ClearRisksFilter}" status="RiskListRefresh" name="ClearRisksFilter" reRender="risksListEnhanced, RisksManagerBlock,RiskFilters" oncomplete="resetSearchInput();"/>
+
+        <div id="RisksFilterPopup" style="display:none;">
+            <div id="RiskFilters">
+                
+                <div class="risks-filter-header">{!$ObjectType.Risk__c.LabelPlural} {!$Label.Filter}<i onclick="jQuery('#RisksFilterPopup').hide();" class="filter-collapse-btn fa fa-angle-double-up" title="{!$Label.Close}"></i></div>
+                
+				<div style="height: 5px;"/>
+				
+                <div class="filter-row">
+					<apex:outputPanel rendered="{!RiskCategoryInFieldSet}">
+						<apex:outputLabel styleClass="filter-row-category" value="{!$ObjectType.KimbleOne__RiskCategory__c.Label}"/>
+						<apex:selectList id="riskCategoryFilter" styleClass="risk-cat-filter-dropdown" value="{!TheRiskCategoryIds}" multiselect="true">
+							<apex:selectOptions id="SelectedRiskCategories" value="{!RiskCategories}"/>
+						</apex:selectList>
+					</apex:outputPanel>
+				</div>
+                	
+                <div class="filter-row">
+					<apex:outputPanel rendered="{!RiskSeverityInFieldSet}">
+						<apex:outputLabel styleClass="filter-row-category" value="{!$ObjectType.KimbleOne__Risk__c.fields.KimbleOne__RiskSeverity__c.label}"/>
+						<apex:selectList id="riskSeverityFilter" styleClass="risk-severity-filter-dropdown" value="{!TheRiskSeverityIds}" multiselect="true">
+							<apex:selectOptions value="{!RiskSeverities}"/>
+						</apex:selectList>
+					</apex:outputPanel>
+				</div>
+				
+                <div class="filter-row">
+					<apex:outputPanel rendered="{!RiskProbabilityInFieldSet}">
+						<apex:outputLabel styleClass="filter-row-category" value="{!$ObjectType.KimbleOne__Risk__c.fields.KimbleOne__RiskProbability__c.label}"/>
+						<apex:selectList id="riskProbabilityFilter" styleClass="risk-probability-filter-dropdown" value="{!TheRiskProbabilityIds}" multiselect="true">
+							<apex:selectOptions value="{!RiskProbabilities}"/>
+						</apex:selectList>
+					</apex:outputPanel>
+				</div>
+
+                <div class="filter-row">
+					<apex:outputPanel rendered="{!RiskImpactInFieldSet}">
+						<apex:outputLabel styleClass="filter-row-category" value="{!$ObjectType.KimbleOne__Risk__c.fields.KimbleOne__RiskImpact__c.label}"/>
+						<apex:selectList id="riskImpactFilter" styleClass="risk-impact-filter-dropdown" value="{!TheRiskImpactIds}" multiselect="true">
+							<apex:selectOptions value="{!RiskImpacts}"/>
+						</apex:selectList>
+					</apex:outputPanel>
+				</div>
+				
+                <div class="filter-row">
+					<apex:outputPanel rendered="{!RiskStatusInFieldSet}">
+						<apex:outputLabel styleClass="filter-row-category" value="{!$ObjectType.KimbleOne__Risk__c.fields.KimbleOne__RiskStatus__c.label}"/>
+						<apex:selectList id="riskStatusFilter" styleClass="risk-status-filter-dropdown" value="{!TheRiskStatusIds}" multiselect="true">
+							<apex:selectOptions value="{!RiskStatuses}"/>
+						</apex:selectList>
+					</apex:outputPanel>
+				</div>
+				
+                <div class="filter-row">
+                    <input class="btn" id="applyFilterButton" onclick="applyRisksFilter();" type="Button" value="{!$Label.kimbleone__gobutton}"/>
+                    <input class="btn" id="clearFilterButton" onclick="clearRisksFilter();" type="Button" value="{!$Label.kimbleone__clearalllabel}"/>
+                </div>
+            </div>
+        </div>
+
+    </apex:form>
+
+     	  <apex:form id="CopyRisksPopupForm">
+
+    <div id="CopyRisksPopup" style="display:none"> 
+  
+		<apex:outputPanel id="CopyRisksFromRelatedItems">
+           		<apex:pageBlock >
+            		<div id="CopyRisksFromRelatedItemsErrors">
+           				<apex:pageMessages escape="false"/>
+           			</div>          		 
+            		<apex:pageBlockButtons location="bottom">
+						<apex:commandButton styleClass="DisableButtonWhileBusy" action="{!copyRisksFromRelatedItem}" value="{!$Label.kimbleone__addselected}" oncomplete="hideModalBoxyWithErrorCheck('#CopyRisksFromRelatedItemsErrors');RefreshRisks();" reRender="CopyRisksFromRelatedItems,RisksManagerPanel,risksListEnhanced"/>
+						<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+					</apex:pageBlockButtons>
+
+					<apex:outputLabel value="{!$Label.kimbleone__relateditemlabel}" styleClass="assessment-label"/>
+					<apex:actionRegion >
+						<apex:selectList styleClass="assessment-dropdown" value="{!SelectedRelatedItem}" size="1" multiselect="false">
+		           			<apex:selectOptions value="{!RelatedItems}"/>
+							<apex:actionSupport status="RiskRefresh" event="onchange" action="{!PopulateRelatedRisks}" rerender="RelatedRisksList"   />
+		       			</apex:selectList>
+		       			
+		       			<apex:actionStatus id="RiskRefresh">
+			                <apex:facet name="start">
+			                    <div id="loadingIndicatorOuterContainer" class="loadingIndicator">
+			                        <div id="loadingIndicatorInnerContainer">
+			                            <img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+			                        </div>
+			                    </div>
+			                </apex:facet>
+			            </apex:actionStatus>
+					</apex:actionRegion>
+
+					<apex:outputPanel id="RelatedRisksList">
+					<div class="table-wrapper">
+             		<apex:pageBlockTable styleClass="related-risk-table" value="{!TheRelatedRisks}" var="TheRelatedRisk">
+             			<apex:column width="5%">
+		                    <apex:facet name="header">
+		                        <apex:inputCheckbox styleClass="select-all" onclick="selectAllCheckboxes()"/>
+		                    </apex:facet>
+		                    <apex:inputCheckbox styleClass="row-selector" value="{!TheRelatedRisk.IsSelected}"/>
+		                </apex:column>
+
+             			<apex:column width="20%">
+		                    <apex:facet name="header">
+		                        <apex:outputText value="{!$ObjectType.KimbleOne__RiskCategory__c.Label}"/>
+		                    </apex:facet>
+		                    <apex:outputText value="{!TheRelatedRisk.TheRisk.RiskCategory__r.Name}"/>
+		                </apex:column>
+		                
+               			<apex:column width="43%">
+		                    <apex:facet name="header">
+		                        <apex:outputText value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__Summary__c.Label}"/>
+		                    </apex:facet>
+		                    <apex:outputText value="{!TheRelatedRisk.TheRisk.KimbleOne__Summary__c}"/>
+		                </apex:column>
+		                
+               			<apex:column width="10%">
+		                    <apex:facet name="header">
+		                        <apex:outputText value="{!$ObjectType.KimbleOne__RiskImpact__c.Label}"/>
+		                    </apex:facet>
+		                    <apex:outputText value="{!TheRelatedRisk.TheRisk.RiskImpact__r.Name}"/>
+		                </apex:column>
+		                
+               			<apex:column width="10%">
+		                    <apex:facet name="header">
+		                        <apex:outputText value="{!$ObjectType.KimbleOne__RiskProbability__c.Label}"/>
+		                    </apex:facet>
+		                    <apex:outputText value="{!TheRelatedRisk.TheRisk.RiskProbability__r.Name}"/>
+		                </apex:column>
+		                
+               			<apex:column width="10%">
+		                    <apex:facet name="header">
+		                        <apex:outputText value="{!$ObjectType.KimbleOne__RiskSeverity__c.Label}"/>
+		                    </apex:facet>
+		                    <apex:outputText value="{!TheRelatedRisk.TheRisk.RiskSeverity__r.Name}"/>
+		                </apex:column>
+		                
+<!-- 						compensate for the scrollbar -->
+			            <apex:column width="2%"/>
+			        </apex:pageBlockTable>
+			        </div>
+			        <script>
+			        	resetSelectAll();
+			        	
+	        			function resetSelectAll()
+						{
+							jQuery("input.select-all").each(function(){jQuery(this).prop('checked', false);});
+						}
+			        </script>
+            		</apex:outputPanel>
+        		</apex:pageBlock>
+	
+
+        </apex:outputPanel> 
+  	</div>	
+         	</apex:form>
+
+	<script>
+		/*jQuery(document).ready(function()
+		{							
+			jQuery.each( jQuery('.dashboardContainer'), function(i, dashboardContainer) {
+					jQuery('div[pageSource]', dashboardContainer).each(function() {
+			   		loadDashboardComponent(jQuery( this ));					   			
+			   });
+			})			
+			
+		});*/
+    	function clearRisksFilter()
+    	{
+    		jQuery('#RisksFilterPopup').hide();
+    		
+            $('.filterRiskButton').removeClass('toolbar-button-selected');
+    	    jQuery('.hide-closed-checkbox').prop('checked',false);
+    	    
+			jQuery.each(jQuery('.select2-container-multi'), function(i, obj) {
+				jQuery(obj).select2('val', '');
+			});
+    		
+    		ClearRisksFilter();
+    	}
+
+    	function applyRisksFilter()
+    	{
+    		jQuery('#RisksFilterPopup').hide();
+
+    		RefreshRisks();
+    	}
+    	
+    	function InitialiseFilterHighlight()
+    	{
+    	    $('.filterRiskButton').removeClass('toolbar-button-selected');
+    	    
+            if($('.hide-closed-checkbox').is(":checked")) 
+                $('.filterRiskButton').addClass('toolbar-button-selected');
+                
+            jQuery.each(jQuery('.select2-container-multi'), function(i, obj) {
+				if(jQuery(obj).select2('val').length > 0) $('.filterRiskButton').addClass('toolbar-button-selected');
+			});    
+        }
+		
+		function loadDashboardComponent(dashboardComponent)
+		{
+			var pageSourceName = dashboardComponent.attr('pageSource');
+	   		
+	   		jQuery.ajax({ url: kimble.pages[pageSourceName] + dashboardComponent.attr('context-id')})
+				.done(function(html) {
+					dashboardComponent.empty();
+					
+					if(html != null && html != '')
+					{
+						jQuery(html).appendTo("#" + dashboardComponent.attr('id'));
+					}
+					else
+					{
+						// nothing to render in the component
+						// remove the container for this component to allow the page to re-flow
+						dashboardComponent.remove();
+					}
+				})
+				.fail(function(xhr, status, error) {
+					if(error !=null && error !="") {
+						console.log('ajax component load error: ' + error);
+						// hide the container for this component
+						dashboardComponent.hide();
+					}									
+				})			
+		}
+			
+		function copyRisksFromRelatedItem()
+		{
+			initialiseModalBoxy('#CopyRisksPopup', '{!JSENCODE($Label.New)} {!$ObjectType.Risk__c.labelplural}', jQuery('form[id$=\'CopyRisksPopupForm\']'));
+		}
+			
+		function openRisksFilter()
+		{
+			initialiseModalBoxy('#RisksFilterPopup', '{!JSENCODE($Label.New)} {!$ObjectType.Risk__c.labelplural}', jQuery('form[id$=\'RisksFilterPopupForm\']'));
+		}
+ 			
+  		function selectAllCheckboxes()
+  		{
+  			if(jQuery("input.select-all:visible")[0].checked)
+  			{
+            	jQuery("input.row-selector:visible").each(function(){jQuery(this).prop('checked', true);});
+           	}
+           	else
+           	{
+           		jQuery("input.row-selector:visible").each(function(){jQuery(this).prop('checked', false);});
+			}
+        }
+        		
+		function copyRisksPopupLoadComplete()
+		{
+		}
+				
+ 		</script>
+ 		
+ 		<style>
+			.Loading 
+			{
+				background-image: url('{!URLFOR($Resource.JobImages, 'running16.gif')}') !important;
+				background-repeat:no-repeat !important;
+				background-position: 50%, 50%;
+				width:18px;
+				height:18px;
+			}
+			#riskDashboardSummaryContainer
+			{
+				display: block;
+			}
+ 			.assessment-label {
+				font-weight: bold;
+			}
+			
+ 			.assessment-dropdown {
+				margin-left: 10px;
+				margin-bottom: 10px;
+			}
+ 			.full-width {
+ 				display: block;
+ 			}
+ 			.add-risk-icon {
+ 				cursor: pointer;
+ 				left: -10px;
+			position: relative;
+ 			}
+ 			.second-action-link {
+			margin-left: 6px;
+ 			}
+ 			.filter-text {
+			margin-bottom: 8px;
+		  	width: 100%;
+		}
+		.left-hand-panel {
+			display: inline-block;
+		}
+		.right-hand-panel {
+			display: inline-block;
+			position: relative;
+			top: 0;
+			vertical-align: top;
+			margin-left: 13px;
+		}
+		.inner-card {
+			min-width: 490px;
+		}
+		.risk-header {
+			text-align: right;
+			display: inline-block;
+			vertical-align: middle;
+			right: 14px;
+			position: absolute;
+			top: 4px;
+		}
+		.risk-summary-column {
+			max-width: 320px;
+		}
+		.risk-header-title {
+			position: relative;
+		}
+		.risk-summary-type {
+			border-bottom: 2px solid #bbb;
+			font-weight: bold;
+			font-style: italic;
+		}
+		.risk-summary-type-cell {
+			font-weight: bold;
+			font-style: italic;
+			border-bottom: 2px solid #bbb !important;
+		}
+		.overall-risk-summary-type-cell {
+			font-weight: bold;
+			font-size: 20px;
+		}
+		.header-risk-summary-type-cell {
+			font-size: 16px;
+			color: inherit;
+			font-family: inherit;
+			font-weight: 500;
+			line-height: 1.1;
+			padding-left: 34px;
+			padding-right: 15px;
+		}
+		.related-risk-table {
+			width: 850px !important;
+		}
+
+		.table-wrapper {
+			height: 355px;
+		  	overflow-y: auto;
+ 				overflow-x: hidden;
+		}
+		.risk-summary-container {
+			display: inline-block;
+		}
+		.risk-severity-summary-container {
+			margin-left: 20px;
+		}
+		.cardBody {
+			margin-bottom: 10px;
+		}
+		.card.min-horizontal-padding {
+		  	margin-bottom: 10px;
+		}
+		
+		.risk-summary-table {
+			width: 100%;
+		}
+		
+		.loadingIndicator {
+		   top:0;
+		   right:0;
+		   width:100%;
+		   height:100%;
+		   font-weight: bold;
+		   position:absolute;
+		   text-align:center;
+		   /* IE filter */
+		   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+		   -moz-opacity:0.7;    /* Mozilla extension */
+		   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+		   opacity:0.7; /* CSS3 */
+		   z-index:1000;
+		   background-color:white;
+		}
+		
+		.loadingIndicator img {
+		    margin-right:9px;
+		}
+		
+		#loadingIndicatorInnerContainer { 
+		    position:absolute; 
+		    top:50%;
+		    height:10em; 
+		    margin-top:-2em;
+		    width:100%;
+		}
+		div#toolbar-buttons {
+		    display: table-cell;
+		    position: relative;
+		    padding-bottom: 6px;
+		}
+		.toolbar-container {
+			position: relative;
+		}
+		.toolbar-button {
+			display: inline-block;
+			padding: 6px 10px 6px 10px;
+			background-color: white;
+			margin-right: 4px;
+			border: 1px solid #ccc;
+			border-radius: 2px;
+			cursor: pointer;
+		}
+		.toolbar-button.active-toolbar-button {
+			color: white;
+			background-color: #888;
+		}
+		.toolbar-container {
+			position: relative;
+		}
+		.toolbar {
+			display: table;
+			width: 100%;
+		}
+            .hover-mutton {
+              display: inline-block;
+              position: relative;
+            }
+			div#toolbar-buttons {
+				display: table-cell;
+				position: relative;
+				padding-bottom: 6px;
+			}
+			span.gantt-display-mode {
+				position: absolute;
+				right: 10px;
+			}
+			.toolbar-button:hover, a.toolbar-button-selected {
+				text-decoration: none;
+				color: white;
+				background-color: #1A9EFF;
+			}
+			.toolbar-button.button-left {
+				border-top-right-radius: 0px;
+				border-bottom-right-radius: 0px;
+				margin-right: 0px;
+			}
+			.toolbar-button.button-right {
+				border-top-left-radius: 0px;
+				border-left: 0;
+				border-bottom-left-radius: 0px;
+			}
+			.toolbar-button .fa {font-size: 14px;}
+			.toolbar-button.disabled {background-color: #ccc;color: darkgray;}
+			.toolbar-button.disabled:hover {background-color: #ccc;color: darkgray;}
+            .risks-filter-header {
+		    font-weight: bold;
+		    font-size: 14px;
+		    padding: 10px;
+		    background-color: #F5F5F5;
+		    border: 1px solid #DDD;
+		    border-radius: 4px;
+		    margin-left: 2px;
+		    margin-right: 2px;
+            }
+            i.filter-collapse-btn.fa.fa-angle-double-up {
+                color: #BBB;
+                cursor: pointer;
+                padding-right: 6px;
+                position: absolute;
+                right: 13px;
+                top: 13px;
+                font-size: 26px;
+            }
+            input#applyFilterButton {
+                margin-top: 10px;
+            }
+            div#RisksFilterPopup {
+                position: absolute;
+                top: 51px;
+                padding: 5px;
+                width: auto;
+                max-width: 500px;
+                min-width: 350px;
+                height: auto;
+                z-index: 999;
+                border-color: #ddd;
+                border-style: solid;
+                border-width: 0px 1px 1px 1px;
+                background-color: #fff;
+                box-shadow: rgba(31, 31, 31, 0.16) 4px 3px 8px;
+                left: 219px;
+                overflow-y: auto;
+            }
+            .filter-row {
+                margin-top:8px;
+                margin-left:8px;
+                font-size: 1em;
+                font-weight: bold;
+                color: #4a4a56;
+                margin-bottom: 3px;
+            }
+            .filter-row-category {
+                margin-bottom: 0px;
+            }
+			/* SELECT 2 STYLING */
+			.select2-results li {margin-left:0px;}
+			.select2-container-multi .select2-choices
+			{
+				border: 2px solid rgb(224,224,224);
+				background-image:none;
+			}
+			.select2-container-multi .select2-choices .select2-search-choice {
+				border: 1px solid #aaaaaa;
+				border-radius: 4px;
+				padding: 5px 20px 5px 5px;
+				background-image:none;
+			}
+			
+			.select2-container-multi .select2-search-choice-close {
+				background-image:  url({!URLFOR($Resource.AssignmentImages, 'assignmentSprite.png')});
+				background-position: -2px -29px;
+				background-repeat: no-repeat;
+				left:auto;
+			}
+			
+			.select2-container-multi .select2-choices .select2-search-choice .select2-search-choice-close:hover {
+				background-position: -2px -1px;
+			}
+			.select2-container.select2-container-multi {
+			    width: auto !important;
+			    min-width: 301px;
+    			display: block;
+			    max-width: 400px;
+   			}
+   			table.risks-grid tr.dataRow:hover {
+				background-color: #e3feff;
+			}
+			.kimble-enhanced-table tr {
+				height: 28px !important;
+			}
+			.risk-reference-link {
+				color: rgb(0, 95, 178) !important;
+				text-decoration: none;
+			}
+			.show-hide-closed-risks {
+			    color: rgb(0, 95, 178) !important;
+			    cursor: pointer;
+			}
+			span .disable-link a {
+				pointer-events: none;
+				cursor: default;
+				color: black !important;
+				border-bottom: none !important;
+   			}
+	</style>
+
+    </apex:define>
+    </apex:composition>
+
+</apex:page>

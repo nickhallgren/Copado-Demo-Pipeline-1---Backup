@@ -1,0 +1,421 @@
+<apex:page controller="KimbleOne.ResourceDaySummaryController" showHeader="false" sidebar="false" contentType="text/css" tabStyle="KimbleOne__ReferenceData__c">
+
+<div class="resources-container">
+	<apex:repeat value="{!TheResources}" var="resource">
+		<div class="resource-summary-card">
+			<div class="resource-summary-header"><span class="context-date"><apex:outputText value="{!ContextDate}:"/></span><span class="resource-name"><apex:outputText value="{!resource.Name}"/></span><div class="day-charms"></div></div>
+			
+			<div class="resource-body">
+				<div class="resource-aggregate-detail-container">
+					<div class="resource-aggregate-detail" data-req-usage="{!IF(!ISBLANK(resource.TheRequiredUsage), resource.TheRequiredUsage, 0)}" data-hrs-per-day="{!resource.HoursPerDay}" data-json="{!resource.PriorityUsageMapJson}">
+						<table class="allocation-table">
+							<tr>
+								<apex:outputPanel layout="none" rendered="{!!ISBLANK(resource.TheRequiredUsage)}">
+								<td class="td-label"><apex:outputText value="{!$Label.kimbleone__requiredhourslabel}"/></td><td class="td-value"><span class="resource-req-usage"></span></td>
+								</apex:outputPanel>
+								<td class="td-label"><apex:outputText value="{!$Label.kimbleone__usedhourslabel}"/></td><td class="td-value"><span class="resource-used-usage"></span></td>
+								<td class="td-label"><apex:outputText value="{!$Label.kimbleone__availablehourslabel}"/></td><td class="td-value"><span class="resource-available-usage"></span></td>
+							</tr>
+						</table>
+					</div>
+				</div>
+				
+				<!-- fixed height / scrollable -->
+				<div class="resource-assignments-container">
+					<table border="0" cellpadding="0" cellspacing="0">
+						<thead>
+						</thead>
+						<tbody>
+							<apex:repeat value="{!resource.Assignments}" var="assignment">
+							<tr class="assignment-usage" data-cls="{!assignment.StyleClass}" data-name="{!assignment.Name}" data-owner="{!assignment.Owner}" data-hrs="{!assignment.HoursPerDay}" data-util="{!assignment.Utilisation}" data-start-date="{!assignment.StartDate}" data-scheduled-only="{!assignment.ScheduledDaysOnly}" data-usage-pattern="{!assignment.UsagePatternPart}">
+								
+							</tr>
+							</apex:repeat>
+						</tbody>
+					</table>
+					
+				</div>
+				<apex:outputPanel layout="none" rendered="{!resource.HasEvents}">
+				<table border="0" cellpadding="0" cellspacing="0" class="resource-events list">
+					<thead>
+						<tr>
+							<td><apex:outputText value="{!$Label.kimbleone__calendartasksheading}"/></td>
+							<td class="subject-col"><apex:outputText value="{!$ObjectType.Event.Fields.Subject.Label}"/></td>
+						</tr>
+					</thead>
+					<tbody>
+						<apex:repeat value="{!resource.Events}" var="e">
+							<apex:repeat value="{!resource.Events[e]}" var="event">
+								<tr>
+									<apex:variable value="{!IF(ContextDate == event.EventDate, 'ev-today', 'ev-otherday')}" var="cellClass"/>
+									<td class="{!cellClass}"><apex:outputText value="{!event.EventDate}"/></td>
+									<td><apex:outputText value="{!event.Subject}"/></td>
+								</tr>
+							</apex:repeat>
+						</apex:repeat>
+					</tbody>
+				</table>
+				</apex:outputPanel>
+			</div>
+			
+			
+		</div>
+	</apex:repeat>
+</div>
+
+<script>
+	var summaryViewStartDate = '{!YEAR(StartDate)}-{!MONTH(StartDate)}-{!DAY(StartDate)}';
+	var summaryViewEndDate = '{!YEAR(EndDate)}-{!MONTH(EndDate)}-{!DAY(EndDate)}';
+	
+	var daySummaryLabels = {};
+	daySummaryLabels['ResourceOverUtilisedOnAssignmentWarning'] = '<apex:outputText value="{!$Label.kimbleone__resourceoverutilisedwarning}"/>';
+	daySummaryLabels['ResourceOverUtilisedOnAllAssignmentsWarning'] = '<apex:outputText value="{!$Label.kimbleone__resourceoverutilisedonallassignmentswarning}"/>';
+	daySummaryLabels['ImportantEvents'] = '<apex:outputText value="{!$Label.kimbleone__calendartasksheading}"/>';
+	daySummaryLabels['ImportantEventsMessage'] = '<apex:outputText value="{!$Label.kimbleone__calendartasksmessage}"/>';
+	daySummaryLabels['ActivityOwner'] = '<apex:outputText value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.OwnerId.Label}"/>';
+	
+	var theContextDate = '<apex:outputText value="{!$CurrentPage.Parameters.dte}"/>';
+	
+	function drawSummaryGantts()
+	{
+		var hasAssignments = false;
+		
+		if(jQuery('.assignment-usage').length)
+		{
+			var periodHeaderHtml = '<tr><th><span>{!$ObjectType.ActivityAssignment__c.LabelPlural}</span></th>';
+			
+			for (var i=0;i<days_between(summaryViewStartDate.toDate(), summaryViewEndDate.toDate());i++)
+			{
+				var contextDate = new Date(summaryViewStartDate.toDate().getFullYear(), summaryViewStartDate.toDate().getMonth(), summaryViewStartDate.toDate().getDate() + i, 0, 0, 0, 0);
+				
+				if (!isDateNonBusDay(contextDate))
+				{
+					var selected = (contextDate.toKimbleUTC() == theContextDate ? ' selected ' : '');
+					
+					periodHeaderHtml += ('<th><span class="' + selected + '">' + kimble.regional.dayNames[contextDate.getDay()].substring(0,3) + ' ' + contextDate.getDate() +'</span></th>');
+				
+				}
+			}
+			
+			periodHeaderHtml += '</tr>';
+			
+			jQuery('.resource-assignments-container>table>thead').append(periodHeaderHtml);
+			
+			//draw the assignment daily numbers
+			jQuery.each(jQuery('.assignment-usage'), function (i, obj){
+				var j = jQuery(obj);
+				
+				var usage = j.attr('data-usage-pattern');
+				var hrsPerDay = new Number(j.attr('data-hrs'));
+				var utilisation = new Number(j.attr('data-util'));
+				var startDate = j.attr('data-start-date');
+				var scheduledOnly = (j.attr('data-scheduled-only') == 'true');
+				
+				var assignmentHtml = '<td ><span class="assignment-class ' + j.attr('data-cls') + ' "></span><span class="assignment-name" title="' + daySummaryLabels['ActivityOwner'] + ': ' + j.attr('data-owner') + '">' + j.attr('data-name') + '</span></td>';
+				var usagePattern = new ActivityAssignmentUsagePattern(hrsPerDay,startDate.toDate(),usage,utilisation,utilisation);
+				
+				for (var i=0;i<days_between(summaryViewStartDate.toDate(), summaryViewEndDate.toDate());i++)
+				{
+					var contextDate = new Date(summaryViewStartDate.toDate().getFullYear(), summaryViewStartDate.toDate().getMonth(), summaryViewStartDate.toDate().getDate() + i, 0, 0, 0, 0);
+					
+					if (!isDateNonBusDay(contextDate))
+					{
+						assignmentHtml += '<td>';
+						
+						if (contextDate >= startDate.toDate())
+						{
+							var dayUsage = usagePattern.getUsagePatternOnDate(contextDate);
+							
+							if (dayUsage != null)
+							{
+								var forecast = dayUsage.split(':')[0]; 
+		 						var actual = dayUsage.split(':')[1];
+		 						
+		 						var classes = '';
+		 						var cellVal = 0;
+		 						
+		 						if (actual != '0')
+		 						{
+		 							classes += ' assignment-time-entry';
+		 							cellVal = actual;
+		 						}
+		 						else if (forecast != undefined )
+		 						{
+					      			if (forecast == NONFORECASTDAY || forecast == CLOSEDDAY)
+					      			{
+					      				classes += ' non-forecast-day ';
+					      			}
+					      			else
+					      			{
+										var f = KeyToHoursUsagePatternMap[forecast];
+								
+										if (f == null && !scheduledOnly) // percentage usage
+										{
+											f = new Number(forecast) * hrsPerDay / 100;
+										}
+										
+										cellVal = (f == null ? 0 : f);
+									}
+								}
+								
+								hasAssignments = true;
+								assignmentHtml += '<div class="' + classes + '">' + kimble.formatNumber(cellVal, '#.##') + '</div>';
+							}		
+						}
+						assignmentHtml += '</td>';
+					}
+				}
+				j.append(assignmentHtml);
+			});
+		}
+
+		if(!hasAssignments)	jQuery('.resource-assignments-container').hide();
+		
+		drawAggregateDetail();
+	}
+	
+	drawSummaryGantts();
+	 
+	function drawAggregateDetail() {
+		
+		jQuery.each(jQuery('.resource-aggregate-detail'), function(i, obj){
+			
+			var dayCharms = jQuery(obj).closest('.resource-summary-card').find('.day-charms');
+			dayCharms.empty();
+			
+			var usage = JSON.parse(jQuery(obj).attr('data-json'));
+			var hrsPerDay = new Number(jQuery(obj).attr('data-hrs-per-day'));
+			var requiredUsage = new Number(kimble.parseNumber(jQuery(obj).attr('data-req-usage')));
+			
+			var remainingUsage = hrsPerDay;
+			var totHrs = 0;
+			
+			jQuery.each(Object.keys(classificationStyleMap), function(i, key) {
+				
+				if (usage[key] != null && classificationStyleMap[key] != undefined && classificationStyleMap[key].IsUtilPct)
+				{
+					totHrs += usage[key];
+				}
+			});
+
+			remainingUsage = Math.max(hrsPerDay - totHrs, 0);
+			
+			jQuery(obj).find('.resource-req-usage').text(kimble.formatNumber(requiredUsage,'0.##'))
+			if(requiredUsage > hrsPerDay) dayCharms.append('<i class="fa fa-exclamation-triangle assignment-over-utilised" title="' + daySummaryLabels['ResourceOverUtilisedOnAssignmentWarning'] + '"/>');
+
+			jQuery(obj).find('.resource-used-usage').text(kimble.formatNumber(totHrs,'0.##'));
+			// only flag over utilised on all assignments if there are other assignments (which we can infer from the totalhrs which excludes this assignment being non-zero)
+			if(totHrs > 0 && (totHrs + requiredUsage) > hrsPerDay) dayCharms.append('<i class="fa fa-exclamation-circle all-over-utilised" title="' + daySummaryLabels['ResourceOverUtilisedOnAllAssignmentsWarning'] + '"/>');
+
+			jQuery(obj).find('.resource-available-usage').text(kimble.formatNumber(remainingUsage,'0.##'));
+
+			if(jQuery(obj).closest('.resource-summary-card').find('.ev-today').length) dayCharms.append('<i class="fa fa-calendar important-event" title="' + daySummaryLabels['ImportantEventsMessage'] + '"/>');		
+		});
+	}
+	 
+</script>
+
+<style>
+	.resource-summary-card {
+	    padding: 5px;
+	    min-width: 485px;
+	}
+	.resource-summary-header{
+		padding: 12px;
+	    font-size: 14px;
+	    background-color: #f1f1f1;
+	    color: #454545;
+	    font-weight: bold;
+	    margin-bottom: 4px;
+	    position: relative;
+	}
+	.resource-total-usage {
+	    position: absolute;
+	    top: 77px;
+	    left: 44px;
+	    z-index: 99999;
+	    font-weight: bold;
+	    width: 38px;
+	    text-align: center;
+	}
+	table.allocation-table {
+		padding: 0px 4px 5px 4px;
+	    width: 100%;
+	}
+	.td-label {
+	    text-align: center;
+	    padding: 8px 0px 8px 0px;
+	    font-size: 12px;
+	}
+	td.td-value {
+	    font-size: 16px;
+	    font-weight: bold;
+	    color: #454545;
+	    text-align: right;
+	    padding-left: 8px;
+	}
+	.resource-assignments-container {
+	    display: inline-block;
+	    max-height: 120px;
+	    overflow-y: auto;
+	    overflow-x: hidden;
+	}
+	.resource-assignments-container td div{
+		border: 1px solid #aaa;
+	    border-radius: 2px;
+	    height: 22px;
+	    line-height: 22px;
+	    width: 30px;
+	    margin: auto;
+	    text-align:center;
+	}
+	.resource-body {
+	    white-space: nowrap;
+	}
+	.resource-assignments-body {
+	    max-height: 100px;
+	    overflow-y: auto;
+	}
+
+	.resource-assignments-container th span {
+	white-space: nowrap;
+	font-size: 0.75em;
+	overflow: hidden;
+	display: inline-block;
+	height: 25px;
+	line-height: 25px;
+	text-align: center;
+	border-bottom: solid #e0e3e5 1px;
+	border-right: solid #e0e3e5 1px;
+	background-color: #f2f3f3;
+	text-overflow: ellipsis;
+	width: 36px;
+	}
+	
+	.resource-assignments-container span.selected,
+	.resource-events td.ev-today {
+    	background-color: gold !important;
+	}
+	
+	.resource-assignments-container th:first-child span{width:180px;font-size:11px;padding-left: 6px;font-weight:bold;text-align: left;}
+	
+	.resource-assignments-container .assignment-name
+	{
+		text-overflow: ellipsis;
+    	white-space: nowrap;
+    	overflow: hidden;
+    	padding-left: 2px;
+    	width: 170px;
+    	display: inline-block;
+    	height: 32px;
+    	line-height: 32px;
+	}
+
+	.assignment-class
+	{
+	display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-right: 4px;
+    margin-bottom: 12px;}
+    
+	.context-date {
+	    font-weight: bold;
+	    margin-right: 5px;
+	}
+	
+	table.resource-events thead {
+	    font-weight: bold;
+	    background-color: #f2f3f3;
+	}
+	.day-charms {
+		position: absolute;
+		right: 12px;
+		top: 7px;
+	}
+	.day-charms i {
+		font-size: 22px;
+		margin-right: 5px;
+	}
+	.day-charms i.important-event  {
+		color: #2196F3;
+	}
+	.day-charms i.assignment-over-utilised  {
+		color: #ffb600;
+	}
+	.day-charms i.all-over-utilised  {
+		color: #B42E34;
+	}
+	table.resource-events {
+		margin-left: 123px;
+		margin-bottom: 3px;
+	}
+	td.subject-col {
+	    width: 392px;
+	}
+	/* These are needed here because the tracking plan gantt page doesn't have this CSS loaded' */
+	.assignment-class-none
+	{
+		background-color: black;
+		color:white;
+	}
+	.assignment-class-0
+	{
+		background: #F4C2C2 !important;
+		color:white !important;
+	}
+	.assignment-class-1, .assignment-class-1 a
+	{
+		background-image: url('{!URLFOR($Resource.AssignmentImages, 'Unavailable.png')}') !important;
+		color:white !important;
+	}
+	.assignment-class-2, .assignment-class-2 a 
+	{
+		background: #4CC417 !important;
+		color:white !important;
+	}
+	.assignment-class-3, .assignment-class-3 a
+	{
+		background: #FFBF00 !important;
+		color:white !important;
+	}
+	.assignment-class-4, .assignment-class-4 a
+	{
+		background: #FF00FF !important;
+		color:white !important;
+	}
+	.assignment-class-5, .assignment-class-5 a
+	{
+		background: #FFFF8D !important;
+	}
+	.assignment-class-6, .assignment-class-6 a
+	{
+		background: #c9a8e0 !important;
+		color:white !important;
+	}
+	.assignment-class-7, .assignment-class-7 a
+	{
+		background: #CCFF00 !important;
+	}
+	.assignment-class-8, .assignment-class-8 a
+	{
+		background: #00a693 !important;
+		color:white !important;
+	}
+	.assignment-class-9, .assignment-class-9 a
+	{
+		background: #e87511 !important;
+		color:white !important;
+	}
+	.assignment-class-10, .assignment-class-10 a
+	{
+		background: #a7d3ff !important;
+	}
+	.assignment-time-entry
+	{
+		background: #729BC7 !important;
+	}
+</style>
+
+</apex:page>

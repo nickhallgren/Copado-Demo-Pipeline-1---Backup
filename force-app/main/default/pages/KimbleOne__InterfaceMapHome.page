@@ -1,0 +1,3238 @@
+<apex:page standardController="KimbleOne__InterfaceMap__c" extensions="KimbleOne.InterfaceMapHomeController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__ReferenceData__c">
+<apex:composition template="KimbleOne__SiteMaster">
+	
+	<apex:define name="Menu">
+		<!-- <c:PageHeader PageTitle="{!$ObjectType.KimbleOne__InterfaceMap__c.Label}" PageSubtitle="{!IF(ISBLANK(InterfaceMap__c.Id), $Label.New, InterfaceMap__c.Name)}" DefaultHelpPage=""/>-->
+		<c:Menu id="menuPageTitle" MenuContextName="{!$ObjectType.KimbleOne__InterfaceMap__c.Label}"/>
+	</apex:define>
+	<apex:define name="Content">
+		<apex:variable var="valueLabel" value="-{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__SourceValue__c.label}-"/>
+		<apex:variable var="fieldLabel" value="-{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__SourceFieldName__c.label}-"/>
+		
+		
+								
+		
+		<style>
+			.processing 
+			{
+				padding-left: 20px;
+				background-repeat: no-repeat;
+				padding-right: 12px;
+				height: 18px;
+				display: block;
+				line-height: 18px;
+				font-weight:bold;
+				background-image: url('{!URLFOR($Resource.JobImages, 'running16.gif')}');
+			}
+		</style>
+		<script>
+		var theMap = {IsOutboundMap:{!IF(aInterfaceType.Enum__c == 'OutboundInterfaceRun', 'true','false')}};
+		var theInterfaceFieldMapsHash={};
+		var theMapId = '{!JSINHTMLENCODE(InterfaceMap__c.Id)}';
+		var theInterfaceTypeId = '{!JSINHTMLENCODE(aInterfaceType.Enum__c)}';
+		var fieldMapCount=0;
+		var currentlySelectedKey;
+		var referencedPositions = {};
+		var theTypeEnum = '{!JSENCODE(aInterfaceType.Enum__c)}';
+		var theTypeObjectType = '{!JSENCODE(aInterfaceType.ObjectType__c)}';
+		jQuery(window).load(function (){
+		
+			if (theMapId != '') 
+				getInterfaceMap(theMapId);
+			else
+			{
+				decideHide(theInterfaceTypeId);
+				currentlySelectedKey = 1;	
+			}
+			
+			decideHideSourceFieldPositionsCol();
+			
+			jQuery.ionTabs("#field_source");
+					
+			/*		
+			$('.InterfaceFieldMapsTable>tbody').sortable({
+        		start: function(event, ui) {
+            	var start_pos = ui.item.index();
+            	ui.item.data('start_pos', start_pos);
+            	console.log(ui.selected);
+            	console.log(ui);
+            	
+        		},
+        		change: function(event, ui) {
+        			console.log(ui);
+        		},
+        		update: function(event, ui) {
+        			console.log(ui);
+            
+           		}
+	    	});
+	    	*/
+			
+ 			decideHideMapFormatDropdown();
+					
+		});
+		function selectCurrentKey(id)
+		{
+			jQuery('.InterfaceFieldMapsTable>tbody>tr').css('background-color','#FFFFFF');
+	        jQuery('.InterfaceFieldMapsTable>tbody>tr[interfaceMapFieldId='+id+']').css('background-color','#C0C0C0');
+	        currentlySelectedKey = id   ;
+	     
+		}
+		function updateTableView()
+		{
+			var groupByList = [];
+			var aggregatesList = [];
+			jQuery('.InterfaceFieldMapsTable>tbody>tr').remove();
+			jQuery('.InterfaceFieldMapsListItem>option').remove();
+			jQuery('.AggPosition>option').remove();
+			jQuery('.InterfaceFieldMapsList>option').remove();
+			
+ 			jQuery.each(jQuery('.AggPosition'),function(key1,item){
+            	jQuery(item).append(jQuery('<option>').attr('value','').text(''));
+            });
+            	
+            	
+			jQuery.each(getSortInterfaceFieldMapsHash(),function(key,fieldMap){
+			
+				if(fieldMap.Grouping!=undefined )
+				{
+					if(fieldMap.Grouping == 'GroupBy')
+						groupByList.push(fieldMap.OriginalKey);
+					else if(fieldMap.Grouping == 'Aggregate')
+					{
+						fieldMap.Aggregate.FieldPosition = fieldMap.OriginalKey;
+						aggregatesList.push(fieldMap.Aggregate);
+					}
+				}
+				fieldMap.SourceValue = jQuery('<span>'+(fieldMap.SourceValue==undefined?'':fieldMap.SourceValue)+'</span>').text();
+ 				var tr= jQuery('<tr>').attr('interfaceMapFieldId',fieldMap.OriginalKey);
+ 				tr.click(function(e){selectCurrentKey(jQuery(this).attr('interfaceMapFieldId'));e.preventDefault();});
+ 				if(fieldMap.OriginalKey == currentlySelectedKey)
+ 					tr.css('background-color','#C0C0C0')
+ 				
+ 				var totalItems=1; 
+ 				var len = 0; if(fieldMap.SourceFieldMapValues!=undefined) len = Object.keys(fieldMap.SourceFieldMapValues).length;
+ 				if('{!JSINHTMLENCODE(aInterfaceType.Enum__c)}'=='{!JSINHTMLENCODE(OutboundInterfaceTypeEnum)}' && len > 0)
+					totalItems = len;
+				
+				var actionsPanel = jQuery(jQuery('#ActionsPanel').html());
+ 				
+ 				tr.append(jQuery('<td>').attr('rowspan',totalItems).append(actionsPanel));
+ 				if('{!JSINHTMLENCODE(aInterfaceType.Enum__c)}'!='{!JSINHTMLENCODE(OutboundInterfaceTypeEnum)}')
+				{
+ 					tr.append(jQuery('<td>').text(fieldMap.DestinationFieldPosition).addClass('OutPanelCol'));
+	 				tr.append(jQuery('<td>').text(fieldMap.DestinationFieldName).css('overflow','hidden').css('text-overflow','ellipsis'));
+            		
+            		tr.append(jQuery('<td>').attr('rowspan',totalItems)
+            								.append(jQuery('<input>').attr('type','checkbox').prop('checked',fieldMap.IsMandatory).attr('disabled','disabled')));
+            		var groupingVal = '';
+            		if(fieldMap.Grouping!=undefined)
+            			groupingVal = fieldMap.Grouping;
+            		tr.append(jQuery('<td>').text(groupingVal).addClass('OutPanelCol'));
+            		tr.append(jQuery('<td>').text(jQuery('#InterfaceSource').find('option[value="'+fieldMap.InterfaceSourceId+'"]').text()).addClass('OutPanelCol').css('word-wrap','break-word'));
+ 					tr.append(jQuery('<td>').text(jQuery('#SourceType').next().find('option[value="'+fieldMap.SourceTypeId+'"]').text()).css('overflow','hidden').css('text-overflow','ellipsis'));
+            		tr.append(jQuery('<td>').text(jQuery('#TransfornationTypeOut').find('option[value="'+fieldMap.TransformationTypeId+'"]').text()).addClass('OutPanelCol'));
+            		tr.append(jQuery('<td>').text(fieldMap.SourceFieldPositions).addClass('SourceFieldPositionsCol'));
+            		tr.append(jQuery('<td>').text(fieldMap.SourceFieldName).addClass('SourceFieldNameCol').css('overflow','hidden').css('text-overflow','ellipsis'));
+            		tr.append(jQuery('<td>').text(fieldMap.SourceValue).css('overflow','hidden').css('text-overflow','ellipsis'));
+            		tr.append(jQuery('<td>').text(fieldMap.DestinationFieldLookupKeyFieldName).addClass('InPanelCol'));
+            		///OutPanelCol
+            		jQuery('.InterfaceFieldMapsTable').append(tr);
+ 				}
+ 				else
+ 				{
+ 				
+ 					tr.append(jQuery('<td>').attr('rowspan',totalItems)
+		 									.text(fieldMap.DestinationFieldPosition).addClass('OutPanelCol'));
+			 		tr.append(jQuery('<td>').attr('rowspan',totalItems)
+			 								.text(fieldMap.DestinationFieldName).css('overflow','hidden').css('text-overflow','ellipsis'));
+		            tr.append(jQuery('<td>').attr('rowspan',totalItems)
+		            						.append(jQuery('<input>').attr('type','checkbox').prop('checked',fieldMap.IsMandatory).attr('disabled','disabled')));
+		            		
+		           	var groupingVal = '';
+            		if(fieldMap.Grouping!=undefined)
+            			groupingVal = fieldMap.Grouping;
+            		
+            		tr.append(jQuery('<td>').attr('rowspan',totalItems).text(groupingVal).addClass('OutPanelCol'));
+		            		
+ 					jQuery('.InterfaceFieldMapsTable').append(tr);
+ 				
+ 					var iCounter=0;
+ 					jQuery.each(fieldMap.SourceFieldMapValues,function(k,v){
+ 					v.SourceValue = jQuery('<span>'+(v.SourceValue==undefined?'':v.SourceValue)+'</span>').text();
+ 				
+ 						if(iCounter == 0)
+ 						{	
+		 					
+		            		tr.append(jQuery('<td>').text(jQuery('#InterfaceSource').find('option[value="'+v.InterfaceSourceId+'"]').text()).addClass('OutPanelCol').css('overflow','hidden').css('text-overflow','ellipsis'));
+		 					tr.append(jQuery('<td>').text(jQuery('#SourceType').next().find('option[value='+v.SourceTypeId+']').text()).css('overflow','hidden').css('text-overflow','ellipsis'));
+		            		tr.append(jQuery('<td>').text(jQuery('#TransfornationTypeOut').find('option[value='+v.TransformationTypeId+']').text()).addClass('OutPanelCol').css('overflow','hidden').css('text-overflow','ellipsis'));
+		            		tr.append(jQuery('<td>').text(fieldMap.SourceFieldPositions).addClass('SourceFieldPositionsCol').css('overflow','hidden').css('text-overflow','ellipsis'));
+		            		tr.append(jQuery('<td>').text(v.SourceFieldName).addClass('SourceFieldNameCol').css('overflow','hidden').css('text-overflow','ellipsis'));
+		            		tr.append(jQuery('<td>').text(v.SourceValue).css('overflow','hidden').css('text-overflow','ellipsis'));
+		            		tr.append(jQuery('<td>').text(fieldMap.DestinationFieldLookupKeyFieldName).addClass('InPanelCol').css('overflow','hidden').css('text-overflow','ellipsis'));
+		            		
+		            		
+		            	}
+		            	else
+		            	{
+		            		var tr1= jQuery('<tr>').attr('interfaceMapFieldId',fieldMap.OriginalKey);
+		            		tr1.click(function(e){selectCurrentKey(jQuery(this).attr('interfaceMapFieldId'));e.preventDefault();});
+		            		if(fieldMap.OriginalKey == currentlySelectedKey)
+ 								tr1.css('background-color','#C0C0C0');
+ 							tr1.append(jQuery('<td>').text(jQuery('#InterfaceSource').find('option[value="'+v.InterfaceSourceId+'"]').text()).addClass('OutPanelCol').css('overflow','hidden').css('text-overflow','ellipsis'));
+		 					tr1.append(jQuery('<td>').text(jQuery('#SourceType').next().find('option[value='+v.SourceTypeId+']').text()).css('overflow','hidden').css('text-overflow','ellipsis'));
+		            		tr1.append(jQuery('<td>').text(jQuery('#TransfornationTypeOut').find('option[value='+v.TransformationTypeId+']').text()).addClass('OutPanelCol').css('overflow','hidden').css('text-overflow','ellipsis'));
+		            		tr1.append(jQuery('<td>').text('').addClass('SourceFieldPositionsCol').css('overflow','hidden').css('text-overflow','ellipsis'));
+		            		tr1.append(jQuery('<td>').text(v.SourceFieldName).addClass('SourceFieldNameCol').css('overflow','hidden').css('text-overflow','ellipsis'));
+		            		tr1.append(jQuery('<td>').text(v.SourceValue).css('overflow','hidden').css('text-overflow','ellipsis'));
+		            		jQuery('.InterfaceFieldMapsTable').append(tr1);//overflow:hidden;text-overflow: ellipsis;
+		            	   
+		            	}
+		            	iCounter++;
+ 					});
+ 				}
+ 				tr.find('.ActionIcons').attr('id','act'+fieldMap.OriginalKey);
+ 				tr.find('.ActionIcons').find('a').attr('interfacemapfieldid',fieldMap.OriginalKey);
+ 				tr.find('.action-icon').toolbar({content: '#act'+fieldMap.OriginalKey,
+		 						        		position: 'right',
+												event: 'click',
+												hideOnClick: true,
+												adjustment: -3});
+
+ 				if(fieldMap.DestinationFieldPosition!=undefined)
+ 				{
+	 				var opt=jQuery('<option>').attr('value',fieldMap.DestinationFieldPosition).text(fieldMap.DestinationFieldPosition);
+	            	jQuery('.InterfaceFieldMapsList').append(opt);
+	            	
+	            	jQuery.each(jQuery('.InterfaceFieldMapsListItem,.AggPosition'),function(key1,item){
+	            		var opt1=jQuery('<option>').attr('value',fieldMap.DestinationFieldPosition).text(fieldMap.DestinationFieldPosition);
+	            		jQuery(item).append(opt1);
+	            	});
+            	}
+ 			});
+			decideHideSourceFieldPositionsCol();
+			decideHideMapFormatDropdown();
+ 			decideHideRecordStartLine();
+ 				
+ 			
+			jQuery('#GroupByFields').val(groupByList.toString());
+	 		
+	 		var json =JSON.stringify(aggregatesList);
+			jQuery('#AggregateFields').val(json);
+	 		
+	 					
+	 		if(Object.keys(theInterfaceFieldMapsHash).length ==0 )
+	 			currentlySelectedKey = 1;
+	 		
+		}
+		function getReferencedPositions()
+		{
+			referencedPositions = {};
+			jQuery.each(getSortInterfaceFieldMapsHash(),function(key,fieldMap){
+				if(fieldMap.SourceFieldMapValues != undefined)
+				{
+					jQuery.each(fieldMap.SourceFieldMapValues,function(k,fieldMapItem){
+	 					if(fieldMapItem.SourceTypeId == '{!JSINHTMLENCODE(GetPositionInterfaceFieldMapSourceTypeId)}')
+	 					{
+	 						var po = parseInt(fieldMapItem.SourceValue);
+	 						referencedPositions[po] = po;
+	 					}
+	 					else if(fieldMapItem.SourceTypeId == '{!JSINHTMLENCODE(GetTransformationInterfaceFieldMapSourceTypeId)}')
+	 					{
+	 						var transformationJsonObject =  jQuery.parseJSON(jQuery('<span>').text(fieldMapItem.SourceValue).text());
+			 				jQuery.each(transformationJsonObject,function(k,obj){
+			 					
+			 					if(obj==null || typeof obj == 'number' || typeof obj == 'string')
+			 						return;
+			 					
+			 					if(obj.InputTypeEnum!=undefined && obj.InputTypeEnum == 'Position')
+			 					{
+			 						var po = parseInt(obj.Value);
+	 								referencedPositions[po] = po;
+			 					}
+			 					
+			 					jQuery.each(obj,function(k,obj1){
+				 					if(obj1==null || typeof obj1 == 'number' || typeof obj1 == 'string')
+				 						return;
+				 					if(obj1.InputTypeEnum!=undefined && obj1.InputTypeEnum == 'Position')
+				 					{
+				 						var po = parseInt(obj1.Value);
+	 									referencedPositions[po] = po;
+				 					}
+				 					
+				 					jQuery.each(obj1,function(k,obj2){
+				 					if(obj2==null || typeof obj2 == 'number' || typeof obj2 == 'string')
+				 						return;
+				 					if(obj2.InputTypeEnum!=undefined && obj2.InputTypeEnum == 'Position')
+				 					{
+				 						var po = parseInt(obj2.Value);
+	 									referencedPositions[po] = po;
+				 					}	
+			 					});	
+				 						
+			 					});	 
+	 											
+	 						});
+	 						
+	
+	 					}
+		 			});
+		 		}
+		 		if(fieldMap.Aggregate != undefined)
+		 		{
+		 			jQuery.each(fieldMap.Aggregate.Conditions,function(k,cond){
+		 				referencedPositions[parseInt(cond.WhenPosition)] = parseInt(cond.WhenPosition);
+		 			});
+		 		}
+		 	});	
+		 	return referencedPositions;
+		}
+		//onload Call GetInterfaceMap to get InterfaceMap
+		function getInterfaceMap(id)
+		{
+			DisableButton('SaveButton');
+			jQuery('.ButtonLoading').show();
+			
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InterfaceMapHomeController.GetInterfaceMap}',id,
+        		function(result, event){
+ 			
+ 				theMap = result;
+ 				decideHide('{!JSINHTMLENCODE(aInterfaceType.Enum__c)}');
+ 				jQuery('#Name').val(theMap.Name);
+ 				
+ 				
+ 				jQuery('#ShowHeader').prop('checked', theMap.ShowHeader);
+ 				jQuery('[id$="MapFormat"]').val(theMap.MapFormat);
+ 				jQuery('#FieldDelimiter').val(theMap.FieldDelimiter);
+ 				
+ 				jQuery('#GroupByFields').val(theMap.GroupByFields);
+ 				var groupBy = {};
+ 				if(theMap.GroupByFields!=undefined && theMap.GroupByFields!=null && theMap.GroupByFields!='')
+ 				{
+ 					jQuery.each(theMap.GroupByFields.split(','),function(key,value){
+ 						groupBy[value] = parseInt(value);
+ 					});
+ 				}
+ 				jQuery('#GroupDelimiter').val(theMap.GroupDelimiter);
+
+ 				if(theMap.MapContext != undefined)
+ 					theMap.MapContext = jQuery('<span>'+theMap.MapContext+'</span>').text();
+ 				jQuery('#MapContext').val(theMap.MapContext);
+
+ 				if(theMap.AggregateFields!=undefined)
+ 					theMap.AggregateFields = jQuery('<span>'+theMap.AggregateFields+'</span>').text();
+ 				jQuery('#AggregateFields').val(theMap.AggregateFields);
+
+ 				aggregates = {};
+ 				if(theMap.AggregateFields!=undefined && theMap.AggregateFields!=null && theMap.AggregateFields!='')
+ 				{
+	 				var aggregatesList = jQuery.parseJSON(theMap.AggregateFields);
+	 				jQuery.each(aggregatesList,function(key,value){
+	 					aggregates[value.FieldPosition] = value;
+	 				});
+ 				}
+ 				jQuery('#RecordStartLine').val(theMap.RecordStartLine);
+ 				jQuery('#RecordBatchSize').val(theMap.RecordBatchSize);
+ 				jQuery('[id$="CurrencyISOCode"]').val(theMap.CurrencyISOCode);
+ 				theInterfaceFieldMapsHash={};
+ 				var maxKey=0;
+ 				fieldMapCount = 1;
+ 				jQuery.each(theMap.FieldMaps,function(key,fieldMap){
+ 					var id = '{!JSINHTMLENCODE(aInterfaceType.Enum__c)}'=='{!JSINHTMLENCODE(OutboundInterfaceTypeEnum)}'?fieldMap.DestinationFieldPosition:fieldMapCount;
+ 					theInterfaceFieldMapsHash[id]=fieldMap;
+ 					if(groupBy[id] != undefined )
+ 						theInterfaceFieldMapsHash[id].Grouping = 'GroupBy';
+ 					if(aggregates[id] != undefined )
+ 					{
+ 						theInterfaceFieldMapsHash[id].Grouping = 'Aggregate';
+ 						theInterfaceFieldMapsHash[id].Aggregate = aggregates[id];
+ 					}	
+ 					fieldMapCount++;
+ 					if(id>maxKey)
+ 						maxKey=id;
+ 				});
+ 				if(currentlySelectedKey==undefined)
+ 					currentlySelectedKey = maxKey;
+ 				
+ 				updateTableView();
+ 				
+ 				
+ 				if(result==null && event.type=='exception')
+       			{
+       				jQuery('#InterfaceMapErrors').show();
+       				jQuery('#InterfaceMapErrorsMsg').html(event.message);
+       			}
+       			else
+       			{
+       				jQuery('#InterfaceMapErrors').hide();
+       			}		
+        		EnableButton('SaveButton');
+				jQuery('.ButtonLoading').hide();
+ 				
+ 				//populateMapFields
+ 				
+ 				//create fields list
+ 				});
+		}
+		
+		function saveInterfaceMap()
+		{
+			jQuery('#InterfaceMapErrors').hide();
+			if(!validateMap(jQuery('#Name')))
+				return;
+				
+			if('{!JSINHTMLENCODE(aInterfaceType.Enum__c)}'=='{!JSINHTMLENCODE(OutboundInterfaceTypeEnum)}')
+			{		
+				if(!validateMap(jQuery('#FieldDelimiter')))
+					return;
+			}	
+			
+			DisableButton('SaveButton');
+       		DisableButton('ValidateButton');
+       		jQuery('.ButtonLoading').show();
+			theMap.Name=jQuery('#Name').val();
+			theMap.InterfaceTypeId='{!JSINHTMLENCODE(aInterfaceType.Id)}';
+			theMap.MapFormat = jQuery('[id$="MapFormat"]').val();
+			
+			if('{!JSINHTMLENCODE(aInterfaceType.Enum__c)}'=='{!JSINHTMLENCODE(OutboundInterfaceTypeEnum)}')
+			{
+				theMap.ShowHeader=jQuery('#ShowHeader').prop('checked');
+				theMap.FieldDelimiter=jQuery('#FieldDelimiter').val();
+				theMap.GroupByFields=jQuery('#GroupByFields').val();
+	 			theMap.GroupDelimiter=jQuery('#GroupDelimiter').val();
+	 			theMap.MapContext=jQuery('#MapContext').val();
+	 			theMap.AggregateFields=jQuery('#AggregateFields').val();
+	 		}
+			else
+			{
+				theMap.RecordStartLine=parseInt(jQuery('#RecordStartLine').val());
+	 			theMap.RecordBatchSize=parseInt(jQuery('#RecordBatchSize').val());
+	 			theMap.CurrencyISOCode=jQuery('[id$="CurrencyISOCode"]').val();
+	 			theMap.ShowHeader = false;
+	 		}
+		
+			theMap.FieldMaps = new Array();
+			var counterField=0;
+			jQuery.each(theInterfaceFieldMapsHash,function(key,fieldMap){
+				fieldMap.OriginalKey = undefined;
+				fieldMap.Grouping = undefined;
+				fieldMap.Aggregate = undefined;
+				theMap.FieldMaps[counterField] = fieldMap;
+				counterField++;
+			});
+		
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InterfaceMapHomeController.SaveInterfaceMap}',theMap,
+        		function(result, event){
+       				 if(result==null && event.type=='exception')
+       				 {
+       				 	jQuery('#InterfaceMapErrors').show();
+       				 	jQuery('#InterfaceMapErrorsMsg').html(event.message);
+       				 }
+       				 else
+       				 {
+       				 	jQuery('#InterfaceMapErrors').hide();
+       				 	theMapId = result;
+       				 	getInterfaceMap(theMapId);
+       				 }		
+        			EnableButton('SaveButton');
+        			EnableButton('ValidateButton');
+			
+					jQuery('.ButtonLoading').hide();
+		
+        		});
+ 		}
+ 		var interfaceMapFieldCurrentPos;
+ 		function editInterfaceMapField(id)
+ 		{
+ 			jQuery('#InterfaceFieldMapId').val(id);
+ 			selectCurrentKey(id);
+ 			var interfaceFieldMap=theInterfaceFieldMapsHash[id];
+ 			jQuery('#DestinationFieldName').val(interfaceFieldMap.DestinationFieldName);
+ 			jQuery('#IsMandatory').prop('checked',interfaceFieldMap.IsMandatory);
+ 			
+ 			if(theInterfaceTypeId!='{!JSINHTMLENCODE(OutboundInterfaceTypeEnum)}')
+ 			{
+ 				jQuery('#SourceFieldName').val(interfaceFieldMap.SourceFieldName);
+ 				jQuery('#DestinationFieldLookupKeyFieldName').val(interfaceFieldMap.DestinationFieldLookupKeyFieldName);
+ 				jQuery('#SourceType').val(interfaceFieldMap.SourceTypeId);
+ 				jQuery('#SourceType').next().val(interfaceFieldMap.SourceTypeId);
+ 				jQuery('#SourceValue').val(interfaceFieldMap.SourceValue);
+ 				jQuery('#SourceFieldPositions').val(interfaceFieldMap.SourceFieldPositions);
+ 				
+ 			}
+ 			else
+ 			{
+				jQuery('.TransformationTypeTable>tbody>tr').remove();
+				jQuery('.AggregateTable>tbody>tr').remove();
+				interfaceMapFieldCurrentPos = interfaceFieldMap.DestinationFieldPosition;
+
+				if (interfaceFieldMap.SourceFieldMapValues['{!$ObjectType.OutboundInterfaceRequest__c.Name}'] != null) {
+					jQuery.ionTabs.setTab('Tabs_Group_name', '{!$ObjectType.OutboundInterfaceRequest__c.Name}');
+				}
+
+				jQuery.each(jQuery('.InterfaceSource'),function(key,fieldItem){
+				 	
+				 	var fieldItemObj = interfaceFieldMap.SourceFieldMapValues[jQuery(fieldItem).attr('sourceid')];
+				 	if (fieldItemObj == undefined) fieldItemObj = {};
+				 		
+					jQuery(fieldItem).find('.InterfaceFieldMapsList').val('');
+		 			jQuery(fieldItem).find('.SourceValueOut').val('');
+		 			jQuery(fieldItem).find('.SourceFieldOut').val('');
+					jQuery(fieldItem).find('.InterfaceFieldMapsList').hide();
+		 			jQuery(fieldItem).find('.SourceValueOut').hide();
+		 			jQuery(fieldItem).find('.SourceFieldOut').hide();
+					
+					var sourceId = jQuery(fieldItem).attr('sourceId');
+					jQuery(fieldItem).find('.SourceTypeOut').val(fieldItemObj.SourceTypeId);
+					jQuery(fieldItem).find('.SourceTypeOut').next().val(fieldItemObj.SourceTypeId);
+					if(fieldItemObj.SourceTypeId=='{!JSINHTMLENCODE(GetLiteralInterfaceFieldMapSourceTypeId)}')
+		 			{
+		 				jQuery(fieldItem).find('.SourceValueOut').val(fieldItemObj.SourceValue);
+		 				jQuery(fieldItem).find('.SourceValueOut').show();
+		 			}
+					else if(fieldItemObj.SourceTypeId=='{!JSINHTMLENCODE(GetNumericInterfaceFieldMapSourceTypeId)}')
+		 			{
+		 				jQuery(fieldItem).find('.SourceValueOut').val(fieldItemObj.SourceValue);
+		 				jQuery(fieldItem).find('.SourceValueOut').show();
+		 			}
+		 			else if(fieldItemObj.SourceTypeId=='{!JSINHTMLENCODE(GetPositionInterfaceFieldMapSourceTypeId)}')
+		 			{
+		 				jQuery(fieldItem).find('.InterfaceFieldMapsList').val(fieldItemObj.SourceValue);
+		 				jQuery(fieldItem).find('.InterfaceFieldMapsList').show();
+		 			}
+			 		else if(fieldItemObj.SourceTypeId=='{!JSINHTMLENCODE(GetFieldInterfaceFieldMapSourceTypeId)}')
+		 			{
+		 				jQuery(fieldItem).find('.SourceFieldOut').val(fieldItemObj.SourceValue);
+		 				jQuery(fieldItem).find('.SourceFieldOut').show();
+		 			}
+			 		else if(fieldItemObj.SourceTypeId=='{!JSINHTMLENCODE(GetTransformationInterfaceFieldMapSourceTypeId)}')
+		 			{
+		 				jQuery(fieldItem).find('.TransfornationTypeOut').show();
+		 				jQuery(fieldItem).find('.TransfornationTypeOut').val(fieldItemObj.TransformationTypeId);
+		 				var transformationJsonObject =  jQuery.parseJSON(jQuery('<span>').text(fieldItemObj.SourceValue).text());
+		 				
+		 				
+		 				if(fieldItemObj.TransformationTypeId == '{!JSINHTMLENCODE(FormatTransformationType)}') // has one value
+						{
+							var value = {};
+							value.Value= transformationJsonObject.Value.Value;
+							value.Type= transformationJsonObject.Value.InputTypeEnum;
+							value.TransformationValue= transformationJsonObject.DateFormat;
+							
+							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITH_TRANSVAL,'-DateFormat-',WITHOUT_ADDBTN,WITHOUT_REMBTN,NO_LBL,value);
+	 					}
+	 					else if(fieldItemObj.TransformationTypeId == '{!JSINHTMLENCODE(SetScaleTransformationType)}' )
+	 					{
+	 						var value = {};
+							value.Value= transformationJsonObject.Value.Value;
+							value.Type= transformationJsonObject.Value.InputTypeEnum;
+							value.TransformationValue= transformationJsonObject.Scale;
+							
+	 						addTransformationTypeValueWithValue(AT_TOP,sourceId,WITH_TRANSVAL,'-Scale-',WITHOUT_ADDBTN,WITHOUT_REMBTN,NO_LBL,value);
+	 					}
+	 					else if(fieldItemObj.TransformationTypeId ==  '{!JSINHTMLENCODE(GetLineByPositionTransformationType)}')
+	 					{
+	 						var value = {};
+							value.Value= transformationJsonObject.Value.Value;
+							value.Type= transformationJsonObject.Value.InputTypeEnum;
+							value.TransformationValue= transformationJsonObject.Position;
+							
+	 						addTransformationTypeValueWithValue(AT_TOP,sourceId,WITH_TRANSVAL,'-Position-',WITHOUT_ADDBTN,WITHOUT_REMBTN,NO_LBL,value);
+	 					}
+	 					else if(fieldItemObj.TransformationTypeId == '{!JSINHTMLENCODE(TruncateTransformationType)}' )//one value + modification value
+	 					{
+	 						var value = {};
+							value.Value= transformationJsonObject.Value.Value;
+							value.Type= transformationJsonObject.Value.InputTypeEnum;
+							value.TransformationValue= transformationJsonObject.Length;
+							
+	 						addTransformationTypeValueWithValue(AT_TOP,sourceId,WITH_TRANSVAL,'-Truncate-',WITHOUT_ADDBTN,WITHOUT_REMBTN,NO_LBL,value);
+	 					}
+	 					else if(fieldItemObj.TransformationTypeId == '{!JSINHTMLENCODE(AddTransformationType)}')//N values
+	 					{
+	 						jQuery.each(jQuery(transformationJsonObject.Values),function(key,v){
+	 						
+	 							var value = {};
+								value.Value= v.Value;
+								value.Type= v.InputTypeEnum;
+								
+			 					if(key == 0)
+			 						addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Number-',WITHOUT_ADDBTN,WITHOUT_REMBTN,NO_LBL,value);
+		 						else if(key == 1)
+		 							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Number-',WITH_ADDBTN,WITHOUT_REMBTN,NO_LBL,value);
+		 						else
+		 							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Number-',WITHOUT_ADDBTN,WITH_REMBTN,NO_LBL,value);
+		 					
+			 				});
+	 					}
+		 				else if(fieldItemObj.TransformationTypeId == '{!JSINHTMLENCODE(ConcatenateTransformationType)}')//N values
+	 					{
+	 						jQuery.each(jQuery(transformationJsonObject.Values),function(key,v){
+	 						
+	 							var value = {};
+								value.Value= v.Value;
+								value.Type= v.InputTypeEnum;
+								
+			 					if(key == 0)
+			 						addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-ConcateValue-',WITHOUT_ADDBTN,WITHOUT_REMBTN,NO_LBL,value);
+		 						else if(key == 1)
+		 							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-ConcateValue-',WITH_ADDBTN,WITHOUT_REMBTN,NO_LBL,value);
+		 						else
+		 							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-ConcateValue-',WITHOUT_ADDBTN,WITH_REMBTN,NO_LBL,value);
+			 				});
+	 					
+	 					}
+	 					else if(fieldItemObj.TransformationTypeId == '{!JSINHTMLENCODE(MultiplyTransformationType)}' || fieldItemObj.TransformationTypeId == '{!JSINHTMLENCODE(DivideTransformationType)}')//2 values
+				 		{
+				 			var value1 = {};
+							value1.Value= transformationJsonObject.X.Value;
+							value1.Type= transformationJsonObject.X.InputTypeEnum;
+							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Number-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'X',value1);
+				 			
+				 			var value2 = {};
+							value2.Value= transformationJsonObject.Y.Value;
+							value2.Type= transformationJsonObject.Y.InputTypeEnum;
+							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Number-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'Y',value2);
+				 		}
+				 		else if(fieldItemObj.TransformationTypeId == '{!JSINHTMLENCODE(ReplaceNullTransformationType)}' )
+				 		{
+				 			var value1 = {};
+							value1.Value= transformationJsonObject.DefaultValue.Value;
+							value1.Type= transformationJsonObject.DefaultValue.InputTypeEnum;
+							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-DefaultValue-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'DefaultValue',value1);
+				 			
+				 			
+				 			jQuery.each(jQuery(transformationJsonObject.Replacements),function(key,v){
+	 						
+	 							var value = {};
+								value.Value= v.Value;
+								value.Type= v.InputTypeEnum;
+								
+			 					if(key == 0)
+			 						addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Replacement-',WITH_ADDBTN,WITHOUT_REMBTN,'Replacements',value);
+		 						else
+		 							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Replacement-',WITHOUT_ADDBTN,WITH_REMBTN,NO_LBL,value);
+		 						
+			 				});
+				 			
+				 		}
+				 		else if(fieldItemObj.TransformationTypeId == '{!JSINHTMLENCODE(CurrencyConvertTransformationType)}' )
+				 		{
+				 			var value1 = {};
+							value1.Value= transformationJsonObject.Value.Value;
+							value1.Type= transformationJsonObject.Value.InputTypeEnum;
+							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Value-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'Value',value1);
+				 			
+				 			var value2 = {};
+							value2.Value= transformationJsonObject.FromCurrency.Value;
+							value2.Type= transformationJsonObject.FromCurrency.InputTypeEnum;
+							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-FromCurrency-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'FromCurrency',value2);
+				 			
+				 			var value3 = {};
+							value3.Value= transformationJsonObject.ToCurrency.Value;
+							value3.Type= transformationJsonObject.ToCurrency.InputTypeEnum;
+							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-ToCurrency-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'ToCurrency',value3);
+				 			
+				 			var value4 = {};
+							value4.Value= transformationJsonObject.ConversionDate.Value;
+							value4.Type= transformationJsonObject.ConversionDate.InputTypeEnum;
+							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Conversion Date-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'ConversionDate',value4);
+				 		}
+				 		else if(fieldItemObj.TransformationTypeId  == '{!JSINHTMLENCODE(SubstituteTransformationType)}' )
+				 		{
+				 			var value1 = {};
+							value1.Value= transformationJsonObject.Value.Value;
+							value1.Type= transformationJsonObject.Value.InputTypeEnum;
+							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Value-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'Value',value1);
+				 			
+				 			var value2 = {};
+							value2.Value= transformationJsonObject.Target.Value;
+							value2.Type= transformationJsonObject.Target.InputTypeEnum;
+							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Target-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'Target',value2);
+				 			
+				 			var value3 = {};
+							value3.Value= transformationJsonObject.Replacement.Value;
+							value3.Type= transformationJsonObject.Replacement.InputTypeEnum;
+							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Replacement-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'Replacement',value3);
+				 		}
+				 		else if(fieldItemObj.TransformationTypeId  == '{!JSINHTMLENCODE(CaseStatementTransformationType)}' )
+				 		{
+				 			var value1 = {};
+							value1.Value= transformationJsonObject.TestValue.Value;
+							value1.Type= transformationJsonObject.TestValue.InputTypeEnum;
+							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-TestValue-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'TestValue',value1);
+				 			
+				 			var condition1When = {};
+							condition1When.Value= transformationJsonObject.Conditions[0].WhenValue.Value;
+							condition1When.Type= transformationJsonObject.Conditions[0].WhenValue.InputTypeEnum;
+							condition1When.Label= 'When';
+				 			
+				 			var condition1Then = {};
+							condition1Then.Value= transformationJsonObject.Conditions[0].ThenValue.Value;
+							condition1Then.Type= transformationJsonObject.Conditions[0].ThenValue.InputTypeEnum;
+							condition1Then.Label= 'Then';
+				 			
+				 			
+				 			addTransformationTypeValueWithValueMuiliple(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Conditions When Value-',WITH_ADDBTN,WITHOUT_REMBTN,[condition1When,condition1Then]);
+				 			
+				 			var value2 = {};
+							value2.Value= transformationJsonObject.ElseValue.Value;
+							value2.Type= transformationJsonObject.ElseValue.InputTypeEnum;
+							addTransformationTypeValueWithValue(AT_BOTTOM,sourceId,WITHOUT_TRANSVAL,'-ElseValue-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'ElseValue',value2);
+				 	
+				 			jQuery.each(transformationJsonObject.Conditions,function(k,condi){
+				 				if(k>0)
+				 				{
+				 					var conditionOthersWhen = {};
+									conditionOthersWhen.Value= condi.WhenValue.Value;
+									conditionOthersWhen.Type= condi.WhenValue.InputTypeEnum;
+									conditionOthersWhen.Label= 'When';
+				 			
+				 					var conditionOthersThen = {};
+									conditionOthersThen.Value = condi.ThenValue.Value;
+									conditionOthersThen.Type = condi.ThenValue.InputTypeEnum;
+									conditionOthersThen.Label = 'Then';
+				 					addTransformationTypeValueWithValueMuiliple(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Conditions When Value-',WITHOUT_ADDBTN,WITH_REMBTN,[conditionOthersWhen,conditionOthersThen]);
+				 			
+				 				}
+				 			});
+				 			
+				 		}
+				 		else if(fieldItemObj.TransformationTypeId  == '{!JSINHTMLENCODE(TaxRateTransformationType)}' )
+				 		{
+				 			var value1 = {};
+							value1.Value= transformationJsonObject.TaxCodeId.Value;
+							value1.Type= transformationJsonObject.TaxCodeId.InputTypeEnum;
+							
+				 			addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-TaxCode-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'TaxCode',value1);
+				 			
+				 			var value2 = {};
+							value2.Value= transformationJsonObject.RateDate.Value;
+							value2.Type= transformationJsonObject.RateDate.InputTypeEnum;
+							
+				 			addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-RateDate-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'RateDate',value2);
+				 		}
+				 		else if(fieldItemObj.TransformationTypeId  == '{!JSINHTMLENCODE(TranslateUserIdToResourceIdTransformationType)}' )
+				 		{
+				 			var value1 = {};
+							value1.Value= transformationJsonObject.UserId.Value;
+							value1.Type= transformationJsonObject.UserId.InputTypeEnum;
+							
+				 			addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-UserId-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'UserId',value1);
+				 		}
+				 		else if(fieldItemObj.TransformationTypeId  == '{!JSINHTMLENCODE(TranslateResourceIdToUserIdTransformationType)}' )
+				 		{
+				 			var value1 = {};
+							value1.Value= transformationJsonObject.ResourceId.Value;
+							value1.Type= transformationJsonObject.ResourceId.InputTypeEnum;
+							
+				 			addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-ResourceId-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'ResourceId',value1);
+				 		}
+						else if(fieldItemObj.TransformationTypeId  == '{!JSINHTMLENCODE(UnitTypeConvertTransformationType)}') 			
+			 			{
+			 				var value1 = {};
+							value1.Value= transformationJsonObject.Value.Value;
+							value1.Type= transformationJsonObject.Value.InputTypeEnum;
+							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Value-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'Value',value1);
+				 			
+				 			var value3 = {};
+							value3.Value= transformationJsonObject.FromUnitType.Value;
+							value3.Type= transformationJsonObject.FromUnitType.InputTypeEnum;
+							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-FromUnitTypeId-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'FromUnitTypeId',value3);
+				 			
+				 			var value4 = {};
+							value4.Value= transformationJsonObject.ToUnitType.Value;
+							value4.Type= transformationJsonObject.ToUnitType.InputTypeEnum;
+							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-ToUnitTypeId-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'ToUnitTypeId',value4);
+							
+							var value5 = {};
+							value5.Value= transformationJsonObject.HoursPerDay.Value;
+							value5.Type= transformationJsonObject.HoursPerDay.InputTypeEnum;
+							addTransformationTypeValueWithValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-HoursPerDay-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'HoursPerDay',value5);
+				 		
+			 			}
+			 		
+			 			
+		 				
+			 		}
+			 	});
+			 	if(interfaceFieldMap.Grouping != undefined)
+	 				jQuery('#Grouping').val('GroupBy');
+				else
+					jQuery('#Grouping').val('');
+					
+				if(interfaceFieldMap.Aggregate != undefined)
+	 			{
+	 				
+	 				jQuery('#Grouping').val('Aggregate');
+	 				var count=0;
+					jQuery.each(interfaceFieldMap.Aggregate.Conditions,function(key,condition){
+						if(count==0)
+							addAggregateWithValue(WITH_ADDBTN,WITHOUT_REMBTN,condition);
+						else
+							addAggregateWithValue(WITHOUT_ADDBTN,WITH_REMBTN,condition);
+						count++;
+					});
+					
+					
+				}	
+			}
+ 			setAvaPositions();
+ 			initialiseModalBoxy('#InterfaceFieldMapPopup', '{!JSENCODE($Label.Edit)} {!$ObjectType.InterfaceFieldMap__c.Label}');
+			showModalBoxy();
+			decideHideSourceType();
+			decideHideSourceTypeOut('',true);
+ 		}
+ 		function decideHideSourceFieldPositionsCol()
+ 		{
+ 			if(jQuery('#RecordStartLine').val() == '')
+ 			{
+ 				jQuery('.SourceFieldPositionsCol').hide();
+ 				jQuery('.SourceFieldNameCol').show();
+ 			}
+ 			else
+ 			{
+ 				jQuery('.SourceFieldPositionsCol').show();
+ 				jQuery('.SourceFieldNameCol').hide();
+ 			}
+ 					
+ 			if(theInterfaceTypeId=='{!JSINHTMLENCODE(OutboundInterfaceTypeEnum)}')
+			{
+				jQuery('.OutPanelCol').show();
+				jQuery('.InPanelCol').hide();
+			}
+			else
+			{
+				jQuery('.OutPanelCol').hide();
+				jQuery('.InPanelCol').show();
+			}	
+ 		}	
+ 		function decideHideSourceType()
+ 		{
+ 			if(theInterfaceTypeId=='{!JSINHTMLENCODE(OutboundInterfaceTypeEnum)}')
+			{
+				jQuery('.InPanel').parent().hide();
+				jQuery('.OutPanel').parent().show();
+				selectInterfaceSource();
+			}
+			else
+			{
+				jQuery('.OutPanel').parent().hide();
+				jQuery('.InPanel').parent().show();
+				jQuery('#SourceType').next().find('option[value="{!GetPositionInterfaceFieldMapSourceTypeId}"]').attr('disabled','disabled');
+				jQuery('#SourceType').next().find('option[value="{!GetTransformationInterfaceFieldMapSourceTypeId}"]').attr('disabled','disabled');
+				
+				
+	 			
+	 			
+	 			if(jQuery('#SourceType').next().val()=='{!JSINHTMLENCODE(GetLiteralInterfaceFieldMapSourceTypeId)}')
+	 			{
+	 				jQuery('#SourceValue').parent().parent().parent().show();
+	 				jQuery('#SourceFieldPositions').parent().parent().parent().hide();
+		 			jQuery('#SourceFieldName').parent().parent().parent().hide();
+		 			
+	 			}
+	 			else if(jQuery('#SourceType').next().val()=='{!JSINHTMLENCODE(GetNumericInterfaceFieldMapSourceTypeId)}')
+	 			{
+	 				jQuery('#SourceValue').parent().parent().parent().show();
+	 				jQuery('#SourceFieldPositions').parent().parent().parent().hide();
+		 			jQuery('#SourceFieldName').parent().parent().parent().hide();
+		 			
+	 			}
+	 			else
+	 			{
+		 			if(jQuery('#RecordStartLine').val()!='')
+		 			{
+		 				jQuery('#SourceValue').parent().parent().parent().hide();
+	 					jQuery('#SourceFieldPositions').parent().parent().parent().show()
+		 				jQuery('#SourceFieldName').parent().parent().parent().hide()
+		 			}
+		 			else
+		 			{
+		 				jQuery('#SourceValue').parent().parent().parent().hide();
+	 					jQuery('#SourceFieldPositions').parent().parent().parent().hide()
+		 				jQuery('#SourceFieldName').parent().parent().parent().show()
+		 			}	
+	 			}
+ 			}
+ 		}
+ 		function saveInterfaceMapField()
+ 		{
+ 			//validations
+ 			hideErrors();
+ 			
+ 			if(!validateField(jQuery('#DestinationFieldName')))
+	 				return;
+			if(theInterfaceTypeId!='{!JSINHTMLENCODE(OutboundInterfaceTypeEnum)}')//Inwardsbounds
+			{	
+	 			
+	 			if(!validateField(jQuery('#SourceType')))
+	 				return;
+	 			
+	 			
+	 			if(jQuery('#SourceType').next().val()=='{!JSINHTMLENCODE(GetLiteralInterfaceFieldMapSourceTypeId)}')
+	 			{
+	 				if(!validateField(jQuery('#SourceValue')))
+	 					return;
+	 			}
+	 			else if(jQuery('#SourceType').next().val()=='{!JSINHTMLENCODE(GetNumericInterfaceFieldMapSourceTypeId)}')
+	 			{
+	 				if(!validateField(jQuery('#SourceValue')))
+	 					return;
+	 			}
+	 			else
+	 			{
+		 			if(jQuery('#RecordStartLine').val()!='')
+		 			{
+		 				if(!validateField(jQuery('#SourceFieldPositions')))
+	 						return;
+	 				}
+		 			else
+		 			{
+		 				if(!validateField(jQuery('#SourceFieldName')))
+	 						return;
+	 				}	
+	 			}
+	 			
+	 			
+	 			if(jQuery('#SourceType').next().val()=='{!JSINHTMLENCODE(GetLiteralInterfaceFieldMapSourceTypeId)}')
+	 			{
+	 				jQuery('#SourceFieldPositions').val('');
+	 				jQuery('#SourceFieldName').val('');
+	 			}
+	 			else if(jQuery('#SourceType').next().val()=='{!JSINHTMLENCODE(GetNumericInterfaceFieldMapSourceTypeId)}')
+	 			{
+	 				jQuery('#SourceFieldPositions').val('');
+	 				jQuery('#SourceFieldName').val('');
+	 			}
+	 			else
+	 			{
+		 			if(jQuery('#RecordStartLine').val()!='')
+		 			{
+		 				jQuery('#SourceValue').val('');
+	 					jQuery('#SourceFieldName').val('');
+	 				}
+		 			else
+		 			{
+		 				jQuery('#SourceFieldPositions').val('');
+	 					jQuery('#SourceValue').val('');
+	 				}	
+	 			}
+	 			
+	 			var interfaceFieldMap;
+	 				
+	 			var id=jQuery('#InterfaceFieldMapId').val();
+	 			if(id =='' || id == undefined)
+	 			{
+	 				interfaceFieldMap = {};
+	 				interfaceFieldMap.Values = new Array();
+	 			}
+	 			else
+	 				interfaceFieldMap = theInterfaceFieldMapsHash[id];
+	 			
+	 			interfaceFieldMap.DestinationFieldName=jQuery('#DestinationFieldName').val();
+	 			interfaceFieldMap.IsMandatory=jQuery('#IsMandatory').prop('checked');
+	 			interfaceFieldMap.SourceFieldName=jQuery('#SourceFieldName').val();
+	 			interfaceFieldMap.SourceFieldPositions=jQuery('#SourceFieldPositions').val();
+	 			interfaceFieldMap.SourceValue=jQuery('#SourceValue').val();
+	 			interfaceFieldMap.DestinationFieldLookupKeyFieldName=jQuery('#DestinationFieldLookupKeyFieldName').val();
+	 			interfaceFieldMap.SourceTypeId=jQuery('#SourceType').val();
+	 			
+	 			if(id =='' || id == undefined)
+	 			{
+	 				//new
+	 				if(currentlySelectedKey!=undefined)
+	 				{
+	 					if(Object.keys(theInterfaceFieldMapsHash).length ==0 )
+	 						currentlySelectedKey=1;
+	 					else
+	 						currentlySelectedKey=parseInt(currentlySelectedKey)+1;
+	 				
+	 					var theInterfaceFieldMapsHashNew = {};
+	 						jQuery.each(theInterfaceFieldMapsHash,function(key,fieldMap){
+	 						
+	 						if(parseInt(key) < currentlySelectedKey)
+		 						theInterfaceFieldMapsHashNew[key] = fieldMap;
+		 				
+		 					if(parseInt(key) >= currentlySelectedKey)
+		 						theInterfaceFieldMapsHashNew[parseInt(key)+1] = fieldMap;
+		 				 	
+		 				});
+		 				theInterfaceFieldMapsHashNew[currentlySelectedKey] = interfaceFieldMap;
+		 				theInterfaceFieldMapsHash =theInterfaceFieldMapsHashNew;
+		 				
+	 				}
+	 				else
+	 				{
+	 					id=fieldMapCount++;
+	 					theInterfaceFieldMapsHash[id] = interfaceFieldMap;
+	 				}	
+	 			}
+	 			else
+	 				theInterfaceFieldMapsHash[id] = interfaceFieldMap;	
+	 			//update id's
+	 			
+ 			}
+ 			else//Outward
+ 			{
+				var sourceValue;
+	 			var interfaceFieldMap;
+	 			var id=jQuery('#InterfaceFieldMapId').val();
+		 			if(id =='' || id == undefined)
+		 			{
+		 				interfaceFieldMap = {};
+		 				interfaceFieldMap.Values= new Array();
+		 				
+		 				if(currentlySelectedKey!=undefined && entryType == 'VIS')
+		 				{
+		 					if(!containsVIS() || currentlySelectedKey<0)
+		 						currentlySelectedKey = 1;
+		 					else if(currentlySelectedKey>0)
+		 						currentlySelectedKey = parseInt(currentlySelectedKey)+1;
+		 					
+		 				}
+		 				else if(currentlySelectedKey!=undefined && entryType == 'VAR')
+		 				{
+		 					if(!containsVAR()  || currentlySelectedKey>0)
+	 							currentlySelectedKey = -1;
+	 					}
+		 				interfaceFieldMap.DestinationFieldPosition = currentlySelectedKey;
+		 					
+		 			}
+		 			else
+	 					interfaceFieldMap = theInterfaceFieldMapsHash[id];
+	 					
+		 			
+		 			interfaceFieldMap.DestinationFieldName=jQuery('#DestinationFieldName').val();
+		 			interfaceFieldMap.IsMandatory=jQuery('#IsMandatory').prop('checked');
+		 			
+	 				
+	 				interfaceFieldMap.SourceFieldMapValues = {};
+	 			
+	 			jQuery.each(jQuery('.InterfaceSource'),function(key,fieldItem){
+	 				var sourceFieldMapValue = {};
+					var sourceType=jQuery(fieldItem).find('.SourceTypeOut').next().val();
+		 			
+		 			
+		 			if(sourceType=='{!JSINHTMLENCODE(GetFieldInterfaceFieldMapSourceTypeId)}')
+		 			{
+		 				if(!validate(jQuery(fieldItem).find('.SourceFieldOut')))
+		 					return;
+			 		}
+			 		
+			 		
+	 				
+		 			if(sourceType=='{!JSINHTMLENCODE(GetFieldInterfaceFieldMapSourceTypeId)}')
+		 			{
+		 				jQuery(fieldItem).find('.InterfaceFieldMapsList').val('');
+		 				jQuery(fieldItem).find('.SourceValueOut').val('');
+		 				sourceValue=jQuery(fieldItem).find('.SourceFieldOut').val();
+		 			}
+		 			else if(sourceType=='{!JSINHTMLENCODE(GetLiteralInterfaceFieldMapSourceTypeId)}')
+		 			{
+		 				jQuery(fieldItem).find('.InterfaceFieldMapsList').val('');
+		 				jQuery(fieldItem).find('.SourceFieldOut').val('');
+		 				var sourceValInput = jQuery(fieldItem).find('.SourceValueOut');
+		 				if(sourceValInput.val()!='' && sourceValInput.val()!=sourceValInput.attr('label'))
+		 					sourceValue=jQuery(fieldItem).find('.SourceValueOut').val();
+		 				else
+		 					sourceValue=null;
+		 					
+		 			}
+		 			else if(sourceType=='{!JSINHTMLENCODE(GetNumericInterfaceFieldMapSourceTypeId)}')
+		 			{
+		 				jQuery(fieldItem).find('.InterfaceFieldMapsList').val('');
+		 				jQuery(fieldItem).find('.SourceFieldOut').val('');
+		 				var sourceValInput = jQuery(fieldItem).find('.SourceValueOut');
+		 				if(sourceValInput.val()!='' && sourceValInput.val()!=sourceValInput.attr('label'))
+		 					sourceValue=jQuery(fieldItem).find('.SourceValueOut').val();
+		 				else
+		 					sourceValue=null;
+		 					
+		 			}
+		 			else if(sourceType=='{!JSINHTMLENCODE(GetPositionInterfaceFieldMapSourceTypeId)}')
+		 			{
+			 			jQuery(fieldItem).find('.SourceValueOut').val('');
+		 				jQuery(fieldItem).find('.SourceFieldOut').val('');
+		 				if(jQuery(fieldItem).find('.InterfaceFieldMapsList').val()!=null)
+		 				sourceValue=jQuery(fieldItem).find('.InterfaceFieldMapsList').val();
+		 			}
+			 		else if(sourceType=='{!JSINHTMLENCODE(GetTransformationInterfaceFieldMapSourceTypeId)}')
+		 			{
+			 			jQuery(fieldItem).find('.InterfaceFieldMapsList').val('');
+		 				jQuery(fieldItem).find('.SourceValueOut').val('');
+		 			}
+		 			else
+		 			{
+		 				return;
+		 			}
+		 				
+		 			sourceFieldMapValue.InterfaceSourceId=jQuery(fieldItem).attr('sourceid');
+		 			
+		 			
+		 			if(sourceType=='{!JSINHTMLENCODE(GetTransformationInterfaceFieldMapSourceTypeId)}')
+		 			{
+		 					//do generic bit
+		 				var json;
+		 				var values= new Array();
+		 				var fields= new Array();
+		 				var transformation = {};
+		 				jQuery.each(jQuery('.TransformationTypeTable.'+jQuery(fieldItem).attr('sourceid')+'>tbody>tr'),function(key,value){
+		 					var transValue = {}; 
+		 					var itemInputType = jQuery(value).find('.SourceTypeItem').next().val();
+		 					if(itemInputType=='{!JSINHTMLENCODE(GetLiteralInterfaceFieldMapSourceTypeId)}')
+		 					{
+		 						transValue.InputTypeEnum = 'Literal';
+		 						var sourceValInput = jQuery(value).find('.SourceValueOutItem');
+		 						if(sourceValInput.val()!='' && sourceValInput.val()!=sourceValInput.attr('label'))
+		 							transValue.Value=sourceValInput.val();
+		 						else
+		 							transValue.Value=null;
+		 				
+		 					}
+		 					else if(itemInputType=='{!JSINHTMLENCODE(GetNumericInterfaceFieldMapSourceTypeId)}')
+		 					{
+		 						transValue.InputTypeEnum = 'Numeric';
+		 						var sourceValInput = jQuery(value).find('.SourceValueOutItem');
+		 						if(sourceValInput.val()!='' && sourceValInput.val()!=sourceValInput.attr('label'))
+		 							transValue.Value=sourceValInput.val();
+		 						else
+		 							transValue.Value=null;
+		 				
+		 					}
+		 					else if(itemInputType=='{!JSINHTMLENCODE(GetPositionInterfaceFieldMapSourceTypeId)}')
+		 					{
+		 						transValue.InputTypeEnum = 'Position';
+		 						transValue.Value =  jQuery(value).find('.InterfaceFieldMapsListItem').val();
+		 					}
+		 					else if(itemInputType=='{!JSINHTMLENCODE(GetFieldInterfaceFieldMapSourceTypeId)}')
+		 					{
+		 						transValue.InputTypeEnum = 'Field';
+		 						transValue.Value =  jQuery(value).find('.SourceFieldOutItem').val();
+		 					}
+		 					values[values.length] = transValue;
+		 				});
+		 				
+	 					//check for fields
+	 					jQuery.each(values,function(key,value){
+	 						if(value.InputTypeEnum == 'Field')
+	 							fields[fields.length] = value.Value;
+	 					
+	 					});
+	 					if(fields.length == 0)
+	 						transformation.Fields  = null;
+	 					else
+	 						transformation.Fields = fields;
+	 						
+	 					if(values.length == 1)
+	 						transformation.Value = values[0];
+	 					else
+	 						transformation.Values = values;
+	 						
+	 					var tType=jQuery(fieldItem).find('.TransfornationTypeOut').val();
+		 				if(tType == '{!JSINHTMLENCODE(SetScaleTransformationType)}')
+	 					{
+		 					transformation.Scale = jQuery('.TransformationTypeTable>tbody>tr>td').find('.TransformationValue').val();
+		 				}
+		 				else if(tType == '{!JSINHTMLENCODE(FormatTransformationType)}') 
+		 				{
+		 					var val = null;
+		 					if (jQuery('.TransformationTypeTable>tbody>tr>td').find('.TransformationValue').attr('label') == jQuery('.TransformationTypeTable>tbody>tr>td').find('.TransformationValue').val())
+		 						val = null;
+		 					else
+		 						val = jQuery('.TransformationTypeTable>tbody>tr>td').find('.TransformationValue').val();
+		 						
+		 					transformation.DateFormat = val;
+						}
+						else if(tType ==  '{!JSINHTMLENCODE(GetLineByPositionTransformationType)}')
+						{
+							transformation.Position = jQuery('.TransformationTypeTable>tbody>tr>td').find('.TransformationValue').val();
+		 				} 
+	 					else if(tType == '{!JSINHTMLENCODE(TruncateTransformationType)}' )
+	 					{
+	 						transformation.Length = jQuery('.TransformationTypeTable>tbody>tr>td').find('.TransformationValue').val();
+		 				
+	 					}
+	 					else if(tType == '{!JSINHTMLENCODE(AddTransformationType)}')
+	 					{
+	 						//nothing needed
+	 					}
+	 					else if(tType == '{!JSINHTMLENCODE(ConcatenateTransformationType)}')
+	 					{
+	 						//nothing needed
+	 					}
+	 					else if(tType == '{!JSINHTMLENCODE(MultiplyTransformationType)}' )
+	 					{
+	 						transformation.X  = values[0];
+	 						transformation.Y  = values[1];
+	 						transformation.Values = undefined;
+	 					}
+	 					else if(tType == '{!JSINHTMLENCODE(DivideTransformationType)}' )
+	 					{
+	 						transformation.X  = values[0];
+	 						transformation.Y  = values[1];
+	 						transformation.Values = undefined;
+	 					}
+	 					else if(tType == '{!JSINHTMLENCODE(ReplaceNullTransformationType)}' )
+	 					{
+	 						transformation.DefaultValue = values[0];
+	 						var newVals = new Array;
+	 						
+	 						jQuery.each(values,function(key,value){
+	 							if(key>0)
+	 								newVals[newVals.length] = value;
+	 						});
+	 						transformation.Replacements = newVals;
+	 						transformation.Values = undefined;
+	 					
+	 					}
+	 					
+	 					else if(tType == '{!JSINHTMLENCODE(CurrencyConvertTransformationType)}' )
+	 					{
+	 					
+	 					
+	 						transformation.Value = values[0];
+	 						transformation.FromCurrency = values[1];
+	 						transformation.ToCurrency = values[2];
+	 						transformation.ConversionDate = values[3];
+	 						transformation.Values = undefined;
+	 					}
+	 					else if(tType == '{!JSINHTMLENCODE(CaseStatementTransformationType)}')
+	 					{
+	 						transformation.TestValue = values[0];
+	 						transformation.Conditions = [];
+	 						var firstCondition = {};
+	 						firstCondition.WhenValue = values[1];
+	 						firstCondition.ThenValue = values[2];
+	 						transformation.Conditions.push(firstCondition);
+	 						
+	 						var rowCount=1;
+	 						var otherCondition;
+	 						jQuery.each(transformation.Values,function(k,v){
+	 							if((k > 2) && k !=(values.length-1))
+	 							{
+	 								if(rowCount == 1)	
+	 								{
+	 									otherCondition = {};
+	 									otherCondition.WhenValue = v;
+	 									rowCount =2 ;
+	 								}
+	 								else if(rowCount == 2)
+	 								{
+	 									otherCondition.ThenValue = v;
+	 									transformation.Conditions.push(otherCondition);
+	 									rowCount=1;
+	 								}
+	 								
+	 							}	
+	 						});
+	 						
+	 						transformation.ElseValue = values[values.length-1];
+	 						
+	 						transformation.Values = undefined;
+	 					}
+		 				else if(tType == '{!JSINHTMLENCODE(SubstituteTransformationType)}' )
+	 					{
+	 				
+	 						transformation.Value = values[0];
+	 						transformation.Target = values[1];
+	 						transformation.Replacement = values[2];
+	 						transformation.Values = undefined;
+	 					}
+	 					else if(tType == '{!JSINHTMLENCODE(TaxRateTransformationType)}' )
+	 					{
+	 				
+	 						transformation.TaxCodeId = values[0];
+	 						transformation.RateDate = values[1];
+	 						transformation.Values = undefined;
+	 					}
+	 					else if(tType == '{!JSINHTMLENCODE(TranslateUserIdToResourceIdTransformationType)}' )
+	 					{
+	 				
+	 						transformation.UserId = values[0];
+	 						transformation.Values = undefined;
+	 					}
+	 					else if(tType == '{!JSINHTMLENCODE(TranslateResourceIdToUserIdTransformationType)}' )
+	 					{
+	 				
+	 						transformation.ResourceId = values[0];
+	 						transformation.Values = undefined;
+	 					}
+	 					else if(tType == '{!JSINHTMLENCODE(UnitTypeConvertTransformationType)}')
+	 					{
+	 						transformation.Value = values[0];
+	 						transformation.FromUnitType = values[1];
+	 						transformation.ToUnitType = values[2];
+	 						transformation.HoursPerDay = values[3];
+	 						transformation.Values = undefined;
+	 					}
+		 				sourceFieldMapValue.TransformationTypeId = tType;
+		 		
+		 				sourceValue=JSON.stringify(transformation);
+			 		
+		 			}
+		 		
+		 			sourceFieldMapValue.SourceValue = sourceValue;
+	 				sourceFieldMapValue.SourceTypeId=sourceType;
+	 				interfaceFieldMap.SourceFieldMapValues[sourceFieldMapValue.InterfaceSourceId] = sourceFieldMapValue;
+				});
+	 			//Update hash
+	 			if(id =='' || id == undefined)
+	 			{
+	 				//new
+	 				if(currentlySelectedKey!=undefined)
+	 				{
+ 						updateOtherInterfaceFieldMaps(currentlySelectedKey,NOT_DEL);
+ 						theInterfaceFieldMapsHash[currentlySelectedKey] = interfaceFieldMap;
+	 				}
+	 				else
+	 				{
+	 					id=fieldMapCount++;
+		 				theInterfaceFieldMapsHash[id] = interfaceFieldMap;
+	 				}	
+		 			
+		 		}
+		 		else
+		 			theInterfaceFieldMapsHash[id]=interfaceFieldMap;
+	 			
+	 			
+	 			//grouping
+	 			var pos = interfaceFieldMap.DestinationFieldPosition;
+	 			if(jQuery('#Grouping').val() == 'GroupBy')
+	 				interfaceFieldMap.Grouping = 'GroupBy';
+	 			else 
+	 				interfaceFieldMap.Grouping = undefined;
+	 			
+	 			if(jQuery('#Grouping').val() == 'Aggregate')
+	 			{
+	 			
+		 			var fieldAgg = {};
+		 			var conditions = [];
+		 			jQuery.each(jQuery('.AggregateTable>tbody>tr'),function(key,tr){
+		 				var condition = {};
+		 				
+		 				if(jQuery(tr).find('.AggPosition').val()=='')
+		 					condition.WhenPosition=null;
+		 				else
+		 					condition.WhenPosition=parseInt(jQuery(tr).find('.AggPosition').val());
+		 				
+		 				if(condition.Equals=jQuery(tr).find('.AggEquals').val()=='')
+		 					condition.Equals=null;
+		 				else
+		 					condition.Equals=jQuery(tr).find('.AggEquals').val();
+		 				
+		 				condition.FunctionEnum=jQuery(tr).find('.AggFunction').val();
+		 				conditions.push(condition);
+		 			});
+		 			fieldAgg.Conditions = conditions;
+		 			fieldAgg.FieldPosition = pos;
+	 			
+	 				interfaceFieldMap.Grouping = 'Aggregate';
+	 				interfaceFieldMap.Aggregate = fieldAgg;
+	 			
+	 				
+	 			}	
+	 			else
+	 			{
+	 				interfaceFieldMap.Aggregate = undefined;
+	 			
+	 			}
+	 			
+	 		}
+	 		
+ 			updateTableView();
+ 			hideModalBoxy();
+ 			decideHideMapFormatDropdown();
+ 			decideHideRecordStartLine();
+ 		}
+ 		
+ 		function updateOtherInterfaceFieldMaps(newFieldKey,isDelete)
+ 		{
+ 			var theInterfaceFieldMapsHashNew = {};
+ 			jQuery.each(theInterfaceFieldMapsHash,function(key,fieldMap){
+ 				
+ 				var newKey = parseInt(key);
+ 				if(parseInt(key)  >= newFieldKey && newFieldKey>0)
+ 				{
+ 					if(!isDelete)
+		 				newKey = parseInt(key)+1;
+		 			else 
+		 				newKey = parseInt(key)-1;
+		 		}
+		 		else if( parseInt(key)  <= newFieldKey && newFieldKey<0)
+		 		{
+		 		 	if(!isDelete)	
+		 				newKey =  parseInt(key)-1;
+		 			else 
+		 				newKey =  parseInt(key)+1;
+		 		}
+		 		theInterfaceFieldMapsHashNew[newKey] = fieldMap;
+		 		if('{!JSINHTMLENCODE(aInterfaceType.Enum__c)}'=='{!JSINHTMLENCODE(OutboundInterfaceTypeEnum)}')
+					theInterfaceFieldMapsHashNew[newKey].DestinationFieldPosition = newKey;	
+		 			
+		 		
+ 					
+		 					
+		 		//for SourceValue of transformationtype
+		 		updateOtherInterfaceFieldMap(theInterfaceFieldMapsHashNew[newKey],newFieldKey,isDelete);
+			});
+		 	
+		 	
+		 	
+
+		 	
+		 
+ 			theInterfaceFieldMapsHash= theInterfaceFieldMapsHashNew;
+ 		}
+ 		function updateOtherInterfaceFieldMap(fieldMap,newFieldKey,isDelete)
+ 		{
+ 			//for SourceValue of transformationtype
+		 		if(fieldMap.SourceFieldMapValues == undefined)
+		 			return;
+		 		jQuery.each(fieldMap.SourceFieldMapValues,function(k,fieldMapItem){
+ 					if(fieldMapItem.SourceTypeId == '{!JSINHTMLENCODE(GetPositionInterfaceFieldMapSourceTypeId)}')
+ 					{
+ 						if(parseInt(fieldMapItem.SourceValue)>=newFieldKey && newFieldKey>0)
+ 						{
+		 					if(!isDelete)
+		 						fieldMapItem.SourceValue = parseInt(fieldMapItem.SourceValue)+1;
+		 					else
+		 						fieldMapItem.SourceValue = parseInt(fieldMapItem.SourceValue)-1;
+		 						
+		 				}
+		 				else if(newFieldKey<0 &&  parseInt(fieldMapItem.SourceValue)<=newFieldKey)
+		 				{
+		 					if(!isDelete)
+		 						fieldMapItem.SourceValue = parseInt(fieldMapItem.SourceValue)-1;
+		 					else
+		 						fieldMapItem.SourceValue = parseInt(fieldMapItem.SourceValue)+1;
+		 				}
+ 					}
+ 					else if(fieldMapItem.SourceTypeId == '{!JSINHTMLENCODE(GetTransformationInterfaceFieldMapSourceTypeId)}')
+ 					{
+ 						var transformationJsonObject =  jQuery.parseJSON(jQuery('<span>').text(fieldMapItem.SourceValue).text());
+		 				var changesOccured=false;
+		 				jQuery.each(transformationJsonObject,function(k,obj){
+		 					
+		 					if(obj==null || typeof obj == 'number' || typeof obj == 'string')
+		 						return;
+		 					
+		 					if(obj.InputTypeEnum!=undefined && obj.InputTypeEnum == 'Position')
+		 					{
+		 						if(parseInt(obj.Value)>=newFieldKey && newFieldKey>0)
+				 				{	
+				 					if(!isDelete)
+				 						obj.Value = parseInt(obj.Value)+1; 
+		 							else
+		 								obj.Value = parseInt(obj.Value)-1; 
+		 							changesOccured = true;
+		 						}
+		 						else if(newFieldKey<0 && parseInt(obj.Value)<=newFieldKey)
+		 						{
+		 							if(!isDelete)
+				 						obj.Value = parseInt(obj.Value)-1; 
+		 							else
+		 								obj.Value = parseInt(obj.Value)+1; 
+		 							changesOccured = true;
+		 						}
+		 				
+		 					}
+		 					
+		 					jQuery.each(obj,function(k,obj1){
+			 					if(obj1==null || typeof obj1 == 'number' || typeof obj1 == 'string')
+			 						return;
+			 					if(obj1.InputTypeEnum!=undefined && obj1.InputTypeEnum == 'Position')
+			 					{
+			 						if(parseInt(obj1.Value)>=newFieldKey && newFieldKey>0)
+				 					{
+				 						if(!isDelete)
+			 								obj1.Value = parseInt(obj1.Value)+1; 
+			 							else
+			 								obj1.Value = parseInt(obj1.Value)-1; 
+			 							changesOccured = true;
+			 						}
+			 						else if(newFieldKey<0 && parseInt(obj1.Value)<=newFieldKey)
+		 							{
+		 								if(!isDelete)
+			 								obj1.Value = parseInt(obj1.Value)-1; 
+		 								else
+		 									obj1.Value = parseInt(obj1.Value)+1; 
+			 							changesOccured = true;
+		 							}
+			 					}	
+			 					
+			 					jQuery.each(obj1,function(k,obj2){
+				 					if(obj2==null || typeof obj2 == 'number' || typeof obj2 == 'string')
+				 						return;
+				 					if(obj2.InputTypeEnum!=undefined && obj2.InputTypeEnum == 'Position')
+				 					{
+				 						if(parseInt(obj2.Value)>=newFieldKey && newFieldKey>0)
+					 					{
+					 						if(!isDelete)
+				 								obj2.Value = parseInt(obj2.Value)+1; 
+				 							else
+				 								obj2.Value = parseInt(obj2.Value)-1; 
+				 							changesOccured = true;
+				 						}
+				 						else if(newFieldKey<0 && parseInt(obj2.Value)<=newFieldKey)
+			 							{
+			 								if(!isDelete)
+				 								obj2.Value = parseInt(obj2.Value)-1; 
+			 								else
+			 									obj2.Value = parseInt(obj2.Value)+1; 
+				 							changesOccured = true;
+			 							}
+				 					}	
+		 						});	 
+			 					
+		 					});	 
+ 											
+ 						});
+ 						if(changesOccured)
+ 							fieldMapItem.SourceValue=JSON.stringify(transformationJsonObject);	
+ 					}
+		 					
+		 		});
+ 			if(fieldMap.Aggregate != undefined)
+		 	{
+		 		var a = fieldMap.Aggregate;
+		 		jQuery.each(a.Conditions,function(k,cond){
+				 	if(parseInt(cond.WhenPosition)>=newFieldKey &&  newFieldKey >0)
+				 	{
+						if(!isDelete)
+					 		cond.WhenPosition = parseInt(cond.WhenPosition)+1;
+					 	else
+					 		cond.WhenPosition = parseInt(cond.WhenPosition)-1;
+				 	}
+					else if(parseInt(cond.WhenPosition)<=newFieldKey &&  newFieldKey <0)
+					{
+						if(!isDelete)
+					 		cond.WhenPosition = parseInt(cond.WhenPosition)-1;
+				 		else
+					 		cond.WhenPosition = parseInt(cond.WhenPosition)+1;
+					 }	
+			 	});	
+		 		
+		 	}
+ 		}
+ 		function getPreviousKey(curkey)
+ 		{
+ 			var previousKey;
+ 			jQuery.each(getSortInterfaceFieldMapsHash(),function(key,fieldMap){
+	 			var shouldFinish = false;
+	 			if(curkey == parseInt(fieldMap.OriginalKey))
+	 				shouldFinish = true;
+	 			if(!shouldFinish)
+	 				previousKey = parseInt(fieldMap.OriginalKey);
+	 			return (!shouldFinish);
+	 		});
+	 		return previousKey;
+ 		
+ 		}
+ 		
+ 		function getNextKey(curkey)
+ 		{
+ 			var readyForNext = false;
+ 			var nextKey;
+ 			jQuery.each(getSortInterfaceFieldMapsHash(),function(key,fieldMap){
+	 			var isFinished=false;
+	 			if(readyForNext)
+	 			{
+	 				nextKey = parseInt(fieldMap.OriginalKey);
+	 				isFinished = true;
+	 			}
+	 			if(curkey == fieldMap.OriginalKey)
+	 				readyForNext = true;
+	 			return (!isFinished);
+	 		});
+	 		
+	 		return nextKey;
+ 		}
+ 		var DEL = true;
+ 		var NOT_DEL = false;
+ 		//values methods
+ 		function copyInterfaceMapField(id)
+ 		{
+ 			if(Object.keys(theInterfaceFieldMapsHash).length == 0)
+ 				return;
+ 			var curId = parseInt(id);
+ 			var newId = parseInt(id);
+ 			if(newId>0)
+ 				newId=newId+1;
+ 			
+ 				var isGroupBy = false;
+ 			var isAgg = false;
+ 			var formerAgg;
+ 			
+ 			selectCurrentKey(newId);
+ 			var interfaceMapFieldCopy=jQuery.extend(true,{},theInterfaceFieldMapsHash[id]);
+ 			if(theInterfaceTypeId=='{!JSINHTMLENCODE(OutboundInterfaceTypeEnum)}')
+	 			interfaceMapFieldCopy.DestinationFieldPosition = newId;
+ 			updateOtherInterfaceFieldMaps(newId,NOT_DEL);
+ 			updateOtherInterfaceFieldMap(interfaceMapFieldCopy,newId);
+ 			
+ 			theInterfaceFieldMapsHash[newId] = interfaceMapFieldCopy;
+ 			updateTableView();
+ 			decideHideMapFormatDropdown();
+ 		}
+ 		function decideHideMapFormatDropdown()
+ 		{
+ 			if(Object.keys(theInterfaceFieldMapsHash).length >= 1) 
+ 				$('.MapFormatDropdown').attr('disabled',true);
+ 			else 
+ 				$('.MapFormatDropdown').attr('disabled',false);
+ 		}
+ 		function decideHideRecordStartLine()
+ 		{
+ 			var selectedMapFormat = $('.MapFormatDropdown')[0].value; 
+ 			var theEnum;
+ 			
+ 			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InterfaceMapHomeController.GetSelectedMapFormatEnum}',
+				selectedMapFormat,
+				    function(result, event){          
+				        if (event.status) 
+				        {
+ 							console.log('result: ' +result);
+				      		theEnum = result
+ 							
+				 			if(theEnum == '{!JSINHTMLENCODE(JsonInterfaceMapFormatEnum)}' || theEnum == '{!JSINHTMLENCODE(ComplexJsonInterfaceMapFormatEnum)}')
+							{
+								$('.RecordStartLineInput').attr('disabled',true);
+								$('.RecordStartLineInput')[0].value = '';
+							}
+							else
+							{
+								$('.RecordStartLineInput').attr('disabled',false);
+								if($('.RecordStartLineInput')[0].value == '')
+									$('.RecordStartLineInput')[0].value = 0;
+							}	
+				      		 
+				      		
+				        } 
+				        else if (event.type === 'exception') 
+				        {
+				            alert(event.message);
+				        } 
+				        else 
+				        {
+				            alert(event.message);
+				        }
+				}, 
+				{escape: true, timeout: 60000}
+			);
+			
+			decideHideSourceFieldPositionsCol();
+ 		}
+ 		function convertInterfaceFieldMapType(id)
+ 		{
+ 			if(Object.keys(theInterfaceFieldMapsHash).length == 0)
+ 				return;
+ 			var fromId = parseInt(id);
+ 			var toId;
+ 			if(fromId<0)
+ 				toId = 1;
+ 			else 
+ 				toId = -1;
+ 			
+ 			if(getReferencedPositions()[id]==undefined)
+ 			{
+ 			
+	 			var interfaceMapFieldCopy=jQuery.extend(true,{},theInterfaceFieldMapsHash[id]);
+	 			if(theInterfaceTypeId=='{!JSINHTMLENCODE(OutboundInterfaceTypeEnum)}')
+		 			interfaceMapFieldCopy.DestinationFieldPosition = toId;
+	 			updateOtherInterfaceFieldMaps(toId,NOT_DEL);
+	 			updateOtherInterfaceFieldMap(interfaceMapFieldCopy,toId);
+	 			
+	 			theInterfaceFieldMapsHash[toId] = interfaceMapFieldCopy;
+	 			
+	 			deleteInterfaceMapFieldProper(id);
+	 			selectCurrentKey(toId);
+	 			
+	 			updateTableView();
+	 		}
+	 		else
+ 			{
+ 				alert('Cannot convert. Dependent fields exists.');
+ 			}
+ 		}
+ 		function moveUp(id)
+ 		{
+ 			var currentKey = id;
+ 			var currentInterfaceField = jQuery.extend(true,{},theInterfaceFieldMapsHash[id]);
+ 			var previousKey = getPreviousKey(id);
+ 			if(previousKey == undefined)
+ 				return;
+ 			var previousInterfaceField = jQuery.extend(true,{},theInterfaceFieldMapsHash[previousKey]);	
+ 			
+ 			
+ 			if(theInterfaceTypeId=='{!JSINHTMLENCODE(OutboundInterfaceTypeEnum)}')
+	 		{
+	 			currentInterfaceField.DestinationFieldPosition = previousKey;
+ 				previousInterfaceField.DestinationFieldPosition = id;
+ 			}
+ 			
+ 			if(!updateMove(currentKey,previousKey,currentInterfaceField))
+ 				return;
+ 			
+ 		
+ 			
+ 			currentlySelectedKey = previousKey;
+ 			theInterfaceFieldMapsHash[previousKey] =  currentInterfaceField;
+ 			theInterfaceFieldMapsHash[id] =  previousInterfaceField;
+ 			
+ 			updateTableView();
+ 		}
+ 		function moveDown(id)
+ 		{
+ 			var currentInterfaceField = jQuery.extend(true,{},theInterfaceFieldMapsHash[id]);
+ 			var nextKey = getNextKey(id);
+ 			if(nextKey == undefined)
+ 				return;
+ 			
+ 			var nextInterfaceField = jQuery.extend(true,{},theInterfaceFieldMapsHash[nextKey]);	
+ 			
+ 			if(theInterfaceTypeId=='{!JSINHTMLENCODE(OutboundInterfaceTypeEnum)}')
+	 		{
+	 			currentInterfaceField.DestinationFieldPosition = nextKey;
+ 				nextInterfaceField.DestinationFieldPosition = id;
+ 			}
+ 			
+ 			if(!updateMove(id,nextKey,currentInterfaceField))
+ 				return;
+ 				
+ 			currentlySelectedKey = nextKey;
+ 			theInterfaceFieldMapsHash[nextKey] =  currentInterfaceField;
+ 			theInterfaceFieldMapsHash[id] =  nextInterfaceField;
+ 			
+ 			updateTableView();
+ 		}
+ 		
+ 		function updateMove(currentKey,otherKey,currentInterfaceField)
+ 		{
+ 			var cannotAllowMove = false;
+ 		
+		 	if(currentInterfaceField.SourceFieldMapValues != undefined)
+		 	{
+		 		jQuery.each(currentInterfaceField.SourceFieldMapValues,function(k,fieldMapItem){
+ 					if(fieldMapItem.SourceTypeId == '{!JSINHTMLENCODE(GetPositionInterfaceFieldMapSourceTypeId)}')
+ 					{
+ 						if(parseInt(fieldMapItem.SourceValue)==otherKey)
+ 							cannotAllowMove = true;
+		 				
+ 					}
+ 					else if(fieldMapItem.SourceTypeId == '{!JSINHTMLENCODE(GetTransformationInterfaceFieldMapSourceTypeId)}')
+ 					{
+ 						var transformationJsonObject =  jQuery.parseJSON(jQuery('<span>').text(fieldMapItem.SourceValue).text());
+		 				var changesOccured=false;
+		 				jQuery.each(transformationJsonObject,function(k,obj){
+		 					
+		 					if(obj==null || typeof obj == 'number' || typeof obj == 'string')
+		 						return;
+		 					
+		 					if(obj.InputTypeEnum!=undefined && obj.InputTypeEnum == 'Position')
+		 					{
+		 						if(parseInt(obj.Value)==otherKey)
+				 				{	
+				 					cannotAllowMove = true;
+		 						}
+		 				
+		 					}
+		 					
+		 					jQuery.each(obj,function(k,obj1){
+			 					if(obj1.InputTypeEnum!=undefined && obj1.InputTypeEnum == 'Position')
+			 					{
+			 						if(parseInt(obj1.Value)==otherKey)
+				 					{
+										cannotAllowMove = true;
+		 							}
+			 					}
+			 					if(obj1!=null && typeof obj1 != 'number' && typeof obj1 != 'string')
+				 				{
+					 				jQuery.each(obj1,function(k,obj2){
+				 						if(obj2.InputTypeEnum!=undefined && obj2.InputTypeEnum == 'Position')
+				 						{
+				 							if(parseInt(obj2.Value)==otherKey)
+					 						{
+												cannotAllowMove = true;
+			 								}
+				 						}	
+			 						});
+			 					}	
+		 					});	 
+ 											
+ 						});
+ 					}
+		 					
+		 					
+		 					
+		 		});
+ 			}
+ 				
+ 			if(cannotAllowMove)
+ 			{
+ 				alert('Field is dependant on previous field');
+ 				return false;
+ 			}	
+ 			
+ 			jQuery.each(theInterfaceFieldMapsHash,function(key,fieldMap){
+ 				
+ 				if(fieldMap.SourceFieldMapValues == undefined)
+		 			return;
+		 		jQuery.each(fieldMap.SourceFieldMapValues,function(k,fieldMapItem){
+ 					if(fieldMapItem.SourceTypeId == '{!JSINHTMLENCODE(GetPositionInterfaceFieldMapSourceTypeId)}')
+ 					{
+ 						if(parseInt(fieldMapItem.SourceValue)==otherKey)
+ 							fieldMapItem.SourceValue = currentKey;
+		 				else if(parseInt(fieldMapItem.SourceValue)==currentKey)
+		 					fieldMapItem.SourceValue = otherKey;
+		 			}
+ 					else if(fieldMapItem.SourceTypeId == '{!JSINHTMLENCODE(GetTransformationInterfaceFieldMapSourceTypeId)}')
+ 					{
+ 						var transformationJsonObject =  jQuery.parseJSON(jQuery('<span>').text(fieldMapItem.SourceValue).text());
+		 				var changesOccured=false;
+		 				jQuery.each(transformationJsonObject,function(k,obj){
+		 					
+		 					if(obj==null || typeof obj == 'number' || typeof obj == 'string')
+		 						return;
+		 					
+		 					if(obj.InputTypeEnum!=undefined && obj.InputTypeEnum == 'Position')
+		 					{
+		 						if(parseInt(obj.Value)==otherKey)
+				 				{	
+				 					obj.Value = currentKey;
+		 							changesOccured = true;
+		 						}
+		 						else if(parseInt(obj.Value)==currentKey)
+		 						{
+		 							obj.Value = otherKey;
+		 							changesOccured = true;
+		 						}
+		 				
+		 					}
+		 					
+		 					jQuery.each(obj,function(k,obj1){
+			 					if(obj1==null || typeof obj1 == 'number' || typeof obj1 == 'string')
+			 						return;
+			 					if(obj1.InputTypeEnum!=undefined && obj1.InputTypeEnum == 'Position')
+			 					{
+			 						if(parseInt(obj1.Value)==otherKey)
+					 				{	
+					 					obj1.Value = currentKey;
+			 							changesOccured = true;
+			 						}
+			 						else if(parseInt(obj1.Value)==currentKey)
+			 						{
+			 							obj1.Value = otherKey;
+			 							changesOccured = true;
+			 						}
+			 					}
+			 					
+			 					jQuery.each(obj1,function(k,obj2){
+				 					if(obj2==null || typeof obj2 == 'number' || typeof obj2 == 'string')
+				 						return;
+				 					if(obj2.InputTypeEnum!=undefined && obj2.InputTypeEnum == 'Position')
+				 					{
+				 						if(parseInt(obj2.Value)==otherKey)
+						 				{	
+						 					obj2.Value = currentKey;
+				 							changesOccured = true;
+				 						}
+				 						else if(parseInt(obj2.Value)==currentKey)
+				 						{
+				 							obj2.Value = otherKey;
+				 							changesOccured = true;
+				 						}
+				 					}	
+		 						});	 	
+		 					});	 
+ 											
+ 						});
+ 						if(changesOccured)
+ 							fieldMapItem.SourceValue=JSON.stringify(transformationJsonObject);	
+ 					}
+		 					
+		 					
+		 					
+		 		});
+ 				
+ 			});
+ 		
+
+ 		
+ 			return true;
+ 		}	
+ 		
+ 		function getInterfaceMapFieldValues(id)
+ 		{
+ 			jQuery('#InterfaceFieldMapId').val(id);
+ 			var interfaceFieldMapValues=theInterfaceFieldMapsHash[id].Values;
+ 			
+ 			jQuery('.InterfaceFieldMapValuesTable>tbody>tr').remove();
+ 			
+ 			jQuery.each(interfaceFieldMapValues,function(key,value){
+ 				
+ 				
+ 				var tr= jQuery('<tr>').addClass('Value');
+ 				tr.append(jQuery('<td>').append(jQuery('<a>').attr('href','#').text('{!JSENCODE($Label.Remove)}').click(function(){removeInterfaceMapFieldValue(jQuery(this))})));
+            	tr.append(jQuery('<td>').append(jQuery('<input>').val(value.SourceValue).attr('type','text').addClass('Source')));
+            	tr.append(jQuery('<td>').append(jQuery('<input>').val(value.DestinationValue).attr('type','text').addClass('Destination')));
+            	
+ 				jQuery('.InterfaceFieldMapValuesTable').append(tr);
+ 			});
+ 			initialiseModalBoxy('#InterfaceFieldMapValuesPopup', '{!JSENCODE($Label.Edit)} {!$ObjectType.InterfaceFieldMapValue__c.LabelPlural}');showModalBoxy();
+ 		}
+ 		function newInterfaceMapFieldValue(id)
+ 		{
+ 			var tr= jQuery('<tr>').addClass('Value');
+ 			tr.append(jQuery('<td>').append(jQuery('<a>').attr('href','#').text('{!JSENCODE($Label.Remove)}').click(function(){removeInterfaceMapFieldValue(jQuery(this))})));
+            tr.append(jQuery('<td>').append(jQuery('<input>').attr('type','text').addClass('Source')));
+            tr.append(jQuery('<td>').append(jQuery('<input>').attr('type','text').addClass('Destination')));
+            	
+ 			jQuery('.InterfaceFieldMapValuesTable').append(tr);
+ 		
+ 		}
+ 		function removeInterfaceMapFieldValue(id)
+ 		{
+ 			id.parent().parent().remove();
+ 		}
+ 		function saveInterfaceMapFieldValues()
+ 		{
+ 			var id=jQuery('#InterfaceFieldMapId').val();
+ 			var values=jQuery('.InterfaceFieldMapValuesTable>tbody>tr[class=Value]')
+ 			
+ 			theInterfaceFieldMapsHash[id].Values= new Array();
+ 			var counterField=0;	
+ 			jQuery.each(values,function(key,value){
+ 				var source=jQuery(value).find('td>.Source').val()
+ 				var destination=jQuery(value).find('td>.Destination').val()
+ 				theInterfaceFieldMapsHash[id].Values[counterField]={};
+ 				theInterfaceFieldMapsHash[id].Values[counterField].SourceValue = source;
+ 				theInterfaceFieldMapsHash[id].Values[counterField].DestinationValue = destination;
+ 				
+				counterField++;
+ 			});
+ 			updateTableView();
+ 			hideModalBoxy();
+ 		}
+ 		
+ 		var entryType;
+ 		function newInterfaceMapField()
+ 		{
+ 			hideErrors();
+ 			
+ 			fieldMapCount++;
+ 			jQuery('#DestinationFieldName').val('');
+ 			jQuery('#IsMandatory').prop('checked',false);
+ 			jQuery('#SourceFieldName').val('');
+ 			jQuery('#DestinationFieldLookupKeyFieldName').val('');
+ 			jQuery('#SourceType').val('{!JSINHTMLENCODE(GetFieldInterfaceFieldMapSourceTypeId)}');
+ 			jQuery('#SourceType').next().val('{!JSINHTMLENCODE(GetFieldInterfaceFieldMapSourceTypeId)}');
+ 			jQuery('#SourceValue').val('');
+ 			jQuery('#SourceFieldPositions').val('');
+ 			jQuery('.TransformationTypeTable>tbody>tr').remove();
+			jQuery('.AggregateTable>tbody>tr').remove();
+			jQuery('#Grouping').val('');
+ 			
+ 			jQuery.each(jQuery('.InterfaceSource'),function(key,fieldItem){
+ 				jQuery(fieldItem).find('.SourceValueOut').val('');
+ 				jQuery(fieldItem).find('.SourceFieldOut').val('');
+ 	
+ 				jQuery(fieldItem).find('.SourceTypeOut').val('{!JSINHTMLENCODE(GetFieldInterfaceFieldMapSourceTypeId)}');
+ 				jQuery(fieldItem).find('.SourceTypeOut').next().val('{!JSINHTMLENCODE(GetFieldInterfaceFieldMapSourceTypeId)}');
+ 			
+ 			});
+ 			
+ 			initialiseModalBoxy('#InterfaceFieldMapPopup', '{!JSENCODE($Label.New)} {!$ObjectType.InterfaceFieldMap__c.Label}');
+ 			showModalBoxy();
+ 			decideHide(theInterfaceTypeId);
+ 			decideHideSourceType();
+ 			decideHideSourceTypeOut('',true);
+ 			setAvaPositions();
+ 			jQuery('#InterfaceFieldMapId').val('');
+ 			jQuery('#GroupByFields').val('');
+ 			
+ 		}
+ 		function newInterfaceMapFieldVisible()
+ 		{
+ 			entryType = 'VIS';
+ 			newInterfaceMapField();
+ 		}
+ 		function newInterfaceMapFieldVariable()
+ 		{
+ 			entryType = 'VAR';
+ 			newInterfaceMapField();
+ 		}
+ 		function hideErrors()
+ 		{
+ 			jQuery('#InterfaceFieldMapErrors').hide();
+ 		}
+ 		function validate(idOrClass)
+ 		{
+ 			var label=idOrClass.attr('label');
+ 			if(idOrClass.val() == '' || idOrClass.val() == label)
+ 				return false;
+ 			else 
+ 				return true;
+ 		}
+ 		function validateField(idOrClass)
+ 		{
+ 			if(!validate(idOrClass))
+ 			{	
+ 				jQuery('#InterfaceFieldMapErrors').show();
+ 				jQuery('#InterfaceFieldMapErrorsMsg').text('{!JSENCODE($Label.ValidationRequiredMessage)}'.replace('{0}',idOrClass.attr('label')));
+ 				return false
+ 			}
+ 			else
+		 		return true;
+ 		}
+ 		function validateMap(idOrClass)
+ 		{
+ 			if(!validate(idOrClass))
+ 			{	
+ 				jQuery('#InterfaceMapErrors').show();
+ 				jQuery('#InterfaceMapErrorsMsg').text('{!JSENCODE($Label.ValidationRequiredMessage)}'.replace('{0}',idOrClass.attr('label')));
+ 				return false
+ 			}
+ 			else
+		 		return true;
+ 		}
+ 		function deleteInterfaceMapField(id)
+ 		{
+ 			if(getReferencedPositions()[id]==undefined)
+ 			{
+ 				deleteInterfaceMapFieldProper(id);
+ 				var switchTo;
+ 				var nextTo = getNextKey(id);
+ 				if(theInterfaceFieldMapsHash[id]!=undefined)
+ 					switchTo  = id;
+ 				
+ 				if(switchTo==undefined)
+ 					switchTo = nextTo;
+ 				
+ 				if(switchTo==undefined)
+ 					switchTo = getPreviousKey(id);
+ 				
+				selectCurrentKey(switchTo);
+ 				updateTableView();
+ 			}
+ 			else
+ 			{
+ 				alert('Cannot allow delete. Dependent fields exists.');
+ 			}
+ 		}
+ 		function deleteInterfaceMapFieldProper(id)
+ 		{
+ 			delete theInterfaceFieldMapsHash[id];
+ 			updateOtherInterfaceFieldMaps(id,DEL);
+ 		}
+ 		
+		function decideHide(value)
+		{
+			if(value=='{!JSINHTMLENCODE(OutboundInterfaceTypeEnum)}')
+			{
+				jQuery('.InPanel').parent().hide();
+				jQuery('.OutPanel').parent().show();
+			}
+			else
+			{
+				jQuery('.InPanel').parent().show();
+				jQuery('.OutPanel').parent().hide();
+			}
+		}
+	
+		function decideHideSourceTypeOutItem(id)
+		{
+			var row = jQuery('.TransformationTypeTable>tbody>tr[sourceitem='+id+']');
+			var selectedVal=row.find('.SourceTypeItem').next().val();
+			if(selectedVal=='{!JSINHTMLENCODE(GetLiteralInterfaceFieldMapSourceTypeId)}')
+			{
+				row.find('.SourceValueOutItem').show();
+	 			row.find('.InterfaceFieldMapsListItem').hide();
+		 		row.find('.SourceFieldOutItem').hide();
+		 	}
+			else if(selectedVal=='{!JSINHTMLENCODE(GetLiteralInterfaceFieldMapSourceTypeId)}')
+			{
+				row.find('.SourceValueOutItem').show();
+	 			row.find('.InterfaceFieldMapsListItem').hide();
+		 		row.find('.SourceFieldOutItem').hide();
+		 	}
+	 		else if(selectedVal=='{!JSINHTMLENCODE(GetPositionInterfaceFieldMapSourceTypeId)}')
+	 		{
+		 		row.find('.SourceValueOutItem').hide();
+	 			row.find('.InterfaceFieldMapsListItem').show();
+		 		row.find('.SourceFieldOutItem').hide();
+		 	}
+		 	else if(selectedVal=='{!JSINHTMLENCODE(GetFieldInterfaceFieldMapSourceTypeId)}')
+	 		{
+	 			row.find('.SourceValueOutItem').hide();
+	 			row.find('.InterfaceFieldMapsListItem').hide();
+		 		row.find('.SourceFieldOutItem').show();
+		 	}
+		 		
+		}
+		function decideHideSourceTypeOut(sourceId,forAll)
+ 		{
+ 			if(theInterfaceTypeId=='{!JSINHTMLENCODE(OutboundInterfaceTypeEnum)}')
+			{
+				jQuery('.InPanel').parent().hide();
+				jQuery('.OutPanel').parent().show();
+				
+				jQuery.each(jQuery('.InterfaceSource'),function(key,fieldItem){
+						var sourceType = jQuery(fieldItem).find('.SourceTypeOut').next().val();
+						if(sourceType == '{!JSINHTMLENCODE(GetLiteralInterfaceFieldMapSourceTypeId)}')
+			 			{
+			 				jQuery(fieldItem).find('.SourceValueOut').show();
+			 				jQuery(fieldItem).find('.InterfaceFieldMapsList').hide();
+				 			jQuery(fieldItem).find('.SourceFieldOut').hide();
+				 			jQuery(fieldItem).find('.TransfornationTypeOut').hide();
+				 			jQuery(fieldItem).find('.Transformation').parent().hide();
+						}
+						else if(sourceType == '{!JSINHTMLENCODE(GetNumericInterfaceFieldMapSourceTypeId)}')
+			 			{
+			 				jQuery(fieldItem).find('.SourceValueOut').show();
+			 				jQuery(fieldItem).find('.InterfaceFieldMapsList').hide();
+				 			jQuery(fieldItem).find('.SourceFieldOut').hide();
+				 			jQuery(fieldItem).find('.TransfornationTypeOut').hide();
+				 			jQuery(fieldItem).find('.Transformation').parent().hide();
+						}
+			 			else if(sourceType == '{!JSINHTMLENCODE(GetPositionInterfaceFieldMapSourceTypeId)}')
+			 			{
+				 			jQuery(fieldItem).find('.SourceValueOut').hide();
+			 				jQuery(fieldItem).find('.InterfaceFieldMapsList').show();
+				 			jQuery(fieldItem).find('.SourceFieldOut').hide();
+				 			jQuery(fieldItem).find('.TransfornationTypeOut').hide();
+				 			jQuery(fieldItem).find('.Transformation').parent().hide();
+						}
+				 		else if(sourceType == '{!JSINHTMLENCODE(GetFieldInterfaceFieldMapSourceTypeId)}')
+			 			{
+				 			jQuery(fieldItem).find('.SourceValueOut').hide();
+			 				jQuery(fieldItem).find('.InterfaceFieldMapsList').hide();
+				 			jQuery(fieldItem).find('.SourceFieldOut').show();
+				 			jQuery(fieldItem).find('.TransfornationTypeOut').hide();
+				 			jQuery(fieldItem).find('.Transformation').parent().hide();
+						}
+				 		else if(sourceType == '{!JSINHTMLENCODE(GetTransformationInterfaceFieldMapSourceTypeId)}')
+			 			{
+				 			jQuery(fieldItem).find('.SourceValueOut').hide();
+			 				jQuery(fieldItem).find('.InterfaceFieldMapsList').hide();
+				 			jQuery(fieldItem).find('.SourceFieldOut').hide();
+				 			jQuery(fieldItem).find('.TransfornationTypeOut').show();
+				 			jQuery(fieldItem).find('.Transformation').parent().show();
+						}
+						else
+						{
+							jQuery(fieldItem).find('.SourceValueOut').hide();
+			 				jQuery(fieldItem).find('.InterfaceFieldMapsList').hide();
+				 			jQuery(fieldItem).find('.SourceFieldOut').hide();
+				 			jQuery(fieldItem).find('.TransfornationTypeOut').hide();
+				 			jQuery(fieldItem).find('.Transformation').parent().hide();
+						
+						}
+				 		showLabel(jQuery(fieldItem).find('.SourceValueOut'));
+				 		showLabel(jQuery(fieldItem).find('.SourceFieldOut'));
+				 		//jQuery(fieldItem).find('.TransfornationTypeOut').change();		
+				});	
+		 	
+		 		
+			}
+		}
+		
+		function removeItem(id)
+ 		{
+ 			id.parent().parent().remove();
+ 		}
+ 		function removeItemTransformationTypeValue(id)
+ 		{
+ 			jQuery('.TransformationTypeTable>tbody>tr[item='+id+']').remove(); 
+ 		}
+ 		function containsVIS()
+ 		{
+ 			var found = false;
+ 			jQuery.each(Object.keys(theInterfaceFieldMapsHash),function(k,v){
+ 				if(parseInt(v)>0)
+ 					found = true;
+ 			});
+ 			return found;
+ 		}
+ 		function containsVAR()
+ 		{
+ 			var found = false;
+ 			jQuery.each(Object.keys(theInterfaceFieldMapsHash),function(k,v){
+ 				if(parseInt(v)<0)
+ 					found = true;
+ 			});
+ 			return found;
+ 		}
+		function setAvaPositions()
+		{
+			var calcCurrentlySelectedKey=currentlySelectedKey; 
+			if(currentlySelectedKey!=undefined && entryType == 'VIS')
+		 	{
+		 		if(!containsVIS() || currentlySelectedKey<0 )
+		 			calcCurrentlySelectedKey = 1;
+		 		else if(currentlySelectedKey>0)
+		 			calcCurrentlySelectedKey=parseInt(currentlySelectedKey)+1;
+		 					
+		 	}
+		 	else if(currentlySelectedKey!=undefined && entryType == 'VAR')
+		 	{
+		 		if(!containsVAR() || currentlySelectedKey>0)
+	 				calcCurrentlySelectedKey = 0;
+	 		}
+		
+			jQuery.each(jQuery('.InterfaceFieldMapsList>option'),function(key,obj){
+		 		if(parseInt(jQuery(obj).val())>=parseInt(calcCurrentlySelectedKey))
+		 			jQuery(obj).attr('disabled','disabled');
+		 		else
+		 			jQuery(obj).removeAttr('disabled');
+		 		
+		 	});
+		
+			jQuery.each(jQuery('.InterfaceFieldMapsListItem>option'),function(key,obj){
+		 		if(parseInt(jQuery(obj).val())>=parseInt(calcCurrentlySelectedKey))
+		 			jQuery(obj).attr('disabled','disabled');
+		 		else
+		 			jQuery(obj).removeAttr('disabled');
+		 		
+		 	});
+		 	
+		 	
+		}
+		var transCount=0;
+	function addTransformationTypeValueWithValueMuiliple(isAtBottom,sourceId,withTransVal,transValLabel,addButton,removeButton,values)
+	{
+		transCount++;
+		if(values.length >0)
+		{
+			var labelsList = [];
+			jQuery.each(values,function(key,value){
+				labelsList.push(value.Label);
+			});
+			jQuery.each(values,function(key,value){
+				if(key==0)
+				{
+					var tr = addTransformationTypeValueWithValue(isAtBottom,sourceId,withTransVal,transValLabel,addButton,false,value.Label,value);
+					tr.find('.AddTransformationValueButton').attr('fieldlabels',labelsList.toString());
+				}
+				else
+					addTransformationTypeValueWithValue(isAtBottom,sourceId,withTransVal,transValLabel,false,removeButton,value.Label,value);
+				
+				transCount--;
+			});
+		}
+		
+	}	
+	function addTransformationTypeValueWithValue(isAtBottom,sourceId,withTransVal,transValLabel,addButton,removeButton,itemLabel,value)
+	{
+		var tr = addTransformationTypeValue(isAtBottom,sourceId,withTransVal,transValLabel,addButton,removeButton,itemLabel);
+		if(value.Type == 'Literal')
+	 	{
+	 		tr.find('.SourceValueOutItem').val(value.Value);
+	 		tr.find('.SourceValueOutItem').show();
+	 		tr.find('.InterfaceFieldMapsListItem').hide();
+	 		tr.find('.SourceFieldOutItem').hide();
+	 		tr.find('.SourceTypeItem').val('{!JSINHTMLENCODE(GetLiteralInterfaceFieldMapSourceTypeId)}');
+	 		tr.find('.SourceTypeItem').next().val('{!JSINHTMLENCODE(GetLiteralInterfaceFieldMapSourceTypeId)}');
+		}
+		else if(value.Type == 'Numeric')
+	 	{
+	 		tr.find('.SourceValueOutItem').val(value.Value);
+	 		tr.find('.SourceValueOutItem').show();
+	 		tr.find('.InterfaceFieldMapsListItem').hide();
+	 		tr.find('.SourceFieldOutItem').hide();
+	 		tr.find('.SourceTypeItem').val('{!JSINHTMLENCODE(GetNumericInterfaceFieldMapSourceTypeId)}');
+	 		tr.find('.SourceTypeItem').next().val('{!JSINHTMLENCODE(GetNumericInterfaceFieldMapSourceTypeId)}');
+		}
+	 	else if(value.Type == 'Position')
+	 	{
+	 		tr.find('.InterfaceFieldMapsListItem').val(value.Value);
+	 		tr.find('.InterfaceFieldMapsListItem').show();
+	 		tr.find('.SourceFieldOutItem').hide();
+	 		tr.find('.SourceTypeItem').val('{!JSINHTMLENCODE(GetPositionInterfaceFieldMapSourceTypeId)}');
+			tr.find('.SourceTypeItem').next().val('{!JSINHTMLENCODE(GetPositionInterfaceFieldMapSourceTypeId)}');
+		}
+		else if(value.Type == 'Field')
+	 	{
+	 		tr.find('.SourceFieldOutItem').val(value.Value);
+	 		tr.find('.SourceFieldOutItem').show();
+	 		tr.find('.SourceTypeItem').val('{!JSINHTMLENCODE(GetFieldInterfaceFieldMapSourceTypeId)}');
+			tr.find('.SourceTypeItem').next().val('{!JSINHTMLENCODE(GetFieldInterfaceFieldMapSourceTypeId)}');
+			tr.find('.SourceValueOutItem').hide();
+			tr.find('.InterfaceFieldMapsListItem').hide();
+		}
+	 	if(value.TransformationValue!=undefined)
+	 	{
+	 		tr.find('.TransformationValue').val(value.TransformationValue);
+	 		tr.find('.TransformationValue').show();
+	 	
+	 	}
+	 	return tr;
+	}
+	//called from add button, for muiltiples values
+	function addTransformationTypeValueMuiltiple(isAtBottom,sourceId,withTransVal,transValLabel,addButton,fieldsToAddArrLabel,removeButton,itemLabel)
+	{
+		transCount++;
+		if(fieldsToAddArrLabel.length >0)
+		{
+			jQuery.each(fieldsToAddArrLabel,function(key,value){
+				if(key == 0)
+					addTransformationTypeValueWithAddBtnFields(isAtBottom,sourceId,withTransVal,transValLabel,addButton,fieldsToAddArrLabel,false,value);
+				else
+					addTransformationTypeValueWithAddBtnFields(isAtBottom,sourceId,withTransVal,transValLabel,addButton,fieldsToAddArrLabel,removeButton,value);
+				transCount --;
+			});
+		}
+		else
+		{
+			addTransformationTypeValue(isAtBottom,sourceId,withTransVal,transValLabel,addButton,removeButton,itemLabel)
+		}
+		
+	}
+	// simple
+	function addTransformationTypeValue(isAtBottom,sourceId,withTransVal,transValLabel,addButton,removeButton,itemLabel)
+	{
+		return addTransformationTypeValueWithAddBtnFields(isAtBottom,sourceId,withTransVal,transValLabel,addButton,[],removeButton,itemLabel)
+	}
+	//setup with add button that generate muiltiple values
+	var sourceTypeCount = 0;
+	function addTransformationTypeValueWithAddBtnFields(isAtBottom,sourceId,withTransVal,transValLabel,addButton,fieldsToAddArrLabel,removeButton,itemLabel)
+	{
+		transCount++;
+		sourceTypeCount++;
+		var tr=jQuery('<tr>');
+ 		tr.attr('item',transCount);
+ 		tr.attr('sourceitem',sourceTypeCount);
+ 		if(isAtBottom)
+ 			tr.addClass('AtBottom');
+ 		tr.append(jQuery('<td>').text(itemLabel));
+ 		tr.append(jQuery('<td>').html(jQuery('.TransformationPanel').html()));
+ 		tr.find('.SourceTypeItem').next().attr('sourceitem',sourceTypeCount);
+ 		tr.find('.SourceTypeItem').next().find('option[value="{!GetTransformationInterfaceFieldMapSourceTypeId}"]').remove();
+ 		tr.find('.SourceTypeItem').next().change(function(){decideHideSourceTypeOutItem(jQuery(this).attr('sourceitem'))});
+ 		tr.find('.AddTransformationValueButton').css('display',addButton?'':'none').attr('label',transValLabel).attr('sourceId',sourceId)
+ 				.attr('fieldlabels',fieldsToAddArrLabel.toString());
+ 		tr.find('.RemoveTransformationValueButton').css('display',removeButton?'':'none');
+ 		
+ 		if(withTransVal)
+ 		{
+ 			tr.find('.TransformationValue').show();
+ 			tr.find('.TransformationValue').attr('label',transValLabel);
+ 		}
+ 		else
+ 			tr.find('.TransformationValue').hide();
+ 		
+ 		if(isAtBottom)
+ 		{ 
+ 			if(jQuery('.TransformationTypeTable.'+sourceId+'>tbody>tr.AtBottom').length==0)
+ 				jQuery('.TransformationTypeTable.'+sourceId).append(tr);
+ 			else
+ 				tr.insertAfter(jQuery(jQuery('.TransformationTypeTable.'+sourceId+'>tbody>tr.AtBottom')[0]));	
+		}
+		else
+		{
+			if(jQuery('.TransformationTypeTable.'+sourceId+'>tbody>tr.AtBottom').length==0)
+ 				jQuery('.TransformationTypeTable.'+sourceId).append(tr);
+ 			else
+ 				tr.insertBefore(jQuery(jQuery('.TransformationTypeTable.'+sourceId+'>tbody>tr.AtBottom')[0]));	
+		}
+ 		if(removeButton)
+ 		{
+ 			showLabel(jQuery('.SourceValueOutItem'));
+			showLabel(jQuery('.SourceFieldOutItem'));
+			showLabel(jQuery('.TransformationValue'));
+ 		}
+ 		
+ 		
+		var sourceType = jQuery('#InterfaceSource').find('option[value="'+sourceId+'"]').attr('object');
+		tr.find('.SourceFieldOutItem').fieldSelector({rootObject:sourceType});
+		
+ 		decideHideSourceTypeOutItem(tr.attr('sourceitem'));
+ 		return tr;
+	}
+	var WITH_TRANSVAL = true;var WITHOUT_TRANSVAL = false;		
+ 	var WITH_ADDBTN = true;	var WITHOUT_ADDBTN = false; var NO_LBL='';
+ 		var WITH_REMBTN = true;	var WITHOUT_REMBTN = false;
+ 	var AT_BOTTOM = true;var AT_TOP = false;
+	function selectTranformationType(obj,sourceId)
+	{
+		jQuery('.TransformationTypeTable.'+sourceId+'>tbody>tr').remove();
+	
+		if(obj.val() == '{!JSINHTMLENCODE(FormatTransformationType)}') // has one value
+		{
+			addTransformationTypeValue(AT_TOP,sourceId,WITH_TRANSVAL,'-DateFormat-',WITHOUT_ADDBTN,WITHOUT_REMBTN,NO_LBL);
+ 		}
+ 		else if(obj.val() == '{!JSINHTMLENCODE(SetScaleTransformationType)}' )
+ 		{
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITH_TRANSVAL,'-Scale-',WITHOUT_ADDBTN,WITHOUT_REMBTN,NO_LBL);
+ 		}
+ 		else if(obj.val() ==  '{!JSINHTMLENCODE(GetLineByPositionTransformationType)}')
+ 		{
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITH_TRANSVAL,'-Position-',WITHOUT_ADDBTN,WITHOUT_REMBTN,NO_LBL);
+ 		}
+ 		else if(obj.val() == '{!JSINHTMLENCODE(TruncateTransformationType)}' )//one value + modification value
+ 		{
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITH_TRANSVAL,'-Truncate-',WITHOUT_ADDBTN,WITHOUT_REMBTN,NO_LBL);
+ 		}
+ 		else if(obj.val() == '{!JSINHTMLENCODE(AddTransformationType)}')//N values
+ 		{
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Number-',WITHOUT_ADDBTN,NO_LBL);
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Number-',WITH_ADDBTN,WITHOUT_REMBTN,NO_LBL);
+ 		}
+ 		else if(obj.val() == '{!JSINHTMLENCODE(ConcatenateTransformationType)}')//N values
+ 		{
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-ConcateValue-',WITHOUT_ADDBTN,NO_LBL);
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-ConcateValue-',WITH_ADDBTN,WITHOUT_REMBTN,NO_LBL);
+ 		}
+ 		else if(obj.val() == '{!JSINHTMLENCODE(MultiplyTransformationType)}' || obj.val() == '{!JSINHTMLENCODE(DivideTransformationType)}')//2 values
+ 		{
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Number-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'X');
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Number-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'Y');
+ 		}
+ 		else if(obj.val() == '{!JSINHTMLENCODE(ReplaceNullTransformationType)}' )
+ 		{
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-DefaultValue-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'DefaultValue');
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Replacement-',WITH_ADDBTN,WITHOUT_REMBTN,'Replacements');
+ 		}
+ 		else if(obj.val() == '{!JSINHTMLENCODE(CurrencyConvertTransformationType)}' )
+ 		{
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Value-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'Value');
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-FromCurrency-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'FromCurrency');
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-ToCurrency-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'ToCurrency');
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Conversion Date-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'ConversionDate');
+ 		}
+ 		else if(obj.val()  == '{!JSINHTMLENCODE(SubstituteTransformationType)}' )
+ 		{
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Value-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'Value');
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Target-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'Target');
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Replacement-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'Replacement');
+ 		}
+ 		else if(obj.val()  == '{!JSINHTMLENCODE(CaseStatementTransformationType)}' )
+ 		{
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-TestValue-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'TestValue');
+ 			addTransformationTypeValueWithAddBtnFields(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Conditions When Value-',WITH_ADDBTN,['When','Then'],WITHOUT_REMBTN,'When');
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Conditions Then Value-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'Then');
+ 			addTransformationTypeValue(AT_BOTTOM,sourceId,WITHOUT_TRANSVAL,'-ElseValue-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'ElseValue');
+ 		}
+ 		else if(obj.val()  == '{!JSINHTMLENCODE(TaxRateTransformationType)}' )
+ 		{
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-TaxCode-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'TaxCode');
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-RateDate-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'RateDate');
+ 		}
+ 		else if(obj.val()  == '{!JSINHTMLENCODE(TranslateUserIdToResourceIdTransformationType)}' )
+ 		{
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-UserId-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'UserId');
+ 		}
+ 		else if(obj.val()  == '{!JSINHTMLENCODE(TranslateResourceIdToUserIdTransformationType)}' )
+ 		{
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-ResourceId-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'ResourceId');
+ 		}
+ 		else if(obj.val()  == '{!JSINHTMLENCODE(UnitTypeConvertTransformationType)}')
+ 		{
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-Value-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'Value');
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-FromUnitTypeId-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'FromUnitTypeId');
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-ToUnitTypeId-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'ToUnitTypeId');
+ 			addTransformationTypeValue(AT_TOP,sourceId,WITHOUT_TRANSVAL,'-HoursPerDay-',WITHOUT_ADDBTN,WITHOUT_REMBTN,'HoursPerDay');
+ 		}
+ 		
+ 		showLabel(jQuery('.SourceValueOutItem'));
+		showLabel(jQuery('.SourceFieldOutItem'));
+		showLabel(jQuery('.TransformationValue'));
+		        	
+	}
+	var aggCount=0;
+	function addAggregateWithValue(addButton,removeButton,value)
+	{
+		var tr = addAggregate(addButton,removeButton);
+		tr.find('.AggPosition').val(value.WhenPosition);
+		tr.find('.AggEquals').val(value.Equals);
+		tr.find('.AggFunction').val(value.FunctionEnum);
+	}
+	function addAggregate(addButton,removeButton)
+	{
+		aggCount++;
+		var tr=jQuery('<tr>');
+ 		tr.attr('item',aggCount);
+ 		tr.append(jQuery('<td>').html(jQuery('.AggregatePanel').html()));
+ 		tr.find('.AddAggregateButton').css('display',addButton?'':'none');
+ 		tr.find('.RemoveAggregateButton').css('display',removeButton?'':'none');
+ 		
+ 		jQuery('.AggregateTable').append(tr);
+ 		return tr;
+	}
+	function decideGroupingType(obj)
+	{
+		jQuery('.AggregateTable>tbody>tr').remove();
+		if(obj.val() == 'Aggregate')
+		{
+			 addAggregate(WITH_ADDBTN,WITHOUT_REMBTN)
+		}
+	}
+	function showLabel(objs)
+	{
+		jQuery.each(objs,function(key,obj){
+			if(jQuery(obj).val()=='' || jQuery(obj).val()==jQuery(obj).attr('label'))
+			{
+				jQuery(obj).val(jQuery(obj).attr('label'));
+				jQuery(obj).css('color','#666666');
+			}
+			else 
+			{
+				jQuery(obj).css('color','#000000');
+			}
+		});
+	}
+	function removeLabel(objs)
+	{
+		jQuery.each(objs,function(key,obj){
+			if(jQuery(obj).val()==jQuery(obj).attr('label'))
+			{	
+				jQuery(obj).val('');
+				jQuery(obj).css('color','#000000');
+			}
+		});
+	}	
+	function sortInterfaceFieldMapsHash() 
+	{
+		var theInterfaceFieldMapsHashNew = {};
+		var mapPositionToSet = {};
+		var pos = [];
+    	jQuery.each(theInterfaceFieldMapsHash,function(key,fieldMap){
+    		 pos.push(theInterfaceFieldMapsHash[key].DestinationFieldPosition);
+        	 mapPositionToSet[theInterfaceFieldMapsHash[key].DestinationFieldPosition] = key;
+    	});
+    	
+    	var possort = pos.sort(function(a, b){return a-b});
+    	jQuery.each(possort,function(i,po){
+    		var key = mapPositionToSet[po];
+      		var value = theInterfaceFieldMapsHash[key];
+      		theInterfaceFieldMapsHashNew[po] = value;
+    	});
+    	
+    	theInterfaceFieldMapsHash = {};
+		
+    	jQuery.each(theInterfaceFieldMapsHashNew,function(key,fieldMap){
+    		  theInterfaceFieldMapsHash[key] = fieldMap;
+    	});
+	}
+	
+	//override to force array to be retruned when validating inbound maps
+	function getSortInterfaceFieldMapsHash() 
+	{
+		return getSortInterfaceFieldMapsHash(false);
+	}
+	
+	function getSortInterfaceFieldMapsHash(returnArray) 
+	{
+		var theInterfaceFieldMapsHashNew = [];
+		jQuery.each(theInterfaceFieldMapsHash,function(key,fieldMap){
+    		fieldMap.OriginalKey = key;
+    		theInterfaceFieldMapsHashNew.push(fieldMap);
+     	});
+		
+		if(theInterfaceTypeId=='{!JSINHTMLENCODE(OutboundInterfaceTypeEnum)}' || returnArray)
+    		return theInterfaceFieldMapsHashNew.sort(function(a, b){return a.DestinationFieldPosition-b.DestinationFieldPosition});
+    	else
+    		return theInterfaceFieldMapsHashNew;
+	}
+	
+		
+	function selectInterfaceSource()
+	{
+		jQuery.each(jQuery('.InterfaceSource'),function(key,fieldItem){
+			var sourceType = jQuery('#InterfaceSource').find('option[value="'+jQuery(fieldItem).attr('sourceId')+'"]').attr('object');
+			jQuery(fieldItem).find('.SourceFieldOut').fieldSelector({rootObject:sourceType});
+		});
+	}
+	
+	function showFileUploadPopup()
+	{
+		initialiseModalBoxy('#fileUploadPopupDiv', '{!JSENCODE($Label.UploadReceiptHeading)}');
+		showModalBoxy();
+		document.getElementById('fileUploadIFrame').src = document.getElementById('fileUploadIFrame').src;
+	}
+	
+	var linesWithFieldsErrors = {};
+	function validateQuery(fieldWithLines)
+	{
+
+		if(fieldWithLines.length >0)
+		{
+			var aField = fieldWithLines.shift();
+			
+			var sourceObject = $('#InterfaceSource>option[value='+aField.SourceId+']').attr('object');
+			//var interfaceTypeEnum = sforce.connection.query("SELECT Enum__c FROM InterfaceType__c WHERE Id = "+theMap.InterfaceTypeId;
+			if (sourceObject != undefined){
+			 	var result = sforce.connection.query("SELECT "+aField.Value+" FROM "+sourceObject+" LIMIT 1" , {
+		      		onSuccess : function(result) {
+		      			if(result.done != "true")
+		      				linesWithFieldsErrors[aField.Id]=aField.Id;
+		      			validateQuery(fieldWithLines);	
+		            },
+		      		onFailure : function(error) {
+		      		 linesWithFieldsErrors[aField.Id]=aField.Id;
+		       		 console.log("error has occurred " + error);
+		       		 validateQuery(fieldWithLines);
+		     	 	}
+		  		});
+	  		}else{
+
+	  			var relatedObjectCol = {
+	  				"ExpenseItemImport" : {value: 0, name:"ExpenseItemImport", impObj: KimbleNamespaceWithUnderscores + "ExpenseItemImportLine__c"},
+	  				"TimeEntryImport" : {value: 1, name:"TimeEntryImport", impObj: KimbleNamespaceWithUnderscores + "TimeEntryImportLine__c"},
+	  				"AnalysisItemImport" : {value: 2, name:"AnalysisItemImport", impObj: KimbleNamespaceWithUnderscores + "AnalysisItemImportLine__c"},
+	  				"PlainObjectImport" : {value: 3, name:"PlainObjectImport", impObj: theTypeObjectType},
+	  				"UpdateResourceCalendar" : {value: 4, name:"UpdateResourceCalendar", impObj: KimbleNamespaceWithUnderscores + "AssignmentScheduleImportLine__c"},
+	  				"SupplierInvoiceStatement" : {value: 5, name:"SupplierInvoiceStatement", impObj: KimbleNamespaceWithUnderscores + "SupplierInvoiceStatementLine__c"},
+	  				"ActivityAssignmentImport" : {value: 6, name:"ActivityAssignmentImport", impObj: KimbleNamespaceWithUnderscores + "ActivityAssignmentImportLine__c"},
+	  				"InterfaceRunLineObject" : {value: 7, name:"InterfaceRunLine__c", impObj: KimbleNamespaceWithUnderscores + "InterfaceRunLine__c"}
+	  			};
+
+  				var relatedObj = relatedObjectCol[theTypeEnum].impObj;
+  				if(aField.Enum == 'InterfaceRunLineObject')
+  					relatedObj = relatedObjectCol['InterfaceRunLineObject'].impObj;
+	  			
+	  			var result = sforce.connection.query("SELECT "+aField.Value+" FROM "+relatedObj+" LIMIT 1" , {
+		      		onSuccess : function(result) {
+		      			if(result.done != "true")
+		      				linesWithFieldsErrors[aField.Id]=aField.Id;
+		      			validateQuery(fieldWithLines);	
+		            },
+		      		onFailure : function(error) {
+		      		 if(aField.Enum != 'InterfaceRunLineObject'){
+		      		     aField.Enum = 'InterfaceRunLineObject';
+		      		     fieldWithLines.push(aField);
+		      		 }
+           			 else{
+		      		 	linesWithFieldsErrors[aField.Id]=aField.Id;
+		       		 	console.log("error has occurred " + error);
+		       		 }
+		       		 validateQuery(fieldWithLines);
+		       		}
+		  		});		  		
+	  		}
+		}
+		else
+		{
+	 		var linesWithFieldsErrorsArr = Object.keys(linesWithFieldsErrors);
+		 	if(linesWithFieldsErrorsArr.length > 0)
+		 	{
+		 		jQuery('#InterfaceMapErrorsMsg').html("Field Validations Failed! Errors on lines:" +linesWithFieldsErrorsArr.toString());
+		 		jQuery('#InterfaceMapErrors').show();
+		 	}
+		 	else
+		 		alert("Field Validations Passed!");
+		 	       				 
+        	EnableButton('SaveButton');
+        	EnableButton('ValidateButton');
+			jQuery('.ButtonLoading').hide();
+		 	
+	 	}				
+	}
+	
+	function validateInterfaceMapForFieldErrors()
+	{
+		jQuery('#InterfaceMapErrors').hide();
+       	DisableButton('SaveButton');
+       	DisableButton('ValidateButton');
+		jQuery('.ButtonLoading').show();	
+		
+		linesWithFieldsErrors = {};
+		var fieldWithLines = [];
+		jQuery.each(getSortInterfaceFieldMapsHash(true),function(key,fieldMap){
+				if(fieldMap.SourceFieldMapValues != undefined && theInterfaceTypeId=='OutboundInterfaceRun')
+				{
+					jQuery.each(fieldMap.SourceFieldMapValues,function(k,fieldMapItem){
+	 					if(fieldMapItem.SourceTypeId == '{!JSINHTMLENCODE(GetFieldInterfaceFieldMapSourceTypeId)}')
+	 					{
+	 						var lineObj= {};
+	 						lineObj.SourceId = fieldMapItem.InterfaceSourceId;
+	 						lineObj.Value = fieldMapItem.SourceValue;
+	 						lineObj.Id = fieldMap.DestinationFieldPosition;
+	 						fieldWithLines.push(lineObj);
+	 					}
+	 					else if(fieldMapItem.SourceTypeId == '{!JSINHTMLENCODE(GetTransformationInterfaceFieldMapSourceTypeId)}')
+	 					{
+	 						var transformationJsonObject =  jQuery.parseJSON(jQuery('<span>').text(fieldMapItem.SourceValue).text());
+			 				jQuery.each(transformationJsonObject,function(k,obj){
+			 					
+			 					if(obj==null || typeof obj == 'number' || typeof obj == 'string')
+			 						return;
+			 					
+			 					if(obj.InputTypeEnum!=undefined && obj.InputTypeEnum == 'Field')
+			 					{
+			 						var lineObj= {};
+	 								lineObj.SourceId = fieldMapItem.InterfaceSourceId;
+	 								lineObj.Value = obj.Value;
+	 								lineObj.Id = fieldMap.DestinationFieldPosition;
+	 								fieldWithLines.push(lineObj);
+	 							}
+			 					
+			 					jQuery.each(obj,function(k,obj1){
+					 					if(obj1==null || typeof obj1 == 'number' || typeof obj1 == 'string')
+					 						return;
+					 					if(obj1.InputTypeEnum!=undefined && obj1.InputTypeEnum == 'Field')
+					 					{
+					 						var lineObj= {};
+	 										lineObj.SourceId = fieldMapItem.InterfaceSourceId;
+	 										lineObj.Value = obj1.Value;
+	 										lineObj.Id = fieldMap.DestinationFieldPosition;
+	 										fieldWithLines.push(lineObj);
+		 								}
+					 					
+					 					jQuery.each(obj1,function(k,obj2){
+					 					if(obj2==null || typeof obj2 == 'number' || typeof obj2 == 'string')
+					 						return;
+					 					if(obj2.InputTypeEnum!=undefined && obj2.InputTypeEnum == 'Field')
+					 					{
+					 						var lineObj= {};
+	 										lineObj.SourceId = fieldMapItem.InterfaceSourceId;
+	 										lineObj.Value = obj2.Value;
+	 										lineObj.Id = fieldMap.DestinationFieldPosition;
+	 										fieldWithLines.push(lineObj);
+		 								}	
+			 						});	
+				 						
+			 					});	 
+	 											
+	 						});
+	 						
+	
+	 					}
+		 			});
+		 		}else{
+		 		
+		 			var lineObj= {};
+					lineObj.Value = fieldMap.DestinationFieldName;
+					lineObj.Id = fieldMap.OriginalKey;
+					lineObj.Enum = theTypeEnum;
+					fieldWithLines.push(lineObj);
+		 		
+		 		}
+		 		
+		 	});	
+		 	
+		 	
+		 	
+		 	validateQuery(fieldWithLines);
+		 	
+		 	
+		 	
+		 	
+       				 	
+	}	
+		</script>
+		<apex:form >
+		<input type="text" id="AggregateFields" class="HideControl"/>
+		<input type="text" id="GroupByFields" class="HideControl"/>
+		<select id="InterfaceSource" style="display:none">
+			<apex:repeat value="{!GetInterfaceSources}" var="s">
+				<option value="{!JSENCODE(s.Id)}" object="{!JSENCODE(s.ExportObject)}"> {!JSENCODE(s.Name)} </option>
+			</apex:repeat>
+		</select>
+       	<select id="TransfornationTypeOut" style="display:none">
+			<apex:repeat value="{!GetTransformationTypes}" var="t">
+				<option value="{!JSENCODE(t.Id)}"> {!JSENCODE(t.Name)} </option>
+			</apex:repeat>
+		</select>	
+		<apex:pageBlock title="{!$ObjectType.KimbleOne__InterfaceMap__c.Label}">    
+			<div id="InterfaceMapErrors" style="display:none">
+				<apex:pageMessage summary="{!$Label.kimbleone__errors}" severity="warning" strength="2" rendered="true">
+					<ul style=" margin:0px ;padding:0">
+						<li  id="InterfaceMapErrorsMsg" >
+							&nbsp;
+						</li>
+					</ul>
+				</apex:pageMessage>
+			</div>
+			<apex:pageBlockButtons location="top">
+				<button id="SaveButton" class="btn SaveButton" onclick="saveInterfaceMap();return false" rerender="MapFormatDropdown">
+					<div style="float:left;padding:2px">{!$Label.Save}&nbsp;&nbsp;</div>
+					<div class="ButtonLoading" style="display:none;float:right">
+	         			<span class="processing"></span>
+	         		</div>
+				</button>
+				<button id="ValidateButton" class="btn ValidateButton" onclick="validateInterfaceMapForFieldErrors();return false">
+					<div style="float:left;padding:2px">{!$Label.Validate}</div>
+					<div class="ButtonLoading" style="display:none;float:right">
+	         			<span class="processing"></span>
+	         		</div>
+				</button>
+					
+				
+			</apex:pageBlockButtons>
+					
+			<apex:pageblockSection collapsible="false" showheader="false"  columns="2" > 
+               	<apex:pageBlockSectionItem >
+               		<apex:outputLabel value="{!$ObjectType.KimbleOne__InterfaceMap__c.fields.Name.label}"/>
+               		<apex:outputPanel layout="none">
+						<div class="requiredInput">
+							<div class="requiredBlock"></div>
+               				<input type="text" id="Name" label="{!$ObjectType.KimbleOne__InterfaceMap__c.fields.Name.label}"/>
+               			</div>
+               		</apex:outputPanel>
+               	</apex:pageBlockSectionItem>
+               	<apex:pageBlockSectionItem >
+               		<apex:outputLabel value="{!$ObjectType.KimbleOne__InterfaceMap__c.fields.KimbleOne__InterfaceType__c.label}"/>
+               		<apex:outputField value="{!interfaceMapWithType.KimbleOne__InterfaceType__c}"/>
+               	</apex:pageBlockSectionItem>
+            </apex:pageblockSection>
+            
+           	<apex:pageblockSection collapsible="false" showheader="false"  columns="2" > 
+            
+               	<apex:pageBlockSectionItem labelStyleClass="OutPanel">
+               		<apex:outputLabel value="{!$ObjectType.KimbleOne__InterfaceMap__c.fields.KimbleOne__FieldDelimiter__c.label}"/>
+               		<apex:outputPanel layout="none">
+						<div class="requiredInput">
+							<div class="requiredBlock"></div>
+							<input type="text" id="FieldDelimiter" label="{!$ObjectType.KimbleOne__InterfaceMap__c.fields.KimbleOne__FieldDelimiter__c.label}"/>
+               			</div>
+               		</apex:outputPanel>
+               	</apex:pageBlockSectionItem>
+               		
+               	<apex:pageBlockSectionItem labelStyleClass="OutPanel">
+               		<apex:outputLabel value="{!$ObjectType.KimbleOne__InterfaceMap__c.fields.KimbleOne__GroupDelimiter__c.label}"/>
+               		<input type="text" id="GroupDelimiter"/>
+               	</apex:pageBlockSectionItem>
+               	
+               	<apex:pageBlockSectionItem labelStyleClass="OutPanel">
+               		<apex:outputLabel value="{!$ObjectType.KimbleOne__InterfaceMap__c.fields.KimbleOne__ShowHeader__c.label}"/>
+               		<input type="checkbox" id="ShowHeader"/>
+               	</apex:pageBlockSectionItem>
+               	 	
+               	<apex:pageBlockSectionItem labelStyleClass="OutPanel">
+               		<apex:outputLabel value="{!$ObjectType.KimbleOne__InterfaceMap__c.fields.KimbleOne__MapContext__c.label}"/>
+               		<input type="text" id="MapContext"/>
+               	</apex:pageBlockSectionItem>
+               	
+               	<apex:pageBlockSectionItem >
+               		<apex:outputLabel value="{!$ObjectType.KimbleOne__InterfaceMap__c.fields.KimbleOne__MapFormat__c.label}"/>
+               		<apex:selectList styleClass="MapFormatDropdown" id="MapFormat" size="1" disabled="false" onchange="decideHideRecordStartLine()">
+               			<apex:selectOptions value="{!TheMapFormats}"/>
+               		</apex:selectList> 
+               	</apex:pageBlockSectionItem>
+               	
+            </apex:pageblockSection>
+            <apex:pageblockSection collapsible="false" showheader="false"  columns="2" > 
+            
+  				<apex:pageBlockSectionItem labelStyleClass="InPanel" rendered="true">
+               		<apex:outputLabel value="{!$ObjectType.KimbleOne__InterfaceMap__c.fields.KimbleOne__RecordStartLine__c.label}"/>
+               		<input type="text" id="RecordStartLine" onchange="decideHideSourceFieldPositionsCol()" class="RecordStartLineInput" disabled="false"/>
+               	</apex:pageBlockSectionItem>
+               	
+               	<apex:pageBlockSectionItem labelStyleClass="InPanel">
+               		<apex:outputLabel value="{!$ObjectType.KimbleOne__InterfaceMap__c.fields.KimbleOne__RecordBatchSize__c.label}"/>
+               		<input type="text" id="RecordBatchSize"/>
+               	</apex:pageBlockSectionItem>
+               	
+               	<apex:pageBlockSectionItem labelStyleClass="InPanel">
+               		<apex:outputLabel value="{!$ObjectType.KimbleOne__InterfaceMap__c.fields.CurrencyISOCode.label}"/>
+               		<apex:selectList id="CurrencyISOCode" size="1" >
+						<apex:selectOptions value="{!TheActiveCurrencies}" />
+	             	</apex:selectList>
+               	</apex:pageBlockSectionItem>
+               	
+            </apex:pageblockSection>
+            
+		</apex:pageBlock>
+		</apex:form>
+		<apex:pageBlock title="{!$ObjectType.KimbleOne__InterfaceFieldMap__c.LabelPlural}">  
+			<apex:pageBlockButtons location="top"  >
+				<apex:outputPanel layout="none" rendered="{!aInterfaceType.KimbleOne__Enum__c==OutboundInterfaceTypeEnum}">
+					<input type="button" id="" class="btn" value="{!$Label.UpLabel}" onclick="moveUp(currentlySelectedKey)"></input>
+					<input type="button" id="" class="btn" value="{!$Label.DownLabel}" onclick="moveDown(currentlySelectedKey)"></input>
+				</apex:outputPanel>
+				<input type="button" id="" class="btn" value="{!$Label.CopyLink}" onclick="copyInterfaceMapField(currentlySelectedKey)"></input>
+				<input type="button" id="" class="btn" value="{!$Label.New} {!$Label.VisibleField}" onclick="newInterfaceMapFieldVisible()"></input>
+				<apex:outputPanel layout="none" rendered="{!aInterfaceType.KimbleOne__Enum__c == 'OutboundInterfaceRun'}">
+					<input type="button" id="" class="btn" value="{!$Label.New} {!$Label.VariableField}" onclick="newInterfaceMapFieldVariable()"></input>
+					<input type="button" id="" class="btn" value="{!$Label.ConvertFieldType}" onclick="convertInterfaceFieldMapType(currentlySelectedKey)"></input>
+				</apex:outputPanel>
+			</apex:pageBlockButtons>
+			<div class="InterfaceFieldMapsTablePanel">
+				<table class="list InterfaceFieldMapsTable" border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed;">
+					<thead>
+						<tr class="headerRow">
+							<td style="width:3%">{!$Label.ActionLinksHeader}</td>
+							<td style="width:5%;word-wrap: break-word;" class="OutPanelCol">{!$ObjectType.InterfaceFieldMap__c.fields.DestinationFieldPosition__c.label}</td>
+							<td style="width:7%;word-wrap: break-word;">{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__DestinationFieldName__c.label}</td>
+							<td style="width:5%">{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__IsMandatory__c.label}</td>
+							<td style="width:5%" class="OutPanelCol">{!$Label.kimbleone__grouping}</td>
+							<td style="width:7%;word-wrap: break-word;" class="OutPanelCol">{!$ObjectType.InterfaceFieldMap__c.fields.InterfaceSource__c.label}</td>
+							<td style="width:7%">{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__SourceType__c.label}</td>
+							<td style="width:7%;word-wrap: break-word;" class="OutPanelCol">{!$ObjectType.InterfaceFieldMap__c.fields.TransformationType__c.label}</td>
+							<td style="width:5%" class="SourceFieldPositionsCol">{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__SourceFieldPositions__c.label}</td>
+							<td style="width:5%" class="SourceFieldNameCol">{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__SourceFieldName__c.label}</td>
+							<td style="width:{!IF(aInterfaceType.Enum__c==OutboundInterfaceTypeEnum,30,7)}%" >{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__SourceValue__c.label}</td>
+							<td style="width:5%" class="InPanelCol">{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__DestinationFieldLookupKeyFieldName__c.label}</td>
+							<!-- sytle="max-width:200px; word-wrap: break-word;text-overflow: ellipsis;" -->
+						</tr>
+					</thead>
+				</table>
+			</div>
+		</apex:pageBlock>
+			
+		<div id="InterfaceFieldMapPopup" style="display:none">
+			<input type="hidden" id="InterfaceFieldMapId"/>
+			<apex:pageBlock >
+			<div id="InterfaceFieldMapErrors" style="display:none">
+				<apex:pageMessage summary="{!$Label.kimbleone__errors}" severity="warning" strength="2" rendered="true">
+					<ul style=" margin:0px ;padding:0">
+						<li id="InterfaceFieldMapErrorsMsg" class="InterfaceFieldMapErrorsMsg">
+							&nbsp;
+						</li>
+					</ul>
+				</apex:pageMessage>
+			</div>
+
+ 			
+
+	 		<apex:pageBlockButtons location="bottom">
+                <input value="{!$Label.OK}" class="btn" type="button" Id="CategorySave" onclick="saveInterfaceMapField()"/>
+                <input value="{!$Label.Cancel}" class="btn"  type="button" onclick="hideModalBoxy();"/>
+            </apex:pageBlockButtons>
+	 		<apex:pageblockSection columns="1" >
+	 		
+	 		
+	 		
+	 		
+	 			<apex:pageBlockSectionItem labelStyleClass="InPanel OutPanel">
+               		<apex:outputLabel value="{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__DestinationFieldName__c.label}"/>
+               		<apex:outputPanel layout="none">
+						<div class="requiredInput">
+							<div class="requiredBlock"></div>
+               				<input type="text" id="DestinationFieldName" label="{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__DestinationFieldName__c.label}"/>
+               			</div>
+               		</apex:outputPanel>
+              	</apex:pageBlockSectionItem>
+			
+			
+				
+				<apex:pageBlockSectionItem labelStyleClass="InPanel OutPanel">
+               		<apex:outputLabel value="{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__IsMandatory__c.label}"/>
+               		<input type="checkbox" id="IsMandatory"/>
+              	</apex:pageBlockSectionItem>
+			
+				<apex:pageBlockSectionItem labelStyleClass="InPanel">
+               		<apex:outputLabel value="{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__SourceType__c.label}"/>
+               		<input type="text" id="SourceType" class="kimbledropdown InterfaceFieldMapSourceType null false false" onchange="decideHideSourceType()" 
+               			label="{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__SourceType__c.label}"/>
+               </apex:pageBlockSectionItem>
+              	
+              	<apex:pageBlockSectionItem labelStyleClass="InPanel">
+               		<apex:outputLabel value="{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__SourceFieldPositions__c.label}"/>
+               		<apex:outputPanel layout="none">
+						<div class="requiredInput">
+							<div class="requiredBlock"></div>
+               				<input type="text" id="SourceFieldPositions" label="{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__SourceFieldPositions__c.label}"/>
+               			</div>
+               		</apex:outputPanel>
+              	</apex:pageBlockSectionItem>
+					
+			  	<apex:pageBlockSectionItem labelStyleClass="InPanel">
+               		<apex:outputLabel value="{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__SourceFieldName__c.label}"/>
+               		<apex:outputPanel layout="none">
+						<div class="requiredInput">
+							<div class="requiredBlock"></div>
+               				<input type="text" id="SourceFieldName" label="{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__SourceFieldName__c.label}"/>
+               			</div>
+               		</apex:outputPanel>
+              	</apex:pageBlockSectionItem>
+              	
+				<apex:pageBlockSectionItem labelStyleClass="InPanel">
+               		<apex:outputLabel value="{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__SourceValue__c.label}"/>
+               		<apex:outputPanel layout="none">
+						<div class="requiredInput">
+							<div class="requiredBlock"></div>
+               				<input type="text" id="SourceValue" label="{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__SourceValue__c.label}"/>
+               			</div>
+               		</apex:outputPanel>
+              	</apex:pageBlockSectionItem>
+			
+				
+
+			
+				<apex:pageBlockSectionItem labelStyleClass="InPanel">
+               		<apex:outputLabel value="{!$ObjectType.KimbleOne__InterfaceFieldMap__c.fields.KimbleOne__DestinationFieldLookupKeyFieldName__c.label}"/>
+               		<input type="text" id="DestinationFieldLookupKeyFieldName"/>
+              	</apex:pageBlockSectionItem>
+              	
+              	<apex:pageBlockSectionItem labelStyleClass="OutPanel">
+					<apex:outputLabel value="{!$Label.kimbleone__grouping}"/>
+	             	<select id="Grouping" onchange="decideGroupingType(jQuery(this))">
+	             		<option value="">None</option>
+	             		<option value="GroupBy">GroupBy</option>
+	             		<option value="Aggregate">Aggregate</option>
+	             	</select>
+	             	<table class="AggregateTable">
+	             	</table>
+	            </apex:pageBlockSectionItem>
+			  	</apex:pageblockSection>
+              	
+				<div class="ionTabs" id="field_source" data-name="Tabs_Group_name">
+				<ul class="ionTabs__head">
+        			<apex:repeat var="interfaceSource" value="{!GetInterfaceSources}">
+						<li class="ionTabs__tab" data-target="{!interfaceSource.Id}"><apex:outputText value="{!interfaceSource.Name}"/></li>
+					</apex:repeat>
+    			</ul>
+    			<div class="ionTabs__body">
+        			<apex:repeat var="interfaceSource" value="{!GetInterfaceSources}">
+						<div class="ionTabs__item" data-name="{!interfaceSource.Id}">
+						<div class="InterfaceSource" sourceId="{!interfaceSource.Id}"> 
+							<apex:pageblockSection columns="1" >
+							<apex:pageBlockSectionItem >
+	            				<apex:outputLabel value="{!$Label.kimbleone__source}"/>
+	               				<apex:outputPanel layout="none">
+			               			<div>
+				               			<span>
+				                 			<input type="text"  class="kimbledropdown InterfaceFieldMapSourceType null false true SourceTypeOut" onchange="decideHideSourceTypeOut('{!JSINHTMLENCODE(interfaceSource.Id)}',false);jQuery(this).parent().parent().find('.TransfornationTypeOut').change()" 
+				               					label="Source"/>
+				             			</span>
+					               		<input type="text" value="" class="SourceValueOut" onblur="showLabel(jQuery(this))" onclick="removeLabel(jQuery(this))" label="{!JSENCODE(valueLabel)}"/> 
+					               		<input type="text" value="" class="SourceFieldOut"  onblur="showLabel(jQuery(this))" onclick="removeLabel(jQuery(this))" onchange="showLabel(jQuery(this))" label="{!JSENCODE(fieldLabel)}"/>
+					               		<span>
+					               			<select class="TransfornationTypeOut" onchange="selectTranformationType(jQuery(this),'{!JSINHTMLENCODE(interfaceSource.Id)}');" label="{!$ObjectType.InterfaceFieldMap__c.fields.TransformationType__c.label}">
+												<apex:repeat value="{!GetTransformationTypes}" var="t">
+													<option value="{!JSENCODE(t.Id)}"> {!JSENCODE(t.Name)} </option>
+												</apex:repeat>
+											</select>
+					               		
+					               		</span>
+					               		<select class="InterfaceFieldMapsList">
+					               		</select>
+				               		</div>
+		               			</apex:outputPanel>
+	               			</apex:pageBlockSectionItem>
+			 
+				 			<apex:pageBlockSectionItem labelStyleClass="OutPanel Transformation">
+				 				<apex:outputLabel value="{!$Label.kimbleone__transformation}"/>
+				 				<table class="TransformationTypeTable {!interfaceSource.Id}">
+				 				</table>
+				 			</apex:pageBlockSectionItem>
+						
+			 		</apex:pageblockSection>
+			 		</div>
+        		</div>
+				</apex:repeat>
+				<div class="ionTabs__preloader"></div>
+        	 	</div>
+			</div>
+		
+			  	
+	 	</apex:pageBlock>
+	</div>
+	
+	
+	<div style="display:none" class="TransformationPanel">
+		
+		  	<span>
+		  		<input type="text" class="kimbledropdown InterfaceFieldMapSourceType null false false SourceTypeItem" onchange="decideHideSourceTypeOutItem(jQuery(this).parent().parent().parent().attr('sourceitem'))" 
+		    		label="Source"/>
+		  	</span>
+		    
+		    <select class="InterfaceFieldMapsListItem">
+		    </select>
+		    
+		    <input type="text" value="" class="SourceValueOutItem"  onblur="showLabel(jQuery(this))" onclick="removeLabel(jQuery(this))" label="{!JSENCODE(valueLabel)}"/> 
+		    <input type="text" value="" class="SourceFieldOutItem"  onblur="showLabel(jQuery(this))" onclick="removeLabel(jQuery(this))" label="{!JSENCODE(fieldLabel)}"/>
+		   	<input type="text" value="" class="TransformationValue"  onblur="showLabel(jQuery(this))" onclick="removeLabel(jQuery(this))" label="-Transformation Value-"/>
+			<input value="{!$Label.Add}" class="btn AddTransformationValueButton" type="button" onclick="addTransformationTypeValueMuiltiple(AT_TOP,jQuery(this).attr('sourceId'),WITHOUT_TRANSVAL,jQuery(this).attr('label'),WITHOUT_ADDBTN,jQuery(this).attr('fieldlabels').split(','),WITH_REMBTN,NO_LBL)"/>
+		    <input value="{!$Label.Remove}" class="btn RemoveTransformationValueButton" type="button" onclick="removeItemTransformationTypeValue(jQuery(this).parent().parent().attr('item'))"/>
+		                       
+	 </div>
+	 
+	 <div id="ActionsPanel" style="display:none">
+			<a class="action-icon" title="{!$Label.ClickForActionsMessage}">
+				<i class="fa fa-cog fa-2x"></i>
+			</a>
+			<div class="toolbar-icons ActionIcons" style="display: none;" >
+				<a href="javascript:void(0);" onclick="editInterfaceMapField(jQuery(this).attr('interfacemapfieldid'));" title="{!$Label.Edit}" class="actionLink"><i class="fa fa-pencil-square-o"></i></a>
+				<a href="javascript:void(0);" onclick="deleteInterfaceMapField(jQuery(this).attr('interfacemapfieldid'));" title="{!$Label.Delete}" class="actionLink"><i class="fa fa-trash-o"></i></a>
+				<a href="javascript:void(0);" onclick="getInterfaceMapFieldValues(jQuery(this).attr('interfacemapfieldid'));" title="{!$Label.ValuesMapLabel}" class="actionLink"><i class="fa fa-list-alt"></i></a>
+			</div>
+		</div>
+	 
+	<div class="AggregatePanel" style="display:none">
+       <label>
+       		WhenPosition
+       		<select class="AggPosition">
+       		</select>
+       </label>
+       <label>
+       		Equals
+       		<input type="text" class="AggEquals"/> 
+       </label>
+       <label>
+       		Function
+       		<select class="AggFunction">
+            	<option value="SUM">SUM</option>
+             	<option value="AVG">AVG</option>
+            </select>
+       </label>
+       <input value="{!$Label.Add}" class="btn AddAggregateButton" type="button" onclick="addAggregate(WITHOUT_ADDBTN,WITH_REMBTN)"/>
+	   <input value="{!$Label.Remove}" class="btn RemoveAggregateButton" type="button" onclick="removeItem(jQuery(this))"/>
+		     
+     </div>
+	
+		<div id="InterfaceFieldMapValuesPopup" style="display:none">
+			<apex:pageBlock >
+			<div id="InterfaceFieldMapValuesErrors" style="display:none">
+				<apex:pageMessage summary="{!$Label.kimbleone__errors}" severity="warning" strength="2" rendered="true">
+					<ul style=" margin:0px ;padding:0">
+						<li id="InterfaceFieldMapValuesErrorsMsg" class="InterfaceFieldMapValuesErrorsMsg" style="display:none">
+							&nbsp;
+						</li>
+					</ul>
+				</apex:pageMessage>
+			</div>
+
+ 			<apex:pageBlockButtons location="top">
+ 				 <input value="{!$Label.Add}" class="btn" type="button" onclick="newInterfaceMapFieldValue()"/>
+            </apex:pageBlockButtons>
+	 		<apex:pageBlockButtons location="bottom">
+                <input value="{!$Label.OK}" class="btn" type="button" onclick="saveInterfaceMapFieldValues()"/>
+                <input value="{!$Label.Cancel}" class="btn"  type="button" onclick="hideModalBoxy();"/>
+            </apex:pageBlockButtons>
+            <div class="InterfaceFieldMapValuesTablePanel">
+				<table class="list InterfaceFieldMapValuesTable" border="0" cellpadding="0" cellspacing="0">
+					<thead>
+						<tr class="headerRow">
+							<td>{!$Label.ActionLinksHeader}</td>
+							<th>{!$ObjectType.InterfaceFieldMapValue__c.fields.SourceValue__c.label}</th>
+							<th>{!$ObjectType.InterfaceFieldMapValue__c.fields.DestinationValue__c.label}</th>
+						</tr>
+					</thead>
+				</table>
+			</div>
+	 	</apex:pageBlock>
+	</div>
+		<div id="fileUploadPopupDiv" style="display:none">
+				<apex:outputPanel id="FileUploadPopupPanel" layout="none">
+					<input id="expenseItemAttachment" type="hidden" value=""/>
+					<iframe id="fileUploadIFrame" src="{!$Page.FileUpload}?ObjectId={!InterfaceMap__c.Id}" style="border: 0;height: 122px;width: 286px;"></iframe>
+				</apex:outputPanel>
+			</div>
+	<c:ResourceAssignmentCalendar />
+	<style>
+/* Ion.Tabs
+// css version 1.0.0
+// by Denis Ineshin | ionden.com
+// ===================================================================================================================*/
+
+/* =====================================================================================================================
+// Ion.Tabs: Base */
+
+.ionTabs {
+    position: relative;
+}
+    .ionTabs__head {
+        position: relative; display: block;
+        list-style-type: none;
+        margin: 0; padding: 0;
+        z-index: 1;
+    }
+    .ionTabs__head:before, .ionTabs__head:after {content: ""; display: table;}
+    .ionTabs__head:after {clear: both;}
+    .ionTabs__head {zoom: 1;}
+
+        .ionTabs__tab {
+            position: relative;
+            display: block; float: left;
+            list-style-type: none;
+            background: none;
+            margin: 0; padding: 0;
+            cursor: pointer;
+        }
+            .ionTabs__tab.ionTabs__tab_state_active {
+                cursor: default;
+            }
+
+    .ionTabs__body {
+        position: relative;
+        z-index: 2;
+    }
+
+    .ionTabs__item {
+        position: relative;
+        display: none;
+    }
+        .ionTabs__item.ionTabs__item_state_active {
+            display: block;
+        }
+
+    .ionTabs__preloader {
+        position: relative;
+    }
+    
+
+.ionTabs {
+    margin: 0 0 8px;
+}
+    .ionTabs__head {
+        border-bottom: 1px solid #cecece;
+    }
+
+    .ionTabs__tab {
+        font-size: 11px; line-height: 13px;
+        background: #ededed;
+        border: 1px solid #cecece;
+        border-bottom: none;
+        padding: 7px 25px 7px;
+        margin-right: 10px;
+        color: #484848;
+        margin-top: 10px;
+        text-align: center;
+        min-width: 50px;
+    }
+        .ionTabs__tab:hover {
+            background: #e5e5e5;
+        }
+        .ionTabs__tab.ionTabs__tab_state_active {
+            top: 7px;
+            margin-top: 0;
+            padding: 5px 25px 11px;
+            background: #fff;
+            color: #4a4a56;
+            border-top-color: #d71410;
+            border-bottom: 1px solid #fff;
+        }
+
+    .ionTabs__body {
+        background: #fff;
+        border: 1px solid #cecece;
+        border-top: none;
+    }
+
+    .ionTabs__item {
+        padding: 15px 26px;
+    }
+
+    .ionTabs__preloader {
+        height: 50px;
+        background: url(../img/preloader-flat.gif) no-repeat 25px 50%;
+    }
+    ul.ionTabs__head li.ionTabs__tab_state_active {
+    	border-top: 2px solid  #3172d7;
+    	font-weight:bold;
+	}
+	
+	
+
+	
+	.InterfaceFieldMapsListItem, .SourceValueOutItem, .SourceFieldOutItem, .SourceValueOut, .SourceFieldOut, .InterfaceFieldMapsList{
+		width:330px;
+	}
+	.InterfaceFieldMapValuesTablePanel{
+		height:300px;
+		overflow-y: scroll;
+	}
+</style>
+<script>
+// Ion.Tabs
+// version 1.0.2 Build: 17
+// https://github.com/IonDen/ion.tabs
+(function(a,w,g,n){if(!a.ionTabs){var h={},q={},k={},b,d,r,v=a(g),t=function(){try{if(g.localStorage&&null!==g.localStorage)return{save:function(b,a){"object"===typeof a&&(a=JSON.stringify(a));try{localStorage.setItem(b,a)}catch(c){"QUOTA_EXCEEDED_ERR"===c&&(localStorage.clear(),localStorage.setItem(b,a))}},load:function(a){try{return JSON.parse(localStorage.getItem(a))}catch(b){return localStorage.getItem(a)}},del:function(a){localStorage.removeItem(a)}}}catch(b){return{save:function(){return null},load:function(){return null},del:function(){return null}}}return null}(),u=function(a){this.container=a};u.prototype={init:function(){var c=this.container,m=c.find(".ionTabs__tab"),d=c.find(".ionTabs__item"),s=c.find(".ionTabs__preloader"),l,f=c.data("name"),e;m.each(function(){l=a(this);e="Button__"+f+"__"+l.data("target");l.prop("id",e)});d.each(function(){l=a(this);e="Tab__"+f+"__"+l.data("name");l.prop("id",e)});m.on("click.ionTabs",function(b){b.preventDefault();s[0].style.display="block";p(a(this).data("target"))});var p=function(c){c=decodeURIComponent(c);e="#Button__"+f+"__"+c;a(e).addClass("ionTabs__tab_state_active").siblings().removeClass("ionTabs__tab_state_active");e="#Tab__"+f+"__"+c;a(e).addClass("ionTabs__item_state_active").siblings().removeClass("ionTabs__item_state_active");s[0].style.display="none";var d;k[f]=c;b="tabs";for(d in k)k.hasOwnProperty(d)&&(b+="|"+encodeURIComponent(d)+":"+encodeURIComponent(k[d]));"hash"===h.type&&(n.hash=b);"storage"===h.type&&t.save(n.hostname+"__ionTabsPosition",b);v.trigger("ionTabsChange",{group:f,tab:c,tabId:e});if("function"===typeof h.onChange)h.onChange({group:f,tab:c,tabId:e})};k[f]?p(k[f]):p(m.eq(0).data("target"));this.setTab=function(a){p(a)}}};a.ionTabs=function(c,m){if(c){var g;h=a.extend({type:"hash",onChange:null},m);"hash"===h.type&&(b=n.hash);"storage"===h.type&&(b=t.load(n.hostname+"__ionTabsPosition"));if(b){b=b.split("|");if(1<b.length)for(d=1;d<b.length;d+=1)r=b[d].split(":"),k[decodeURIComponent(r[0])]=decodeURIComponent(r[1]);b=""}a(c).each(function(){g=a(this);var b=encodeURIComponent(g.data("name"));q[b]=new u(g);q[b].init()})}};a.ionTabs.setTab=function(a,b){q[a].setTab(b)}}})(jQuery,document,window,location);</script>
+	</apex:define>
+</apex:composition>
+
+</apex:page>

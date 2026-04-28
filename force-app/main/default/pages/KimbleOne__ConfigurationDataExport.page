@@ -1,0 +1,222 @@
+<apex:page sidebar="false" standardcontroller="KimbleOne__ConfigurationDataExport__c" extensions="KimbleOne.ConfigurationDataExportController,KimbleOne.FilesAndAttachmentsController">
+
+    <script type="text/javascript">
+    	var __sfdcSessionId = '{!GETSESSIONID()}';
+    	sforce.connection.sessionId = __sfdcSessionId;
+    </script>
+	
+	<apex:outputPanel layout="none" rendered="{!$Label.kimbleone__namespace == 'null'}">
+		<script>
+			var KimbleNamespaceWithUnderscores = '';
+		</script>
+	</apex:outputPanel>
+	<apex:outputPanel layout="none" rendered="{!$Label.kimbleone__namespace != 'null'}">
+		<script>
+			var KimbleNamespaceWithUnderscores = '{!JSENCODE($Label.Namespace)}__';
+		</script>
+	</apex:outputPanel>
+	
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__ConfigurationDataJs)}" />
+	
+	<apex:outputPanel layout="none" rendered="{!!ConfigScopeOverriden}">
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__ConfigurationDataExportScope)}" />
+	</apex:outputPanel>
+	<apex:outputPanel layout="none" rendered="{!ConfigScopeOverriden}">
+		<apex:includeScript value="{!JSENCODE(ConfigScopeOverrideResourcePath)}" />
+	</apex:outputPanel>
+		
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuery, 'jquery-1.10.1.min.js')}"/>
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryUI, 'js/jquery-ui-1.10.3.custom.min.js')}"/>
+
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQueryUI, 'css/cupertino/jquery-ui-1.10.3.custom.min.css')}"/>
+
+	<apex:includeScript value="/soap/ajax/29.0/connection.js"/>
+	<apex:includeScript value="/soap/ajax/29.0/apex.js"/>
+
+      
+    <apex:pageMessages escape="false"/>
+     	
+	<apex:pageBlock title="Export Kimble Configuration Data">
+		
+		<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+
+		<apex:outputPanel layout="none">
+				<input type="button" class="btn" id="exportBtn" value="Export Configuration Data" onclick="resetProgressBar();exportKimbleConfigurationData();"/>
+		</apex:outputPanel>
+						
+		</apex:pageblockSection>
+	
+	</apex:pageBlock>
+	
+	<apex:pageBlock title="Export Progress">
+		
+		<apex:pageblockSection collapsible="true" showheader="false" columns="1" >
+
+		<apex:outputPanel layout="none">
+			<div id="progressbar"><div class="progress-label"></div></div>	
+		</apex:outputPanel>
+		
+		<div id="logMessages" style="width: 100%;height: 100px;overflow: auto"></div>
+							
+		</apex:pageblockSection>
+	
+	</apex:pageBlock>
+	
+	<apex:pageBlock title="Org Contents For Export">
+		
+		<apex:pageblockSection collapsible="true" showheader="false" columns="1" >
+
+		<input type="button" class="btn" value="Select All" onclick="setAllExportCheckboxes(true);"/>
+		<input type="button" class="btn" value="Clear Selection" onclick="setAllExportCheckboxes(false);"/>
+		
+		<span class="resourceScopeLabel">Resource Scope:</span>
+		<label class="resourceScopeRadioLabel" for="groupsAndGenericsInd">Groups and Generics Only</label> 
+		<input type="radio" name="resourceScope" id="groupsAndGenericsInd" checked="checked" onclick="toggleAllResources(false);"/>
+		<label class="resourceScopeRadioLabel" for="allResourcesInd">All Resources</label> 
+		<input type="radio" name="resourceScope" id="allResourcesInd" onclick="toggleAllResources(true);"/>
+		
+		<apex:outputPanel layout="none">
+			<table id="configurationObjectDetail">
+		     <thead class="ui-widget-header">
+ 			 	<tr>
+ 			 		<th>Export?</th>
+					<th>sObjectName</th>
+					<th>Restriction</th>
+					<th>Count</th>
+				</tr>
+		     </thead>
+ 			 <tbody class="ui-widget-content">
+  			</tbody>
+			</table>
+		</apex:outputPanel>
+							
+		</apex:pageblockSection>
+	
+	</apex:pageBlock>
+
+	<style>
+	
+	.resourceScopeLabel
+	{
+		margin-left: 50px;
+		font-weight: bold;
+	}
+
+	.resourceScopeRadioLabel
+	{
+		margin-left: 10px;
+	}
+	
+	.exportRestrictionInput
+	{
+		width: 300px;
+		font-size: 8pt;
+	}
+	
+	.ui-progressbar
+	{
+	  position: relative;
+	}
+	
+	.progress-label
+	{
+	  position: absolute;
+	  left: 50%;
+	  top: 4px;
+	  font-weight: bold;
+	  text-shadow: 1px 1px 0 #fff;
+	}
+	
+	.GOOD
+	{
+	  color: green;
+	}
+	
+	.INFO
+	{
+	  color: black;
+	}
+	
+	.ERROR
+	{
+	  color: red;
+	}
+		
+	</style>
+		
+	<script>
+	
+		var isFilesEnabled = <apex:outputText value="{!FilesEnabled}"/>;
+		
+		var isKimbleMaster = <apex:outputText value="{!IsMasterOrg}"/>;
+		var exportPageSizeOverride = <apex:outputText value="{!ExportPageSizeOverride}"/>;
+		
+		if(exportPageSizeOverride != 0) exportPageSize = exportPageSizeOverride; 
+		
+		var progressbar;
+		
+		// in orgs where there is more than one version of jQuery installed we must explicitly override other versions
+		jQuery1_10_1 = $.noConflict( true );
+	
+		jQuery1_10_1(document).ready(function()
+		{
+			jQuery1_10_1('#exportBtn').prop('disabled', true).addClass('btnDisabled');
+			analyseOrgForExport();
+			
+			progressbar = jQuery1_10_1( "#progressbar" ),
+    		progressLabel = jQuery1_10_1( ".progress-label" );
+
+		  	progressbar.progressbar({
+		    	value: false,
+		    	change: function() {
+		      		progressLabel.text( progressbar.progressbar( "value" ).toFixed(2) + "%" );
+		    	},
+		    	complete: function() {
+		      		progressLabel.text( "Done" );
+		    	}
+		  	});
+		  	jQuery1_10_1('#exportBtn').prop('disabled', false).removeClass('btnDisabled');
+		});
+
+		function incrementProgressBar(incrementValue)
+		{
+	 		var val = progressbar.progressbar( "value" ) || 0;
+	
+	    	progressbar.progressbar( "value",  val + incrementValue);
+	 	}
+
+	 	function resetProgressBar()
+	 	{
+	 		progressbar.progressbar( "value",  0);
+	 	}
+	 	 	
+	 	function completeProgressBar()
+	 	{
+	 		progressbar.progressbar( "value",  100);
+	 	}
+	 	
+		function querySObjectsViaRemoting(queryToExecute, pageSize, lastId, cumulativeQueryResults, callback)
+		{ 
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ConfigurationDataExportController.Query}',
+		       		queryToExecute, pageSize, lastId,
+		      			function(result, event){          
+		             		
+		             		if (event.status) 
+				            {
+				             	callback(result, queryToExecute, pageSize, cumulativeQueryResults);		             								
+				         	} 
+				         	else if (event.type === 'exception') 
+				         	{
+				             	alert(event.message);
+				         	} 
+				         	else 
+				         	{
+				             	alert(event.message);
+				         	}
+		         	}, 
+		         	{escape: true, buffer: false, timeout: 60000}
+		     	);
+	     	}
+	</script>
+
+</apex:page>

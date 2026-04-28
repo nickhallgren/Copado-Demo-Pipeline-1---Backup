@@ -1,0 +1,181 @@
+<apex:page standardController="KimbleOne__ApplicationRole__c" extensions="KimbleOne.ApplicationRoleUsersController" sidebar="false">
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu"> 
+	<c:Menu MenuContextType="ApplicationRole" MenuContextId="{!KimbleOne__ApplicationRole__c.Id}" MenuContextName="{!KimbleOne__ApplicationRole__c.Name}"/>
+</apex:define>
+    
+<apex:define name="Content">
+
+<script>
+
+	
+function removeUserFromRoleExc(userId)
+{
+	userIdToRefresh = userId;
+	removeUserFromRole(userId);	
+}
+
+var userIdToRefresh;
+
+	function setSelectedUsers()
+	{
+		var selectedItems=''; 
+		$("input:checkbox[name=Users]:checked").each(function(){
+			selectedItems=selectedItems+','+$(this).val();
+  		});
+		$('.SelectedUsers').val(selectedItems);
+	}
+	function setUpCheckBoxes()
+	{
+		jQuery('#AllUsers').unbind('change');
+		jQuery('#AllUsers').change(function(){
+			UncheckOrCheckGroup(jQuery(this),'Users');
+		});
+		jQuery('.AUser').unbind('change');
+		jQuery('.AUser').change(function(){
+			UnCheckParent($(this),'AllUsers');
+		});
+	}		
+ </script>
+ <apex:outputPanel id="mainPanel">
+ 	<apex:pageMessages escape="false"/>
+	<apex:form > 
+       		<apex:actionFunction action="{!removeUserFromRole}" name="removeUserFromRole" rerender="mainPanel" >
+      			<apex:param name="userId" value="" />
+			</apex:actionFunction>
+
+			<apex:actionFunction action="{!cleanUserList}" name="cleanUserList" rerender="SearchUsersPanel" oncomplete="showModalBoxy();" />
+
+			<apex:pageBlock >				
+				<apex:pageBlockButtons >
+					<apex:outputPanel layout="none"  rendered="{!$ObjectType.KimbleOne__ApplicationRole__c.updateable}">
+				    	<input class="btn" type="button" onclick="initialiseModalBoxy('#SearchUsersPopup', '{!JSENCODE($Label.ApplicationRoleAddUser)}');cleanUserList();" value="{!$Label.ApplicationRoleAddUser}"/>
+				    </apex:outputPanel>
+				</apex:pageBlockButtons>
+
+             	<apex:pageBlockTable value="{!UsersWithCurrentRole.TheRecords}" var="user" title="{!$ObjectType.KimbleOne__ApplicationRole__c.label} {!$ObjectType.User.labelplural}">
+               		<apex:column rendered="{!$ObjectType.KimbleOne__ApplicationRole__c.updateable}">
+               				<apex:facet name="header">{!$Label.kimbleone__actionlinksheader}</apex:facet>
+               				<a class="actionLink" onclick="var d = confirmDelete();if(!d) return; removeUserFromRoleExc('{!JSINHTMLENCODE(user.Id)}');">{!$Label.kimbleone__delete}</a>
+				    </apex:column>
+               		<apex:column headerValue="{!$ObjectType.User.Fields.Name.Label}">
+               			<apex:outputLink value="../{!userIdToResourceIdMap[user.Id]}" rendered="{!userIdToResourceIdMap[user.Id]!='NONE'}" title="{!$Label.kimbleone__applicationrolejumpresource}">{!user.Name}</apex:outputLink>
+               			<apex:outputPanel rendered="{!userIdToResourceIdMap[user.Id]=='NONE'}">{!user.Name}</apex:outputPanel>
+               		</apex:column>
+               		<apex:column value="{!user.UserName}" headerValue="{!$ObjectType.User.Fields.UserName.Label}"/>
+               		<apex:column value="{!user.IsActive}" headerValue="{!$ObjectType.User.Fields.IsActive.Label}"/>
+				</apex:pageBlockTable>		
+									
+				<apex:pageBlockSection columns="3" collapsible="false">
+					<apex:outputText value="{!UsersWithCurrentRole.CurrentPageDescription}"/>
+					<apex:pageBlockSectionItem >
+						<apex:selectRadio value="{!usersWithCurrentRole.ThePageSize}">
+				            <apex:actionSupport event="onclick"  action="{!usersWithCurrentRole.Reset}"  rerender="mainPanel" status="pageStatus"/>
+							<apex:selectOptions value="{!pageResultsOptions}" />
+						</apex:selectRadio>
+					</apex:pageBlockSectionItem>
+					<apex:pageBlockSectionItem >
+						<apex:outputPanel >
+							<div style="float: right; margin-right: 15px; margin-top:15px;">
+						    	<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!UsersWithCurrentRole.GoPrevious}" rerender="mainPanel" rendered="{!UsersWithCurrentRole.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+						    	<apex:outputText styleclass="greyedLink" rendered="{!!UsersWithCurrentRole.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+						    	&nbsp;|&nbsp;
+						    	<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!UsersWithCurrentRole.GoNext}" rerender="mainPanel" rendered="{!UsersWithCurrentRole.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+						    	<apex:outputText styleclass="greyedLink" rendered="{!!UsersWithCurrentRole.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+							</div>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+				</apex:pageBlockSection>
+				<apex:actionStatus id="pageStatus"  startText=".. {!$Label.kimbleone__refreshinglabel}"  stopText=""/>
+			</apex:pageBlock>
+			
+	</apex:form>
+				
+ </apex:outputPanel>
+				
+				
+   <div id="SearchUsersPopup" style="display:none;">
+ 
+	<apex:outputPanel id="SearchUsersPanel">
+		<apex:form >
+	      <div id="SearchUsersErrors">
+			<apex:pageMessages escape="false"/> 
+		  </div>
+
+ 			<apex:inputText value="{!usersToAssign}"  styleclass="HideControl SelectedUsers"/> 
+				
+       		<apex:actionFunction action="{!searchUser}" name="searchUser" rerender="resultsPanel" status="resultsPanel" oncomplete="setUpCheckBoxes()">
+       			<apex:param name="searchText" value="" />
+       			<apex:param name="selectedResourceGroupId" value="" />
+       		</apex:actionFunction>
+
+       		<apex:actionFunction action="{!assignUsers}" name="assignUsers" oncomplete="hideModalBoxyWithErrorCheck('#SearchUsersErrors')" rerender="mainPanel, SearchUsersPanel" />
+ 		
+			<apex:pageBlock >               
+				<apex:pageBlockSection columns="3">
+					<apex:pageBlockSectionItem >
+						<apex:outputLabel value="{!$ObjectType.User.label} {!$ObjectType.User.Fields.Name.Label}"/>
+	            		<input type="text" value="" class="queryText"/>
+	            	</apex:pageBlockSectionItem>
+	            	<apex:pageBlockSectionItem >
+						<apex:outputLabel value="{!$Label.kimbleone__filter} {!$ObjectType.Group.label}"/>
+	            		<apex:inputText styleclass="kimblecustomlookup GetResourceGroups null false true comboGroup" />
+	            	</apex:pageBlockSectionItem>
+	            	<apex:pageBlockSectionItem >
+	            		<input type="button" class="btn" value="{!$Label.ApplicationRoleSearchUser}" onclick="searchUser($('.queryText').val(),$('.comboGroup').val());"/>
+	            		&nbsp;
+	            	</apex:pageBlockSectionItem>
+					
+	            </apex:pageBlockSection>
+	         
+	         	<div style="max-height: 300px;overflow-y: auto;">
+	           	<apex:actionStatus id="resultsPanel">
+					<apex:facet name="start">
+						<div style="margin-top:20px; margin-bottom:20px;margin-left:12px">
+							<span style="font-weight: bold;color: #4A4A56;font-size: 91%;"><img src="{!URLFOR($Resource.KimbleOne__LoadingImage)}" style="margin-right: 8px;position: relative;top: 2px;"/>{!$Label.kimbleone__loading}</span>
+						</div>
+					</apex:facet>
+					<apex:facet name="stop">
+					<apex:outputpanel style="height:200px;overflow-y: auto; overflow-x: auto;">
+					<apex:pageMessages escape="false"/> 
+					<apex:pageBlockTable value="{!userList}" var="user" >
+						<apex:column >
+		 					<apex:facet name="header">
+		 						<apex:outputPanel layout="none" rendered="{!userList!=null || userList.size!=0}">
+		 							<input type="checkbox" name="Users" value="AllUsers" id="AllUsers"  />
+		 						</apex:outputPanel>		
+		 					</apex:facet>
+		 					<input type="checkbox" name="Users" value="{!user.Id}" class="AUser"/>
+		 				</apex:column>
+						<apex:column >
+							{!user.Name}
+								<input type="text" class="users HideControl" value="{!user.Id}"/>
+						</apex:column>
+						<apex:column >
+							{!user.UserName}
+						</apex:column>
+					</apex:pageBlockTable>
+					</apex:outputpanel>	            	
+				</apex:facet>
+				</apex:actionStatus>
+				</div>
+
+            	<apex:pageBlockButtons >	            		
+            		<input type="button" class="btn DisableButtonWhileBusy" value="{!$Label.Save}" onclick="setSelectedUsers();assignUsers();"/>
+					<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>	            		
+            	</apex:pageBlockButtons>
+	            
+       		</apex:pageBlock>
+		</apex:form>    
+	</apex:outputpanel>     
+    </div>
+				
+				
+				
+</apex:define>
+</apex:composition>
+
+
+
+</apex:page>

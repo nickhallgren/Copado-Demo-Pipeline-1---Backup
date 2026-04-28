@@ -1,0 +1,155 @@
+<apex:page standardController="KimbleOne__Resource__c" extensions="KimbleOne.TimesheetPrintController" showHeader="false" sidebar="false" renderAs="pdf">
+<html>
+		<head>
+			<style>table.sigTable tr td { height: 30px }
+			@page {
+				size: A4 landscape !important;
+			}
+			</style>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__PdfHeaderFooterStyle, 'PdfHeaderFooterStyle-A4.css')}"/>
+			<apex:stylesheet value="{!$Resource.KimbleOne__InvoiceCreditNoteStyle}" />
+		</head> 
+  		<body class="textLeft">
+			<c:PdfHeaderFooter type="header" position="right">
+	    		<div>                   
+	        		<apex:image value="{!documentUrl}" styleClass="image" height="{!$Label.kimbleone__invoiceprintt1imageheight}" width="{!$Label.kimbleone__invoiceprintt1imagewidth}" rendered="{!includeSignature}"></apex:image>
+	    		</div>
+			</c:PdfHeaderFooter>
+			<c:PdfHeaderFooter type="header" position="left" textStyleClass="">
+    			<div>                   
+       				<h2>
+		  				<apex:outputText value="{!UPPER($ObjectType.KimbleOne__Timesheet__c.Label)}"/> ( <apex:outputText value="{!thePeriod.Name}"/>)
+		 			</h2>
+  				</div>
+			</c:PdfHeaderFooter>
+			
+			<c:PdfHeaderFooter type="footer" position="right" textStyleClass="textRight"  showPageNumbers="true"/>
+			
+			<apex:variable var="counter" value="{!0}"/>
+  			
+  			<apex:repeat value="{!Activities}" var="activity">
+				
+				<apex:outputPanel id="pageBreakOnActivity" rendered="{!includeSignature}">
+					<hr style="{!IF(counter>0,'page-break-before: always;','')}"/>
+				</apex:outputPanel>
+				
+				<apex:outputPanel id="noPageBreakOnActivity" rendered="{! !includeSignature}">
+					<hr/>
+				</apex:outputPanel>
+				
+				<apex:pageBlock >
+					
+					<table id="invoiceDetails" class="table">
+            		<apex:variable var="counter" value="{!counter+1}"/>
+            			<tbody>
+                			<tr>
+                			    <!-- Left Hand Column -->
+                    			<td width="60%">
+                    				 <table class="table">
+                            			<tbody>
+                                			<tr>                                    
+                                    			<td class="boldLabel">
+                                    				<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Label}: " />
+                                    				<apex:outputText value="{!TheResource.Name}" />
+                                    			</td>
+                                			</tr>                               
+                                		</tbody>
+                                	  </table>
+                                </td>
+                                <td width="40%">
+                                	<table class="table">
+                            			<tbody>
+                                			<tr>                                    
+                                    			<td class="boldLabelRight">
+                                    				<apex:outputText value="{!$Label.kimbleone__total} {!$Label.kimbleone__units}: " />
+													<apex:outputText value="{!ActivityEntrySum[activity.Id]} ({!activity.UsageUnitType__r.KimbleOne__Suffix__c})"/>
+                                    			</td>
+                                			</tr>                               
+                                		</tbody>
+                                	  </table>
+                                </td>
+                            </tr>
+                            <tr>
+                            	 <td width="60%" class="boldLabel">
+                                	<apex:outputText value="{!$Label.kimbleone__activity}: " />
+							<apex:outputText value="{!activity.KimbleOne__FullName__c}" />
+                                </td>
+                            </tr>
+                    	</tbody>
+                    </table>
+					
+					<br/>
+					<apex:pageBlockTable cellpadding="2" border="1" value="{!ActivityEntries[activity.Id]}" var="entry" styleclass="labelCell smallFontOverride">
+						<apex:column value="{!entry.TimePeriod__r.Name}" headerValue="{!$ObjectType.KimbleOne__TimePeriod__c.Label}({!$Label.kimbleone__day})"/>
+						<apex:column headerValue="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__PlanTaskAssignment__c.Label}  /  {!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Reference__c.Label}"  >
+							<apex:outputText value="{!entry.PlanTaskAssignment__r.PlanTask__r.Task__r.Name}"/> 
+							<br/>
+							<apex:outputText value="{!entry.Reference__c} "/>
+						</apex:column>
+						<apex:column value="{!entry.ActivityAssignment__r.ActivityRole__r.Name}" headerValue="{!$Label.kimbleone__role}"/>
+						<apex:column headerValue="{!$Label.kimbleone__units} ({!activity.UsageUnitType__r.KimbleOne__Suffix__c})">
+							<apex:outputText value="{!IF(ISBLANK(entry.FormattedEntryUnits__c),entry.EntryUnits__c,entry.FormattedEntryUnits__c)}"/>
+						</apex:column>
+						<apex:column value="{!entry.ActivityAssignmentRate__r.ActivityPeriodRateband__r.Name}" headerValue="{!$Label.kimbleone__day}"/>
+						<apex:column value="{!entry.Notes__c}" headerValue="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Notes__c.Label}"/>
+						
+						<apex:column headerValue="{!$ObjectType.KimbleOne__Timesheet__c.Fields.KimbleOne__ApprovalStatus__c.Label} ">
+					 		<apex:outputtext value="{!entry.TimeSheet__r.ApprovalStatus__c}" rendered="{!NOT(ISBLANK(entry.TimeSheet__c))}" /> 
+							<apex:outputtext value="{!$Label.kimbleone__approvalstatusdraftlabel}" rendered="{!ISBLANK(entry.TimeSheet__c)}"/> 
+						</apex:column>
+						
+						<apex:repeat value="{!TheActivityTimeCategories[activity.Id]}" var="category">
+							<apex:column headerValue="{!category.Name} ">
+					 			<apex:outputtext value="{!entry.category1__c}" rendered="{!category.DisplaySequence__c==1}" /> 
+								<apex:outputtext value="{!entry.category2__c}" rendered="{!category.DisplaySequence__c==2}" /> 
+								<apex:outputtext value="{!entry.category3__c}" rendered="{!category.DisplaySequence__c==3}" /> 
+								<apex:outputtext value="{!entry.category4__c}" rendered="{!category.DisplaySequence__c==4}" /> 
+								<apex:outputtext value="{!entry.category5__c}" rendered="{!category.DisplaySequence__c==5}" /> 
+							</apex:column>
+						</apex:repeat>
+				
+
+					</apex:pageBlockTable>
+				</apex:pageBlock>
+				<br/>
+				<br/>
+				<br/>
+				
+				<apex:pageBlock rendered="{!includeSignature}">
+				<table border="1" class="sigTable" cellspacing="0" width="100%">
+					<tr>
+						<td class="boldLabel" width="50%">{!$ObjectType.Resource__c.Label}</td>
+						<td class="boldLabel" width="50%">{!$Label.ClientLabel}</td>
+					</tr>
+					<tr>
+						<td style="height: 50px">
+							{!$Label.SignedLabel}:
+						</td>
+						<td style="height: 50px">
+							{!$Label.SignedLabel}:
+						</td>
+					</tr>
+					<tr>
+						<td>
+							{!$Label.DateLabel}:
+						</td>
+						<td>
+							{!$Label.DateLabel}:
+						</td>
+					</tr>
+					<tr>
+						<td>
+							{!$Label.Name}:
+						</td>
+						<td>
+							{!$Label.Name}:
+						</td>
+					</tr>
+				</table> 	
+				</apex:pageBlock>
+						
+			</apex:repeat>
+			</body>
+		</html>
+		
+</apex:page>

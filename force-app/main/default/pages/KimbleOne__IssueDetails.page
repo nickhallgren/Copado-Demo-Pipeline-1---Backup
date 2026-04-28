@@ -1,0 +1,199 @@
+<apex:page standardController="KimbleOne__Issue__c" extensions="KimbleOne.IssueDetailsController" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+	<c:Menu DefaultHelpPage="Issues.html" MenuContextType="{!IF(ISBLANK(KimbleOne__Issue__c.KimbleOne__Proposal__c), 'DeliveryGroup','Proposal')}" MenuContextId="{!IF(ISBLANK(KimbleOne__Issue__c.KimbleOne__Proposal__c), KimbleOne__Issue__c.KimbleOne__DeliveryGroup__c,KimbleOne__Issue__c.KimbleOne__Proposal__c)}" MenuContextName="{!IF(ISBLANK(KimbleOne__Issue__c.KimbleOne__Proposal__c), KimbleOne__Issue__c.DeliveryGroup__r.Name ,KimbleOne__Issue__c.Proposal__r.Name)}"/>
+
+</apex:define>  
+   
+<apex:define name="Content">
+
+	   
+	<apex:pagemessages escape="false"/>
+
+	<chatter:feedWithFollowers entityId="{!KimbleOne__Issue__c.Id}" rendered="{!ShowChatter}"/>
+	
+    <apex:form >
+		<apex:outputPanel id="IssueDetailsPanel" >
+		    	<apex:pageBlock id="IssueDetailsBlock" title="{!$ObjectType.KimbleOne__Issue__c.Label}">
+		    	
+		    	    <apex:pageBlockButtons location="top">
+    				<apex:commandButton rendered="{!KimbleOne__Issue__c.DeliveryGroup__r.DeliveryStage__r.KimbleOne__AllowNewIssues__c}" action="{!Edit}" value="{!$Label.kimbleone__edit} {!$ObjectType.KimbleOne__Issue__c.label}"/>
+    				</apex:pageBlockButtons> 
+		    	  
+		    		<div id="IssueDetailsErrors">
+           				<apex:pageMessages escape="false"/>
+           			</div>
+		    	   
+					<apex:pageBlockButtons location="bottom"> 
+						<apex:commandButton action="{!goToIssueManager}" value="{!$Label.kimbleone__back}" oncomplete="" reRender=""/>						
+					</apex:pageBlockButtons>
+					
+             		<apex:pageblockSection collapsible="false" showheader="false"  columns="2">
+             		 
+               			<apex:outputfield value="{!KimbleOne__Issue__c.Name}" />  
+               			<apex:outputfield value="{!KimbleOne__Issue__c.KimbleOne__IssueImpact__c}" />
+               			
+               			<apex:outputfield value="{!KimbleOne__Issue__c.KimbleOne__Status__c}" />               			               			
+               			<apex:outputfield value="{!KimbleOne__Issue__c.KimbleOne__IsInternal__c}" />
+               			
+               			<apex:outputfield value="{!KimbleOne__Issue__c.KimbleOne__IssueCategory__c}" />
+               			<apex:outputfield value="{!KimbleOne__Issue__c.KimbleOne__ClosedDate__c}" />
+               			
+               			<apex:outputfield value="{!KimbleOne__Issue__c.KimbleOne__Summary__c}" />
+               			<apex:outputfield value="{!KimbleOne__Issue__c.KimbleOne__Description__c}" />
+               			
+               			<apex:outputfield value="{!KimbleOne__Issue__c.KimbleOne__RaisedByContact__c}" />
+               			<apex:outputfield value="{!KimbleOne__Issue__c.KimbleOne__OwnedByContact__c}" />
+               			<apex:outputfield value="{!KimbleOne__Issue__c.KimbleOne__Risk__c}" />               			               			               			               			               			               			               			               			               			
+               			
+               			<apex:repeat value="{!$ObjectType.KimbleOne__Issue__c.FieldSets.KimbleOne__IssueDetails}" var="f">
+     						<apex:outputField value="{!theIssue[f]}"/>
+   						</apex:repeat>
+               			               			               			               			               			               			               			               			
+					</apex:pageBlockSection>					
+
+		    	</apex:pageBlock>
+		</apex:outputPanel>
+		    
+    </apex:form>
+    
+        
+    
+    <apex:form >
+		<apex:outputPanel id="IssuesResolutionListPanel" >
+		    	<apex:pageBlock id="IssuesResolutionListBlock" title="{!$ObjectType.Issue__c.Label }">  
+		    		<div id="IssuesResolutionListErrors">
+           				<apex:pageMessages escape="false"/>
+           			</div>
+		    	   
+		    	    <apex:pageBlockButtons location="top">	
+						<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__IssueResolution__c.createable}">
+							<apex:commandButton rendered="{!KimbleOne__Issue__c.DeliveryGroup__r.DeliveryStage__r.KimbleOne__AllowNewIssues__c}" action="{!newIssueResolution}" value="{!$Label.kimbleone__new} {!$ObjectType.KimbleOne__IssueResolution__c.label}" onclick="initialiseModalBoxy('#IssuesResolutionEditPopup', '{!JSENCODE($Label.kimbleone__new)} {!$ObjectType.KimbleOne__IssueResolution__c.label}');$('#IssuesResolutionEditPopup')[0].style.visibility='visible';" onComplete="initialiseItems();" reRender="IssuesResolutionEdit"/>
+						</apex:outputPanel>						
+					</apex:pageBlockButtons>
+		    	
+					<apex:pageBlockTable value="{!issuesResolutionList}" var="issueResolutionLine">
+		       			<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+							<apex:outputPanel rendered="{!$ObjectType.KimbleOne__IssueResolution__c.updateable}">
+								<apex:outputLink value="#" onclick="editIssueResolution('{!JSINHTMLENCODE(issueResolutionLine.id)}');initialiseModalBoxy('#IssuesResolutionEditPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__IssueResolution__c.label}');showModalBoxy();">{!$Label.kimbleone__edit}</apex:outputLink>
+			  				</apex:outputPanel>
+			  				<apex:outputPanel rendered="{!$ObjectType.KimbleOne__IssueResolution__c.deletable}">
+			  					&nbsp;|&nbsp;
+			  					<apex:outputLink value="#" onclick="deleteIssueResolution('{!JSINHTMLENCODE(issueResolutionLine.id)}');">{!$Label.kimbleone__delete}</apex:outputLink>
+			  				</apex:outputPanel>
+						</apex:column>						  		
+						<apex:column value="{!issueResolutionLine.KimbleOne__Summary__c}" headerValue="{!$ObjectType.KimbleOne__IssueResolution__c.Fields.KimbleOne__Summary__c.Label}"/>						
+						<apex:column value="{!issueResolutionLine.KimbleOne__AssignedToContact__c}" headerValue="{!$ObjectType.KimbleOne__IssueResolution__c.Fields.KimbleOne__AssignedToContact__c.Label}"/>
+						<apex:column value="{!issueResolutionLine.KimbleOne__DueDate__c}" headerValue="{!$ObjectType.KimbleOne__IssueResolution__c.Fields.KimbleOne__DueDate__c.Label}"/>
+						<apex:column value="{!issueResolutionLine.KimbleOne__ClosedDate__c}" headerValue="{!$ObjectType.KimbleOne__IssueResolution__c.Fields.KimbleOne__ClosedDate__c.Label}"/>						
+					</apex:pageBlockTable>
+
+		    	</apex:pageBlock>
+		</apex:outputPanel>
+		    
+		    
+       	<apex:actionFunction action="{!deleteIssueResolution}" name="deleteIssueResolution" rerender="IssuesResolutionListPanel, IssuesResolutionEdit" oncomplete="">
+     		<apex:param name="irId" value="" />
+		</apex:actionFunction>
+		    
+       	<apex:actionFunction action="{!editIssueResolution}" name="editIssueResolution" rerender="IssuesResolutionListPanel, IssuesResolutionEdit" oncomplete="initialiseItems();">
+     		<apex:param name="irId" value="" />
+		</apex:actionFunction>
+
+		    
+    </apex:form>
+        
+    
+    
+    
+    
+    
+	<div id="IssuesResolutionEditPopup" style="display:none"> 
+  
+		<apex:outputPanel id="IssuesResolutionEdit">
+     	  <apex:form >
+           		<apex:pageBlock >
+           		 
+           			<div id="EditIssuesResolutionErrors">
+           				<apex:pageMessages escape="false"/>
+           			</div>
+            		<apex:pageBlockButtons location="bottom">
+						<apex:commandButton action="{!saveIssueResolution}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#EditIssuesResolutionErrors');initialiseItems();" reRender="IssuesResolutionListPanel"/>
+						<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+					</apex:pageBlockButtons>
+
+             		<apex:pageblockSection collapsible="false" showheader="false" columns="1">             
+               			<apex:inputfield value="{!aIssueResolution.KimbleOne__Summary__c}" style="width:500px;"/>
+               		</apex:pageblockSection>
+               		
+               		<apex:pageblockSection collapsible="false" showheader="false" columns="2">
+						<apex:inputfield value="{!aIssueResolution.KimbleOne__AssignedToContact__c}" />												
+						<apex:inputfield value="{!aIssueResolution.KimbleOne__DueDate__c}" styleclass="kimbleDatePicker" />
+						<apex:inputfield value="{!aIssueResolution.KimbleOne__AssignedDate__c}" styleclass="kimbleDatePicker withTime"/>
+						<apex:inputfield value="{!aIssueResolution.KimbleOne__ClosedDate__c}" styleclass="kimbleDatePicker"/>
+					</apex:pageblockSection>
+					 
+					<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+						<apex:inputfield value="{!aIssueResolution.KimbleOne__Notes__c}" style="width:500px;"/>						               			
+		            </apex:pageBlockSection>
+            
+        		</apex:pageBlock>
+	
+         	</apex:form>
+
+        </apex:outputPanel> 
+  
+	</div>
+
+	<script>
+
+	jQuery(window).load(function()
+	{
+		initialiseItems();
+	});
+
+	function initialiseItems()
+	{
+		SetupDatePicker();
+		SetupDatePickerWithTime();
+	}
+
+	function SetupDatePicker()
+	{
+		//dateFormat: 'yy-mm-dd',
+		jQuery('.kimbleDatePicker:not(.withTime)').datepicker({
+		dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+		showOtherMonths: true,
+		selectOtherMonths: true,
+		changeMonth: true,
+		changeYear: true});
+	}
+
+	function SetupDatePickerWithTime()
+	{
+	    jQuery('.kimbleDatePicker.withTime').datepicker({
+		dateFormat: kimble.regional.dateFormat,
+		firstDay: kimble.firstDayIndex,
+		showOtherMonths: true,
+		selectOtherMonths: true,
+		changeMonth: true,
+		changeYear: true,
+		onSelect: function()
+		{
+			jQuery(this).val(jQuery(this).val() + ' ' + '{!startTime}');
+  		}
+		});
+
+ 	}
+
+	</script>
+
+    </apex:define>
+</apex:composition> 
+
+
+
+</apex:page>

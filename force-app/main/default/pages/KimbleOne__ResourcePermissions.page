@@ -1,0 +1,188 @@
+<apex:page standardController="KimbleOne__Resource__c" sidebar="false" extensions="KimbleOne.ResourcePermissionsController">
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu"> 
+	<c:Menu DefaultHelpPage="AssignApplicationRolesandPermiss.html" MenuContextType="Resource" MenuContextId="{!KimbleOne__Resource__c.Id}" MenuContextName="{!KimbleOne__Resource__c.Name}"/> 
+</apex:define>
+    
+<apex:define name="Content">
+ 
+<script>
+
+   	function toggleCheckboxes(parent) 
+	{
+		var p = jQuery(parent);
+		
+		jQuery.each(jQuery('[parent-id="' + p.attr('id') + '"]'), function(i, obj)
+		{
+			jQuery(obj).find('input').prop('checked', p.prop('checked'));
+		});
+	}	
+	
+	jQuery(document).ready(function() {
+		refreshSlide();
+		
+		//Check permission group where all children checked
+		
+		jQuery.each(jQuery('.permission-group'), function(i, permGroup){
+		
+			var allChecked = true;
+			var p = jQuery(permGroup);
+			
+			jQuery.each(jQuery('[parent-id="' + p.attr('id') + '"]'), function(i, obj)
+			{
+				if (jQuery(obj).find('input').prop('checked') == false) allChecked = false;				
+			});
+			
+			p.prop('checked', allChecked);
+		
+		});
+			
+	});
+
+	function refreshSlide()
+   	{
+   		 jQuery("tr.head>td>span.slide").click(function () { 
+   			if(jQuery(this).is('.expanded'))
+   				jQuery(this).addClass('collapsed').removeClass('expanded');
+   			else
+   				jQuery(this).addClass('expanded').removeClass('collapsed');
+   			
+   			jQuery("tr.body[parentid=" + jQuery(this).parent().parent().attr('id')+"]").slideToggle("fast");
+   		});
+   	}
+   	
+</script>
+ 
+ <style>
+	tr.head>td 
+{
+	background-color:#1797C0;
+	color:white;
+	text-align:left;
+	font-weight: bold;
+	padding:4px 4px 4px 4px;
+	
+}
+
+.slide
+{
+cursor:pointer
+}
+.expanded
+{
+	background-image: url("{!URLFOR($Resource.TimesheetGrid, 'expanded.gif')}");
+	background-repeat:no-repeat;
+}
+.collapsed
+{
+	background-image: url("{!URLFOR($Resource.TimesheetGrid, 'collapsed.gif')}");
+	background-repeat:no-repeat;
+}
+.invalid-permission-ind, .permission-info-ind
+{
+    font-size: 16px;
+    margin-left: 2px;
+}
+.permission-info-ind
+{
+    color: #626262;
+}
+.invalid-permission-ind
+{
+    color: red;
+}
+.invalid-permission
+{
+    background-color: #FFB8B8;
+}
+</style>
+
+<apex:outputPanel id="mainPanel">
+
+	<apex:pageMessages id="Errors" escape="false"/>
+	
+	<apex:form id="TheForm">
+    
+       	<apex:pageBlock > 
+			<apex:pageBlockButtons location="top">
+				<apex:commandButton id="SaveButton" action="{!Save}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__save}"  reRender="mainPanel"/>
+			</apex:pageBlockButtons>
+			<apex:pageBlockSection title="{!$ObjectType.KimbleOne__ApplicationRole__c.LabelPlural}" collapsible="false"/>
+			
+			<apex:outputPanel id="RolesAndPermissionsPanel">
+			
+			<apex:pageBlockTable value="{!AllRoles}" var="role">
+				<apex:column headerValue="{!$ObjectType.KimbleOne__ApplicationRole__c.Label}" value="{!role.Name}"/>
+				<apex:column >
+					<apex:inputField value="{!UserRolesMap[role].InputCheckbox__c}"/>
+				</apex:column>
+			</apex:pageBlockTable>
+			
+			<table style="width:100%">
+				
+				<apex:repeat value="{!FunctionalAreasAndPermissionGroups}" var="functionalArea" >
+
+					<tr class="head" id="{!functionalArea.Id}">
+						<td>
+							<span class="slide expanded">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+							<apex:outputText value="{!functionalArea.Name}"/></td>
+					</tr>
+
+					<tr class="body" parentid="{!functionalArea.Id}">
+						<td>
+							<table border="0" style="width:700px" cellpadding="0" cellspacing="0" class="list" >
+	 	
+	 							<apex:repeat value="{!functionalArea.PermissionGroups__r}" var="group" >	
+		 							<tr class="headerRow">
+										<td class="headerRow" colspan="1"><h2><apex:outputText value="{!group.Name}"/></h2></td>
+										<td class="headerRow" > 
+											<h2><input id="{!JSINHTMLENCODE(group.Id)}" type="checkbox" onclick="toggleCheckboxes(this)" class="permission-group"/></h2>
+										</td>
+										
+									</tr>
+									
+									<apex:repeat value="{!PermissionGroupMap[group.Id]}" var="perm" >
+										<apex:variable value="{!perm.PermisionSetIsValid}" var="isValid"/>
+										<tr parent-id="{!JSINHTMLENCODE(group.Id)}" class="{!IF(!isValid,'invalid-permission','')}">
+											<td style="width:500px;">
+												<apex:outputText value="{!perm.Name}"/>
+												<apex:outputPanel layout="none" rendered="{!!ISNULL(perm.Description)}">
+													<i class="fa fa-info-circle permission-info-ind" title="{!JSENCODE(perm.Description)}"></i>
+												</apex:outputPanel>	
+												<apex:outputPanel layout="none" rendered="{!!isValid}">
+													<i class="fa fa-exclamation-circle invalid-permission-ind" title="Permission Set {!JSENCODE(perm.PermissionSetAPIName)} does not exist"></i>
+												</apex:outputPanel>												
+											</td>								
+					 						<td>
+					 							<apex:outputpanel rendered="{!perm.Enabled}">
+					 								<apex:inputField value="{!SelectedPermissionsMap[perm.Id].InputCheckbox__c}"/>					 							
+					 							</apex:outputpanel>
+					 							<apex:outputpanel rendered="{!!perm.Enabled}">
+					 								<apex:image url="{!URLFOR($Resource.KimbleOne__SalesForceCheckedImageArchived, 'checkbox_checked.gif')}" title="{!$Label.kimbleone__fromrolelabel}" />					 							
+					 							</apex:outputpanel>
+					 						</td>
+					 					</tr>
+					 				</apex:repeat>							
+		
+								</apex:repeat>
+									
+	 						</table>
+	 					</td>
+	 				</tr>
+
+				</apex:repeat>
+
+			</table> 
+			 </apex:outputPanel>
+		</apex:pageBlock>
+
+	</apex:form>
+				
+</apex:outputPanel>						
+
+ 
+				
+</apex:define>
+</apex:composition>
+</apex:page>

@@ -1,0 +1,267 @@
+<apex:page controller="KimbleOne.ActivityTimeCategoriesController" sidebar="false" tabStyle="KimbleOne__ReferenceData__c">
+ 
+<apex:composition template="KimbleOne__SiteMaster">
+
+	<apex:define name="Menu">
+   
+   		<c:Menu DefaultHelpPage="TimeCategories.html" MenuContextType="{!TheMenuContext.Type}" MenuContextId="{!TheMenuContext.Id}" MenuContextName="{!TheMenuContext.Name}"/>
+    
+     </apex:define>
+
+<apex:define name="Content">
+
+   <apex:outputPanel id="ActivityTimeCategories" layout="block">
+		<apex:form >
+			
+			<div id="activityTimeCategoriesErrors">
+				<apex:pageMessages escape="false"/>
+			</div>
+			
+			<apex:pageBlock >
+
+				<apex:pageBlockButtons location="top">
+
+					<!-- Add Category at any point, up to maximum of 5 -->
+					<apex:outputPanel layout="none" rendered="{!(ActivityTimeCategories.size<maxCategoriesAllowed)&&($ObjectType.KimbleOne__ActivityTimeCategory__c.createable)}">
+						<input type="button" class="btn"
+							value="{!$Label.New} {!$ObjectType.ActivityTimeCategory__c.Label}"
+							onclick="initialiseModalBoxy('#ActivityTimeCategoryPopup', '{!JSENCODE($Label.New)} {!$ObjectType.ActivityTimeCategory__c.Label}');newActivityTimeCategory();"></input>
+					</apex:outputPanel>
+
+				</apex:pageBlockButtons>
+				
+				<apex:variable var="counter" value="{!1}"/>
+				
+				<apex:pageBlockTable value="{!ActivityTimeCategories}" var="a">
+
+					<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}" >
+
+						<!-- Edit -->
+						<apex:outputPanel rendered="{!$ObjectType.KimbleOne__ActivityTimeCategory__c.updateable}">
+							<apex:outputLink value="#" onclick="initialiseModalBoxy('#ActivityTimeCategoryPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__ActivityTimeCategory__c.Label}');editActivityTimeCategory('{!JSINHTMLENCODE(a.Id)}')">{!$Label.kimbleone__edit}</apex:outputLink>
+						</apex:outputPanel>
+						
+						<!-- Delete: If Actions Enabled -->			  
+        	   			<apex:outputPanel layout="none" rendered="{!(enableActions)&&($ObjectType.KimbleOne__ActivityTimeCategory__c.deletable)}">
+           					&nbsp;|&nbsp;
+	     					<apex:commandLink onclick="var d = confirmDelete();if(!d) return;" action="{!deleteActivityTimeCategory}" reRender="ActivityTimeCategories">{!$Label.kimbleone__delete}
+								<apex:param name="ActivityTimeCatId" value="{!a.Id}" />
+							</apex:commandLink>
+           				</apex:outputPanel>
+						
+						<!-- Move Up: If not first Category and Actions Enabled -->				
+						<apex:outputpanel layout="none" rendered="{!(counter!=1) && enableActions}">
+							&nbsp;|&nbsp;
+							<apex:commandLink action="{!moveUpActivityTimeCategory}" reRender="ActivityTimeCategories">{!$Label.kimbleone__uplabel}
+								<apex:param name="ActivityTimeCatId" value="{!a.Id}" />
+							</apex:commandLink>
+						</apex:outputpanel>
+     					
+     					<!-- Move Down: If not last Category and Actions Enabled -->				
+						<apex:outputpanel layout="none" rendered="{!NOT(counter==ActivityTimeCategories.size) && enableActions}"> 
+							&nbsp;|&nbsp;
+							<apex:commandLink action="{!moveDownActivityTimeCategory}" reRender="ActivityTimeCategories">{!$Label.kimbleone__downlabel}
+								<apex:param name="ActivityTimeCatId" value="{!a.Id}" />
+							</apex:commandLink>
+						</apex:outputpanel>
+     					
+						<apex:variable var="counter" value="{!counter+1}"/>
+
+					</apex:column>
+
+					<apex:column value="{!a.Name}"
+						headerValue="{!$ObjectType.KimbleOne__ActivityTimeCategory__c.Fields.Name.Label}" />
+					<apex:column value="{!a.KimbleOne__DisplaySequence__c}" 
+						headerValue="{!$ObjectType.KimbleOne__ActivityTimeCategory__c.Fields.KimbleOne__DisplaySequence__c.Label}" />
+					<apex:column value="{!a.DisplayType__r.KimbleOne__Enum__c}"
+						headerValue="{!$ObjectType.KimbleOne__ActivityTimeCategory__c.Fields.KimbleOne__DisplayType__c.Label}" />
+					<apex:column value="{!a.KimbleOne__IsMandatory__c}"
+						headerValue="{!$ObjectType.KimbleOne__ActivityTimeCategory__c.Fields.KimbleOne__IsMandatory__c.Label}" />
+					<apex:column value="{!a.KimbleOne__TimeCategoryValues__c}"
+						headerValue="{!$ObjectType.KimbleOne__ActivityTimeCategory__c.Fields.KimbleOne__TimeCategoryValues__c.Label}" />
+					<apex:column value="{!a.KimbleOne__IsActive__c}"
+						headerValue="{!$ObjectType.KimbleOne__ActivityTimeCategory__c.Fields.KimbleOne__IsActive__c.Label}" />
+											
+				</apex:pageBlockTable>
+
+			</apex:pageBlock>
+
+			<apex:actionFunction action="{!newActivityTimeCategory}"
+				name="newActivityTimeCategory"
+				rerender="ActivityTimeCategory"
+				oncomplete="showModalBoxy(); decideDisableSaveButton()">
+			</apex:actionFunction>
+
+			<apex:actionFunction action="{!EditActivityTimeCategory}"
+				name="editActivityTimeCategory" rerender="ActivityTimeCategory"
+				oncomplete="showModalBoxy();decideHide()">
+				<apex:param name="ActivityTimeCatId" value="" />
+			</apex:actionFunction>
+
+		</apex:form>
+	</apex:outputPanel>
+
+
+	<div id="ActivityTimeCategoryPopup" style="display: none"><apex:outputPanel id="ActivityTimeCategory">
+
+		<apex:form >
+			<apex:outputPanel style="width:500px;" layout="block">
+			
+				<apex:outputPanel id="Errorpanel">
+					<div id="activityTimeCatErrors">
+						<apex:pageMessages escape="false"/>
+					</div>
+				</apex:outputPanel>
+
+				<apex:pageBlock >
+			
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton action="{!SaveActivityTimeCategory}"
+							value="{!$Label.kimbleone__save}"
+							oncomplete="hideModalBoxyWithErrorCheck('#activityTimeCatErrors');"
+							reRender="Errorpanel, ActivityTimeCategories" onclick="beforeSave()" styleclass="SaveButton"/>
+						<input class="btn" type="button" onclick="hideModalBoxy();"
+							value="{!$Label.Cancel}" />
+					</apex:pageBlockButtons>
+
+					<apex:pageblockSection collapsible="false" showheader="false"
+						columns="1">
+						<apex:inputHidden value="{!ActivityTimeCategory.KimbleOne__DisplaySequence__c}"/>
+						<apex:inputField value="{!ActivityTimeCategory.Name}" required="true"/>
+						
+						<apex:pageblockSectionItem >
+							<apex:outputText value="{!$ObjectType.KimbleOne__ActivityTimeCategory__c.Fields.KimbleOne__DisplayType__c.Label}"/>
+							<apex:inputText value="{!ActivityTimeCategory.KimbleOne__DisplayType__c}"
+									styleclass="kimbledropdown DisplayType NoFilter true true" required="true" onchange=" decideHide()" />
+						</apex:pageblockSectionItem>
+						
+						<apex:inputField value="{!ActivityTimeCategory.KimbleOne__IsMandatory__c}"/>
+						<apex:inputtext value="{!ActivityTimeCategory.KimbleOne__TimeCategoryValues__c}" styleclass="TimeCategoryValues HideControl"/>
+						
+						<apex:inputField value="{!ActivityTimeCategory.KimbleOne__IsActive__c}"/>						
+						
+						<apex:pageblockSectionItem >
+							<apex:outputLabel value="{!$Label.kimbleone__loadvalueslabel}" styleclass="SelectedValuePanel"  style="display:none"/>
+							<apex:outputPanel layout="none">
+								<input id="objectNameInput" type="text" class="SelectedValuePanel"  style="display:none"/>
+								<input type="button" value="{!$Label.LoadButton}" class="SelectedValuePanel"  style="display:none" onclick="GetObjectsItems();"/>
+							</apex:outputPanel>
+						</apex:pageblockSectionItem>
+						
+						<apex:pageblockSectionItem >
+							<apex:outputText value="{!$ObjectType.KimbleOne__ActivityTimeCategory__c.Fields.KimbleOne__TimeCategoryValues__c.Label}" styleclass="SelectedValuePanel" style="display:none"/>
+								<apex:panelGrid columns="2"  styleclass="SelectedValuePanel" style="display:none;vertical-align:top">
+									<apex:outputPanel >
+										<input type="text" id="PreSelectedValues" size="8" style="width:200px" />
+									</apex:outputPanel>
+									<apex:outputPanel >
+										<input id="addButton" type="button" value="{!$Label.AddButton}" onclick="if($('#PreSelectedValues').val()=='')return false;$('#SelectedValues').append($('<option></option>').attr('value',jQuery.trim($('#PreSelectedValues').val())).text(jQuery.trim($('#PreSelectedValues').val()))); $('#PreSelectedValues').val('');decideDisableSaveButton()"/>
+									</apex:outputPanel>
+									<apex:outputPanel >
+										<select Id="SelectedValues"  multiple="multiple" size="5" style="width:200px" 
+											onclick="if(	$('#SelectedValues option:selected').length>0) $('#removeButton').removeAttr('disabled'); else $('#removeButton').attr('disabled','disabled');">
+										</select>
+									</apex:outputPanel>
+									<apex:outputPanel >
+										<input id="removeButton" type="button" value="{!$Label.RemoveButton}" onclick="$('#SelectedValues option:selected').remove();$('#removeButton').attr('disabled','disabled'); decideDisableSaveButton()" disabled="disabled"/>
+									</apex:outputPanel>
+								</apex:panelGrid>
+						</apex:pageblockSectionItem>
+					</apex:pageblockSection>						
+				</apex:pageBlock>
+			</apex:outputPanel>
+		</apex:form>
+
+
+	</apex:outputPanel></div>
+		<script>
+			function decideHide()
+			{
+				if($('.DisplayType').val()!='{!JSENCODE(DisplayTypeDropDownEnum)}')
+				{
+					$('.SelectedValuePanel').hide();
+				}
+				else
+				{
+					$('.SelectedValuePanel').show();
+					
+					var selectedvalues=$('.TimeCategoryValues').val().split(',');
+					$('#SelectedValues').html('');
+					
+					jQuery.each(selectedvalues, function(i, val) {
+						if(val != '')
+							$('#SelectedValues').append($('<option></option>').attr('value',val).text(val));
+					});
+				}
+				
+				decideDisableSaveButton();
+			}
+			function beforeSave()
+			{
+				if($('.DisplayType').val()!='{!JSENCODE(DisplayTypeDropDownEnum)}')
+				{
+					$('.TimeCategoryValues').val('');
+				}
+				else
+				{
+					var selectedvalues='';
+					$("#SelectedValues option").each(function(key,value)
+					{
+						selectedvalues+=$(this).val();
+						if($("#SelectedValues option").length!=(key+1))
+						selectedvalues+=',';
+						
+					});
+					$('.TimeCategoryValues').val(selectedvalues);
+				}
+			}
+			
+			function decideDisableSaveButton()
+			{
+				if(($('.DisplayType').val()=='{!JSINHTMLENCODE(DisplayTypeDropDownEnum)}') && $("#SelectedValues option").length==0)
+					DisableButton('SaveButton');
+				else
+					EnableButton('SaveButton');
+			}
+			
+			function GetObjectsItems()
+			{
+				var objectName = $('#objectNameInput').val();
+				
+				if(objectName == '') return false; 
+				
+				//validate object name
+				try
+				{
+					sforce.connection.describeSObject(objectName);
+				}
+				catch (e)
+				{
+					alert(e.faultstring);
+					return false;
+				}
+				
+				DisableButton('SaveButton');
+				
+				jQuery('.LoadingObject').show();
+				
+				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityTimeCategoriesController.SelectDynamicObjectContents}', objectName,
+   			     	function(result, event){
+						if(result!=null)
+						{
+							$('#SelectedValues').html('');
+								jQuery.each(result,function(key,value){
+									$('#SelectedValues').append($('<option></option>').attr('value',value.Name).text(value.Name)); 
+								});
+							EnableButton('SaveButton');
+							jQuery('.LoadingObject').hide();
+						}
+					}
+				);
+			}
+		</script>
+</apex:define>
+
+</apex:composition>
+ 
+</apex:page>

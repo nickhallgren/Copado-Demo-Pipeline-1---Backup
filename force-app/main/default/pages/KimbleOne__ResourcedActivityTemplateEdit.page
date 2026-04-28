@@ -1,0 +1,832 @@
+<apex:page standardController="KimbleOne__ResourcedActivityTemplate__c" extensions="KimbleOne.ResourcedActivityTemplateEditController"  showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__ReferenceData__c">
+
+	<apex:composition template="KimbleOne__SiteMaster">
+	    <apex:define name="Menu">
+	     	
+	     	<c:Menu DefaultHelpPage="ViewAssignments.html" MenuContextType="{!IF(ISBLANK(KimbleOne__ResourcedActivityTemplate__c.KimbleOne__ProductDomain__c), 'ResourcedActivityType', 'ProductDomain')}" MenuContextId="{!IF(ISBLANK(KimbleOne__ResourcedActivityTemplate__c.KimbleOne__ProductDomain__c), KimbleOne__ResourcedActivityTemplate__c.KimbleOne__ResourcedActivityType__c, KimbleOne__ResourcedActivityTemplate__c.KimbleOne__ProductDomain__c)}" MenuContextName="{!KimbleOne__ResourcedActivityTemplate__c.Name}" />
+	     	 
+	    </apex:define>
+	    
+	    <apex:define name="Content">
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__HoursAndMinsHelper)}"/>
+
+			<apex:outputPanel layout="block" id="ActivityTemplatesContainer">
+				
+				<div id="resourced-activities-template-container">
+					<apex:repeat value="{!TheResourcedActivityTemplates}" var="resourcedActivityTemplate">
+					
+					<apex:variable var="activityTemplate" value="{!resourcedActivityTemplate.TheActivityTemplate}"/>
+					<apex:variable var="productDomainRel" value="{!activityTemplate.ProductDomain__r}"/>
+					<apex:variable var="activityTypeRel" value="{!activityTemplate.ResourcedActivityType__r}"/>
+					<apex:variable var="hasRevenue" value="{!productDomainRel.RevenueGenerationModel__r.KimbleOne__IsUsageGenerated__c}"/>
+					<apex:variable var="hasCost" value="{!productDomainRel.CostGenerationModel__r.KimbleOne__IsUsageGenerated__c || activityTypeRel.KimbleOne__Enum__c != 'DeliveryElement'}"/>
+					<apex:variable var="isOther" value="{!activityTypeRel.KimbleOne__Enum__c = 'Other'}"/>
+					<div id="{!activityTemplate.Id}" class="resourced-activity-template-container cardContainer">
+						
+						<div class="resourced-activity-template card">
+							<div class="cardHeadingContainer">
+								<div style="display:table-row">
+									<div class="cardHeadingCell">
+										<div class="card-heading-icon fa fa-user" ></div>
+										<div class="card-title-container">
+											<h3 class="cardTitle"><a class="undecorated-link" href="/{!activityTemplate.Id}"><apex:outputText value="{!activityTemplate.Name}"/></a></h3>
+										</div>
+									</div>
+									<div class="cardProperties cardHeadingCell cardHeadingCellFixed">
+										<div class="title-card-body-field">
+				  							<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__UtilisationRule__c.Label}" />
+				  							<span><apex:outputField styleClass="center-aligned-block" value="{!activityTemplate.UtilisationRule__r.Name}"/></span>
+				  						</div>
+										<div class="title-card-body-field">
+				  							<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__UsageUnitType__c.Label}" />
+				  							<span><apex:outputField styleClass="center-aligned-block" value="{!activityTemplate.UsageUnitType__r.Name}"/></span>
+				  						</div>
+										<div class="title-card-body-field">
+				  							<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__InvoicingUnitType__c.Label}" />
+				  							<span><apex:outputField styleClass="center-aligned-block" value="{!activityTemplate.InvoicingUnitType__r.Name}"/></span>
+				  						</div>
+				  						<apex:outputPanel styleclass="title-card-body-field" rendered="{!!ISBLANK(activityTemplate.KimbleOne__CalendarShowAs__c) && activityTemplate.CalendarShowAs__r.KimbleOne__Enum__c != 'None'}">
+											<apex:outputPanel styleclass="title-card-body-charm fa fa-calendar show-calendar-{!activityTemplate.CalendarShowAs__r.KimbleOne__Enum__c}" title="{!$Label.kimbleone__calendarintegrationlabel}">
+					  							<apex:outputPanel styleclass="calendar-is-private fa fa-lock" rendered="{!activityTemplate.KimbleOne__CalendarIsPrivate__c}"></apex:outputPanel>
+					  							
+													<div class="tool-tip-content">
+														<table>
+															<tr>
+																<td><apex:outputLabel styleClass="label-heading" value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__CalendarShowAs__c.Label}" /></td>
+																<td><apex:outputField value="{!activityTemplate.CalendarShowAs__r.Name}"/></td>
+															</tr>
+															<tr>
+																<td><apex:outputLabel styleClass="label-heading" value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__CalendarIsPrivate__c.Label}" /></td>
+																<td><apex:outputField value="{!activityTemplate.KimbleOne__CalendarIsPrivate__c}"/></td>
+															</tr>
+														</table>													
+													</div>
+												
+					  						</apex:outputPanel>
+					  					</apex:outputPanel>
+					  					
+					  					<apex:outputPanel styleclass="title-card-body-field" rendered="{!!activityTemplate.KimbleOne__HideForecastTimeEntries__c}">
+					  						<div class="title-card-body-charm show-forecast-timeentries" title="Forecasting Settings">
+					  							<apex:outputPanel styleclass="self-forecast fa fa-plus" rendered="{!activityTemplate.KimbleOne__CanSelfForecast__c && !activityTemplate.KimbleOne__SelfForecastApprovalRequired__c}"></apex:outputPanel>
+					  							<apex:outputPanel styleclass="self-forecast requires-approval fa fa-question" rendered="{!activityTemplate.KimbleOne__CanSelfForecast__c && activityTemplate.KimbleOne__SelfForecastApprovalRequired__c}"></apex:outputPanel>
+					  							
+					  							<div class="tool-tip-content">
+														<table>
+															<tr>
+																<td><apex:outputLabel styleClass="label-heading" value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__HideForecastTimeEntries__c.Label}" /></td>
+																<td><apex:outputField value="{!activityTemplate.KimbleOne__HideForecastTimeEntries__c}"/></td>
+															</tr>
+															<tr>
+																<td><apex:outputLabel styleClass="label-heading" value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__CanSelfForecast__c.Label}" /></td>
+																<td><apex:outputField value="{!activityTemplate.KimbleOne__CanSelfForecast__c}"/></td>
+															</tr>
+															<tr>
+																<td><apex:outputLabel styleClass="label-heading" value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__SelfForecastApprovalRequired__c.Label}" /></td>
+																<td><apex:outputField value="{!activityTemplate.KimbleOne__SelfForecastApprovalRequired__c}"/></td>
+															</tr>
+														</table>													
+													</div>
+					  							
+					  						</div>
+					  					</apex:outputPanel>
+					  					
+					  					<apex:outputPanel styleclass="title-card-body-field" rendered="{!!ISBLANK(activityTemplate.KimbleOne__PlanType__c) && activityTemplate.PlanType__r.KimbleOne__Enum__c != 'NoPlan'}">
+											<apex:outputPanel styleclass="title-card-body-charm plan-type fa fa-tasks" title="{!$Label.kimbleone__plansettings}">
+					  							<apex:outputPanel styleclass="tracked-plan fa fa-clock-o" rendered="{!activityTemplate.PlanType__r.KimbleOne__Enum__c = 'TrackedPlan'}"></apex:outputPanel>
+					  							<div class="tool-tip-content">
+														<table>
+															<tr>
+																<td><apex:outputLabel styleClass="label-heading" value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__PlanType__c.Label}" /></td>
+																<td><apex:outputField value="{!activityTemplate.PlanType__r.Name}"/></td>
+															</tr>
+															<tr>
+																<td><apex:outputLabel styleClass="label-heading" value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__WorkItemLevel__c.Label}" /></td>
+																<td><apex:outputField value="{!activityTemplate.WorkItemLevel__r.Name}"/></td>
+															</tr>
+															<tr>
+																<td><apex:outputLabel styleClass="label-heading" value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__WorkItemUnitType__c.Label}" /></td>
+																<apex:outputPanel rendered="{!ISBLANK(activityTemplate.KimbleOne__WorkItemUnitType__c)}">
+																<td><apex:outputText value="{!$Label.kimbleone__none}"/></td>
+																</apex:outputPanel>
+																<apex:outputPanel rendered="{!!ISBLANK(activityTemplate.KimbleOne__WorkItemUnitType__c) && !ISBLANK(activityTemplate.WorkItemUnitType__r.KimbleOne__Suffix__c)}">
+																<td><apex:outputField value="{!activityTemplate.WorkItemUnitType__r.KimbleOne__Suffix__c}"/></td>
+																</apex:outputPanel>
+																<apex:outputPanel rendered="{!!ISBLANK(activityTemplate.KimbleOne__WorkItemUnitType__c) && ISBLANK(activityTemplate.WorkItemUnitType__r.KimbleOne__Suffix__c)}">
+																<td><apex:outputField value="{!activityTemplate.WorkItemUnitType__r.Name}"/></td>
+																</apex:outputPanel>
+															</tr>
+															<tr>
+																<td><apex:outputLabel styleClass="label-heading" value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__HasTaskStartEndTime__c.Label}" /></td>
+																<td><apex:outputField value="{!activityTemplate.KimbleOne__HasTaskStartEndTime__c}"/></td>
+															</tr>
+														</table>													
+													</div>
+					  						</apex:outputPanel>
+					  						
+					  					</apex:outputPanel>
+					  										  					
+									</div>
+									<div class="cardMenu cardHeadingCell cardHeadingCellFixed">
+										<div data-floating-dropdown="#{!activityTemplate.Id}-menu-data" class="fa fa-bars resourced-activity-template-menu burger-menu"></div>
+										<div class="deleting Loading" style="display:none"></div>
+										<div id="{!activityTemplate.Id}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+							   			 	<ul class="floating-dropdown-menu">
+										        <li><a href="javascript:editResourcedActivityTemplateClick('{!JSINHTMLENCODE(activityTemplate.Id)}');"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.Edit} {!$ObjectType.ResourcedActivityTemplate__c.Label}</a></li>
+										        <apex:repeat value="{!resourcedActivityTemplate.TheAvailableTimePatterns}" var="timepattern">
+										        	 <li><a href="javascript:newActivityTimePatternTemplateClick('{!JSINHTMLENCODE(activityTemplate.Id)}', '{!JSINHTMLENCODE(timepattern.Id)}');"><i class="fa fa-plus-square dropdown-icon"></i>{!$Label.Add}&nbsp;<apex:outputText value="{!timePattern.Name}"/></a></li>
+										        </apex:repeat>
+									     	</ul>
+										</div>
+									</div>
+								</div>
+							</div>
+							
+							<div class="cardBody">
+								
+								<div class="inner-cards-container">
+									<apex:repeat value="{!resourcedActivityTemplate.TheActivityTimePatternTemplates}" var="timePatternTemplate">
+										<div id="{!timePatternTemplate.Id}" class="inner-card-container">
+										<div id="{!timePatternTemplate.Id}" class="inner-card">
+											<div class="inner-card-header">
+												<div class="inner-card-header-icon fa fa-clock-o" ></div>
+												<div class="inner-card-title"><apex:outputText value="{!timePatternTemplate.Name}"/></div>
+												
+												<div data-floating-dropdown="#{!timePatternTemplate.Id}-menu-data" class="fa fa-bars burger-menu"></div>
+												<div class="deleting Loading" style="display:none"></div>
+												<div id="{!timePatternTemplate.Id}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+										   			 <ul class="floating-dropdown-menu">
+												        <li><a href="javascript:editActivtyTimePatternTemplateClick('{!JSINHTMLENCODE(timePatternTemplate.Id)}');"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.Edit}</a></li>
+												        <li><a href="javascript:newActivityRateBandTemplateClick('{!JSINHTMLENCODE(activityTemplate.Id)}', '{!JSINHTMLENCODE(timePatternTemplate.Id)}');"><i class="fa fa-plus-square dropdown-icon"></i>{!$Label.New} {!$ObjectType.ActivityPeriodRateBandTemplate__c.Label}</a></li>
+												        
+												    </ul>
+												</div>
+												
+											</div>
+											
+											<div class="inner-card-body">
+												<div class="">
+													<span><apex:outputText styleclass="card-field-label" value="{!$ObjectType.KimbleOne__ActivityTimePatternTemplate__c.Fields.KimbleOne__ForecastUsageEntryFormat__c.Label}"/><apex:outputField styleclass="card-field-value" value="{!timePatternTemplate.KimbleOne__ForecastUsageEntryFormat__c}"/> (<apex:outputText styleclass="card-field-value" value="{!activityTemplate.UsageUnitType__r.KimbleOne__Suffix__c}"/>)</span>
+													
+													<span style="float: right;"><apex:outputText styleclass="card-field-label" value="{!$ObjectType.KimbleOne__ActivityTimePatternTemplate__c.Fields.KimbleOne__ActualUsageEntryFormat__c.Label}"/><apex:outputField styleclass="card-field-value" value="{!timePatternTemplate.KimbleOne__ActualUsageEntryFormat__c}"/> (<apex:outputText styleclass="card-field-value" value="{!activityTemplate.UsageUnitType__r.KimbleOne__Suffix__c}"/>)</span>							
+												</div>
+												<table cellpadding="0" cellspacing="0" border="0" class="inner-card-table"><!-- Fixed Width -->
+												<colgroup>
+													<col width="180px;"/><!-- Name and Usage allocation type -->
+													<col width="25px;"/><!-- Priority and IsDefault-->
+													<apex:outputPanel layout="none" rendered="{!hasRevenue}">
+														<col width="80px;"/><!-- Revenue Factor -->
+													</apex:outputPanel>
+													<col width="80px;"/><!-- Cost Factor -->	
+													<col width="80px;"/><!-- Utilisation Factor -->	
+													<col width="80px;"/><!-- Max Usage -->				
+												</colgroup>
+												<thead>
+													<tr class="headerRow">
+														<th></th>
+														<th></th>
+														<apex:outputPanel layout="none" rendered="{!hasRevenue}">
+															<th>{!$Label.kimbleone__activityperiodratebandrevenue}</th>
+														</apex:outputPanel>
+														<th>{!$Label.kimbleone__activityperiodratebandcost}</th>
+														<th>{!$Label.kimbleone__activityperiodratebandutilisation}</th>
+														<th>{!$Label.kimbleone__activityperiodratebandtoil}</th>
+														<th>{!$Label.kimbleone__activityperiodratebandmaxusage}</th>
+													</tr>
+												</thead> 
+												<tbody>
+													<apex:repeat value="{!timePatternTemplate.ActivityPeriodRateBandTemplates__r}" var="rateBandTemplate">
+														<tr>
+															<td>
+																<div class="card-table-row1"><a class="undecorated-link" href="javascript:editActivityRateBandTemplateClick('{!JSENCODE(activityTemplate.Id)}', '{!JSENCODE(rateBandTemplate.Id)}')"><apex:outputText value="{!rateBandTemplate.Name}"/></a><span class="fa fa-star default-rate-band" title="Default Rate Band" style="display:{!IF(rateBandTemplate.PeriodRateBand__r.IsDefault__c,'','none')}"></span></div>
+																<div class="card-table-row2"><apex:outputText value="{!rateBandTemplate.UsageAllocationType__r.Name}"/></div>
+															</td>
+															<td class="center-value"><apex:outputField value="{!rateBandTemplate.PeriodRateBand__r.KimbleOne__Priority__c}"/></td>
+															<apex:outputPanel layout="none" rendered="{!hasRevenue}">
+																<td class="center-value"><apex:outputField value="{!rateBandTemplate.KimbleOne__RevenueRateFactor__c}"/></td>
+															</apex:outputPanel>
+															<td class="center-value"><apex:outputField value="{!rateBandTemplate.KimbleOne__CostRateFactor__c}"/></td>
+															<td class="center-value"><apex:outputField value="{!rateBandTemplate.KimbleOne__UtilisationFactor__c}"/></td>
+															<td class="center-value"><apex:outputField value="{!rateBandTemplate.KimbleOne__TOILFactor__c}"/></td>
+															<td class="center-value"><apex:outputField value="{!rateBandTemplate.KimbleOne__MaximumUsage__c}"/></td>
+														</tr>											
+													</apex:repeat>
+												</tbody>
+												</table>
+											</div>
+											
+											<div class="inner-card-footer"></div>
+										</div>
+										</div>
+									</apex:repeat>
+									
+								</div> 
+								
+								<div class="card-footer">
+									<span class="card-footer-body"></span>
+								</div>
+													
+							</div>
+						</div>
+					</div>
+				</apex:repeat> 
+		    	</div>    	
+		    	
+		    </apex:outputPanel>  
+		    
+		    <script>
+		    	var l = {};
+		    	l['UsageUnitsChangeMessage'] = '<apex:outputText value="{!$Label.kimbleone__usageunitschangemessage}"/>';
+		    	var hoursAndMinsHelper;
+
+		    	jQuery(window).load(function()
+				{
+					hoursAndMinsHelper = initialiseHoursAndMinsHelper('{!JSENCODE($Label.HoursPart)}','{!JSENCODE($Label.MinutesPart)}', '{!JSENCODE($Label.HoursAndMinsEntryHelp)}');
+
+					jQuery('.hours-and-mins').remove();
+
+					jQuery(document).off('change','[display-hours-mins=true]').on('change', '[display-hours-mins=true]', function(e) {
+							if (jQuery(this).next().hasClass('hours-and-mins'))
+								jQuery(this).next().val(hoursAndMinsHelper.formatHours(kimble.parseNumber(jQuery(this).val())));
+						});
+
+					jQuery(document).off('blur','.hours-and-mins').on('blur', '.hours-and-mins', function(e) {
+						var hrs = hoursAndMinsHelper.parseHours(this.value);
+						jQuery(this).qtip('destroy', true);
+
+						if (hrs == null) {
+							var h = jQuery('<div style="white-space: pre-wrap;">' + hoursAndMinsHelper.helpMessage + '</div>');
+							jQuery('.hours-and-mins').qtip({
+														content: h,
+														position: {my: 'bottom center', at: 'top center',viewport: $(window)},
+														style: {classes: 'qtip-light qtip-shadow qtip-rounded t-tip-qtip'},
+														show: {ready:true, solo: true }
+														});
+						} else {
+							jQuery(this).prev().val(hrs).change();
+						}
+					});
+
+					initialiseTooltips();
+
+				});
+
+		    	function initialiseHoursAndMin() {
+		    	    jQuery('[display-hours-mins=true]').each(function(i, obj){
+						let $o = jQuery(obj);
+
+						if ($o.is('input')) {
+							$o.hide().after('<input type="text" class="hours-and-mins"/>');
+							$o.change();
+						}
+						else {
+							$o.text(hoursAndMinsHelper.formatHours(kimble.parseNumber($o.text())));
+						}
+					});
+       			}
+
+		    	function editResourcedActivityTemplateClick(resourcedActivityTemplateId)
+				{
+					initialiseModalBoxy('#ResourcedActivityTemplateEditPopup', '{!JSENCODE($Label.Edit)}  {!$ObjectType.ResourcedActivityTemplate__c.label}', jQuery('form[id$=\'ResourcedActivityTemplateEditForm\']'));
+					editResourcedActivityTemplate(resourcedActivityTemplateId);
+				}
+
+				function newActivityTimePatternTemplateClick(resourcedActivityTemplateId, timePatternId)
+				{
+					initialiseModalBoxy('#ActivityTimePatternTemplateEditPopup', '{!JSENCODE($Label.Edit)}  {!$ObjectType.ActivityTimePatternTemplate__c.label}', jQuery('form[id$=\'ActivityTimePatternTemplateEditForm\']'));
+					newActivityTimePatternTemplate(resourcedActivityTemplateId, timePatternId);
+				}
+				
+				function editActivtyTimePatternTemplateClick(activityTimePatternTemplateId)
+				{
+					initialiseModalBoxy('#ActivityTimePatternTemplateEditPopup', '{!JSENCODE($Label.Edit)}  {!$ObjectType.ActivityTimePatternTemplate__c.label}', jQuery('form[id$=\'ActivityTimePatternTemplateEditForm\']'));
+					editActivityTimePatternTemplate(activityTimePatternTemplateId);
+				}
+				
+				function newActivityRateBandTemplateClick(resourcedActivityTemplateId, timePatternId)
+				{
+					initialiseModalBoxy('#ActivityRateBandTemplateEditPopup', '{!JSENCODE($Label.Edit)}  {!$ObjectType.ActivityPeriodRateBandTemplate__c.label}', jQuery('form[id$=\'ActivityRateBandTemplateEditForm\']'));
+					newActivityRateBandTemplate(resourcedActivityTemplateId, timePatternId);
+				}
+				
+				function editActivityRateBandTemplateClick(resourcedActivityTemplateId, rateBandTemplateId)
+				{
+					initialiseModalBoxy('#ActivityRateBandTemplateEditPopup', '{!JSENCODE($Label.Edit)}  {!$ObjectType.ActivityPeriodRateBandTemplate__c.label}', jQuery('form[id$=\'ActivityRateBandTemplateEditForm\']'));
+					editActivityRateBandTemplate(resourcedActivityTemplateId, rateBandTemplateId);
+				}
+				
+				function toggleRevenueRateRule()
+				{
+					jQuery('[id$="revenueRateFactorInput"]').closest('tr').toggle();
+					jQuery('[id$="revenueRateInput"]').closest('tr').toggle();
+				}
+				
+				function updateRateBandTemplateName()
+				{
+					jQuery('[id$="rateBandTemplateNameInput"]').val(jQuery('[id$="periodRateBandSelect"]').find('option:selected').text());
+				}
+				
+				function initialiseRevenueRateRule()
+				{
+					jQuery('.hide-rate').closest('tr').hide();
+				}
+				
+				function initialiseTooltips() 
+				{
+					jQuery('.title-card-body-charm').each(function() {
+						jQuery(this).qtip({
+							content:{
+								text:jQuery(this).children('.tool-tip-content'),
+								title:jQuery(this).attr('title'),
+								button: 'Close'
+							},
+							position: {
+					            adjust: {
+					                method: 'flip flip'
+					            },
+					            viewport: $(window)
+					        },
+					        show: {
+		      					event: 'click',
+		      					solo: true
+		   					},
+		   					hide: false,
+							style: {classes: 'qtip-light qtip-shadow qtip-rounded'}})
+					});		
+				}
+		
+				function usageUnitChange()
+				{
+					if(jQuery('i.usage-units-info').length == 0)
+					{
+						var infoAlertHtml = '<i class="usage-units-info fa fa-warning" title="' + l['UsageUnitsChangeMessage'] + '"></i>';
+						var usageUnitsSelect = jQuery('[id$="usageUnitsSelect"]');
+						usageUnitsSelect.after(infoAlertHtml);
+					}
+					else
+					{
+						jQuery('i.usage-units-info').remove();
+					}
+
+					setShowAsHoursMinutesInput();
+				}
+
+				function setShowAsHoursMinutesInput()
+				{
+				    if(jQuery('[id$="usageUnitsSelect"]').val() == '{!UsageUnitTypeHourEnum}')
+				    {
+				        jQuery('[id$="ShowAsHoursMinsInput"]').attr('disabled',false);
+        			}
+        			else
+        			{
+				        jQuery('[id$="ShowAsHoursMinsInput"]').attr('disabled',true);
+				        jQuery('[id$="ShowAsHoursMinsInput"]').prop('checked',false);
+           			}
+    			}
+				
+		    </script>
+		    
+		    <apex:form >
+				<apex:actionFunction action="{!ReadResourcedActivityTemplate}" name="editResourcedActivityTemplate" rerender="ResourcedActivityTemplateEdit" oncomplete="setShowAsHoursMinutesInput();showModalBoxy()">
+					<apex:param name="resourcedActivityTemplateId" value="" />
+		   		</apex:actionFunction>
+		   		
+		   		<apex:actionFunction action="{!NewActivityTimePatternTemplate}" name="newActivityTimePatternTemplate" rerender="ActivityTimePatternTemplateEdit" oncomplete="showModalBoxy();initialiseHoursAndMin()">
+					<apex:param name="resourcedActivityTemplateId" value="" />
+					<apex:param name="timePatternId" value="" />
+		   		</apex:actionFunction>
+		   		
+		   		<apex:actionFunction action="{!ReadActivityTimePatternTemplate}" name="editActivityTimePatternTemplate" rerender="ActivityTimePatternTemplateEdit" oncomplete="showModalBoxy();initialiseHoursAndMin()">
+					<apex:param name="activityTimePatternTemplateId" value="" />
+		   		</apex:actionFunction>
+		   		
+		   		<apex:actionFunction action="{!NewActivityRateBandTemplate}" name="newActivityRateBandTemplate" rerender="ActivityRateBandTemplateEdit" oncomplete="showModalBoxy();initialiseRevenueRateRule();">
+					<apex:param name="resourcedActivityTemplateId" value="" />
+					<apex:param name="activityTimePatternTemplateId" value="" />
+		   		</apex:actionFunction>
+		   		
+		   		<apex:actionFunction action="{!ReadActivityRateBandTemplate}" name="editActivityRateBandTemplate" rerender="ActivityRateBandTemplateEdit" oncomplete="showModalBoxy();initialiseRevenueRateRule();">
+					<apex:param name="resourcedActivityTemplateId" value="" />
+					<apex:param name="activityRateBandTemplateId" value="" />
+		   		</apex:actionFunction>
+		   		
+		   	</apex:form>      
+		    
+		    <apex:form id="ResourcedActivityTemplateEditForm">
+			<div id="ResourcedActivityTemplateEditPopup" style="display:none">
+		  
+				<apex:outputPanel id="ResourcedActivityTemplateEdit" >
+		     	  	<div id="ResourcedActivityTemplateEditErrors">
+		           		<apex:pageMessages escape="false"/>
+		           	</div>
+		     	  	<apex:pageBlock >           				
+		          			<apex:pageBlockButtons location="bottom">
+							<apex:commandButton id="saveResourcedActivityBtn" styleClass="DisableButtonWhileBusy" action="{!SaveResourcedActivityTemplate}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#ResourcedActivityTemplateEditErrors'); initialiseTooltips();" reRender="ResourcedActivityTemplateEdit, ActivityTemplatesContainer"/>
+							<input class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+						</apex:pageBlockButtons>
+						
+						<apex:pageblockSection collapsible="false" showheader="false" columns="2">
+		               
+							<apex:inputfield value="{!TheResourcedActivityTemplate.Name}"/> 
+							
+							<apex:pageblockSectionItem />
+
+						</apex:pageblockSection>
+							
+						<div class="popup-body-container">
+						<apex:pageBlockSection columns="2" title="{!$Label.kimbleone__usagesettings}">
+							
+								<apex:pageblockSectionItem >
+			               			<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__UsageUnitType__c.Label}" />
+			               			<apex:selectList value="{!TheResourcedActivityTemplate.KimbleOne__UsageUnitType__c}" size="1" id="usageUnitsSelect" onchange="usageUnitChange()">
+										<apex:selectOptions value="{!TheTimeUnits}" />	             	
+									</apex:selectList>
+								</apex:pageblockSectionItem>
+
+							<apex:pageblockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__RevenueEntryUnitType__c.Label}" />
+								<apex:selectList value="{!TheResourcedActivityTemplate.KimbleOne__RevenueEntryUnitType__c}" size="1" id="revenueUnitsSelect">
+									<apex:selectOptions value="{!TheRevenueTimeUnits}" />
+								</apex:selectList>
+							</apex:pageblockSectionItem>
+								
+								<apex:pageblockSectionItem >
+			               			<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__InvoicingUnitType__c.Label}" />
+			               			<apex:selectList value="{!TheResourcedActivityTemplate.KimbleOne__InvoicingUnitType__c}" size="1">
+										<apex:selectOptions value="{!TheTimeUnits}" />	             	
+									</apex:selectList>
+								</apex:pageblockSectionItem>
+								
+								<apex:pageblockSectionItem >
+			               			<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__UsageAllocationType__c.Label}" />
+			               			<apex:selectList value="{!TheResourcedActivityTemplate.KimbleOne__UsageAllocationType__c}" size="1">
+										<apex:selectOptions value="{!TheUsageAllocationTypes}" />	             	
+									</apex:selectList>
+								</apex:pageblockSectionItem>
+								
+								<apex:pageblockSectionItem >
+			               			<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__TimeEntryRule__c.Label}" />
+			               			<apex:selectList value="{!TheResourcedActivityTemplate.KimbleOne__TimeEntryRule__c}" size="1">
+										<apex:selectOptions value="{!TheTimeEntryRules}" />	             	
+									</apex:selectList>
+								</apex:pageblockSectionItem>
+								
+								<apex:pageblockSectionItem >
+			               			<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__UsageTrackingModel__c.Label}" />
+			               			<apex:selectList value="{!TheResourcedActivityTemplate.KimbleOne__UsageTrackingModel__c}" size="1">
+										<apex:selectOptions value="{!TheUsageTrackingModels}" />	             	
+									</apex:selectList>
+								</apex:pageblockSectionItem>
+							
+								<apex:pageblockSectionItem >
+			               			<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__UtilisationRule__c.Label}" />
+			               			<apex:selectList value="{!TheResourcedActivityTemplate.KimbleOne__UtilisationRule__c}" size="1">
+										<apex:selectOptions value="{!TheUtilisationRules}" />	             	
+									</apex:selectList>
+								</apex:pageblockSectionItem>
+								
+								<apex:inputField value="{!TheResourcedActivityTemplate.KimbleOne__ActualiseForecastOnly__c}"/>
+								
+								<apex:inputField value="{!TheResourcedActivityTemplate.KimbleOne__AllowFrameworkAssignment__c}"/>
+
+								<apex:inputField value="{!TheResourcedActivityTemplate.KimbleOne__AllowModelAssignment__c}"/>
+
+								<apex:inputField id="ShowAsHoursMinsInput" value="{!TheResourcedActivityTemplate.KimbleOne__ShowUsageAsHoursAndMins__c}"/>
+
+							<apex:inputField value="{!TheResourcedActivityTemplate.KimbleOne__DisableAssignmentRollups__c}" rendered="{!ISBLANK(TheResourcedActivityTemplate.KimbleOne__ProductDomain__c)}"/>
+
+							<apex:inputField value="{!TheResourcedActivityTemplate.KimbleOne__HasCases__c}"/>
+
+							</apex:pageBlockSection>
+							
+							<apex:pageBlockSection columns="2" title="{!$Label.kimbleone__forecastsettings}">
+								
+								<apex:pageblockSectionItem >
+			               			<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__ForecastUnitType__c.Label}" />
+			               			<apex:selectList value="{!TheResourcedActivityTemplate.KimbleOne__ForecastUnitType__c}" size="1">
+										<apex:selectOptions value="{!TheTimeUnits}" />	             	
+									</apex:selectList>
+								</apex:pageblockSectionItem>
+							
+								<apex:inputField value="{!TheResourcedActivityTemplate.KimbleOne__HideForecastTimeEntries__c}"/>
+							
+								<apex:inputField value="{!TheResourcedActivityTemplate.KimbleOne__CanSelfForecast__c}"/>
+							
+								<apex:inputField value="{!TheResourcedActivityTemplate.KimbleOne__SelfForecastApprovalRequired__c}"/>
+								
+							</apex:pageBlockSection>
+							
+							<apex:pageBlockSection columns="2" title="{!$Label.kimbleone__plansettings}" rendered="{!!ISBLANK(TheResourcedActivityTemplate.KimbleOne__ProductDomain__c)}">
+														
+							<apex:pageblockSectionItem >
+		               			<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__PlanType__c.Label}" />
+		               			<apex:selectList value="{!TheResourcedActivityTemplate.KimbleOne__PlanType__c}" size="1">
+									<apex:selectOptions value="{!ThePlanTypes}" />	             	
+								</apex:selectList>
+							</apex:pageblockSectionItem>
+							
+							<apex:pageblockSectionItem >
+		               			<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__WorkItemLevel__c.Label}" />
+		               			<apex:selectList value="{!TheResourcedActivityTemplate.KimbleOne__WorkItemLevel__c}" size="1">
+									<apex:selectOptions value="{!TheWorkItemLevels}" />	             	
+								</apex:selectList>
+							</apex:pageblockSectionItem>
+							
+							<apex:pageblockSectionItem >
+		               			<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__WorkItemUnitType__c.Label}" />
+		               			<apex:selectList value="{!TheResourcedActivityTemplate.KimbleOne__WorkItemUnitType__c}" size="1">
+									<apex:selectOptions value="{!TheWorkItemUnitTypes}" />	             	
+								</apex:selectList>
+							</apex:pageblockSectionItem>
+							
+							<apex:inputField value="{!TheResourcedActivityTemplate.KimbleOne__HasTaskStartEndTime__c}"/>
+							
+							</apex:pageBlockSection>
+							
+							<apex:pageBlockSection columns="2" title="{!$Label.kimbleone__calendarintegrationlabel}">
+							
+								<apex:pageblockSectionItem >
+			               			<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__CalendarShowAs__c.Label}" />
+			               			<apex:selectList value="{!TheResourcedActivityTemplate.KimbleOne__CalendarShowAs__c}" size="1">
+										<apex:selectOptions value="{!TheCalendarShowAs}" />	             	
+									</apex:selectList>
+								</apex:pageblockSectionItem>
+																
+								<apex:pageblockSectionItem >
+			               			<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivityTemplate__c.Fields.KimbleOne__ScheduledTimeRule__c.Label}" />
+			               			<apex:selectList value="{!TheResourcedActivityTemplate.KimbleOne__ScheduledTimeRule__c}" size="1">
+										<apex:selectOptions value="{!TheScheduledTimeRules}" />	             	
+									</apex:selectList>
+								</apex:pageblockSectionItem>
+								
+								<apex:inputField value="{!TheResourcedActivityTemplate.KimbleOne__CalendarIsPrivate__c}"/>
+								
+							</apex:pageBlockSection>
+						</div>
+						
+		        	</apex:pageBlock>
+		
+		        </apex:outputPanel>
+		  
+			</div>
+			</apex:form>
+			
+			<apex:form id="ActivityTimePatternTemplateEditForm">
+			<div id="ActivityTimePatternTemplateEditPopup" style="display:none">
+		  
+				<apex:outputPanel id="ActivityTimePatternTemplateEdit" >
+		     	  	<div id="ActivityTimePatternTemplateEditErrors">
+		           		<apex:pageMessages escape="false"/>
+		           	</div>
+		     	  	<apex:pageBlock >           				
+		          		<apex:pageBlockButtons location="bottom">
+							<apex:commandButton id="saveActivityTimePatternTemplateBtn" styleClass="DisableButtonWhileBusy" action="{!SaveActivityTimePatternTemplate}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#ActivityTimePatternTemplateEditErrors');initialiseHoursAndMin();" reRender="ActivityTimePatternTemplateEdit, ActivityTemplatesContainer"/>
+							<apex:commandButton id="deleteActivityTimePatternTemplateBtn" styleClass="DisableButtonWhileBusy" action="{!deleteActivityTimePatternTemplate}" value="{!$Label.kimbleone__delete}" rendered="{!!ISBLANK(TheActivityTimePatternTemplate.Id) && CanDeleteTimePatternTemplate}" oncomplete="hideModalBoxyWithErrorCheck('#ActivityTimePatternTemplateEditErrors')" reRender="ActivityTimePatternTemplateEdit, ActivityTemplatesContainer"/>
+							<input class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+						</apex:pageBlockButtons>
+						
+						<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+							<apex:pageblockSectionItem labelstyle="width:50%" dataStyle="width:50%">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityTimePattern__c.Fields.KimbleOne__TimePattern__c.Label}" />
+								<apex:outputField value="{!TheActivityTimePatternTemplate.KimbleOne__TimePattern__c}"/>
+							</apex:pageblockSectionItem>
+							
+							<apex:inputField value="{!TheActivityTimePatternTemplate.Name}"/>
+							
+							<apex:inputField value="{!TheActivityTimePatternTemplate.KimbleOne__ForecastUsageEntryFormat__c}"/>
+							
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityTimePattern__c.Fields.KimbleOne__ActualUsageEntryFormat__c.Label} ({!TheResourcedActivityTemplate.UsageUnitType__r.KimbleOne__Suffix__c})" />
+								<apex:inputText html-display-hours-mins="{!TheResourcedActivityTemplate.KimbleOne__ShowUsageAsHoursAndMins__c}" value="{!TheActivityTimePatternTemplate.KimbleOne__ActualUsageEntryFormat__c}" />
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$Label.kimbleone__updateactivitytimepatternslabel}"/>
+								<apex:inputCheckbox value="{!UpdateExistingTimePatterns}"/>
+							</apex:pageBlockSectionItem>
+
+						</apex:pageblockSection>
+		        	</apex:pageBlock>
+		
+		        </apex:outputPanel>
+		  
+			</div>
+			</apex:form>
+			
+			<apex:form id="ActivityRateBandTemplateEditForm">
+			<div id="ActivityRateBandTemplateEditPopup" style="display:none">
+		  
+				<apex:outputPanel id="ActivityRateBandTemplateEdit" >
+		     	  	<div id="ActivityRateBandTemplateEditErrors">
+		           		<apex:pageMessages escape="false"/>
+		           	</div>
+		     	  	<apex:pageBlock >           				
+		          			<apex:pageBlockButtons location="bottom">
+							<apex:commandButton id="saveActivityRateBandTemplateBtn" styleClass="DisableButtonWhileBusy" action="{!saveActivityRateBandTemplate}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#ActivityRateBandTemplateEditErrors')" reRender="ActivityRateBandTemplateEdit, ActivityTemplatesContainer"/>
+							<apex:commandButton id="deleteActivityRateBandTemplateBtn" styleClass="DisableButtonWhileBusy" action="{!deleteActivityRateBandTemplate}" value="{!$Label.kimbleone__delete}" rendered="{!!ISBLANK(TheActivityRateBandTemplate.Id)}" oncomplete="hideModalBoxyWithErrorCheck('#ActivityRateBandTemplateEditErrors')" reRender="ActivityRateBandTemplateEdit, ActivityTemplatesContainer"/>
+							<input class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+						</apex:pageBlockButtons>
+						
+						<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+							
+							<apex:pageblockSectionItem rendered="{!ISBLANK(TheActivityRateBandTemplate.Id) && TheAvailablePeriodRateBands.size > 0}">
+		               			<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityPeriodRateBandTemplate__c.Fields.KimbleOne__PeriodRateBand__c.Label}" />
+		               			<apex:selectList id="periodRateBandSelect" value="{!TheActivityRateBandTemplate.KimbleOne__PeriodRateBand__c}" size="1" onchange="updateRateBandTemplateName()">
+									<apex:selectOptions value="{!TheAvailablePeriodRateBands}" />	             	
+								</apex:selectList>
+							</apex:pageblockSectionItem>
+							
+							<apex:inputField id="rateBandTemplateNameInput" value="{!TheActivityRateBandTemplate.Name}"/>
+							
+							<apex:pageblockSectionItem rendered="{!TheResourcedActivityTemplate.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUsageGenerated__c}">
+				               	<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityPeriodRateBandTemplate__c.Fields.KimbleOne__RevenueRateRule__c.Label}"/>
+				              	<apex:selectRadio id="RevenueRateRule" value="{!TheActivityRateBandTemplate.KimbleOne__RevenueRateRule__c}" required="true" layout="pageDirection" onclick="toggleRevenueRateRule();">
+				           		 	<apex:selectOptions value="{!TheRevenueRateRules}" />
+				           	 	</apex:selectRadio>	          
+							</apex:pageblockSectionItem>  
+							
+							<apex:pageblockSectionItem >
+		               			<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityPeriodRateBandTemplate__c.Fields.KimbleOne__RevenueUnitsCalculationMethod__c.Label}" />
+		               			<apex:selectList value="{!TheActivityRateBandTemplate.KimbleOne__RevenueUnitsCalculationMethod__c}" size="1">
+									<apex:selectOptions value="{!TheRevenueUnitsCalcMethods}" />	             	
+								</apex:selectList>
+							</apex:pageblockSectionItem>
+
+							<apex:inputField id="revenueRateFactorInput" rendered="{!TheResourcedActivityTemplate.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUsageGenerated__c}" required="false" value="{!TheActivityRateBandTemplate.KimbleOne__RevenueRateFactor__c}"  styleclass="{!IF(TheActivityRateBandTemplate.KimbleOne__RevenueRateRule__c != RevenueRateRuleRevenueFactorId , 'hide-rate','')}"/>
+							
+							<apex:inputField id="revenueRateInput"  rendered="{!TheResourcedActivityTemplate.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUsageGenerated__c}" required="false" value="{!TheActivityRateBandTemplate.KimbleOne__RevenueRate__c}" styleclass="{!IF(TheActivityRateBandTemplate.KimbleOne__RevenueRateRule__c = RevenueRateRuleRevenueFactorId , 'hide-rate','')}"/>
+							
+							<apex:inputField value="{!TheActivityRateBandTemplate.KimbleOne__CostRateFactor__c}"/>
+							
+							<apex:inputField value="{!TheActivityRateBandTemplate.KimbleOne__UtilisationFactor__c}"/>
+							
+							<apex:inputField value="{!TheActivityRateBandTemplate.KimbleOne__TOILFactor__c}"/>
+							
+							<apex:inputField value="{!TheActivityRateBandTemplate.KimbleOne__MaximumUsage__c}"/>
+							
+							<apex:pageblockSectionItem >
+		               			<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityPeriodRateBandTemplate__c.Fields.KimbleOne__UsageAllocationType__c.Label}" />
+		               			<apex:selectList value="{!TheActivityRateBandTemplate.KimbleOne__UsageAllocationType__c}" size="1">
+									<apex:selectOptions value="{!TheUsageAllocationTypes}" />	             	
+								</apex:selectList>
+							</apex:pageblockSectionItem>
+										
+							<apex:pageblockSectionItem >
+				               	<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityPeriodRateBandTemplate__c.Fields.KimbleOne__TimeEntryNotesMandatory__c.Label}" />
+								<apex:inputCheckbox value="{!TheActivityRateBandTemplate.KimbleOne__TimeEntryNotesMandatory__c}"/>
+							</apex:pageblockSectionItem>
+							
+						</apex:pageblockSection>
+						
+		        	</apex:pageBlock>
+					
+					
+					
+		        </apex:outputPanel>
+		  
+			</div>
+			</apex:form>
+		    
+		    <style>
+		    .default-rate-band
+		    {
+		    	color: #FFD700;
+				font-size: 11px;
+				margin-left: 6px;    	
+		    }
+		    .cardHeadingContainer
+		    {
+		    	display: table;
+				width: 100%;
+				background-color: #FFF;
+				border-color: #DDD;
+				color: #333;
+				background-color: #FFF;
+				border-color: #DDD;
+				border-bottom: 1px solid #DDD;
+				border-top-right-radius: 3px;
+				border-top-left-radius: 3px;
+				font-size: 18px;
+		    }
+		    .cardHeadingCell
+		    {
+		    	display: table-cell;
+			   vertical-align: middle;
+			   padding: 4px 15px;
+			   border-right: 1px solid #DDD;
+		    }
+		    .cardHeadingCellFixed
+		    {
+		    	width:1px;
+		    	white-space:nowrap;
+		    }
+		    .burger-menu
+		    {
+		    	margin-left:0px;
+		    }
+		    .cardProperties {
+				  font-size: 12px;
+				}
+			.title-card-body-field
+			{
+				margin:0px;
+				padding-right:4px;
+				padding-left:0px;
+				padding-top:0px;
+				padding-bottom:0px;
+				vertical-align: middle;
+			}
+			.title-card-body-charm
+			{
+				cursor:pointer;
+				font-size:26px;
+				width: 35px;
+			}
+			.show-calendar-None
+			{
+				display:none;
+			}
+			.show-calendar-Free
+			{
+				color:#ededed;
+			}
+			.show-calendar-Busy
+			{
+				color:#729BC7;
+			}
+			.show-calendar-OutOfOffice
+			{
+				color:#800080;
+			}
+			.calendar-is-private {
+			    color: gold;
+			    font-size: 18px;
+			    position: relative;
+			    left: -7px;
+			    bottom: -6px;
+			    background-color: white;
+			}
+			.show-forecast-timeentries
+			{
+				background-image: url("{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Forecast.png')}");
+				height: 26px;
+  				background-repeat: no-repeat;
+  				background-size: contain;
+			}
+			.self-forecast {
+    			font-size: 18px;
+    			position: relative;
+    			left: 10px;
+    			top: 12px;
+    			color: #729BC7;
+    		}
+    		.plan-type
+    		{
+    			color: #729BC7;
+    		}
+    		.tracked-plan {
+			    font-size: 18px;
+			    position: relative;
+			    left: -8px;
+			    background-color: white;
+			    bottom: -5px;
+			}
+			.tool-tip-content {
+				display: none;
+			}
+			
+			.tool-tip-content-container {
+				font-size: 12px;
+			}
+			
+			.tool-tip-form-buttons {
+				margin-top: 3px;
+				margin-bottom: 3px;
+				text-align: right;
+			}
+			.tool-tip-content table td:first-child {
+			    padding: 8px;
+			    text-align:right;
+			}
+			/* restrict the height of the edit popup as with all fields the page block buttons are off the page */
+			.popup-body-container {
+			    max-height: 380px;
+			    overflow: auto;
+			}
+			.popup-body-container .pbSubheader {
+			    margin-top: 6px;
+			}
+			.popup-body-container label {
+			    white-space: nowrap;
+			}	
+			.usage-units-info {
+			    font-size: 16px;
+			    color: #E58E1A;
+			    margin-left: 5px;
+			}
+
+		    </style>
+	    </apex:define>
+	</apex:composition>
+
+</apex:page>

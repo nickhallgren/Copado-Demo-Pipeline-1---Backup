@@ -1,0 +1,411 @@
+<apex:page standardController="KimbleOne__Product__c" extensions="KimbleOne.ActivityAssignmentTemplatesController" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">
+ 
+<apex:define name="Menu"> 
+
+	<c:Menu MenuContextType="ProductDefinition" MenuContextId="{!KimbleOne__Product__c.Id}" MenuContextName="{!KimbleOne__Product__c.Name}"/>
+	
+</apex:define>
+    
+<apex:define name="Content"> 
+
+	<style>
+	.template-usage-insight-ind,
+	.template-popup-usage-insight-ind
+	{
+		color: #428BCA;
+		font-size: 22px;
+		margin-right: 5px;
+	}
+	.template-popup-usage-insight-ind {
+		cursor: pointer;
+ 	}
+	td.entry-units-col div:not(.hidden-item) {
+		display: inline-block !important;
+		vertical-align: middle;
+	}
+	.template-usage-insight-qtip .qtip-content {
+		font-size: 12px;
+	}
+	.popup-entry-units-input {
+	    position: relative;
+ 	}
+ 	.popup-entry-units-container {
+ 		position: absolute;
+		right: 12px;
+		top: 3px;
+  	}
+	.numeric-val {
+	    text-align: right;
+ 	}
+ 	.boolean-val {
+	    text-align: center;
+  	}
+  	.allocatable-usage {
+		font-size: 16px;
+		color: #428BCA;
+		margin-left: 2px;
+		position: absolute;
+		margin-top: 1px;
+	}
+	</style>
+	<apex:form id="TheForm">              	
+			<apex:pageMessages escape="false"/>
+			<apex:pageBlock id="ActivityAssignmentTemplatesDetailPanel" >
+			 
+				<apex:pageBlockButtons rendered="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.createable}">
+					<input class="btn" type="button" onclick="initialiseModalBoxy('#ActivityAssignmentTemplatesPopup', '{!JSENCODE($Label.New)} {!$ObjectType.ActivityAssignmentTemplate__c.label}');newActivityAssignmentTemplate()" value="{!$Label.New} {!$ObjectType.ActivityAssignmentTemplate__c.label}"/>
+					<apex:outputPanel layout="none" rendered="{!AllowModelAssignment}">
+					<input class="btn" type="button" onclick="initialiseModalBoxy('#ActivityAssignmentTemplatesPopup', '{!JSENCODE($Label.NewModelAssignmentTemplate)}');newModelActivityAssignmentTemplate()" value="{!$Label.NewModelAssignmentTemplate}"/>
+					</apex:outputPanel>
+				</apex:pageBlockButtons>
+			   
+				<apex:pageBlockTable value="{!TheActivityAssignmentTemplates}" var="template" >
+           			<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+	           			<apex:outputLink value="#"  rendered="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.updateable}" onclick="initialiseModalBoxy('#ActivityAssignmentTemplatesPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.label}');editActivityAssignmentTemplate('{!JSINHTMLENCODE(template.id)}')">{!$Label.kimbleone__edit}</apex:outputLink>
+	           			&nbsp; | &nbsp;
+						<apex:commandLink rendered="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.deletable}" onclick="var d = confirmDelete();if(!d) return;" action="{!DeleteActivityAssignmentTemplate}" reRender="TheForm" >{!$Label.kimbleone__delete}
+							<apex:param name="activityAssignmentTemplateId" value="{!template.Id}" />
+						</apex:commandLink>
+						<apex:outputPanel rendered="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.updateable && template.KimbleOne__IsFrameworkAssignment__c}">
+						&nbsp; | &nbsp;
+							<apex:outputLink value="#"  onclick="initialiseModalBoxy('#ActivityAssignmentTemplatesPopup', '{!JSENCODE($Label.kimbleone__allocate)} {!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.label}');newDrawdownActivityAssignmentTemplate('{!JSINHTMLENCODE(template.id)}')">{!$Label.kimbleone__allocate}</apex:outputLink>
+						</apex:outputPanel>
+					</apex:column>
+
+					<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.Name.Label}" value="{!template.Name}"/>
+					<apex:column headerValue="{!$Label.kimbleone__frameworkassignment}" value="{!template.ActivityAssignmentTemplate__r.Name}" rendered="{!AllowFrameworkAssignment}"/>	
+					<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__Resource__c.Label}" value="{!template.KimbleOne__Resource__c}"/>
+					<apex:column rendered="{!AllowModelAssignment}" headerValue="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__IsModelAssignment__c.Label}" styleClass="boolean-val" value="{!template.KimbleOne__IsModelAssignment__c}"/>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__ActivityRole__c.Label}" value="{!template.KimbleOne__ActivityRole__c}"/>
+					<apex:column rendered="{!AllowFrameworkAssignment}" headerValue="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__IsFrameworkAssignment__c.Label}" styleClass="boolean-val" value="{!template.KimbleOne__IsFrameworkAssignment__c}"/>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__AssignmentPercentage__c.Label}" value="{!template.KimbleOne__AssignmentPercentage__c}" styleClass="numeric-val"/>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__UsageBehaviourRule__c.Label}" value="{!template.KimbleOne__UsageBehaviourRule__c}"/>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__StartDateOffset__c.Label}" value="{!template.KimbleOne__StartDateOffset__c}" styleClass="numeric-val"/>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__StartDateOffsetType__c.Label}" value="{!template.StartDateOffsetType__r.Name}"/>					
+					<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__EntryUnits__c.Label}" value="{!template.KimbleOne__EntryUnits__c}" styleClass="numeric-val"/>
+					<apex:column headerValue="{!$Label.kimbleone__averageentryunits}" headerClass="entry-units-col hidden-item" styleClass="entry-units-col hidden-item numeric-val">
+						<div ass-t-id="{!template.Id}" class="template-usage-insight-ind hidden-item fa fa-lightbulb-o"></div>
+						<div ass-t-id="{!template.Id}" class="template-avg-usage hidden-item">-</div>
+					</apex:column>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__UtilisationPercentage__c.Label}" styleClass="numeric-val">
+                        <apex:outputText value="{0, number, 00.00}">
+                            <apex:param value="{!template.KimbleOne__UtilisationPercentage__c}" />
+                        </apex:outputText>
+					</apex:column>
+ 					<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__EndDateOffset__c.Label}" value="{!template.KimbleOne__EndDateOffset__c}" styleClass="numeric-val"/>
+ 					<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__EndDateOffsetType__c.Label}" value="{!template.EndDateOffsetType__r.Name}"/>
+ 					<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__MilestoneTemplate__c.Label}" value="{!template.KimbleOne__MilestoneTemplate__c}" rendered="{!AND(RevenueMilestones.size > 1,KimbleOne__Product__c.ProductType__r.KimbleOne__Enum__c == 'Delivery')}"/>					
+ 					
+				</apex:pageBlockTable>				
+
+			</apex:pageBlock>
+
+			<apex:actionFunction action="{!NewActivityAssignmentTemplate}" name="newActivityAssignmentTemplate" rerender="ActivityAssignmentTemplatesPopupPanel" oncomplete="showModalBoxy();"/>
+			<apex:actionFunction action="{!NewModelActivityAssignmentTemplate}" name="newModelActivityAssignmentTemplate" rerender="ActivityAssignmentTemplatesPopupPanel" oncomplete="showModalBoxy();"/>
+			<apex:actionFunction action="{!NewDrawdownAssignmentTemplate}" name="newDrawdownActivityAssignmentTemplate" rerender="ActivityAssignmentTemplatesPopupPanel,frameworkAssignmentCheckbox" oncomplete="showModalBoxy();">
+				<apex:param name="parentFrameworkId" value="" />
+			</apex:actionFunction>
+
+			<apex:actionFunction action="{!EditActivityAssignmentTemplate}" name="editActivityAssignmentTemplate" rerender="ActivityAssignmentTemplatesPopupPanel" oncomplete="showModalBoxy();overlayPopupInsights()">
+			  		<apex:param name="activityAssignmentTemplateId" value="" />
+			</apex:actionFunction>
+
+	</apex:form>
+
+	<script>
+		var inlineAssignmentTemplateUsageInsightLabel = '<apex:outputText value="{!$Label.kimbleone__assignmenttemplateusageinsightnarrative}"/>';
+
+		jQuery(window).load(function()
+		{
+			initialiseInsights();
+		});
+
+		var templateInsights = {};
+
+		function initialiseInsights()
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentTemplatesController.GetActivityAssignmentTemplateInsights}',
+					'<apex:outputText value="{!KimbleOne__Product__c}"/>',
+					function(result, event){
+						if (event.status)
+						{
+							templateInsights = result;
+
+							overlayInsights();
+						}
+						else if (event.type === 'exception')
+						{
+							alert(event.message);
+						}
+						else
+						{
+							alert(event.message);
+						}
+				},
+				{escape: true, timeout: 60000}
+			);
+
+			jQuery(document).off('click', '.popup-entry-units-container').on('click', '.popup-entry-units-container', populateEntryUnitsFromInsight);
+		}
+
+		function populateEntryUnitsFromInsight()
+		{
+			var insightTip = jQuery(this);
+			var averageAmt = insightTip.find('div[avg-amt]').attr('avg-amt');
+
+			insightTip.closest('#ActivityAssignmentTemplatesPopup').find('.popup-entry-units').val(formatNumericValue(averageAmt, '#,##0.00')).change();
+		}
+
+		function overlayInsights()
+		{
+			if(Object.keys(templateInsights).length > 0)
+			{
+				jQuery('.template-usage-insight-ind').each(function () {
+					refreshTemplateUsageInsight(jQuery(this));
+				});
+
+				jQuery('.entry-units-col').toggleClass('hidden-item', jQuery('.template-usage-insight-ind:not(.hidden-item)').length == 0);
+			}
+  		}
+
+		function formatNumericValue(theValue, dispFormat)
+		{
+			theValue = (theValue == undefined || theValue == null || theValue == '' ? '0' : theValue);
+
+			return kimble.formatNumber(theValue, (dispFormat == undefined ? '#,##0' : dispFormat));
+		}
+
+		function refreshTemplateUsageInsight(obj)
+		{
+			var templateId = obj.attr('ass-t-id');
+			var theInsightInd = jQuery('.template-usage-insight-ind[ass-t-id="' + templateId + '"');
+			var theAvgUnitsDisp = jQuery('.template-avg-usage[ass-t-id="' + templateId + '"');
+
+			if(templateInsights != undefined && templateInsights[templateId] != undefined)
+			{
+			    var theInsight = templateInsights[templateId];
+				var instanceCountDisplay = formatNumericValue(theInsight.InstanceCount);
+				var avgUsage = formatNumericValue(theInsight.AvgUsage, '#,##0.00');
+				var minUsage = formatNumericValue(theInsight.MinUsage, '#,##0.##');
+				var maxUsage = formatNumericValue(theInsight.MaxUsage, '#,##0.##');
+
+				var theTooltip = inlineAssignmentTemplateUsageInsightLabel.format(instanceCountDisplay, avgUsage, minUsage, maxUsage);
+				theInsightInd.attr('title', theTooltip);
+				theInsightInd.qtip('destroy', true);
+				theInsightInd.qtip({
+		            position: {
+						adjust: { method: 'flip flip'},
+						viewport: $(window)
+					},
+					style: {
+						classes: 'template-usage-insight-qtip qtip-light qtip-shadow qtip-rounded'
+					}
+				});
+				theInsightInd.removeClass('hidden-item');
+				theInsightInd.fadeOut(500).fadeIn(500);
+				theAvgUnitsDisp.text(avgUsage).removeClass('hidden-item');
+			}
+			else
+			{
+				theInsightInd.addClass('hidden-item');
+				theAvgUnitsDisp.removeClass('hidden-item').text('-');
+			}
+		}
+
+		function overlayPopupInsights()
+		{
+		    var templateId = jQuery('input.popup-entry-units:visible').attr('ass-t-id');
+		    var insightAnchorHtml = '<div class="popup-entry-units-container">';
+		    insightAnchorHtml += '<div ass-t-id="' + templateId + '" class="template-popup-usage-insight-ind hidden-item fa fa-lightbulb-o"></div>';
+		    insightAnchorHtml += '</div>';
+			jQuery('input.popup-entry-units:visible').after(insightAnchorHtml);
+
+			var theInsightInd = jQuery('.template-popup-usage-insight-ind[ass-t-id="' + templateId + '"');
+
+			if(templateInsights != undefined && templateInsights[templateId] != undefined)
+			{
+			    var theInsight = templateInsights[templateId];
+				var instanceCountDisplay = formatNumericValue(theInsight.InstanceCount);
+				var avgUsage = formatNumericValue(theInsight.AvgUsage, '#,##0.00');
+				var minUsage = formatNumericValue(theInsight.MinUsage, '#,##0.##');
+				var maxUsage = formatNumericValue(theInsight.MaxUsage, '#,##0.##');
+
+				var theTooltip = inlineAssignmentTemplateUsageInsightLabel.format(instanceCountDisplay, avgUsage, minUsage, maxUsage);
+				theInsightInd.attr('title', theTooltip);
+				theInsightInd.qtip('destroy', true);
+				theInsightInd.qtip({
+		            position: {
+						adjust: { method: 'flip flip'},
+						viewport: $(window)
+					},
+					style: {
+						classes: 'template-usage-insight-qtip qtip-light qtip-shadow qtip-rounded'
+					}
+				});
+				theInsightInd.removeClass('hidden-item');
+				theInsightInd.attr('avg-amt', theInsight.AvgUsage);
+				theInsightInd.fadeOut(500).fadeIn(500);
+			}
+			else
+			{
+				theInsightInd.addClass('hidden-item');
+			}
+  		}
+	</script>
+	
+	<div id="ActivityAssignmentTemplatesPopup" style="display:none;"> 
+  
+		<apex:outputPanel id="ActivityAssignmentTemplatesPopupPanel">
+     	  <apex:form >
+
+				<apex:pageBlock rendered="{!!ISBLANK(TheActivityAssignmentTemplateToEdit)}">
+           		 
+           			<div id="ActivityAssignmentTemplatesPopupErrors"><apex:pageMessages escape="false"/></div>
+           			 
+            		<apex:pageBlockButtons location="bottom">
+						<apex:commandButton id="SaveActivityAssignmentButton" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__save}" action="{!SaveActivityAssignmentTemplate}"  rerender="ActivityAssignmentTemplatesPopupPanel,TheForm" oncomplete="hideModalBoxyWithErrorCheck('#ActivityAssignmentTemplatesPopupErrors');initialiseInsights();"/>
+						<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+					</apex:pageBlockButtons>
+					
+             		<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+
+						<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheActivityAssignmentTemplateToEdit.KimbleOne__ActivityAssignmentTemplate__c)}" labelstyle="width:30%" dataStyle="width:70%">
+							<apex:outputText value="{!$Label.kimbleone__frameworkassignment}" />
+							<apex:outputField value="{!TheActivityAssignmentTemplateToEdit.KimbleOne__ActivityAssignmentTemplate__c}"/>
+						</apex:pageBlockSectionItem>
+						
+               			<apex:inputfield id="activityAssignmentTemplateName" value="{!TheActivityAssignmentTemplateToEdit.Name}" required="true" />
+      
+         			 	<apex:pageBlockSectionItem labelstyle="width:30%" dataStyle="width:70%">
+							<apex:outputLabel for="ResourceList">
+								<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__Resource__c.Label}" />
+							</apex:outputLabel>
+								<apex:outputpanel layout="none">
+									<apex:outputPanel layout="none" rendered="{!!UseResourceEnhancedLookup}">
+										<div class="requiredInput">
+											<div class="requiredBlock"></div>
+											<apex:actionRegion >
+												<apex:selectList id="ResourceList" value="{!TheActivityAssignmentTemplateToEdit.KimbleOne__Resource__c}" size="1" required="true">
+													<apex:selectOptions value="{!TheResourceOptions}" />
+													<apex:actionSupport event="onchange" action="{!ResourceChanged}" rerender="IsResourcedInput"  />
+												</apex:selectList>
+											</apex:actionRegion>											
+										</div>
+									</apex:outputPanel>
+									<apex:outputPanel id="ResourceField" rendered="{!UseResourceEnhancedLookup}">
+										<apex:actionRegion >
+											<apex:inputField id="ResourceInput" required="true" styleclass="kimbleSearch" value="{!TheActivityAssignmentTemplateToEdit.KimbleOne__Resource__c}" rendered="{!!TheActivityAssignmentTemplateToEdit.KimbleOne__IsModelAssignment__c}">
+												<apex:actionSupport event="onchange" action="{!ResourceChanged}" rerender="IsResourcedInput"  />
+											</apex:inputField>
+										</apex:actionRegion>
+										<apex:inputField id="ModelResourceInput" required="true" styleclass="kimbleSearch" html-data-typename="LookupObjectModelResource" value="{!TheActivityAssignmentTemplateToEdit.KimbleOne__Resource__c}" rendered="{!TheActivityAssignmentTemplateToEdit.KimbleOne__IsModelAssignment__c}"/>
+									</apex:outputPanel>
+								</apex:outputpanel>					
+						</apex:pageBlockSectionItem>
+
+						<apex:inputField value="{!NumOfAssignments.KimbleOne__InputInteger__c}" label="{!$ObjectType.KimbleOne__ActivityAssignment__c.fields.KimbleOne__NumberOfActivityAssignments__c.label}" required="true" rendered="{!TheActivityAssignmentTemplateToEdit.KimbleOne__IsModelAssignment__c}"/>
+					</apex:pageblockSection>
+					<apex:outputPanel layout="none" id="IsResourcedInput">
+					<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+						<apex:pageBlockSectionItem rendered="{!ResourceGroupSelected}" labelstyle="width:30%" dataStyle="width:70%">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__IsResourcedGroupAssignment__c.Label}" />
+							
+							<apex:inputField value="{!TheActivityAssignmentTemplateToEdit.KimbleOne__IsResourcedGroupAssignment__c}" label="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.fields.KimbleOne__IsResourcedGroupAssignment__c.label}"/>
+						</apex:pageBlockSectionItem>
+					</apex:pageblockSection>
+					</apex:outputPanel>
+					<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+						<apex:pageBlockSectionItem rendered="{!TheActivityRoleOptions.size > 1}">
+							<apex:outputLabel for="ActivityRoleList">
+								<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ActivityRole__c.Label}" />
+							</apex:outputLabel>
+							
+							<apex:selectList id="ResourceList" value="{!TheActivityAssignmentTemplateToEdit.KimbleOne__ActivityRole__c}" size="1">
+								<apex:selectOptions value="{!TheActivityRoleOptions}" />
+							</apex:selectList>
+				
+						</apex:pageBlockSectionItem>
+						
+						 <apex:pageBlockSectionItem id="frameworkAssignmentCheckbox" rendered="{!AllowFrameworkAssignment && ISBLANK(TheActivityAssignmentTemplateToEdit.KimbleOne__ActivityAssignmentTemplate__c)}"  labelstyle="width:30%" dataStyle="width:70%">
+							<apex:outputLabel rendered="{!!TheActivityAssignmentTemplateToEdit.KimbleOne__IsModelAssignment__c}">
+								<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__IsFrameworkAssignment__c.Label}" />
+							</apex:outputLabel>
+							
+							<apex:outputPanel rendered="{!!TheActivityAssignmentTemplateToEdit.KimbleOne__IsModelAssignment__c}">
+								<apex:inputField rendered="{!!HasChildAssignments}" value="{!TheActivityAssignmentTemplateToEdit.KimbleOne__IsFrameworkAssignment__c}"/>
+								<apex:outputField rendered="{!HasChildAssignments}" value="{!TheActivityAssignmentTemplateToEdit.KimbleOne__IsFrameworkAssignment__c}"/>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+ 						
+ 						<apex:pageBlockSectionItem labelstyle="width:30%" dataStyle="width:70%">
+							<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UsageBehaviourRule__c.Label}" />
+							<apex:actionRegion >
+							<apex:selectList id="UsageBehaviourRule" value="{!TheActivityAssignmentTemplateToEdit.KimbleOne__UsageBehaviourRule__c}" size="1">
+								<apex:selectOptions value="{!TheUsageRuleOptions}" />
+								<apex:actionSupport event="onchange" action="{!RefreshEntryCriteria}" rerender="EntryCriteria"  />
+							</apex:selectList>
+							</apex:actionRegion>
+						</apex:pageBlockSectionItem>
+ 					
+					</apex:pageblockSection>
+					<apex:outputPanel layout="none" id="EntryCriteria">
+					<apex:pageblockSection collapsible="false" showheader="false" columns="1"  rendered="{!UsageBehaviourRulesMap[TheActivityAssignmentTemplateToEdit.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'TaskUsage'}">
+					
+						<apex:pageBlockSectionItem labelstyle="width:30%" dataStyle="width:70%">
+							<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__StartDateOffsetType__c.Label}" />
+							<apex:selectList value="{!TheActivityAssignmentTemplateToEdit.KimbleOne__StartDateOffsetType__c}" size="1">
+										<apex:selectOptions value="{!TheOffsetTypes}" />
+							</apex:selectList>
+						</apex:pageBlockSectionItem>
+						
+						<apex:pageBlockSectionItem labelstyle="width:30%" dataStyle="width:70%">
+							<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__StartDateOffset__c.Label}" />
+							<apex:inputField value="{!TheActivityAssignmentTemplateToEdit.KimbleOne__StartDateOffset__c}" required="true"/>
+						</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem labelstyle="width:30%" dataStyle="width:70%" dataStyleClass="popup-entry-units-input" rendered="{!UsageBehaviourRulesMap[TheActivityAssignmentTemplateToEdit.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'DerivedUsage' && UsageBehaviourRulesMap[TheActivityAssignmentTemplateToEdit.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'NoForecast'}">
+							<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__EntryUnits__c.Label}" />
+							<apex:outputPanel >
+								<apex:inputField value="{!TheActivityAssignmentTemplateToEdit.KimbleOne__EntryUnits__c}" html-ass-t-id="{!TheActivityAssignmentTemplateToEdit.Id}" styleClass="popup-entry-units"/>
+								<apex:outputPanel rendered="{!!(ISBLANK(TheActivityAssignmentTemplateToEdit.KimbleOne__ActivityAssignmentTemplate__c) || ISBLANK(RemainingAllocation))}" ><span title="Total Remaining usage to be allocated: {!RemainingAllocation} " class="fa fa-info-circle allocatable-usage"/></apex:outputPanel>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+						
+						<apex:inputField value="{!TheActivityAssignmentTemplateToEdit.KimbleOne__AssignmentPercentage__c}" rendered="{!UsageBehaviourRulesMap[TheActivityAssignmentTemplateToEdit.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'DerivedUsage' && ISBLANK(TheActivityAssignmentTemplateToEdit.KimbleOne__ActivityAssignmentTemplate__c) && UsageBehaviourRulesMap[TheActivityAssignmentTemplateToEdit.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'NoForecast'}"/>
+	 					
+	 					<apex:inputField value="{!TheActivityAssignmentTemplateToEdit.KimbleOne__UtilisationPercentage__c}" required="true" rendered="{!UsageBehaviourRulesMap[TheActivityAssignmentTemplateToEdit.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'DerivedUtilisation' && UsageBehaviourRulesMap[TheActivityAssignmentTemplateToEdit.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'NoForecast'}"/>
+						
+						<apex:pageBlockSectionItem labelstyle="width:30%" dataStyle="width:70%" rendered="{!UsageBehaviourRulesMap[TheActivityAssignmentTemplateToEdit.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'DerivedEndDate'}">
+							<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__EndDateOffsetType__c.Label}" />
+							<apex:selectList value="{!TheActivityAssignmentTemplateToEdit.KimbleOne__EndDateOffsetType__c}" size="1">
+										<apex:selectOptions value="{!TheOffsetTypes}" />
+							</apex:selectList>
+						</apex:pageBlockSectionItem>
+						
+						<apex:inputField value="{!TheActivityAssignmentTemplateToEdit.KimbleOne__EndDateOffset__c}" required="true" rendered="{!UsageBehaviourRulesMap[TheActivityAssignmentTemplateToEdit.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'DerivedEndDate'}"/>
+						
+   		            </apex:pageBlockSection>
+					</apex:outputPanel>
+   		            <apex:pageblockSection collapsible="false" showheader="false" columns="1" id="Milestones" rendered="{!AND(RevenueMilestones.size > 1, KimbleOne__Product__c.ProductType__r.KimbleOne__Enum__c == 'Delivery')}">
+                         <apex:pageBlockSectionItem labelstyle="width:30%"  dataStyle="width:70%">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__Milestone__c.Label}" for="assignmentMilestone"/>
+							<apex:selectList id="assignmentMilestone" value="{!TheActivityAssignmentTemplateToEdit.KimbleOne__MilestoneTemplate__c}" size="1">
+								<apex:selectOptions value="{!RevenueMilestones}" />
+							</apex:selectList>
+                        </apex:pageBlockSectionItem>
+   		            </apex:pageblockSection>
+   		                
+        		</apex:pageBlock>
+	
+         	</apex:form>
+
+        </apex:outputPanel> 
+  
+	</div>	
+
+</apex:define>
+</apex:composition>
+
+</apex:page>

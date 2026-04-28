@@ -1,0 +1,113 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.DeliveryGroupActorsController" showHeader="true" sidebar="false">
+<apex:composition template="KimbleOne__SiteMaster">
+
+	<apex:define name="Menu">
+		<c:Menu DefaultHelpPage="EngagementActors.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryGroup__c.Id}" MenuContextName="{!KimbleOne__DeliveryGroup__c.Name}"/>
+	</apex:define> 
+	     
+	<apex:define name="Content">
+		<apex:form id="TheForm">
+		<apex:pageMessages escape="false"/>
+		<apex:pageBlock title="{!$ObjectType.KimbleOne__DeliveryGroupActor__c.LabelPlural}">
+			<apex:pageblockbuttons location="top">
+				<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__DeliveryGroupActor__c.createable}">
+					<input id="newActorButton" class="btn" type="button" onclick="newActor('{!JSINHTMLENCODE(DeliveryGroup__c.Id)}');" value="{!$Label.New} {!$ObjectType.DeliveryGroupActor__c.label}" />
+				</apex:outputPanel>
+			</apex:pageblockbuttons>
+			<apex:pageBlockTable value="{!TheActors}" var="Actor">
+				<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+					<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__DeliveryGroupActor__c.updateable}">
+						<apex:outputLink value="#" onclick="initialiseModalBoxy('#ActorPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__DeliveryGroupActor__c.Label}', jQuery('form[id$=\'ActorForm\']'));editDeliveryGroupActor('{!Actor.Id}')">{!$Label.kimbleone__edit}</apex:outputLink>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__DeliveryGroupActor__c.deletable}">
+						&nbsp; | &nbsp;
+						<a href="javascript:void(0)" onclick="if (confirmDelete()) deleteActor('{!Actor.Id}');">{!$Label.Delete}</a>
+					</apex:outputPanel>
+					
+				</apex:column>
+				<apex:column headervalue="{!$ObjectType.KimbleOne__DeliveryElement__c.Label}" value="{!Actor.DeliveryElement__r.Name}"/>
+				<apex:column headervalue="{!$ObjectType.KimbleOne__ActorRole__c.Label}" value="{!Actor.ActorRole__r.Name}"/>
+				<apex:column headervalue="{!$ObjectType.User.Label}" value="{!Actor.KimbleOne__User__c}"/>
+				<apex:column headervalue="{!$ObjectType.Contact.Label}" value="{!Actor.KimbleOne__Contact__c}"/>				
+														
+			</apex:pageBlockTable>			
+		</apex:pageBlock>
+		
+		<apex:actionFunction action="{!DeleteActor}" name="deleteActor" rerender="TheForm">
+      		<apex:param name="ActorId" value="" />
+      	</apex:actionFunction>
+		
+		</apex:form>
+		
+		<apex:form id="ActorForm">
+		<div id="ActorPopup" style="display:none">
+			<apex:outputPanel id="ActorPopupPanel">			
+	   			<apex:pageBlock >
+	   			
+	   	     	<div id="ActorErrors">
+	           		<apex:pageMessages id="ActorMessages" escape="false"/>
+	           	</div>	   			
+     
+	           	<apex:pageBlockButtons location="bottom">
+					<apex:commandButton id="saveActor" action="{!insertActor}" value="{!$Label.kimbleone__save}" reRender="TheForm, ActorPopupPanel" oncomplete="hideModalBoxyWithErrorCheck('#ActorErrors')" rendered="{!$ObjectType.KimbleOne__DeliveryGroupActor__c.createable && (ISBLANK(TheActor.Id))}"/>	            	
+					<apex:commandButton id="editActor" action="{!editActor}" value="{!$Label.kimbleone__save}" reRender="TheForm, ActorPopupPanel" oncomplete="hideModalBoxyWithErrorCheck('#ActorErrors')" rendered="{!$ObjectType.KimbleOne__DeliveryGroupActor__c.updateable && !(ISBLANK(TheActor.Id))}"/>	            	
+					<input id="cancelActor" class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+	  			</apex:pageBlockButtons>
+	            
+	            <apex:pageblockSection collapsible="false" showheader="false" columns="1">
+	       
+						<apex:pageBlockSectionItem >
+		           			<apex:outputText value="{!$ObjectType.KimbleOne__ActorRole__c.Label}" />
+		           			<apex:selectlist value="{!TheActor.KimbleOne__ActorRole__c}" size="1">
+			           			<apex:SelectOptions value="{!ActorRoles}"/>
+			           		</apex:selectlist>
+						</apex:pageBlockSectionItem>						
+						
+						<apex:pageBlockSectionItem >
+		           			<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Label}" />
+		           			<apex:selectlist value="{!TheActor.KimbleOne__DeliveryElement__c}" size="1">
+			           			<apex:SelectOptions value="{!ElementOptions}"/>
+			           		</apex:selectlist>
+						</apex:pageBlockSectionItem>
+						
+                		  <apex:pageBlockSectionItem >
+			              	<apex:outputLabel value="{!$ObjectType.User.Name}"/>
+			              	<apex:outputPanel >
+			              		<apex:inputfield value="{!TheActor.KimbleOne__User__c}"/>
+			              	</apex:outputPanel>			     
+			              </apex:pageBlockSectionItem>
+			              
+                		  <apex:pageBlockSectionItem >
+			              	<apex:outputLabel value="{!$ObjectType.Contact.Name}"/>
+			              	<apex:outputPanel >
+			              		<apex:inputfield value="{!TheActor.KimbleOne__Contact__c}"/>			              		
+			              	</apex:outputPanel>			     
+			              </apex:pageBlockSectionItem>			              
+			              			   	
+	            	</apex:pageBlockSection>            
+				</apex:pageBlock>				
+	        </apex:outputPanel> <!-- end newActor -->
+		</div>
+		</apex:form>
+		
+		<apex:form >
+			<apex:actionFunction action="{!NewDeliveryGroupActor}" name="newDeliveryGroupActor" rerender="ActorPopupPanel" oncomplete="showModalBoxy()">
+       			<apex:param name="deliveryGroupId" value="{DeliveryGroup__c.Id}" />
+       		</apex:actionFunction>
+ 
+			<apex:actionFunction action="{!EditDeliveryGroupActor}"	name="editDeliveryGroupActor" rerender="ActorPopupPanel" oncomplete="showModalBoxy()">
+				<apex:param name="editActorId" value="{!TheActor.Id}" />
+			</apex:actionFunction>
+   		
+     	</apex:form>
+     	
+		<script>
+			function newActor(groupId)
+			{
+				initialiseModalBoxy('#ActorPopup', '{!JSENCODE($Label.New)}  {!$ObjectType.DeliveryGroupActor__c.label}', jQuery('form[id$=\'ActorForm\']'));
+				newDeliveryGroupActor(groupId);
+			}					
+		</script>
+	</apex:define>
+</apex:composition>
+</apex:page>

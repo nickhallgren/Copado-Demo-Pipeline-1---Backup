@@ -1,0 +1,131 @@
+<apex:page standardController="KimbleOne__InterfaceType__c" extensions="KimbleOne.InterfaceTypeEditController" showHeader="true" sidebar="false" >
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu"></apex:define> 
+   
+<apex:define name="Content">
+	<apex:pageBlock title="{!$Label.kimbleone__interfacetypevalidation}">
+            <apex:pageBlockButtons location="top">
+				<input id="validateAll" type="button" class="btn" value="Validate All" onclick="validateAll();"></input>
+            </apex:pageBlockButtons>
+			
+			<apex:pageBlockTable value="{!theInterfaceTypes}" var="interfaceType">
+              <apex:column headerValue="{!$Label.kimbleone__actions}" width="20px">
+              	<div id="type-menu" data-floating-dropdown="#{!interfaceType.Id}-menu-data" class="fa fa-bars burger-menu"></div>
+              	<div id="{!interfaceType.Id}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-left" style="margin-top:1px">
+		   			 <ul class="floating-dropdown-menu">				       
+				        <li><a href="/{!interfaceType.Id}/e"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.Edit}</a></li>
+				        		     
+				       <li><a href="javascript:validateType('{!interfaceType.Id}');"><i class="fa fa-check dropdown-icon"></i>{!$Label.Validate}</a></li>		 
+				    </ul>
+				</div>
+              </apex:column>
+			
+			 <apex:column headerValue="{!$ObjectType.KimbleOne__InterfaceType__c.Label}">
+			 	<a href="/{!interfaceType.Id}"><apex:outputText value="{!interfaceType.Name}"/></a> 
+			 </apex:column>
+			 
+			 <apex:column Value="{!interfaceType.Name}"/>
+			 <apex:column Value="{!interfaceType.KimbleOne__ObjectType__c}"/>
+			 <apex:column Value="{!interfaceType.KimbleOne__BatchSize__c}"/>
+			 <apex:column Value="{!interfaceType.KimbleOne__Enum__c}"/>
+			 <apex:column HeaderValue="{!$Label.kimbleone__validation}" width="500px">
+			 	<div class="validation-progress" id="{!interfaceType.Id}"></div>
+			 	<div class="validation-message"></div>
+			 </apex:column>	
+			 
+			</apex:pageBlockTable>
+	</apex:pageBlock>
+	
+	<script>
+	
+	function validateAll()
+	{
+		jQuery('.validation-progress').addClass('Pending');
+		
+		validateNextType();
+	}
+	
+	function validateNextType()
+	{
+		var nextType = jQuery('.validation-progress.Pending');
+		
+		if (nextType.length == 0) return;
+		
+		validateType(nextType[0].id);
+	}
+	
+	function validateType(typeId)
+    {
+      	jQuery('#' + typeId).removeClass('Pending').addClass('Processing');
+      	jQuery('#' + typeId).next().empty();
+             		
+      		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InterfaceTypeEditController.RunValidation}',
+       			typeId,
+      			function(result, event){
+             		jQuery('#' + typeId).removeClass('Processing');
+             		
+             		if (event.status) 
+		            {
+		             	//result is a list of string messages
+		             	if (result != null && result.length > 0)
+		             	{
+		             		for(var i=0;i<result.length;i++)
+		             		{
+		             			var html = '<div><a href="/' + result[i].Id + '">' + result[i].Name + '</a>';
+		             			
+		             			for (var j=0;j<result[i].Errors.length;j++)
+		             			{
+		             				html += '<div>' + result[i].Errors[j] + '</div>';
+		             			}
+		             			
+		             			jQuery('#' + typeId).next().append(jQuery(html));
+		             		}
+		             	}
+		             	
+		             	validateNextType();
+		         	} 
+		         	else if (event.type === 'exception') 
+		         	{
+		             	alert(event.message);
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		         	}			         	
+         }, 
+         {escape: true, timeout: 60000}
+     );
+   }
+	
+	</script>
+	
+	<style>
+	.burger-menu {float:none;}
+	.validation-progress
+	{
+		padding-left: 20px;
+		background-repeat: no-repeat;
+		padding-right: 12px;
+		height: 18px;
+		line-height: 18px;
+		display:none;
+	}
+	.Pending 
+	{
+		background-image: url('{!URLFOR($Resource.JobImages, 'pending16.gif')}');
+		display: block;
+	}
+	.Processing 
+	{
+		background-image: url('{!URLFOR($Resource.JobImages, 'running16.gif')}');
+		display: block;
+	}
+	</style>
+	
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

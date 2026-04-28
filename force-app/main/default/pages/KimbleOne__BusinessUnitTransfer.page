@@ -1,0 +1,378 @@
+<apex:page standardcontroller="KimbleOne__BusinessUnit__c" extensions="KimbleOne.BusinessUnitTransferController,KimbleOne.SecurityController">
+
+	<apex:composition template="KimbleOne__SiteMaster">
+
+		<apex:define name="Content">
+			<style>
+			#loadingIndicatorInnerContainer {
+				position:absolute;
+				top:50%;
+				height:10em;
+				margin-top:-2em;
+				width:100%;
+			}
+			.loadingIndicator {
+				right:0;
+				width:100%;
+				height:100%;
+				font-weight: bold;
+				position: fixed;
+				margin-top: 0px;
+				top: 0px;
+				text-align:center;
+				/* IE filter */
+				filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+				-moz-opacity:0.7;	/* Mozilla extension */
+				-khtml-opacity:0.7;  /* Safari/Conqueror extension */
+				opacity:0.7; /* CSS3 */
+				z-index:1000;
+				background-color:white;
+				display:none;
+			}
+			.loadingIndicator img {
+				margin-right:9px;
+			}
+			tr.SelectedSummaryTr{
+			     background-color: #dfe8f6 !important;
+
+   			}
+			</style>
+			<apex:form >
+
+				<apex:outputPanel id="BusinessUnitTransferPanel" styleClass="panel" >
+					<div id="loadingIndicatorOuterContainer" class="loadingIndicator" style="display:none">
+						<div id="loadingIndicatorInnerContainer">
+							<img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.SavingLabel}
+						</div>
+					</div>
+					<div id="ControllerErrors">
+						<apex:pagemessages escape="false"/>
+					</div>
+					<div id="BatchErrors" style="display:none">
+						<apex:pageMessage summary="{!$Label.kimbleone__errors}" severity="warning" strength="2" rendered="true">
+							<ul id="BatchErrorMsg" style=" margin:0px ;padding:0">
+
+							</ul>
+						</apex:pageMessage>
+					</div>
+
+					<apex:pageBlock id="BusinessUnitTrasferBlock" title="{!$Label.kimbleone__transferbusinessunit}"  rendered="{!!IsDeactivateMode}">
+
+						<apex:pageBlockButtons location="bottom">
+							<apex:commandButton action="{!transferBusinessUnit}" value="{!$Label.kimbleone__save}" onComplete="if(noControllerErrors())runUpdatesNeeded(true)" reRender="BusinessUnitTransferPanel" styleclass="DisableButtonWhileBusy" rendered="{!HasPermission['Permission04']}" />
+							<apex:commandButton action="{!Cancel}" value="{!$Label.kimbleone__cancel}"/>
+						</apex:pageBlockButtons>
+						<apex:pageblockSection collapsible="false" showheader="true"  columns="1" title="{!$Label.kimbleone__current}">
+
+							<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__BusinessUnitGroup__c}"/>
+
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$Label.kimbleone__from}"/>
+								<apex:outputField value="{!BusinessUnitGrpEffectiveDate.KimbleOne__InputDate__c}"/>
+							</apex:pageBlockSectionItem>
+
+						</apex:pageblockSection>
+
+						<apex:pageblockSection collapsible="false" showheader="true"  columns="1" title="{!$Label.kimbleone__transfer} {!$Label.kimbleone__to} ">
+
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.KimbleOne__BusinessUnitGroup__c.Label}" />
+
+								<apex:outputPanel layout="none">
+									<div class="requiredInput">
+										<div class="requiredBlock"></div>
+										<apex:actionRegion >
+											<apex:selectList value="{!NewBusinessUnitGroup}" size="1">
+												<apex:selectOptions value="{!BusinessUnitGroupOptions}"></apex:selectOptions>
+												<apex:actionSupport event="onchange" action="{!Refresh}" rerender="BusinessUnitTransferPanel"/>
+											</apex:selectList>
+										</apex:actionRegion>
+									</div>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!NewBusinessUnitGroup != null}">
+								<apex:outputLabel value="{!$Label.kimbleone__from}"/>
+								<apex:outputField value="{!NewBusinessUnitGrpEffectiveDate.KimbleOne__InputDate__c}"/>
+							</apex:pageBlockSectionItem>
+						</apex:pageblockSection>
+
+					</apex:pageBlock>
+
+					<script>
+
+					jQuery(document).ready(function() {
+						runUpdatesNeeded(false);
+					});
+
+					function noControllerErrors(){
+					    if($('#ControllerErrors>span')[0].children.length == 0) {
+							return true;
+						}
+
+						return false;
+					}
+
+
+					function runUpdatesNeeded(firstRun){
+
+					    var nextItem = 0;
+					    var currentItem = 0;
+					    if(firstRun){
+					        nextItem = nextItem + 1;
+         				}
+         				else if('{!JSENCODE($CurrentPage.parameters.Item)}' == 'done'){
+					       safeRedirectToSForceURL('{!$Page.BusinessUnitHome}?id={!JSENCODE($CurrentPage.parameters.Id)}');
+					       return;
+					    }
+					    else if('{!JSENCODE($CurrentPage.parameters.Item)}' != '' && !firstRun){
+					    	currentItem = parseInt('{!JSENCODE($CurrentPage.parameters.Item)}');
+					    	nextItem = currentItem+1;
+					    }
+					    else{
+					    	return;
+						}
+
+					   remoteActions(currentItem, nextItem);
+
+     				}
+
+					</script>
+				</apex:outputPanel>
+
+				<apex:pageBlock title="{!$Label.kimbleone__deactivate} {!$ObjectType.KimbleOne__BusinessUnit__c.Label} ({!KimbleOne__BusinessUnit__c.Name})" Id="TransferSummaryPanel" rendered="{!IsDeactivateMode}">
+
+					<apex:dataTable value="{!TransferSummaries}" var="summary" styleClass="list" rendered="{!KimbleOne__BusinessUnit__c.KimbleOne__IsActive__c}">
+						<apex:column >
+							<apex:facet name="header"><apex:outputText value="{!$Label.kimbleone__name}"/></apex:facet>
+							<apex:outputText value="{!summary.Name}"/>
+						</apex:column>
+						<apex:column >
+							<apex:facet name="header"><apex:outputText value="{!$Label.kimbleone__total}"/></apex:facet>
+							<apex:outputText value="{!summary.TotalNumber}"/>
+						</apex:column>
+						<apex:column >
+							<apex:commandLink action="{!SelectTransferSummary}" value="{!$Label.kimbleone__transfer}" reRender="TransferSummaryPanel" rendered="{!summary.TotalNumber > 0}"
+											  onComplete="formatSelectedSummary();setUpCheckBoxesAndSelects(),jQuery('#BatchErrors').hide();" styleClass="{!IF(summary.IsSelected,'SelectedSummary','')}">
+								<apex:param name="transferSummaryType" value="{!summary.Type}"/>
+							</apex:commandLink>
+						</apex:column>
+					</apex:dataTable>
+
+					<apex:outputPanel >
+						&nbsp;
+					</apex:outputPanel>
+
+					<apex:inputText value="{!SelectedSummaryType}" style="display:none" styleClass="SelectedSummaryType"/>
+
+					<apex:pageblockSection collapsible="false" showheader="true"  columns="1" title="{!TransferSummaryItemsHeader}" rendered="{!SelectedSummaryType != null && TransferSummaryItems.size > 0}">
+						<apex:outputPanel layout="block">
+							<input type="button" class="btn" onclick="saveItemTransfer(); return false" value="{!$Label.kimbleone__save}" style="display: block;margin: auto;"/>
+						</apex:outputPanel>
+
+						<apex:dataTable value="{!TransferSummaryItems}" var="obj" styleClass="list">
+							<apex:column style="width:10px">
+								<apex:facet name="header">
+									<apex:outputPanel >
+										<br/>
+										<input type="checkbox" name="SummaryItems" value="AllSummaryItems" id="AllSummaryItems" />
+									</apex:outputPanel>
+								</apex:facet>
+								<input type="checkbox" name="SummaryItems" value="{!obj.Id}" class="ASummaryItem"/>
+							</apex:column>
+							<apex:column >
+								<apex:facet name="header">
+									<apex:outputText value="{!TransferSummaryItemsNameHeader}"/>
+								</apex:facet>
+								<apex:outputLink value="/{!obj.Id}">{!obj.Name}</apex:outputLink>
+							</apex:column>
+							<apex:column >
+								<apex:facet name="header">
+									<apex:outputPanel >
+										<apex:outputText value="{!$Label.kimbleone__transfer} {!$Label.kimbleone__to} {!$ObjectType.KimbleOne__BusinessUnit__c.Label}"/><br/>
+										<apex:selectList size="1" styleClass="AllSummaryItemsBusinessUnit">
+											<apex:selectOptions value="{!BusinessUnitOptions}" />
+										</apex:selectList>
+									</apex:outputPanel>
+								</apex:facet>
+								<select class="SummaryItemBusinessUnit" itemid="{!obj.Id}" itemname="{!obj.Name}" >
+									<apex:selectOptions value="{!BusinessUnitOptions}"/>
+									<apex:repeat value="{!BusinessUnitOptions}" var="opt">
+										<apex:outputPanel layout="none">
+											<option value="{!JSENCODE(opt.Value)}">{!JSENCODE(opt.Label)}</option>
+										</apex:outputPanel>itemid itemid="{!obj.Id}
+									</apex:repeat>
+								</select>
+							</apex:column>
+
+							</apex:dataTable>
+					</apex:pageblockSection>
+
+					<apex:pageBlockButtons location="top">
+						<apex:outputPanel rendered="{!IsDeactivateButtonDisabled}">
+							<input type="button" class="btn DeactivateButton" value="{!$Label.kimbleone__deactivate}" disabled="true"/>
+						</apex:outputPanel>
+						<apex:commandButton action="{!DeactivateBusinessUnit}" value="{!$Label.kimbleone__deactivate}" reRender="TransferSummaryPanel"
+												styleclass="DisableButtonWhileBusy" rendered="{! !IsDeactivateButtonDisabled}"  />
+						<apex:commandButton action="{!Cancel}" value="{!$Label.kimbleone__cancel}"/>
+					</apex:pageBlockButtons>
+				</apex:pageBlock>
+
+				<apex:actionFunction name="refreshTransferSummaries" action="{!RefreshTransferSummaries}" onComplete="jQuery('#loadingIndicatorOuterContainer').hide();" reRender="TransferSummaryPanel"/>
+			</apex:form>
+
+			<script>
+				var items = [{action:'{!$RemoteAction.BusinessUnitTransferController.UpdateElements}',label:'{!$Label.Label026}',isDone:false},{action:'{!$RemoteAction.BusinessUnitTransferController.UpdateActivities}',label:'{!$Label.TransferResourcedActivity}'},{action:'{!$RemoteAction.BusinessUnitTransferController.UpdateResources}', label:'{!$Label.TransferResource}',isDone:false}];
+
+				function remoteActions(currentItem, nextItem){
+				    var item = items[currentItem];
+				    if(item == undefined) return;
+				    jQuery('#loadingIndicatorOuterContainer').show();
+
+					Visualforce.remoting.Manager.invokeAction(item.action,
+                    	'{!JSENCODE(BusinessUnit__c.Id)}',
+                        function(result, event){
+                            if (event.status) {
+                                if (result != null){
+                                    var url = '{!$Page.AsyncJobMonitor}?batchid=' + result + '&title='+item.label+'&redirecturl={!$Page.BusinessUnitTransfer}?id={!JSENCODE($CurrentPage.parameters.Id)}';
+
+                                	if(nextItem < items.length)
+                                		url = url+'%26item='+nextItem;
+                                	else
+                                		url = url+'%26item=done';
+                                    safeRedirectToSForceURL(url);
+                                }
+                            }
+                            else if (event.message != undefined)
+                            {
+                                jQuery('#loadingIndicatorOuterContainer').hide();
+                                console.log(event.message);
+                                jQuery('#BatchErrorMsg').html(event.message);
+                                jQuery('#BatchErrors').show();
+                            }
+                            },
+                            {escape: false, timeout: 60000}
+                        );
+
+    			}
+
+    			function formatSelectedSummary(){
+					jQuery('.SelectedSummary').parent().parent().addClass('SelectedSummaryTr');
+      			}
+
+				function setSelectedSummaryItems()
+				{
+					var selectedItems='';
+					jQuery("input:checkbox[name=SummaryItems]:checked").each(function(){
+						selectedItems=selectedItems+','+jQuery(this).val();
+					});
+					jQuery('.SelectedSummaryItems').val(selectedItems);
+				}
+
+				function setUpCheckBoxesAndSelects()
+				{
+					jQuery('#AllSummaryItems').unbind('change');
+					jQuery('#AllSummaryItems').change(function(){
+						UncheckOrCheckGroup(jQuery(this),'SummaryItems');
+						setEnableOrDisableSelects();
+					});
+					jQuery('.ASummaryItem').unbind('change');
+					jQuery('.ASummaryItem').change(function(){
+						UnCheckParent(jQuery(this),'AllSummaryItems');
+						setEnableOrDisableSelects();
+					});
+
+				    jQuery('.AllSummaryItemsBusinessUnit').unbind('change');
+					jQuery('.AllSummaryItemsBusinessUnit').change(function(){
+						jQuery('.SummaryItemBusinessUnit:enabled').val(jQuery(this).val());
+					});
+
+					jQuery('.SummaryItemBusinessUnit').unbind('change');
+					jQuery('.SummaryItemBusinessUnit').change(function(){
+						jQuery('.AllSummaryItemsBusinessUnit').val('');
+					});
+
+					setEnableOrDisableSelects();
+    			}
+
+    			function setEnableOrDisableSelects(){
+    			    var isAtleastOneChecked = false;
+    			    jQuery.each(jQuery('.ASummaryItem'), function(key,element){
+    			        var checkbx = jQuery(element);
+    			        var selectbx = jQuery(this).parent().parent().find('.SummaryItemBusinessUnit');
+    			    	if(checkbx.prop('checked')){
+    			    	    selectbx.prop('disabled',false);
+    			    	    isAtleastOneChecked = true;
+            			}
+            			else{
+            			    selectbx.prop('disabled',true);
+               				selectbx.val('');
+               			}
+    				});
+    				if(!isAtleastOneChecked){
+    					jQuery('.AllSummaryItemsBusinessUnit').val('');
+    					jQuery('.AllSummaryItemsBusinessUnit').prop('disabled', true);
+    				}
+    				else
+    					jQuery('.AllSummaryItemsBusinessUnit').prop('disabled', false);
+      			}
+
+
+				function saveItemTransfer(){
+
+				    if(jQuery('.SummaryItemBusinessUnit:enabled').length == 0){
+                        jQuery('#BatchErrorMsg').html('{!$Label.SelectItemsToIncludeHeading}');
+                        jQuery('#BatchErrors').show();
+				        return;
+        			}
+
+					jQuery('#BatchErrors').hide();
+				    jQuery('#loadingIndicatorOuterContainer').show();
+
+					var items = [];
+					var invalidItemNames = [];
+					jQuery.each(jQuery('.SummaryItemBusinessUnit:enabled'), function(key,element){
+						var itemId = jQuery(element).attr('itemid');
+						var itemName = jQuery(element).attr('itemname');
+						var buisinessUnitId = jQuery(element).val();
+						if(buisinessUnitId == '')
+							invalidItemNames.push(itemName);
+						items.push({Id:itemId,BusinessUnitId:buisinessUnitId});
+					});
+
+					var errorMessages = '';
+					if(invalidItemNames.length > 0){
+					    jQuery.each(invalidItemNames,function(key,name){
+					     	errorMessages += '<li><b>'+name+': </b>'+('{!$label.RequiredValue}').replace('{0}', '{!$Label.kimbleone__transfer} {!$Label.kimbleone__to} {!$ObjectType.KimbleOne__BusinessUnit__c.Label}')+'</li>';
+						});
+						jQuery('#loadingIndicatorOuterContainer').hide();
+                        jQuery('#BatchErrorMsg').html(errorMessages);
+                        jQuery('#BatchErrors').show();
+					}
+					else{
+						Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.BusinessUnitTransferController.ChangeItemBusinessUnit}',
+                    	items, jQuery('.SelectedSummaryType').val(),
+                        function(result, event){
+                            if (event.status) {
+                                refreshTransferSummaries();
+                            }
+                            else if (event.message != undefined)
+                            {
+                                jQuery('#loadingIndicatorOuterContainer').hide();
+                                console.log(event.message);
+                                jQuery('#BatchErrorMsg').html(event.message);
+                                jQuery('#BatchErrors').show();
+                            }
+                            },
+                            {escape: false, timeout: 60000}
+                        );
+                    }
+
+    			}
+
+			</script>
+
+		</apex:define>
+	</apex:composition>
+
+</apex:page>

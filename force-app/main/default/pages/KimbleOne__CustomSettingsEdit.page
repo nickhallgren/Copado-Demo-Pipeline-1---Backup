@@ -1,0 +1,439 @@
+<apex:page controller="KimbleOne.CustomSettingsEditController"  sidebar="false"> 
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+	<c:Menu MenuContextName="{!$Label.kimbleone__mysettingsheading}" />
+</apex:define>  
+   
+<apex:define name="Content">
+
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+	
+ 	<style>
+		.page-link, .config-item {
+			display: block;
+			padding: 10px 15px;
+			border-bottom: 1px solid #DDD;
+			background-color: white;
+			border-radius: 3px;
+		}
+		.link-icon {
+			font-size: 26px;
+			padding-right: 10px;
+			vertical-align: middle;
+		}
+		.config-item {
+		    position: relative;
+	        height: 26px;
+		    line-height: 26px;
+		    margin-bottom: 5px;
+		    width: 1000px;
+		}
+		.config-item:hover {
+		    background-color: #e3feff;
+		}				
+		.config-item-heading {
+			padding-right: 10px;
+		    font-size: 14px;
+		}
+		.boolean-config-item {
+			font-size: 26px;
+		    cursor: pointer;
+	        position: absolute;
+  				right: 38px;
+		}
+		.boolean-configsetting-item {
+			font-size: 26px;
+		    cursor: pointer;
+	        position: absolute;
+  				right: 38px;
+		}
+		.integer-config-item {
+		    font-size: 17px;
+		    position: absolute;
+		    right: 10px;
+		    top: 8px;
+		    text-align: center;
+		    padding: 2px;
+		    width: 80px;
+		}			
+		.string-config-item {
+		    font-size: 17px;
+		    position: absolute;
+		    right: 10px;
+		    top: 8px;
+		    text-align: center;
+		    padding: 2px; 
+		    width: 200px;
+		}
+		.select-config-item {
+		    font-size: 17px;
+		    position: absolute;
+		    right: 10px;
+		    top: 8px;
+		    text-align: left;
+		    padding: 2px; 
+		    width: 300px;
+		}
+		.hierarchy-setting-ind {
+		    font-size: 20px;
+		    color: #428BCA;
+		}
+		.qtip-content {
+		    font-size: 12px;
+		    line-height: 18px;
+		}
+		/* SF Pb styling overrides to make Pb elements look like Kimble Cards */
+		.bPageBlock {
+		    border: 1px solid rgba(0, 0, 0, 0) !important;
+		    border-radius: 4px;
+		    -webkit-box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+		    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+		    display: inline-block;
+		    border-color: #DDD !important;
+		}
+		
+		.pbHeader {
+		    background-color: white !important;
+		}
+		
+		td.pbTitle {
+		    font-weight: normal !important;
+		}
+		
+		.pbTitle h2.mainTitle {
+	        font-weight: bold;
+		    padding-left: 10px;
+	        white-space: nowrap;
+		}
+		
+		.pbHeader {
+		    color: #333;
+		    border-color: #DDD;
+		    border-top-right-radius: 3px;
+		    border-top-left-radius: 3px;
+		    font-size: 13px;
+		}
+		.apexp .bPageBlock.apexDefaultPageBlock .pbBody {
+		    margin: 12px !important;
+		}
+		.title-card {
+			margin-bottom: 5px;
+		}
+		input#filter-input {
+			border: none;
+			height: 30px;
+			font-size: 15px;
+			padding-left: 20px;
+			border-radius: 4px;
+			width: 1011px;
+		}
+		.filter-not-matched {
+			display: none;
+		}		
+	</style>
+    
+	<apex:pageMessages escape="false"/>
+	
+	<div class="title-card-container">
+		<div class="title-card">
+			<div class="title-card-heading" >
+				<input id="filter-input" placeholder="{!JSENCODE($Label.EnhancedTableSearchPlaceholder)}"/>
+			</div>
+		</div>
+	</div>
+
+   	<apex:repeat value="{!OrderedConfigSectionKeyMap}" var="sectionKey">
+		<apex:pageblock title="{!ConfigSectionKeyToHeadingMap[sectionKey]}">
+			<apex:repeat value="{!ConfigSettingsMap[sectionKey]}" var="theSetting">
+				<div class="config-item" setting-name="{!JSENCODE(theSetting.SettingName)}">
+					<span class="config-item-heading" search-text="{!JSENCODE(theSetting.Narrative)}{!JSENCODE(ConfigSectionKeyToHeadingMap[sectionKey])}">{!JSENCODE(theSetting.Narrative)}</span>
+					<apex:outputPanel layout="none" rendered="{!theSetting.SettingType == 'boolean'}">
+						<i class="k-tgl {!JSENCODE(theSetting.CustomSettingType)} fa {!IF(theSetting.SettingBooleanValue, 'fa-toggle-on', 'fa-toggle-off')} boolean-config-item"></i>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!theSetting.SettingType == 'integer'}">
+						<input class="{!JSENCODE(theSetting.CustomSettingType)} integer-config-item" value="{!theSetting.SettingIntegerValue}"/>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!theSetting.SettingType == 'string'}">
+						<input class="{!JSENCODE(theSetting.CustomSettingType)} string-config-item" value="{!JSENCODE(theSetting.SettingStringValue)}"/>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!theSetting.SettingType == 'string-choice'}">
+					<select class="{!JSENCODE(theSetting.CustomSettingType)} select-config-item">
+					<apex:repeat value="{!theSetting.SettingStringChoices}" var="opt">
+						<apex:outputPanel layout="none" rendered="{!!ISBLANK(theSetting.SettingStringValue) && opt.Value == theSetting.SettingStringValue}">
+							<option value="{!JSENCODE(opt.Value)}" selected="selected">{!JSENCODE(opt.Label)}</option>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!opt.Value != theSetting.SettingStringValue}">
+							<option value="{!JSENCODE(opt.Value)}">{!JSENCODE(opt.Label)}</option>
+						</apex:outputPanel>
+					</apex:repeat>
+					</select>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!theSetting.SettingType == 'integer-choice'}">
+					<select class="{!JSENCODE(theSetting.CustomSettingType)} select-config-item">
+					<apex:repeat value="{!theSetting.SettingStringChoices}" var="opt">
+						<apex:outputPanel layout="none" rendered="{!!ISBLANK(theSetting.SettingIntegerValue) && opt.Value == TEXT(theSetting.SettingIntegerValue)}">
+							<option value="{!JSENCODE(opt.Value)}" selected="selected">{!JSENCODE(opt.Label)}</option>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!opt.Value != TEXT(theSetting.SettingIntegerValue)}">
+							<option value="{!JSENCODE(opt.Value)}">{!JSENCODE(opt.Label)}</option>
+						</apex:outputPanel>
+					</apex:repeat>
+					</select>
+					</apex:outputPanel>
+				</div>
+			</apex:repeat>
+		</apex:pageblock>
+	</apex:repeat>
+
+</apex:define>
+</apex:composition>
+<script>
+
+	jQuery(window).ready(function () {
+	
+		jQuery('.fa-toggle-on').attr('title', 'on');
+		jQuery('.fa-toggle-off').attr('title', 'off');
+	
+		jQuery(document).on('click', '.plan-preference-toggle', togglePlanPreferenceSettingClick);
+		jQuery(document).on('click', '.product-preference-toggle', toggleProductPreferenceSettingClick);
+		jQuery(document).on('click', '.businessunit-preference-toggle', toggleBusinessUnitPreferenceSettingClick);
+		jQuery(document).on('click', '.mytimesheet-preference-toggle', toggleMyTimesheetPreferenceSettingClick);
+		jQuery(document).on('click', '.myassignment-preference-toggle', toggleMyActivityAssignmentPreferenceClick);
+		jQuery(document).on('click', '.insight-preference-toggle', toggleInsightPreferenceSettingClick);
+		jQuery(document).on('click', '.resource-preference-toggle', toggleResourcePreferenceSettingClick);
+		jQuery(document).on('click', '.location-preference-toggle', toggleLocationPreferenceSettingClick);
+		jQuery(document).on('click', '.resource-assignments-preference-toggle', toggleResourceAssignmentsPreferenceSettingClick);
+		jQuery(document).on('click', '.ui-preference-toggle', toggleUIPreferenceSettingClick);
+	
+		jQuery(document).on('change', '.plan-preference-string:not(.always-disabled)', stringPlanPreferenceSettingChange);
+		jQuery(document).on('change', '.mytimesheet-preference-string', stringMyTimesheetPreferenceSettingChange);
+		jQuery(document).on('change', '.flex-preference-string', stringFlexiblePreferenceSettingChange);
+		jQuery(document).on('change', '.myassignment-preference-string', stringMyActivityAssignmentPreferenceSettingChange);
+		jQuery(document).on('change', '.resource-assignments-preference-string', stringResourceAssignmentsPreferenceSettingChange);
+	
+		jQuery(document).on('change', '.myassignment-preference-integer', integerMyActivityAssignmentPreferenceSettingChange);
+			
+		jQuery(document).off('keyup', '#filter-input');
+		jQuery(document).on('keyup', '#filter-input', function () {
+			var filterValue = jQuery(this).val().toLowerCase();
+		
+			if(filterValue != undefined && filterValue != '')
+			{
+				jQuery.each(jQuery('.config-item-heading'), function(key, value) {
+					if(jQuery(value).attr('search-text').toLowerCase().includes(filterValue))
+					{
+						jQuery(value).closest('.config-item').addClass('filter-matched');
+						jQuery(value).closest('.config-item').removeClass('filter-not-matched');
+					}
+					else
+					{
+						jQuery(value).closest('.config-item').addClass('filter-not-matched');
+						jQuery(value).closest('.config-item').removeClass('filter-matched');
+					}
+				});
+		
+				jQuery('.apexp').has('div.config-item.filter-matched').removeClass('filter-not-matched');
+				jQuery('.apexp').not(':has(div.config-item.filter-matched)').addClass('filter-not-matched');
+			}
+			else
+			{
+				jQuery('.filter-not-matched').removeClass('filter-not-matched');
+				jQuery('.apexp').removeClass('filter-not-matched');
+			}
+		});
+		
+		// if the called has indicated a setting name, find this and enter the search criteria to filter the page
+		var targetSettingName = getQueryVariable('setting-name');
+		jQuery('#filter-input').val(jQuery('.config-item[setting-name="' + targetSettingName + '"] span.config-item-heading').text()).keyup();
+	});
+	
+	function toggleInsightPreferenceSettingClick()
+	{				
+		setBooleanCustomSetting('{!$RemoteAction.CustomSettingsEditController.SetInsightPreferenceValue}'
+									, jQuery(this).parent().attr('setting-name')
+									, !jQuery(this).hasClass('fa-toggle-on')
+									, jQuery(this));
+	}
+	
+	function toggleUIPreferenceSettingClick()
+	{				
+		setBooleanCustomSetting('{!$RemoteAction.CustomSettingsEditController.SetUIPreferenceValue}'
+									, jQuery(this).parent().attr('setting-name')
+									, !jQuery(this).hasClass('fa-toggle-on')
+									, jQuery(this));
+	}
+	
+	function togglePlanPreferenceSettingClick()
+	{				
+		setBooleanCustomSetting('{!$RemoteAction.CustomSettingsEditController.SetPlanPreferenceValue}'
+									, jQuery(this).parent().attr('setting-name')
+									, !jQuery(this).hasClass('fa-toggle-on')
+									, jQuery(this));
+	}
+	
+	function toggleBusinessUnitPreferenceSettingClick()
+	{				
+		setBooleanCustomSetting('{!$RemoteAction.CustomSettingsEditController.SetBusinessUnitPreferenceValue}'
+									, jQuery(this).parent().attr('setting-name')
+									, !jQuery(this).hasClass('fa-toggle-on')
+									, jQuery(this));
+	}
+	
+	function toggleProductPreferenceSettingClick()
+	{				
+		setBooleanCustomSetting('{!$RemoteAction.CustomSettingsEditController.SetProductPreferenceValue}'
+									, jQuery(this).parent().attr('setting-name')
+									, !jQuery(this).hasClass('fa-toggle-on')
+									, jQuery(this));
+	}
+	
+	function toggleMyTimesheetPreferenceSettingClick()
+	{				
+		setBooleanCustomSetting('{!$RemoteAction.CustomSettingsEditController.SetMyTimesheetPreferenceValue}'
+									, jQuery(this).parent().attr('setting-name')
+									, !jQuery(this).hasClass('fa-toggle-on')
+									, jQuery(this));
+	}
+	
+	function toggleMyActivityAssignmentPreferenceClick()
+	{				
+		setBooleanCustomSetting('{!$RemoteAction.CustomSettingsEditController.SetMyActivityAssignmentPreferenceValue}'
+									, jQuery(this).parent().attr('setting-name')
+									, !jQuery(this).hasClass('fa-toggle-on')
+									, jQuery(this));
+	}			
+		
+	function toggleResourcePreferenceSettingClick()
+	{				
+		setBooleanCustomSetting('{!$RemoteAction.CustomSettingsEditController.SetResourcePreferenceValue}'
+									, jQuery(this).parent().attr('setting-name')
+									, !jQuery(this).hasClass('fa-toggle-on')
+									, jQuery(this));
+	}
+	
+	function toggleLocationPreferenceSettingClick()
+	{				
+		setBooleanCustomSetting('{!$RemoteAction.CustomSettingsEditController.SetLocationPreferenceValue}'
+									, jQuery(this).parent().attr('setting-name')
+									, !jQuery(this).hasClass('fa-toggle-on')
+									, jQuery(this));
+	}
+	
+	function toggleResourceAssignmentsPreferenceSettingClick()
+	{				
+		setBooleanCustomSetting('{!$RemoteAction.CustomSettingsEditController.SetResourceAssignmentsPreferenceValue}'
+									, jQuery(this).parent().attr('setting-name')
+									, !jQuery(this).hasClass('fa-toggle-on')
+									, jQuery(this));
+	}
+	
+	function stringResourceAssignmentsPreferenceSettingChange()
+	{				
+		setStringCustomSetting('{!$RemoteAction.CustomSettingsEditController.SetResourceAssignmentsPreferenceValue}'
+									, jQuery(this).parent().attr('setting-name')
+									, jQuery(this).val()
+									, jQuery(this));
+	}
+	
+	function stringMyActivityAssignmentPreferenceSettingChange()
+	{				
+		setStringCustomSetting('{!$RemoteAction.CustomSettingsEditController.SetMyActivityAssignmentPreferenceValue}'
+									, jQuery(this).parent().attr('setting-name')
+									, jQuery(this).val()
+									, jQuery(this));
+	}
+	
+	function integerMyActivityAssignmentPreferenceSettingChange()
+	{				
+		setStringCustomSetting('{!$RemoteAction.CustomSettingsEditController.SetMyActivityAssignmentPreferenceValue}'
+									, jQuery(this).parent().attr('setting-name')
+									, parseInt(jQuery(this).val())
+									, jQuery(this));
+	}			
+
+	function stringPlanPreferenceSettingChange()
+	{
+		setStringCustomSetting('{!$RemoteAction.CustomSettingsEditController.SetPlanPreferenceValue}'
+									, jQuery(this).parent().attr('setting-name')
+									, jQuery(this).val()
+									, jQuery(this));
+	}
+	
+	function stringMyTimesheetPreferenceSettingChange()
+	{				
+		setStringCustomSetting('{!$RemoteAction.CustomSettingsEditController.SetMyTimesheetPreferenceValue}'
+									, jQuery(this).parent().attr('setting-name')
+									, jQuery(this).val()
+									, jQuery(this));
+	}
+	
+	function stringFlexiblePreferenceSettingChange()
+	{				
+		setStringCustomSetting('{!$RemoteAction.CustomSettingsEditController.SetFlexiblePreferenceValue}'
+									, jQuery(this).parent().attr('setting-name')
+									, jQuery(this).val()
+									, jQuery(this));
+	}
+	
+	function setStringCustomSetting(remoteAction, settingName, newValue, configInput)
+	{
+		jQuery(configInput).prop('disabled', true);
+		
+		Visualforce.remoting.Manager.invokeAction(remoteAction, settingName, newValue,
+	     			function(result, event)
+	     			{          
+					jQuery(configInput).prop('disabled', false)
+	
+	            		if (!event.status) 
+		            {
+		             	alert(event.message);
+	             	}
+	        		}
+	        		, {escape: true, timeout: 60000});
+	}
+	
+	function setBooleanCustomSetting(remoteAction, settingName, newValue, configSwitch)
+	{
+		var originalState = jQuery(configSwitch).hasClass('fa-toggle-on');
+		prepareToggleForRemoteAction(configSwitch);
+		
+		Visualforce.remoting.Manager.invokeAction(remoteAction, settingName, newValue,
+	     			function(result, event)
+	     			{          
+					processToggleRemoteActionResponse(result, event, originalState, configSwitch);
+	        		}
+	        		, {escape: true, timeout: 60000});
+	}
+				
+	function prepareToggleForRemoteAction(configSwitch)
+	{
+		jQuery(configSwitch).removeClass('fa-toggle-on').removeClass('fa-toggle-off').addClass('fa-spin').addClass('fa-circle-o-notch');
+	}
+	
+	function processToggleRemoteActionResponse(result, event, originalState, configSwitch)
+	{
+		jQuery(configSwitch).removeClass('fa-spin').removeClass('fa-circle-o-notch');
+	
+	    		if (event.status) 
+		{
+			if(!originalState)
+	          		jQuery(configSwitch).addClass('fa-toggle-on').attr('title', 'on');
+	         		else
+	          		jQuery(configSwitch).addClass('fa-toggle-off').attr('title', 'off');
+	      	} 
+	      	else 
+	      	{
+	          	if(originalState)
+	          		jQuery(configSwitch).addClass('fa-toggle-on').attr('title', 'on');
+	         		else
+	          		jQuery(configSwitch).addClass('fa-toggle-off').attr('title', 'off');
+	          		
+	          	alert(event.message);
+	         	}
+	}
+	
+</script>
+
+</apex:page>

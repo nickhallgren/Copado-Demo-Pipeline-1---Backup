@@ -1,0 +1,329 @@
+<apex:page standardcontroller="KimbleOne__Proposal__c" extensions="KimbleOne.DeliveryDatesBulkEditController,KimbleOne.TooltipsController" sidebar="false" tabStyle="KimbleOne__ReferenceData__c">
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu"> 
+
+	<c:Menu DefaultHelpPage="EditDeliveryDates.html" MenuContextType="Proposal" MenuContextId="{!KimbleOne__Proposal__c.Id}" MenuContextName="{!KimbleOne__Proposal__c.Name}"/>
+
+</apex:define>  
+
+<apex:define name="Content">
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+	
+	<!-- Kimble Guidance -->
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+	<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/DeliveryDatesBulkEditNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+		<apex:outputPanel layout="none" rendered="{!DeliveryDatesBulkEditTipOverrideEnabled}">
+			<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+		</apex:outputPanel>
+	</apex:outputPanel>
+	
+	<style>
+	
+	.dateFormat{display:none;}
+	.group-by-row {
+		font-style: italic;
+    	font-weight: bold;
+    	height: 41px;
+    	background-color: #EDEDED;
+    	}
+    	i.fa.fa-pencil {
+    cursor: pointer;
+	}
+    #proposal-container .list td:first-child {width:35px}
+	.kimble-tip {
+		font-size: 16px;
+		margin-left: 4px;
+	    position: absolute;
+	    margin-top: -2px;
+	    cursor: pointer;
+	}
+	.fa-info-circle{
+	    
+	    color: #428BCA;
+	    
+	}
+	.fa-exclamation-circle{
+	    color: #B42E34;
+	    margin-top: 1px;
+	}
+		/*
+    loading panel
+*/
+
+.loadingIndicator {
+   top:0;
+   right:0;
+   width:100%;
+   height:100%;
+   font-weight: bold;
+   position:absolute;
+   text-align:center;
+   /* IE filter */
+   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+   -moz-opacity:0.7;    /* Mozilla extension */
+   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+   opacity:0.7; /* CSS3 */
+   z-index:1000;
+   background-color:white;
+}
+
+.loadingIndicator img {
+    margin-right:9px;
+}
+
+#loadingIndicatorInnerContainer { 
+    position:absolute; 
+    top:50%;
+    height:10em; 
+    margin-top:-2em;
+    width:100%;
+}
+	</style>
+	<apex:form id="TheForm">
+		<div id="proposal-title">
+			<apex:outputPanel id="ProposalCard" layout="none">
+			<div id="ProposalItemsErrors"><apex:pageMessages escape="false"/></div>
+			<div class="title-card-container">
+			<div class="title-card">
+				<div class="title-card-heading" >
+					<div class="title-card-heading-icon">
+						<div class="fa fa-square kimble-probability {!JSINHTMLENCODE(TheProposal.ForecastStatus__r.StyleClass__c)}" title="{!JSINHTMLENCODE(TheProposal.ForecastStatus__r.Name)}"></div>
+					</div>
+					<div class="title-card-heading-text">
+						<apex:outputText value="{!TheProposal.KimbleOne__ShortName__c}" title="{!TheProposal.KimbleOne__ShortName__c}"/>
+					</div>
+				</div>
+				
+				<div class="title-card-body">
+		  			<div id="acceptanceDateOutput" class="title-card-body-field">
+  						<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__AcceptanceDate__c.Label}" />
+  						<span ><apex:outputField styleClass="center-aligned-block" value="{!TheProposal.KimbleOne__AcceptanceDate__c}"/></span>
+  					</div>
+					
+		  			<div id="forecastStatusOutput" class="title-card-body-field">
+  						<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ForecastStatus__c.Label}" />
+  						<span ><apex:outputField styleClass="center-aligned-block" value="{!TheProposal.ForecastStatus__r.Name}"/></span>
+  					</div>
+					<div class="title-card-body-field">
+						<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ContractRevenue__c.Label}" />
+						<span ><apex:outputField id="proposal-contract-revenue" styleClass="center-aligned-block" value="{!TheProposal.KimbleOne__ContractRevenue__c}"/></span>
+					</div>
+					<div id="contractCostOutput" class="title-card-body-field">
+						<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ContractCost__c.Label}" />
+	  					<span ><apex:outputField styleClass="center-aligned-block" value="{!TheProposal.KimbleOne__ContractCost__c}"/></span>
+					</div>
+					<div id="contractMarginOutput" class="title-card-body-field">
+						<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ContractMargin__c.Label}" />
+	  					<span ><apex:outputField styleClass="center-aligned-block" value="{!TheProposal.KimbleOne__ContractMargin__c}"/></span>
+					</div>
+		  			<div id="embeddedCharmsContainer" pageSource="ProposalCharmsCard"></div>
+				</div>
+			</div>
+			</div>
+  			</apex:outputPanel>
+  		</div>
+  		<div id="proposal-container" style="display:none">
+  		<apex:actionStatus id="LoadingStatus">
+                <apex:facet name="start">
+                    <div id="loadingIndicatorOuterContainer" class="loadingIndicator">
+                        <div id="loadingIndicatorInnerContainer">
+                            <img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+                        </div>
+                    </div>
+                </apex:facet>
+        </apex:actionStatus>
+        <apex:actionFunction name="calculateNewDates" action="{!CalculateDates}" rerender="DeliveryItems" status="LoadingStatus" oncomplete="initialisePageAfterLoad();"/>
+  		<apex:pageBlock id="DeliveryItems" title="{!$Label.kimbleone__manageproposaldeliverydates}">  
+  			<apex:pageBlockButtons location="top">
+  				<apex:commandButton action="{!Save}" styleclass="DisableButtonWhileBusy" style="float:right" value="{!$Label.kimbleone__applyfilter}" rerender="TheForm"/>
+           	</apex:pageBlockButtons>
+  			
+  			<apex:pageBlockSection collapsible="false" showheader="false" columns="2" rendered="{!ShowDeliveryOffsetPanel}">
+  				
+                   <apex:pageBlockSectionItem >
+                        <apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__DeliveryStartDate__c.Label}" />
+                        <apex:outputPanel layout="none">
+                        <apex:inputField id="DeliveryStartDate" value="{!TheProposal.KimbleOne__DeliveryStartDate__c}" styleClass="kimbleDatePicker"></apex:inputField>
+                        <input class="btn" type="button" value="{!$Label.Recalculate}" onclick="calculateNewDates()"/>
+                        </apex:outputPanel>
+                    </apex:pageBlockSectionItem>
+
+  			</apex:pageBlockSection>
+  			
+  			<table class="list" border="0" cellpadding="0" cellspacing="0">
+				<thead>
+				<tr class="headerRow">
+					<th class="headerRow"><h2><apex:outputText value="{!$Label.kimbleone__selectlabel}"/></h2></th>
+					<th id="assignmentMilestoneName" class="headerRow "><h2><apex:outputText value="{!$Label.kimbleone__name}"/></h2></th>
+					<th id="behaviourRuleName" class="headerRow "><h2><apex:outputText value="{!$ObjectType.KimbleOne__DeliveryDateBehaviourRule__c.Fields.Name.Label}"/></h2></th>
+					<th id="currentStartDate" class="headerRow "><h2><apex:outputText value="{!$Label.kimbleone__currentstartdate}"/></h2></th>
+					<th id="newStartDate" class="headerRow "><h2><apex:outputText value="{!$Label.kimbleone__newstartdate}"/></h2></th>
+				</tr>
+				</thead>
+				<tbody>
+				<apex:variable value="" var="fullName"/>
+				
+				<apex:repeat id="repeater" value="{!TheDateCalculation.TheItems}" var="item">
+					
+					<apex:outputPanel layout="none" rendered="{!fullName != item.FullName}">
+					<tr class="group-by-row">
+						<td colspan="6">
+							<apex:outputText value="{!item.FullName}" rendered="{!ShowGroupColumn || ISBLANK(item.TheElement)}"/>
+							<apex:outputText value="{!item.TheElement.Name}" rendered="{!!ShowGroupColumn}"/>
+							<apex:variable value="{!item.FullName}" var="fullName"/>
+						</td>
+					</tr>
+					</apex:outputPanel>
+					<tr class="dataRow" >
+						<td><apex:inputField value="{!item.Selected.KimbleOne__InputCheckbox__c}"><apex:actionSupport event="onchange" rerender="{!$Component.TheForm.DeliveryItems.repeater.outputDatePanel}"  oncomplete="initialisePageAfterLoad();"/></apex:inputField></td>
+						<td class="dataCell" style="white-space: nowrap;"><apex:outputText value="{!item.Name}"/></td>
+						<td class="dataCell" style="white-space: nowrap;"><apex:outputText value="{!TheDateCalculation.TheAppliedRules[item.RuleId].Name}"/><apex:outputPanel layout="none" rendered="{!!ISBLANK(TheDateCalculation.TheAppliedRules[item.RuleId].Description__c)}"><span class="fa fa-info-circle kimble-tip" title="{!TheDateCalculation.TheAppliedRules[item.RuleId].Description__c}"></span></apex:outputPanel></td>
+						<td class="dataCell" ><apex:outputField value="{!item.OldStartDate.KimbleOne__InputDate__c}"/></td>
+						<td class="dataCell">
+							<apex:outputPanel id="outputDatePanel">
+								
+								<apex:outputPanel layout="none" rendered="{!!item.Selected.KimbleOne__InputCheckbox__c}">
+									<apex:outputField value="{!item.OldStartDate.KimbleOne__InputDate__c}" />
+									<i class="fa fa-pencil"/>
+								</apex:outputPanel>
+								
+								<apex:outputPanel layout="none" rendered="{!item.Selected.KimbleOne__InputCheckbox__c}">
+									<apex:inputField value="{!item.NewStartDate.KimbleOne__InputDate__c}" styleClass="kimbleDatePicker" rendered="{!item.Selected.KimbleOne__InputCheckbox__c}">
+										<apex:actionSupport event="onchange" action="{!DeliveryItemStartDateChange}" rerender="{!$Component.TheForm.DeliveryItems.repeater.outputDatePanel},{!$Component.TheForm.DeliveryItems.repeater.ItemOffSet}"  oncomplete="initialisePageAfterLoad();">
+											<apex:param name="itemId" value="{!item.TheItem.Id}"  />
+										</apex:actionSupport>
+									</apex:inputField>
+									
+									<apex:outputPanel layout="none" rendered="{!!item.IsValid}"><span class="fa fa-exclamation-circle kimble-tip" title="{!item.ValidationMessage}"></span></apex:outputPanel>
+									
+								</apex:outputPanel>
+							</apex:outputPanel>
+						</td>
+					</tr>
+				</apex:repeat>
+				</tbody>
+			</table>
+  		</apex:pageBlock>
+  		</div>
+  		
+  		<apex:outputPanel layout="none">
+			
+		<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+		<div style="display:none;" kimble-tip="null"></div>
+			
+	<div id="ProposalJobs"></div>
+	<script>
+		jQuery(function () {
+               	loadJobsInline(jQuery('#ProposalJobs'), '{!JSINHTMLENCODE(Proposal__c.Id)}','Initialising proposal data', reloadPage);
+           });
+           
+           function reloadPage(jobsProcessed)
+           {
+           	jQuery('#ProposalJobs').hide();
+           	
+           	if (jobsProcessed)
+           	{
+           		window.location.href = window.location.href;
+          	}
+           	else
+           	{
+           		jQuery('#proposal-container').show();
+           		initialisePageAfterLoad();
+          	}
+           }
+           
+       </script>
+	        
+	</apex:outputPanel>
+  		
+  	</apex:form>
+  	
+  	
+
+  	<script>
+		function initialisePageAfterLoad()
+		{
+			jQuery('.kimble-tip').qtip('destroy', true);
+			jQuery('.kimble-tip').qtip({position: { adjust: { method: 'flip flip'}, viewport: $(window)},
+											show: { solo: true },
+											style: {classes: 'qtip-light qtip-shadow qtip-rounded adjustment-tool-tip'}});
+			
+			jQuery(document).off('click','.fa-pencil');
+			jQuery(document).on('click','.fa-pencil', function() {
+				
+				jQuery(this).closest('tr').find('input[type="checkbox"]').click();
+				
+			});
+			initialisePageTips();
+			SetupDatePicker();
+		}
+		
+		/* Tooltips */
+		var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+		var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+		var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+		var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+		var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+		var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+	
+		function initialisePageTips()
+		{
+			ApplyTipAttributes();
+			initialiseTips();
+		}
+		
+		// add tip attributes to elements
+		function ApplyTipAttributes()
+		{
+			if(enableTips)
+			{
+				jQuery('[id$="acceptanceDateOutput"]').attr('kimble-tip','AcceptanceDate').attr('kimble-tip-extended-text','AcceptanceDateExtendedText');
+				jQuery('[id$="forecastStatusOutput"]').attr('kimble-tip','ForecastStatus').attr('kimble-tip-help-link','UpdateForecastStatusHelpLink');
+				jQuery('[id$="contractCostOutput"]').attr('kimble-tip','ContractCost').attr('kimble-tip-help-link','SwitchForecastLevelHelpLink');
+				jQuery('[id$="contractMarginOutput"]').attr('kimble-tip','MarginPct').attr('kimble-tip-help-link','ProposalMarginPctHelpLink');
+				jQuery('[id$="DeliveryStartDate"]').attr('kimble-tip','DeliveryStartDate').attr('kimble-tip-extended-text','DeliveryStartDateExtendedText').attr('kimble-tip-help-link','EditingDeliveryDatesHelpLink');
+				jQuery('[id$="assignmentMilestoneName"]').attr('kimble-tip','Name').attr('kimble-tip-help-link','EditingDeliveryDatesHelpLink');
+				jQuery('[id$="behaviourRuleName"]').attr('kimble-tip','BehaviourRuleName').attr('kimble-tip-extended-text','BehaviourRuleNameExtendedText');
+				jQuery('[id$="currentStartDate"]').attr('kimble-tip','CurrentStartDate');
+				jQuery('[id$="newStartDate"]').attr('kimble-tip','NewStartDate').attr('kimble-tip-help-link','EditingDeliveryDatesHelpLink');
+			}
+		}
+		
+		function updateTipsConfigSetting(newTipSetting)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+				newTipSetting,
+					function(result, event){
+						if (event.status)
+						{
+							var data = {};
+							data.results = result;
+							loadGuidance();
+						}
+						else
+						{
+							alert(event.message);
+						}
+				},
+				{escape: false, timeout: 60000}
+			);
+		}
+
+		function SetupDatePicker()
+		{
+			//dateFormat: 'yy-mm-dd',
+			jQuery('.kimbleDatePicker').datepicker({
+					dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true,
+					selectOtherMonths: true,
+					changeMonth: true,
+					changeYear: true});
+		}
+	</script>
+</apex:define>
+</apex:composition>
+</apex:page>

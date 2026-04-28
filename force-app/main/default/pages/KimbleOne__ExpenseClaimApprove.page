@@ -1,0 +1,807 @@
+<apex:page standardcontroller="KimbleOne__ExpenseClaim__c"
+	extensions="KimbleOne.ExpenseClaimApproveController,KimbleOne.SecurityController" 
+	sidebar="false">
+
+	<apex:composition template="KimbleOne__SiteMaster">
+
+		<apex:define name="Menu">
+			<c:Menu MenuContextName="{!KimbleOne__ExpenseClaim__c.Name}"  />
+		</apex:define>
+
+		<apex:define name="Content">
+
+			<chatter:feedWithFollowers entityId="{!KimbleOne__ExpenseClaim__c.Id}"/>
+	
+			<apex:form >
+				<apex:actionFunction action="{!AddClaimAttachment}" name="addClaimAttachment" rerender="ClaimAttachmentsPanel, pageErrors" oncomplete="hideModalBoxy()">
+					<apex:param name="attachmentId" value="" />
+				</apex:actionFunction> 
+				<apex:actionFunction action="{!AddItemAttachment}" name="addItemAttachment" rerender=" ExpenseItemPane,Expenses, pageErrors" oncomplete="hideModalBoxy()">
+					<apex:param name="attachmentId" value="" />
+					<apex:param name="expenseId" value="" />
+				</apex:actionFunction> 
+           		<apex:actionFunction action="{!GetExpenseItem}" name="editExpenseItem" rerender="ExpenseItemDetails" oncomplete="showModalBoxy(); initialiseItems();">
+					<apex:param name="ExpenseItem" value="" />
+				</apex:actionFunction>
+				<apex:actionFunction action="{!SelectAttachment}" name="selectAttachment" rerender="ExpenseClaimPane, ClaimAttachmentsPopup, ExpenseItemPane" oncomplete="showReceipt()">
+					<apex:param name="attachmentId" value="" />
+				</apex:actionFunction> 
+				<apex:actionFunction action="{!DeleteAttachment}" name="deleteAttachment" rerender="Expenses, ExpenseItemPane, ClaimAttachmentsPanel, pageErrors,AttachmentReceiptPanel" oncomplete="hideReceipt()">
+					<apex:param name="attachmentId" value="" />
+				</apex:actionFunction>
+					
+				<apex:outputPanel id="pageErrors">
+    				<apex:pageMessages escape="false" />
+				</apex:outputPanel>
+		
+				
+				<apex:pageBlock title="" mode="edit">
+
+					<apex:pageBlockButtons location="top">
+						<apex:commandButton id="RevertToDraft" action="{!RevertToDraft}" value="{!$Label.kimbleone__reverttodraft}" rendered="{!AllowRevert  && HasPermission['RevertApprovedExpenseClaim']}" disabled="{!DisableRevert}" />
+						<input class="btn" type="button" onclick="window.open('{!$Page.ExpenseClaimPrint}?id={!KimbleOne__ExpenseClaim__c.Id}','_printview')" value="{!$Label.Print}" />
+						<input class="btn" type="button" onclick="window.open('{!$Page.ExpenseClaimPrint}?id={!KimbleOne__ExpenseClaim__c.Id}&forClientApproval=1','_printview')" value="{!$Label.PrintSignoffDocumentLabel}" />
+						<apex:outputPanel layout="none" rendered="{!AttachmentConversionEnabled}">
+							<input class="btn" type="button" onclick="generateAttachments('{!JSENCODE(ExpenseClaim__c.Id)}', '{!JSENCODE(ExpenseClaim__c.Reference__c)}');" value="{!$Label.GenerateImageAttachmentsAsPDFButton}" />
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!!AttachmentConversionEnabled}">
+							<input class="btn" type="button" onclick="safeNavigateToSForceURL('{!$Page.ExpenseClaimAttachmentsPdf}?id={!KimbleOne__ExpenseClaim__c.Id}');" value="{!$Label.GenerateImageAttachmentsAsPDFButton}" />
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!!IsApproved}">
+							<input type="button" class="btn" value="{!$Label.kimbleone__add} {!$Label.kimbleone__receiptlabel}" onclick="showFileUploadPopup('');"/>
+						</apex:outputPanel>
+					</apex:pageBlockButtons>
+
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton id="RevertToDraft" action="{!RevertToDraft}" value="{!$Label.kimbleone__reverttodraft}" rendered="{!AllowRevert  && HasPermission['RevertApprovedExpenseClaim']}" disabled="{!DisableRevert}" />
+						<input class="btn" type="button" onclick="window.open('{!$Page.ExpenseClaimPrint}?id={!KimbleOne__ExpenseClaim__c.Id}','_printview')" value="{!$Label.Print}" />
+						<input class="btn" type="button" onclick="window.open('{!$Page.ExpenseClaimPrint}?id={!KimbleOne__ExpenseClaim__c.Id}&forClientApproval=1','_printview')" value="{!$Label.PrintSignoffDocumentLabel}" />
+						<apex:outputPanel layout="none" rendered="{!AttachmentConversionEnabled}">
+							<input class="btn" type="button" onclick="generateAttachments('{!JSENCODE(ExpenseClaim__c.Id)}', '{!JSENCODE(ExpenseClaim__c.Reference__c)}');" value="{!$Label.GenerateImageAttachmentsAsPDFButton}" />
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!!AttachmentConversionEnabled}">
+							<input class="btn" type="button" onclick="safeNavigateToSForceURL('{!$Page.ExpenseClaimAttachmentsPdf}?id={!KimbleOne__ExpenseClaim__c.Id}');" value="{!$Label.GenerateImageAttachmentsAsPDFButton}" />
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!!IsApproved}">
+							<input type="button" class="btn" value="{!$Label.kimbleone__add} {!$Label.kimbleone__receiptlabel}" onclick="showFileUploadPopup('');"/>
+						</apex:outputPanel>
+					</apex:pageBlockButtons>
+
+					<apex:outputpanel id="ExpenseClaimPane">
+						<table cellspacing="0" cellpadding="0" border="0" width="100%">
+							<tr>
+								<td style="vertical-align:top">
+									<apex:pageBlockSection title="{!$Label.kimbleone__expenseclaimapproval}" columns="2">
+
+							<apex:outputField id="reference"
+								value="{!KimbleOne__ExpenseClaim__c.KimbleOne__Reference__c}" />
+							<apex:outputField id="approvalStatus"
+								value="{!KimbleOne__ExpenseClaim__c.KimbleOne__ApprovalStatus__c}" />
+							<apex:outputField id="resource"
+								value="{!KimbleOne__ExpenseClaim__c.KimbleOne__Resource__c}" />
+							<apex:outputField id="approver1"
+								value="{!KimbleOne__ExpenseClaim__c.KimbleOne__Approver1User__c}" />
+							<apex:outputField id="deliveryGroup"
+								value="{!TheClaim.ResourcedActivity__r.KimbleOne__DeliveryGroup__c}" />
+							<apex:outputField id="approver2"
+								value="{!KimbleOne__ExpenseClaim__c.KimbleOne__Approver2User__c}" />
+							<apex:outputField id="activity"
+								value="{!TheClaim.ResourcedActivity__r.Name}" />
+							<apex:outputField id="approvalComments"
+								value="{!KimbleOne__ExpenseClaim__c.KimbleOne__ApprovalComments__c}" />
+							<apex:outputField id="TravelRequisition"
+								value="{!TheClaim.TravelRequisition__r.Name}" label="{!$ObjectType.KimbleOne__ExpenseClaim__c.Fields.KimbleOne__TravelRequisition__c.Label}" rendered="{!NOT(ISBLANK(TheClaim.TravelRequisition__r.Name))}"/>
+							
+           					<apex:pageBlockSectionItem rendered="{!KimbleOne__ExpenseClaim__c.CreatedById == KimbleOne__ExpenseClaim__c.OwnerId}" />
+           					<apex:outputField id="createdBy" rendered="{!KimbleOne__ExpenseClaim__c.CreatedById != KimbleOne__ExpenseClaim__c.OwnerId}" value="{!KimbleOne__ExpenseClaim__c.CreatedById}" />
+
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__ExpenseClaim__c.Fields.KimbleOne__Status__c.Label}" />
+								<apex:outputField value="{!KimbleOne__ExpenseClaim__c.Status__r.Name}" />
+							</apex:pageBlockSectionItem>							
+							
+							<apex:outputField id="totrev"
+								value="{!KimbleOne__ExpenseClaim__c.KimbleOne__TotalExpenseRevenue__c}" />
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__ExpenseClaim__c.Fields.KimbleOne__InvoicingCurrencyTotalExpenseRevenue__c.Label}" />
+								<apex:outputPanel layout="none">
+									<apex:outputText value="{!KimbleOne__ExpenseClaim__c.KimbleOne__InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+									<apex:outputField value="{!KimbleOne__ExpenseClaim__c.KimbleOne__InvoicingCurrencyTotalExpenseRevenue__c}" />
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							<apex:outputField id="totamt"
+								value="{!KimbleOne__ExpenseClaim__c.KimbleOne__TotalExpenseCost__c}" />
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__ExpenseClaim__c.Fields.KimbleOne__ReimbursementCcyTotalReimbursementAmount__c.Label}" />
+								<apex:outputPanel layout="none">
+									<apex:outputText value="{!KimbleOne__ExpenseClaim__c.KimbleOne__ReimbursementCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+									<apex:outputField value="{!KimbleOne__ExpenseClaim__c.KimbleOne__ReimbursementCcyTotalReimbursementAmount__c}" />
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem />
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__ExpenseClaim__c.Fields.KimbleOne__ResourcePayment__c.Label}" />
+								<apex:outputField value="{!KimbleOne__ExpenseClaim__c.KimbleOne__ResourcePayment__c}" />
+							</apex:pageBlockSectionItem>
+							
+						</apex:pageBlockSection>
+
+								</td>
+								<td style="vertical-align:top;padding-left:3px;padding-right:3px;">
+									<div class="pbSubheader first brandTertiaryBgr tertiaryPalette"><h3>{!$Label.ExpenseClaimReceiptsHeading}</h3></div>
+									<apex:outputPanel id="ClaimAttachmentsPanel">
+									<div id="thumbnails" class="ui-widget ui-corner-all thumbnailContainer">
+										<apex:repeat value="{!ClaimAttachments}" var="attachment">
+											
+											<apex:outputPanel layout="none" rendered="{!attachment.ContentType = 'application/pdf'}">
+												<div class="ui-widget {!IF(SelectedAttachmentId==attachment.Id,'ui-state-highlight','ui-widget-inactive')}" style="float: left;cursor:pointer; height: 64px;width: 64px;padding: 5px;margin: 8px;text-align: center;">
+													<apex:image styleClass="ReceiptAttachmentLink" title="{!$Label.kimbleone__pdflabel}" onclick="selectAttachment('{!attachment.Id}')"  value="{!URLFOR($Resource.KimbleOne__AttcIcon)}" width="64" height="64" rendered="{!!ISBLANK(attachment.Id)}"/>
+												</div>
+											</apex:outputPanel>
+											<apex:outputPanel layout="none" rendered="{!attachment.ContentType != 'application/pdf'}">
+												<div class="ui-widget {!IF(SelectedAttachmentId==attachment.Id,'ui-state-highlight','ui-widget-inactive')}" style="float: left;cursor:pointer; height: 64px;width: 64px;padding: 5px;margin: 8px;text-align: center;">
+													<apex:image styleClass="ReceiptAttachmentLink" title="{!$Label.kimbleone__imagelabel}" onclick="selectAttachment('{!JSINHTMLENCODE(attachment.Id)}')"  value="/servlet/servlet.FileDownload?file={!attachment.Id}" width="64" height="64" rendered="{!!ISBLANK(attachment.Id)}"/>
+												</div>
+											</apex:outputPanel>
+											
+										</apex:repeat>
+										<div style="clear:both;"></div>
+									</div>
+									</apex:outputPanel>
+								</td>
+							</tr>	
+						</table>
+						
+					</apex:outputpanel>
+					
+					<apex:PageBlockSection Title="{!$ObjectType.KimbleOne__ExpenseItem__c.Labelplural}" columns="1">
+					
+						<apex:outputpanel id="ExpenseItemPane" >
+							<apex:pageBlockTable var="expenseItem" value="{!ExpenseItems}" >
+
+								<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}"
+									rendered="{!KimbleOne__ExpenseClaim__c.KimbleOne__ApprovalStatus__c==StatusReadyForApproval && CanUpdate}">
+									<a href="#" onclick="initialiseModalBoxy('#EditExpenseItemPopup', '{!$ObjectType.KimbleOne__ExpenseItem__c.label}');editExpenseItem('{!JSENCODE(expenseItem.Id)}')">{!$Label.kimbleone__edit}</a>
+								</apex:column>
+
+								<apex:column value="{!expenseItem.KimbleOne__IncurredDate__c}"
+									headerValue="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__IncurredDate__c.Label}" />
+								<apex:column value="{!expenseItem.KimbleOne__Reference__c}"
+									headerValue="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__Reference__c.Label}" />
+								<apex:column headerValue="{!$Label.kimbleone__expensecategory}">
+									<apex:outputText value="{!expenseItem.ActivityExpenseCategory__r.Name} {!IF(expenseItem.ActivityExpenseCategory__r.ExpenseCategory__r.Name!=expenseItem.ActivityExpenseCategory__r.Name,'('+expenseItem.ActivityExpenseCategory__r.ExpenseCategory__r.Name+')','')} "/>
+									<apex:outputPanel layout="block" styleClass="journey-link" rendered="{!IF(CONTAINS(ExpenseItemJourneyAllocationIds, expenseItem.Id), true, false)}">
+										<apex:outputField value="{!ExpenseItemJourneyAllocationMap[expenseItem.Id].AllowancePeriod__r.Journey__c}"/>
+									</apex:outputPanel>
+								</apex:column>
+								<apex:column styleClass="company-paid-cell" headerValue="{!$Label.kimbleone__companypaidexpenseitem}" rendered="{!EnableCompanyPaidExpenses}">
+									<apex:outputPanel layout="none" rendered="{!IF(expenseItem.KimbleOne__ExpenseItemType__c = CompanyPaidId, true, false)}">
+									<input type="checkbox" checked="checked" disabled="disabled"/>
+									</apex:outputPanel>
+									<apex:outputPanel layout="none" rendered="{!IF(expenseItem.KimbleOne__ExpenseItemType__c = CompanyPaidId, false, true)}">
+									<input type="checkbox" disabled="disabled"/>
+									</apex:outputPanel>
+								</apex:column>
+								<apex:column headerValue="{!$Label.kimbleone__units}">
+									<apex:outputPanel layout="none" rendered="{!ExpenseTypePerUnit==expenseItem.ActivityExpenseCategory__r.ExpenseCategory__r.ExpenseType__r.KimbleOne__Enum__c}" >
+										<apex:outputField value="{!expenseItem.KimbleOne__ExpenseUnits__c}" /> &nbsp;
+										<apex:outputText value="{!expenseItem.ActivityExpenseCategory__r.ExpenseCategory__r.UnitType__r.KimbleOne__Suffix__c}" />
+									</apex:outputPanel>
+								</apex:column>
+								<apex:column headerValue="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__IncurredCurrencyGrossAmount__c.Label}">
+									<apex:outputPanel layout="none" rendered="{! expenseItem.ActivityExpenseCategory__r.ExpenseCategory__r.ExpenseType__r.Enum__c <> ExpenseTypePerUnit }" >
+										<apex:outputText value="{!expenseItem.KimbleOne__IncurredCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+										<apex:outputField value="{!expenseItem.KimbleOne__IncurredCurrencyGrossAmount__c}" />
+									</apex:outputPanel>
+								</apex:column>
+								<apex:column headerValue="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__ExchangeRateConversionFactor__c.Label}">
+									<apex:outputField value="{!expenseItem.KimbleOne__ExchangeRateConversionFactor__c}" 
+										rendered="{!expenseItem.ActivityExpenseCategory__r.ExpenseCategory__r.ExpenseType__r.Enum__c <> ExpenseTypePerUnit
+													&& ((expenseItem.ExchangeRateBasis__c == IncurredToReimbursementExRateId && expenseItem.IncurredCurrencyIsoCode__c !=  expenseItem.ReimbursementCurrencyIsoCode__c) || expenseItem.IncurredCurrencyIsoCode__c <> expenseItem.CurrencyIsoCode) }" />
+								</apex:column>
+								
+								<apex:column value="{!expenseItem.KimbleOne__ExpenseNetAmount__c}" headerValue="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__ExpenseNetAmount__c.Label}" />
+									
+								<apex:column value="{!expenseItem.KimbleOne__TaxCode__c}" headerValue="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__TaxCode__c.Label}" />
+								
+								<apex:column value="{!expenseItem.KimbleOne__ExpenseTaxAmount__c}" headerValue="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__ExpenseTaxAmount__c.Label}" title="{!expenseItem.TaxCode__r.Name}"/>
+								
+								<apex:column headerValue="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__ExpenseRevenue__c.Label}">
+									<apex:outputText value="{!expenseItem.KimbleOne__InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+									<apex:outputField value="{!expenseItem.KimbleOne__InvoicingCurrencyExpenseRevenue__c}" />
+								</apex:column>
+								
+								<apex:column headerValue="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__ReimbursementCurrencyReimbursementAmount__c.Label}">
+									<apex:outputText value="{!expenseItem.KimbleOne__ReimbursementCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+									<apex:outputField value="{!expenseItem.KimbleOne__ReimbursementCurrencyReimbursementAmount__c}" />
+								</apex:column>
+								
+								<apex:column value="{!expenseItem.KimbleOne__StartLocation__c}"
+									headerValue="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__StartLocation__c.Label}" />
+								<apex:column value="{!expenseItem.KimbleOne__EndLocation__c}"
+									headerValue="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__EndLocation__c.Label}" />
+								<apex:column value="{!expenseItem.KimbleOne__Attendees__c}"
+									headerValue="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__Attendees__c.Label}" />
+								
+								
+								<apex:column headervalue="{!$Label.kimbleone__receiptlabel}">
+		      						<apex:inputField value="{!expenseItem.KimbleOne__IsReceipted__c}" rendered="{!expenseItem.Attachments.size == 0}" />
+		      						<apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="showFileUploadPopup('{!JSINHTMLENCODE(expenseItem.Id)}');" rendered="{!expenseItem.Attachments.size == 0}">{!$Label.kimbleone__add}</apex:outputLink>
+      								<apex:outputPanel layout="none" rendered="{!expenseItem.Attachments.size == 1}">
+			      						<div class="ui-widget {!IF(SelectedAttachmentId==expenseItem.Attachments[0].Id,'ui-state-highlight','ui-widget-inactive')}" style="cursor:pointer; height: 32px;width: 32px;padding: 5px;margin: 8px;text-align: center;">
+											<apex:image styleClass="ReceiptAttachmentLink" title="{!IF(expenseItem.Attachments[0].ContentType = 'application/pdf', 'pdf','image')}" onclick="selectAttachment('{!expenseItem.Attachments[0].Id}')"  value="{!URLFOR($Resource.KimbleOne__AttcIcon)}" width="32" height="32" rendered="{!!ISBLANK(expenseItem.Attachments[0].Id)}"/>
+										</div>
+									</apex:outputPanel>
+						
+				      			</apex:column>
+								
+								<apex:column value="{!expenseItem.KimbleOne__Notes__c}" headerValue="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__Notes__c.Label}" />
+
+							</apex:pageBlockTable>
+						</apex:outputpanel>
+
+					</apex:PageBlockSection>
+
+				</apex:pageBlock>
+			
+			<div id="divClaimAttachmentsPopup">
+			<apex:outputPanel id="ClaimAttachmentsPopup">
+				<apex:outputPanel id="AttachmentReceiptPanel">
+					<apex:outputPanel layout="none" rendered="{!EnhancedExpenseViewer && !ISBLANK(SelectedAttachmentId)}">
+						<apex:outputPanel rendered="{!!IsApproved}">
+							<span>
+								<apex:commandLink styleClass="toolbar-button delete-receipt-btn" title="{!$Label.kimbleone__deletebutton}" onclick="var d = confirmDelete();if(!d) return false;deleteAttachment('{!JSINHTMLENCODE(SelectedAttachmentId)}'); return false;">
+									<i class="fa fa-trash receipt-btn"></i>
+								</apex:commandLink>
+							</span>
+						</apex:outputPanel>
+						<span class="receipt-btns-center">
+							<apex:commandLink styleClass="toolbar-button" onclick="receiptScaleDown();" rerender="receipt-scroller" title="{!$Label.kimbleone__zoomout}" rendered="{!SelectedAttachment.ContentType != 'application/pdf'}">
+								<i class="fa fa-search-minus receipt-btn"></i>
+							</apex:commandLink>
+							<apex:commandLink styleClass="toolbar-button" onclick="receiptScaleUp();" rerender="receipt-scroller" title="{!$Label.kimbleone__zoomin}" rendered="{!SelectedAttachment.ContentType != 'application/pdf'}">
+								<i class="fa fa-search-plus receipt-btn"></i>
+							</apex:commandLink>
+							<apex:commandLink styleClass="toolbar-button" onclick="resetReceiptFit();" rerender="receipt-scroller" title="{!$Label.kimbleone__resetzoom}" rendered="{!SelectedAttachment.ContentType != 'application/pdf'}">
+								<i class="fa fa-arrows-alt receipt-btn"></i>
+							</apex:commandLink>
+							<apex:commandLink styleClass="toolbar-button" onclick="receiptFullSize();" rerender="resizable, receipt-scroller" title="{!$Label.kimbleone__fullsize}" rendered="{!SelectedAttachment.ContentType != 'application/pdf'}">
+								<i class="fa fa-picture-o receipt-btn"></i>
+							</apex:commandLink>
+						</span>
+						<span class="receipt-btns-right">
+							<apex:commandLink styleClass="toolbar-button" onclick="showPreviousAttachment();" rerender="receipt-scroller" title="{!$Label.kimbleone__previous}">
+								<i class="fa fa-arrow-left receipt-btn"></i>
+							</apex:commandLink>
+							<apex:commandLink styleClass="toolbar-button" onclick="showNextAttachment();" rerender="receipt-scroller" title="{!$Label.kimbleone__next}">
+								<i class="fa fa-arrow-right receipt-btn"></i>
+							</apex:commandLink>
+						</span>
+						<apex:outputPanel layout="none" rendered="{!SelectedAttachment.ContentType = 'application/pdf'}">
+							<div id="resizable" class="pdf-receipt">
+		  						<iframe id="attachmentsIFrame" src="/servlet/servlet.FileDownload?file={!SelectedAttachmentId}" style="border:0px; height:inherit; width:inherit"></iframe> 
+							</div>
+						</apex:outputPanel>
+					
+						<apex:outputPanel id="receipt-image-panel" layout="none" rendered="{!SelectedAttachment.ContentType != 'application/pdf'}" >
+							<div id="resizable" class="img-receipt">
+								<div id="receipt-scroller" style="width: inherit; height:inherit; max-height: inherit; max-width: inherit; overflow: auto; cursor: grab;" >
+		  							<apex:image id="receipt-image" styleClass="receiptImage" value="/servlet/servlet.FileDownload?file={!SelectedAttachmentId}" style="transform-origin: top left; transform: scale(1.0); height: inherit;"  /> 
+		  						</div>
+							</div>
+						</apex:outputPanel>
+					</apex:outputPanel>
+			
+					<apex:outputPanel layout="none" rendered="{!!EnhancedExpenseViewer && !ISBLANK(SelectedAttachmentId)}">
+						<apex:outputPanel rendered="{!!IsApproved}">
+							<input type="button" class="btn" value="{!$Label.kimbleone__deletebutton}" onclick="var d = confirmDelete();if(!d) return;deleteAttachment('{!JSINHTMLENCODE(SelectedAttachmentId)}');"/><br/><br/>
+						</apex:outputPanel>
+						<div id="resizable">
+							<iframe id="attachmentsIFrame" src="/servlet/servlet.FileDownload?file={!SelectedAttachmentId}" style="border:0px;"></iframe>
+						</div>
+					</apex:outputPanel>
+				</apex:outputPanel>	
+			</apex:outputPanel>
+			</div>
+			
+				<script>
+			function calAmountEdit()
+			{
+				if((!isNaN($('.IncurredCurrencyGrossAmountEdit').val())) && $('.IncurredCurrencyGrossAmountEdit').val()!=''
+					&& (!isNaN($('.ExchangeRateConversionFactorEditText').val())) && $('.ExchangeRateConversionFactorEditText').val()!='') 
+					$('.ExpenseGrossAmountEditText').val(''+(eval($('.IncurredCurrencyGrossAmountEdit').val())*$('.ExchangeRateConversionFactorEditText').val())); 
+				else 
+					$('.ExpenseGrossAmountEditText').val('');
+			}
+		</script>
+
+			</apex:form>
+
+			<apex:include pageName="{!$Page.ApproveRejectItem}" rendered="{!InPageApproveRejectEnabled}"/>
+			<apex:relatedList list="ProcessSteps"></apex:relatedList>
+
+			<div id="EditExpenseItemPopup" style="display: none"><apex:outputPanel id="ExpenseItemDetails">
+
+				<apex:form id="EditExpenseItemForm">
+
+					<apex:pageBlock id="ExpenseFields">
+						
+						<div id="expenseerrors"><apex:pageMessages escape="false"/></div>
+						
+						<apex:pageBlockButtons location="bottom">
+							<apex:commandButton value="{!$Label.kimbleone__save}" action="{!SaveExpenseItem}" oncomplete="hideModalBoxyWithErrorCheck('#expenseerrors'); initialiseItems();" rerender="ExpenseItemDetails, ExpenseItemPane, ExpenseClaimPane"  styleclass="DisableButtonWhileBusy" />
+							<input class="btn" type="button" onclick="hideModalBoxy();"
+								value="{!$Label.Cancel}" />
+						</apex:pageBlockButtons>
+						
+						<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+							
+							<apex:pageBlockSectionItem labelStyle="width:30%">
+								<apex:outputLabel value="{!$Label.kimbleone__resourceactivityalternativelabel}" />
+								<apex:outputText value="{!expenseItem.ActivityExpenseCategory__r.ResourcedActivity__r.Name}" />
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem labelStyle="width:30%">
+								<apex:outputLabel value="{!$Label.kimbleone__expensecategory}" />
+								<apex:outputText value="{!expenseItem.ActivityExpenseCategory__r.Name}" />
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__IncurredDate__c.Label}" />
+								<apex:outputField value="{!expenseItem.KimbleOne__IncurredDate__c}" />
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!!IsPerOccurrence && HasPermission['RevertApprovedExpenseClaim']}" >
+								<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__ExpenseUnits__c.Label} ({!expenseItem.ActivityExpenseCategory__r.ExpenseCategory__r.UnitType__r.KimbleOne__Suffix__c})" />
+								<apex:inputField value="{!expenseItem.KimbleOne__ExpenseUnits__c}" >
+									<apex:actionSupport event="onchange" action="{!IncurredAmountChanged}" rerender="ExpenseFields" onsubmit="DisableParentsChildren($('.DisableButtonWhileBusy'),'Reloading...');" oncomplete="initialiseItems();"/>
+								</apex:inputField>									
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!!IsAllowance && IsPerOccurrence && HasPermission['RevertApprovedExpenseClaim']}" >
+								<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__ExpenseGrossAmount__c.Label} {!expenseItem.KimbleOne__IncurredCurrencyIsoCode__c}" />
+								<apex:inputField value="{!expenseItem.KimbleOne__IncurredCurrencyGrossAmount__c}" required="true">
+									<apex:actionSupport event="onchange" action="{!IncurredAmountChanged}" rerender="ExpenseFields" onsubmit="DisableParentsChildren($('.DisableButtonWhileBusy'),'Reloading...');" oncomplete="initialiseItems();"/>
+								</apex:inputField>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!IsAllowance && IsPerOccurrence && HasPermission['RevertApprovedExpenseClaim']}" >
+								<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__ExpenseGrossAmount__c.Label} {!expenseItem.KimbleOne__IncurredCurrencyIsoCode__c}" />
+								<apex:outputField value="{!expenseItem.KimbleOne__IncurredCurrencyGrossAmount__c}"/>
+							</apex:pageBlockSectionItem>
+														
+							<apex:pageBlockSectionItem rendered="{!IsPerOccurrence}">
+								<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__TaxCode__c.Label}" />
+								
+								<apex:selectList value="{!expenseItem.KimbleOne__TaxCode__c}" size="1">
+									<apex:selectOptions value="{!TheTaxCodes}" />
+									<apex:actionSupport event="onchange" action="{!TaxCodeChanged}" rerender="ExpenseFields" onsubmit="DisableParentsChildren($('.DisableButtonWhileBusy'),'Reloading...');" oncomplete="initialiseItems();"/>
+								</apex:selectList>
+								
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!IsPerOccurrence}">
+								<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__IncurredCurrencyTaxAmount__c.Label} {!expenseItem.KimbleOne__IncurredCurrencyIsoCode__c}" />
+								<apex:inputField value="{!expenseItem.KimbleOne__IncurredCurrencyTaxAmount__c}" required="true">
+									<apex:actionSupport event="onchange" action="{!TaxAmountChanged}" rerender="ExpenseFields" onsubmit="DisableParentsChildren($('.DisableButtonWhileBusy'),'Reloading...');" oncomplete="initialiseItems();"/>
+								</apex:inputField>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!ShowExchangeRate && IsPerOccurrence}" >
+								<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__ExchangeRateConversionFactor__c.Label}" />
+								<apex:inputField value="{!expenseItem.KimbleOne__ExchangeRateConversionFactor__c}" >
+									<apex:actionSupport event="onchange" action="{!ExchangeRateChanged}" rerender="ExpenseFields" onsubmit="DisableParentsChildren($('.DisableButtonWhileBusy'),'Reloading...');" oncomplete="initialiseItems();"/>
+								</apex:inputField>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!ShowExchangeRate && IsPerOccurrence && expenseItem.KimbleOne__ExchangeRateBasis__c!=IncurredToReimbursementExRateId}" >
+								<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__ExpenseGrossAmount__c.Label} {!expenseItem.CurrencyIsoCode}" />
+								<apex:outputField value="{!expenseItem.KimbleOne__ExpenseGrossAmount__c}"/>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!ShowExchangeRate && IsPerOccurrence && expenseItem.KimbleOne__ExchangeRateBasis__c==IncurredToReimbursementExRateId}" >
+								<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__ReimbursementCurrencyReimbursementAmount__c.Label} {!expenseItem.KimbleOne__ReimbursementCurrencyIsoCode__c}" />
+								<apex:outputField value="{!expenseItem.KimbleOne__ReimbursementCurrencyReimbursementAmount__c}"/>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!IsPerOccurrence}">
+								<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__ExpenseNetAmount__c.Label} {!expenseItem.CurrencyIsoCode}" />
+								<apex:outputField value="{!expenseItem.KimbleOne__ExpenseNetAmount__c}"/>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__ExpenseRevenue__c.Label} {!expenseItem.KimbleOne__InvoicingCurrencyIsoCode__c}" />
+								<apex:inputField value="{!expenseItem.KimbleOne__InvoicingCurrencyExpenseRevenue__c}" required="true">
+									<apex:actionSupport event="onchange" action="{!RevenueAmountChanged}" rerender="ExpenseFields" onsubmit="DisableParentsChildren($('.DisableButtonWhileBusy'),'Reloading...');" oncomplete="initialiseItems();"/>
+								</apex:inputField>
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__Notes__c.Label}" />
+								<apex:inputTextarea rows="4" cols="45" value="{!expenseItem.KimbleOne__Notes__c}" />
+							</apex:pageBlockSectionItem>
+							
+							<apex:inputField value="{!expenseItem.KimbleOne__StartLocation__c}" required="true"
+								rendered="{!expenseItem.ActivityExpenseCategory__r.ExpenseCategory__r.KimbleOne__HasStartLocation__c}" />
+							
+							<apex:inputField value="{!expenseItem.KimbleOne__EndLocation__c}" required="true"
+								rendered="{!expenseItem.ActivityExpenseCategory__r.ExpenseCategory__r.KimbleOne__HasEndLocation__c}" />
+							
+							<apex:inputField value="{!expenseItem.KimbleOne__Attendees__c}" required="true"
+								rendered="{!expenseItem.ActivityExpenseCategory__r.ExpenseCategory__r.KimbleOne__HasAttendees__c}" />
+
+							<apex:repeat value="{!$ObjectType.KimbleOne__ExpenseItem__c.FieldSets.KimbleOne__ExpenseItemApprovalDetails}" var="r">
+								<apex:pageBlockSectionItem rendered="{!!CONTAINS(r.FieldPath,'.')}" >
+									<apex:outputText value="{!r.Label}" />
+    								<apex:inputField styleClass="{!CASE(r.Type, 'textarea', 'full-width-field', 'string', 'full-width-field','date',IF($ObjectType.KimbleOne__ExpenseItem__c.Fields[r].updateable,'kimbleDatePicker',''),'')}" required="{!r.Required}" value="{!expenseItem[r]}"/>
+								</apex:pageBlockSectionItem>
+								<apex:pageBlockSectionItem rendered="{!CONTAINS(r.FieldPath,'.')}">
+									<apex:outputText value="{!r.Label}"/>
+									<apex:outputField value="{!expenseItem[r]}"/>
+								</apex:pageBlockSectionItem>
+ 							</apex:repeat>
+				
+            			</apex:pageBlockSection>	
+					
+					</apex:pageBlock>
+					
+				</apex:form>
+			</apex:outputPanel></div>
+			<div id="fileUploadPopupDiv" style="display:none">
+				<apex:outputPanel id="FileUploadPopupPanel" layout="none">
+					<input id="expenseItemAttachment" type="hidden" value=""/>
+					<iframe id="fileUploadIFrame" src="{!$Page.FileUpload}?ObjectId={!JSENCODE(TheClaim.Resource__c)}" style="border: 0;height: 122px;width: 286px;"></iframe>
+				</apex:outputPanel>
+			</div>
+			<apex:outputPanel layout="none" rendered="{!InPageApproveRejectEnabled}">
+			<script>
+				jQuery(window).load(function()
+				{
+					var approvalItemId = '<apex:outputText value="{!KimbleOne__ExpenseClaim__c.Id}"/>';
+
+					overrideSFApproveRejectLink(approvalItemId);
+				});
+
+				function reLoadItemId()
+				{
+				    var itemId =  '<apex:outputText value="{!KimbleOne__ExpenseClaim__c.Id}"/>';
+				    return itemId;
+    			}
+			</script>
+			</apex:outputPanel>
+			<script>
+
+						var receipt = null;
+  						var iframesize = {width:406, height:450};
+						var enhancedExpenseViewerEnabled = {!EnhancedExpenseViewer};
+
+  						function showReceipt()
+  						{
+  							if (receipt == null)
+  								receipt = new Boxy($('#divClaimAttachmentsPopup'), {title: '{!JSENCODE($Label.SelectedReceiptLabel)}', draggable:true, closeable:true});
+  							else
+  								receipt.show();
+  							
+  							if(!enhancedExpenseViewerEnabled)	jQuery('#attachmentsIFrame').width(iframesize.width).height(iframesize.height);
+  							
+  							jQuery('#resizable').resizable({
+								resize: function(event, ui){
+									jQuery('#attachmentsIFrame').width(ui.size.width).height(ui.size.height)},
+								start: function(event, ui) {
+							        jQuery('#attachmentsIFrame').hide();
+							         },
+							    stop: function(event, ui) {
+							        jQuery('#attachmentsIFrame').show();
+							        iframesize.width = jQuery('#attachmentsIFrame').width();
+							        iframesize.height = jQuery('#attachmentsIFrame').height();
+							      }
+								})
+								
+							if(enhancedExpenseViewerEnabled)
+							{	
+								resetReceiptFit();
+								setTimeout(function(){ resetReceiptFit(); }, 500);
+							} 
+  						}
+  						function hideReceipt()
+  						{
+  							if(receipt!=null)
+  								receipt.hide();
+  						}
+						$(document).ready(function(){
+    							
+    							
+    							$('input[name="piSubmit"]').remove();
+    							$('input[name="piRemove"]').remove();
+    							
+    							$('.ReceiptLinks').each(function()
+    							{
+    								//.attr('width','500px').attr('height','500px')
+    								var imagePane=$('<div>').append($('<img>').attr('src','{!JSINHTMLENCODE(baseUrl)}'+$(this).attr('href').replace('..','')));
+									$(this).qtip({
+									   content: imagePane.html() ,
+									    adjust: {target:$(this), mouse: false, screen: true },
+									   position: {
+									       corner: {
+									          target: 'leftBottom',
+									          tooltip: 'bottomRight'
+									       }},
+										   style: { 
+										      width: 600,
+										      padding: 0,
+										      background: '#FFFFFF',
+										      color: 'black',
+										      textAlign: 'left',
+										      border: {
+										         width: 1,
+										         radius: 5,
+										         color: '#FF00FF'
+									      	},
+									      tip: true,
+									      name: 'dark' // Inherit the rest of the attributes from the preset dark style
+									   }
+									});
+    								
+    							});
+    					});
+    					
+    			
+    		function showFileUploadPopup(pos)
+			{
+				initialiseModalBoxy('#fileUploadPopupDiv', '{!JSENCODE($Label.UploadReceiptHeading)}');
+				$('#expenseItemAttachment').val(pos);
+				showModalBoxy();
+				document.getElementById('fileUploadIFrame').src = document.getElementById('fileUploadIFrame').src;
+			}
+    		function cancelAttachment()
+			{
+				hideModalBoxy();
+			}
+			function addAttachment(id)
+			{
+				if($('#expenseItemAttachment').val() == '')
+					addClaimAttachment(id);
+				else
+					addItemAttachment(id, $('#expenseItemAttachment').val());
+			}
+			
+			var myImgScale;
+			
+			function resetReceiptFit()
+			{
+				var myImg = document.getElementsByClassName('receiptImage')[0];
+				var boxHeight = jQuery('#receipt-scroller').height();
+				var boxWidth = jQuery('#receipt-scroller').width();
+				
+				if(myImg != null)
+				{
+					if(myImg.height > myImg.width) 
+					{
+						myImg.style.height = 'inherit';
+						myImg.style.width = '';
+					}
+					else 
+					{
+						myImg.style.width = 'inherit';
+						myImg.style.height = '';
+					}
+					
+					myImgScale = 1;
+					myImg.style.transform = 'scale(' + myImgScale + ')';
+				
+					$("#receipt-scroller").toggle().toggle();
+					
+					initialiseScroll();
+				}
+			}
+			
+			function receiptFullSize()
+			{
+				var myImg = document.getElementsByClassName('receiptImage')[0];
+				
+				if(myImg != null)
+				{
+					myImg.style.height = 'unset';
+					myImg.style.width = 'unset';
+					myImg.style.maxWidth = 'unset';
+					myImg.style.maxHeight = 'unset';
+					myImg.style.transform = '';
+					
+				    var imgHeight = myImg.height;
+					myImg.style.maxHeight = jQuery('#receipt-scroller').height() + 'px';
+				    myImgScale = imgHeight / jQuery('#receipt-scroller').height();
+				    if(myImgScale < 1) myImgScale = 1;
+					myImg.style.transform = 'scale(' + myImgScale + ')';
+				
+					$("#receipt-scroller").toggle().toggle();
+					
+					initialiseScroll();
+				}
+			}
+			
+			function receiptScaleUp()
+			{
+				var myImg = document.getElementsByClassName('receiptImage')[0];
+				
+				myImgScale = myImgScale + 0.2;
+				
+				myImg.style.transform = 'scale(' + myImgScale + ')';
+				
+				$("#receipt-scroller").toggle().toggle();
+			}
+			
+			function receiptScaleDown()
+			{
+				var myImg = document.getElementsByClassName('receiptImage')[0];
+				
+				if(myImgScale > 0.25) myImgScale = myImgScale - 0.2;
+				
+				myImg.style.transform = 'scale(' + myImgScale + ')';
+				
+				$("#receipt-scroller").toggle().toggle();
+			}
+			
+			function showNextAttachment()
+			{
+				var links = document.getElementsByClassName('ReceiptAttachmentLink');
+				var selectedlink = document.getElementsByClassName('ui-state-highlight')[0];
+				var selectedimg = selectedlink.getElementsByTagName('img');
+				
+				var index;
+				var indexOfNext;
+				
+				for (index = 0; index < links.length; index++) 
+				{
+					if(links[index].getAttribute('onclick') == selectedimg[0].getAttribute('onclick')) indexOfNext = index + 1;
+				}
+				
+				if(links[indexOfNext] != null) links[indexOfNext].click();
+				else links[0].click();
+			}
+			
+			function showPreviousAttachment()
+			{
+				var links = document.getElementsByClassName('ReceiptAttachmentLink');
+				var selectedlink = document.getElementsByClassName('ui-state-highlight')[0];
+				var selectedimg = selectedlink.getElementsByTagName('img');
+				
+				var index;
+				var indexOfPrev;
+				
+				for (index = 0; index < links.length; index++) 
+				{
+					if(links[index].getAttribute('onclick') == selectedimg[0].getAttribute('onclick')) indexOfPrev = index - 1;
+				}
+				
+				if(links[indexOfPrev] != null) links[indexOfPrev].click();
+				else links[links.length - 1].click();
+			}
+
+			function initialiseScroll() 
+			{
+		        var scroller = document.querySelector('#receipt-scroller');
+				var isDown = false;
+				var startX;
+				var startY;
+				
+				scroller.addEventListener('mousedown', (e) => {
+				    e.preventDefault();
+					scroller.style.cursor = 'grabbing';
+					isDown = true;
+					scroller.classList.add('active');
+					startX = e.pageX - scroller.offsetLeft;
+					startY = e.pageY - scroller.offsetTop;
+					scrollLeft = scroller.scrollLeft;
+					scrollTop = scroller.scrollTop;
+				});
+				scroller.addEventListener('mouseleave', () => {
+					isDown = false;
+					scroller.classList.remove('active');
+				});
+				scroller.addEventListener('mouseup', () => {
+					scroller.style.cursor = 'grab';
+					isDown = false;
+					scroller.classList.remove('active');
+				});
+				scroller.addEventListener('mousemove', (e) => {
+					if(!isDown) return;
+					e.preventDefault();
+					const x = e.pageX - scroller.offsetLeft;
+					const y = e.pageY - scroller.offsetTop;
+					const walk = (x - startX);
+					const walkY = (y - startY);
+					scroller.scrollLeft = scrollLeft - walk;
+					scroller.scrollTop = scrollTop - walkY;
+				}); 
+			}
+
+			function initialiseItems()
+			{
+				SetupDatePicker();
+   			}
+
+			function SetupDatePicker()
+            {
+                //dateFormat: 'yy-mm-dd',
+                jQuery('.kimbleDatePicker').datepicker({
+                        dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+                        showOtherMonths: true,
+                        selectOtherMonths: true,
+                        changeMonth: true,
+                        changeYear: true});
+            }
+			</script>
+	<div id="aaa">
+	
+	</div>
+	<apex:include pageName="{!$Page.ExpenseExport}"/>
+	<style>
+		body {
+	-webkit-touch-callout: none;
+	-webkit-user-select: none;
+	-khtml-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+		.journey-link {
+		    margin-top: 5px;
+		    font-style: italic;
+		}
+		.thumbnailContainer{background-color:#FFF;border-color: gray;margin-bottom:4px;}
+		
+		.company-paid-cell {
+		    text-align: center;
+		}
+		<apex:outputPanel layout="none" rendered="{!EnhancedExpenseViewer}">
+			input.btn, a.toolbar-button {
+                display: inline-block;
+                padding: 6px 10px 6px 10px !important;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+                cursor: pointer;
+                background: none;
+                background-color: white;
+                font-weight: normal;
+                margin-left: 3px;
+			}
+            input.btn {
+                font-size: 12px !important;
+            }
+            a.toolbar-button{
+                font-size: 13px !important;
+                color: #6f6f6f !important;
+            } 
+            a.toolbar-button:hover,input.btn:hover {
+                background-color: #f4f6f9 !important;
+            }
+            .delete-receipt-btn:hover {
+                color: red !important;
+            }
+            .receipt-btns-center {
+                padding-left: 120px;
+            }
+            .receipt-btns-right {
+               float: right;
+            } 
+            .pdf-receipt{
+               height: calc(min(100vh - 110px, 500px));
+               width: 500px;
+               padding-top: 5px;
+            } 
+            .img-receipt{
+               height: calc(min(100vh - 110px, 500px));
+               width: 500px;
+               max-height: 1000px;
+               max-width: 1000px;
+               padding-top: 5px;
+            }  
+        </apex:outputPanel>
+	</style>
+	
+	</apex:define>
+
+	</apex:composition>
+
+</apex:page>

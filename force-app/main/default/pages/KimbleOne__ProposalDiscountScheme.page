@@ -1,0 +1,211 @@
+<apex:page standardController="KimbleOne__Proposal__c" extensions="KimbleOne.ProposalDiscountSchemeController"  sidebar="false">
+
+    <apex:composition template="KimbleOne__SiteMaster">
+
+        <apex:define name="Menu">
+            <c:Menu MenuContextType="Proposal" MenuContextId="{!KimbleOne__Proposal__c.Id}" MenuContextName="{!KimbleOne__Proposal__c.Name}" rendered="{!!ISBLANK(Proposal__c.Id) }"/>
+        </apex:define>
+
+        <apex:define name="Content">
+
+            <apex:pageMessages escape="false"/>
+
+            <apex:form >
+
+                <apex:outputPanel id="DiscountSchemeEditPanel" rendered="{!CanEditScheme && $ObjectType.KimbleOne__DiscountScheme__c.updateable}">
+
+                    <apex:pageBlock id="DiscountSchemeEditBlock" title="{!$ObjectType.KimbleOne__DiscountScheme__c.Label}">
+
+                        <div id="DiscountSchemeEditErrors">
+                            <apex:pageMessages escape="false"/>
+                        </div>
+
+                        <apex:pageBlockButtons location="bottom">
+                            <apex:commandButton onclick="var d = confirmDelete();if(!d) return;" action="{!DeleteScheme}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__deletebutton}" reRender="DiscountSchemeEditPanel" rendered="{!CanDeleteScheme && $ObjectType.KimbleOne__DiscountScheme__c.deletable}"/>
+                            <apex:commandButton action="{!Save}" value="{!$Label.kimbleone__save}" reRender="DiscountSchemeEditPanel" rendered="{!CanEditScheme && $ObjectType.KimbleOne__DiscountScheme__c.updateable}" onComplete="initialiseItems();"/>
+                            <apex:commandButton value="{!$Label.kimbleone__cancel}" oncomplete="window.history.back();" reRender=""/>
+                        </apex:pageBlockButtons>
+
+                        <apex:pageblockSection collapsible="false" showheader="false" columns="1">
+
+                            <apex:pageBlockSectionItem >
+                                <apex:outputLabel value="{!$ObjectType.KimbleOne__DiscountScheme__c.Fields.KimbleOne__SchemeModel__c.Label}" />
+                                <apex:outputPanel layout="none">
+                                    <div class="requiredInput" id="discountScheme-reqd">
+                                        <div class="requiredBlock"></div>
+                                        <apex:actionRegion >
+                                            <apex:selectList id="discountScheme" value="{!DiscountScheme.KimbleOne__SchemeModel__c}" size="1" required="true">
+                                                <apex:selectOptions value="{!TheSchemeModels}" />
+                                                <apex:actionSupport event="onchange" action="{!SchemeModelChanged}" onComplete="initialiseItems();" rerender="ModelDetails,SchemeDetails,CalculationDates,DiscountRatesPanel" />
+                                            </apex:selectList>
+                                        </apex:actionRegion>
+                                    </div>
+                                </apex:outputPanel>
+                            </apex:pageBlockSectionItem>
+
+                            <apex:pageBlockSectionItem >
+                                <apex:outputLabel value="" />
+                                <apex:outputfield id="ModelDetails" value="{!SchemeModel.KimbleOne__Description__c}" />
+                            </apex:pageBlockSectionItem>
+
+                        </apex:pageblockSection>
+
+                        <apex:pageblockSection id="SchemeDetails" collapsible="false" showheader="false" columns="1" >
+                            <apex:inputfield value="{!DiscountScheme.Name}"/>
+                            <apex:inputfield value="{!DiscountScheme.KimbleOne__DiscountPercentage__c}" rendered="{!SchemeModel.SchemeRateType__r.KimbleOne__Enum__c = 'Flat'}" required="true"/>
+                        </apex:pageblockSection>
+
+                        <apex:pageblockSection id="CalculationDates" collapsible="false" showheader="false" columns="2" rendered="{!SchemeModel.CalculationTerm__r.KimbleOne__Enum__c == 'Periodic'}">
+                            <apex:inputfield value="{!DiscountScheme.KimbleOne__StartDate__c}" styleClass="kimbleDatePicker" />
+                            <apex:inputfield value="{!DiscountScheme.KimbleOne__EndDate__c}" styleClass="kimbleDatePicker" />
+                        </apex:pageblockSection>
+
+                    </apex:pageBlock>
+
+                </apex:outputPanel>
+
+                <apex:outputPanel id="DiscountSchemeViewPanel" rendered="{!!CanEditScheme || !$ObjectType.KimbleOne__DiscountScheme__c.updateable}">
+
+                    <apex:pageBlock id="DiscountSchemeViewBlock" title="{!$ObjectType.KimbleOne__DiscountScheme__c.Label}">
+
+                        <div id="DiscountSchemeViewErrors">
+                            <apex:pageMessages escape="false"/>
+                        </div>
+
+                        <apex:pageblockSection collapsible="false" showheader="false"  columns="2">
+
+                            <apex:outputfield value="{!DiscountScheme.Name}" />
+                            <apex:pageBlockSectionItem >
+                                <apex:outputLabel value="{!$ObjectType.KimbleOne__DiscountScheme__c.Fields.KimbleOne__SchemeModel__c.Label}" />
+                                <apex:outputfield value="{!DiscountScheme.KimbleOne__SchemeModel__c}" />
+                            </apex:pageBlockSectionItem>
+
+							<apex:outputfield value="{!DiscountScheme.KimbleOne__DiscountPercentage__c}" rendered="{!SchemeModel.SchemeRateType__r.KimbleOne__Enum__c = 'Flat'}" />
+                            
+                        </apex:pageblockSection>
+
+                        <apex:pageblockSection collapsible="false" showheader="false" columns="2" rendered="{!SchemeModel.CalculationTerm__r.KimbleOne__Enum__c == 'Periodic'}">
+                            <apex:outputfield value="{!DiscountScheme.KimbleOne__StartDate__c}" />
+                            <apex:outputfield value="{!DiscountScheme.KimbleOne__EndDate__c}" />
+                        </apex:pageblockSection>
+
+                    </apex:pageBlock>
+
+                </apex:outputPanel>
+
+                <apex:outputPanel id="DiscountRatesPanel">
+
+                    <apex:pageBlock id="DiscountRatesList" title="{!$ObjectType.KimbleOne__DiscountRate__c.LabelPlural}" rendered="{!NOT(ISBLANK(DiscountScheme.Id)) && SchemeModel.SchemeRateType__r.KimbleOne__Enum__c != 'Flat'}">
+
+                        <apex:outputPanel layout="none" rendered="{!CanEditScheme && $ObjectType.KimbleOne__DiscountRate__c.createable}">
+                            <input type="button" class="btn" value="{!$Label.New} {!$ObjectType.DiscountRate__c.Label}"
+                                   onclick="initialiseModalBoxy('#DiscountRatePopup', '{!JSENCODE($Label.New)} {!$ObjectType.DiscountRate__c.label}');newDiscountRate();"></input>
+                        </apex:outputPanel>
+
+                        <apex:pageBlockTable value="{!DiscountRates}" var="discRate" >
+
+                            <apex:column headerValue="{!$Label.kimbleone__actionlinksheader}" rendered="{!CanEditScheme && $ObjectType.KimbleOne__DiscountRate__c.updateable}">
+                                <apex:outputLink value="#" onclick="initialiseModalBoxy('#DiscountRatePopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__DiscountRate__c.label}');editDiscountRate('{!JSINHTMLENCODE(discRate.Id)}');" >{!$Label.kimbleone__edit}</apex:outputLink>
+                                <apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__DiscountRate__c.deletable}">
+                                    &nbsp;|&nbsp;
+                                    <apex:commandLink onclick="var d = confirmDelete();if(!d) return;" action="{!deleteDiscountRate}" reRender="DiscountRatesList">{!$Label.kimbleone__delete}
+                                        <apex:param name="drId" value="{!discRate.Id}" />
+                                    </apex:commandLink>
+                                </apex:outputPanel>
+                            </apex:column>
+                            <apex:column value="{!discRate.KimbleOne__MeasureLower__c}" headerValue="{!$ObjectType.KimbleOne__DiscountRate__c.Fields.KimbleOne__MeasureLower__c.Label}" />
+                            <apex:column value="{!discRate.KimbleOne__MeasureUpper__c}" headerValue="{!$ObjectType.KimbleOne__DiscountRate__c.Fields.KimbleOne__MeasureUpper__c.Label}" />
+                            <apex:column value="{!discRate.KimbleOne__DiscountPercentage__c}"  headerValue="{!$ObjectType.KimbleOne__DiscountRate__c.Fields.KimbleOne__DiscountPercentage__c.Label}" />
+
+                        </apex:pageBlockTable>
+
+                    </apex:pageBlock>
+
+                </apex:outputPanel>
+
+                <apex:actionFunction action="{!newDiscountRate}" name="newDiscountRate" rerender="DiscountRatePopupPanel" oncomplete="showModalBoxy();">
+                    <apex:param name="drId" value="" />
+                </apex:actionFunction>
+
+                <apex:actionFunction action="{!editDiscountRate}" name="editDiscountRate" rerender="DiscountRatePopupPanel" oncomplete="showModalBoxy();">
+                    <apex:param name="drId" value="" />
+                </apex:actionFunction>
+
+            </apex:form>
+
+            <div id="DiscountRatePopup" style="display:none">
+
+                <apex:outputPanel id="DiscountRatePopupPanel">
+
+                    <apex:form id="theForm">
+
+                        <apex:pageBlock >
+
+                            <div id="DiscountRatePopUpErrors">
+                                <apex:pageMessages escape="false"/>
+                            </div>
+
+                            <apex:pageBlockButtons location="bottom">
+                                <apex:commandButton action="{!saveDiscountRate}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#DiscountRatePopUpErrors')" reRender="DiscountRatesList, DiscountRatePopupPanel"/>
+                                <input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.kimbleone__cancel}"/>
+                            </apex:pageBlockButtons>
+
+                            <apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+
+              					<apex:pageBlockSectionItem rendered="{!SchemeModel.SchemeMeasure__r.KimbleOne__IsCurrency__c}">
+               						<apex:outputText value="{!$ObjectType.KimbleOne__DiscountRate__c.Fields.KimbleOne__MeasureLower__c.Label} ({!DiscountScheme.CurrencyIsoCode})" />            
+	               					<apex:inputfield value="{!theDiscountRate.KimbleOne__MeasureLower__c}" required="true"/>
+								</apex:pageBlockSectionItem>
+
+        		       			<apex:pageBlockSectionItem rendered="{!!SchemeModel.SchemeMeasure__r.KimbleOne__IsCurrency__c}">
+               						<apex:outputText value="{!$ObjectType.KimbleOne__DiscountRate__c.Fields.KimbleOne__MeasureLower__c.Label}" />            
+	               					<apex:inputfield value="{!theDiscountRate.KimbleOne__MeasureLower__c}" required="true"/>
+								</apex:pageBlockSectionItem>
+
+        		      			<apex:pageBlockSectionItem rendered="{!SchemeModel.SchemeMeasure__r.KimbleOne__IsCurrency__c}">
+               						<apex:outputText value="{!$ObjectType.KimbleOne__DiscountRate__c.Fields.KimbleOne__MeasureUpper__c.Label} ({!DiscountScheme.CurrencyIsoCode})" />            
+	               					<apex:inputfield value="{!theDiscountRate.KimbleOne__MeasureUpper__c}" />
+								</apex:pageBlockSectionItem>
+
+           		    			<apex:pageBlockSectionItem rendered="{!!SchemeModel.SchemeMeasure__r.KimbleOne__IsCurrency__c}">
+               						<apex:outputText value="{!$ObjectType.KimbleOne__DiscountRate__c.Fields.KimbleOne__MeasureUpper__c.Label}" />            
+	               					<apex:inputfield value="{!theDiscountRate.KimbleOne__MeasureUpper__c}" />
+								</apex:pageBlockSectionItem>
+
+                                <apex:inputfield value="{!theDiscountRate.KimbleOne__DiscountPercentage__c}" required="true"/>
+
+                            </apex:pageBlockSection>
+
+                        </apex:pageBlock>
+
+                    </apex:form>
+
+                </apex:outputPanel>
+
+            </div>
+
+            <script>
+                jQuery(window).load(function()
+                {
+                initialiseItems();
+                });
+                function initialiseItems()
+                {
+                SetupDatePicker();
+                }
+                function SetupDatePicker()
+                {
+                //dateFormat: 'yy-mm-dd',
+                jQuery('.kimbleDatePicker').datepicker({
+                dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+                showOtherMonths: true,
+                selectOtherMonths: true,
+                changeMonth: true,
+                changeYear: true});
+                }
+            </script>
+
+        </apex:define>
+    </apex:composition>
+
+</apex:page>

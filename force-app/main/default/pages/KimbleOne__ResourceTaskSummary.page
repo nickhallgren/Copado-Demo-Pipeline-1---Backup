@@ -1,0 +1,532 @@
+<apex:page standardController="KimbleOne__Resource__c" extensions="KimbleOne.ResourceTaskSummaryController" sidebar="false" tabStyle="MyPlanTasks__tab" >
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu" >
+	<c:Menu id="resourceTaskSummaryMenu" DefaultHelpPage="TimeExpenseEntryCalendarView.html" MenuContextName="{!$Label.kimbleone__mytasksheading}"/> 
+</apex:define>
+	
+<apex:define name="Content">
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+
+	<style>
+		/* loading panel */
+		.loadingIndicator {
+		   top:0;
+		   right:0;
+		   width:100%;
+		   height:100%;
+		   font-weight: bold;
+		   position:absolute;
+		   text-align:center;
+		   /* IE filter */
+		   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+		   -moz-opacity:0.7;	/* Mozilla extension */
+		   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+		   opacity:0.7; /* CSS3 */
+		   z-index:1000;
+		   background-color:white;
+		   display:none; 
+		}
+		.loadingIndicator img {
+			margin-right:9px;
+		}
+		#loadingIndicatorInnerContainer { 
+			position:absolute; 
+			top:50%;
+			height:10em; 
+			margin-top:-2em;
+			width:100%;
+		}
+		.working {
+			cursor: wait !important;
+		}
+		.pbBody {
+			margin: 0px !important;
+		}
+		/* list styling */
+		.ti-act-name,
+		.ti-start-date,
+		.ti-end-date,
+		.ai-start-date,
+		.ai-end-date {
+			display: inline-block;
+		}
+		.wi-name {
+			display: inline-block;
+		}
+		li.work-item.list-item {
+			list-style: none;
+		}
+		.list-item {
+			position: relative;
+		}		
+		.ti-name {
+			font-weight: bold;
+			margin-right: 10px;
+			font-size: 14px;
+		}
+		.wi-name {
+			width: 582px;
+			margin-right: 10px;
+		}
+		.list-item div {
+			vertical-align: middle;
+		}		
+		.ti-act-name, .ai-act-name {
+			font-style: italic;
+   		}
+		.ti-act-name {
+			font-size: 10px;
+   		}
+		.ai-act-name {
+			font-size: 14px;
+   		}
+		.ti-start-date,
+		.ti-end-date,
+		.ai-start-date,
+		.ai-end-date {
+			text-align: center;
+			padding: 4px;
+		}
+		.ai-status {
+			display: inline-block;
+			text-align: center;
+		}
+		.task-item.Iteration {
+			background-color: #ededed;
+		}		
+		.list-item[item-status='NotStarted'] {
+			border-right-color: #AFAFAF;
+		}
+		.list-item[item-status='InProgress'] {
+			border-right-color: #E58E1A;
+		}
+		.list-item[item-status='Completed'] {
+			border-right-color: #008852;
+		}
+		.list-item[item-blocked='true'] {
+			border-right-color: #333;
+		}
+		div.item-status.NotStarted {
+			background-color: #AFAFAF;
+			border-color: #AFAFAF;
+			color: white;
+		}
+		div.item-status.InProgress {
+			background-color: #E58E1A;
+			border-color: #E58E1A;
+			color: white;
+		}
+		div.item-status.Completed {
+			background-color: #008852;
+			border-color: #008852;
+			color: white;
+		}
+		div.item-status {
+			border-radius: 4px;
+			padding: 4px;
+	        width: 75px;
+			text-align: center;
+		}
+		.red-highlight,
+		.ti-status.red-highlight div.item-status {
+			background-color: #B42E34;
+			border-color: #B42E34;
+			color: white !important;
+			border-radius: 4px;
+		}
+		.amber-highlight,
+		.ti-status.amber-highlight div.item-status {
+			background-color: #ffc107;
+			border-color: #ffc107;
+			color: white !important;
+			border-radius: 4px;
+		}
+		.list-item {
+			padding: 10px;
+			background-color: white;
+			border-radius: 3px;
+			box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+			margin: 5px;
+			border-right-style: solid;
+		    border-right-width: 6px;
+			border-right-color: white;
+			border-bottom-left-radius: 2px !important;
+			border-top-left-radius: 2px !important;
+			position: relative;
+		}
+		.ti-metrics {
+			position: absolute;
+		    right: 370px;
+		    top: 14px;
+   		}
+		i.work-item-notes-ind {
+		    margin-left: 5px;
+		    font-size: 12px;
+		    color: #428BCA;
+		}
+		.work-item-table, .ai-table, .ti-table {
+			display: table;
+			width: 100%;
+		}
+		.work-item-row, .ai-row, .ti-row {
+			display: table-row;
+		}
+		.work-item-owner-ind {
+			font-size: 12px;
+			color: #afafaf;
+			position: absolute;
+			top: 16px;
+			padding-left: 5px;
+   		}	
+		.wi-add-details, .wi-add-owner {
+		    display: inline-block;
+		}
+		.work-item-name, .ai-act-name, .ti-name-details {
+		    display: table-cell;
+		}
+		.wi-status-details {
+		    display: table-cell;
+		    width: 85px;
+		}
+		.ai-status-details {
+		    display: table-cell;
+	        width: 140px;
+		}
+		.ti-status-details {
+		    display: table-cell;
+	        width:50%;
+		}
+		.ti-status {
+			position: absolute;
+			top: 15px;
+			right: 12px;
+		}
+		.ti-start-date, .ai-start-date {
+		    margin-right: 3px;
+		}
+		.ti-start-date {
+		    position: absolute;
+		    top: 6px;
+		    right: 170px;
+		    margin-right: 15px;
+		    top: 15px;
+		}
+		.ti-end-date {
+		    position: absolute;
+		    top: 6px;
+		    right: 100px;
+		    margin-right: 5px;
+		    top: 15px;
+		}
+		.ti-name-details {
+			line-height: 18px;
+		}
+		.task-list-container {
+			cursor: pointer;
+		}
+	</style>	
+
+	<script>
+		var l = {};
+		l['NotStarted'] = '<apex:outputText value="{!$Label.kimbleone__notstartedlabel}"/>';
+		l['InProgress'] = '<apex:outputText value="{!$Label.kimbleone__inprogresslabel}"/>';
+		l['Completed'] = '<apex:outputText value="{!$Label.kimbleone__complete}"/>';
+
+		l['Baseline'] = '<apex:outputText value="{!$Label.kimbleone__baselinelabel}"/>';
+		l['Expended'] = '<apex:outputText value="{!$Label.kimbleone__expendedeffort}"/>';
+		l['Remaining'] = '<apex:outputText value="{!$Label.kimbleone__remainingeffort}"/>';
+		l['PercentComplete'] = '<apex:outputText value="{!$Label.kimbleone__planpercentcomplete}"/>';
+
+		l['ActualUnits'] = '<apex:outputText value="{!$ObjectType.KimbleOne__WorkItem__c.Fields.KimbleOne__ActualUnits__c.Label}"/>';
+		l['RemainingUnits'] = '<apex:outputText value="{!$ObjectType.KimbleOne__WorkItem__c.Fields.KimbleOne__RemainingUnits__c.Label}"/>';
+		l['IsBlocked'] = '<apex:outputText value="{!$Label.kimbleone__blocked}"/>';
+		
+		var currentResourceId = '<apex:outputText value="{!TheResource.Id}"/>';
+		
+		var taskListURL = '<apex:outputText value="{!$Page.KimbleOne__ResourcePlanTasks}"/>';
+		
+		var unitTypeEnumToSuffixMap = {};
+		<apex:outputText value="unitTypeEnumToSuffixMap={!UnitTypeEnumToSuffixJson};" rendered="{!!ISBLANK(UnitTypeEnumToSuffixJson)}"/>
+		
+		var disablePlan = false;
+		
+		var theTaskList = JSON.parse('{!JSENCODE(TheTaskListJson)}');
+		var theTasks = [];
+		var theActivities = [];
+		var theResources = [];
+		
+		var theResourcedActivityWorkItemUnitTypeMap = '';
+		
+		var taskMap = {};
+		var workItemMap = {};
+		
+		jQuery(window).load(function()
+		{
+			initialise();
+		});
+		
+		function initialise()
+		{
+			jQuery.publish('kimble.task-list-working-start');
+			
+			// hide the banner if in lightning as Lighting renders it's own header
+			if(isSFLightning())
+			{
+				jQuery('span[id$="resourceTaskSummaryMenu"]').hide();
+				jQuery('#content-pane').css('overflow', 'hidden');
+			}
+
+			initialiseActions();
+			
+			theTasks = theTaskList.TheTaskItems;
+			theActivities = theTaskList.TheActivityItems;
+			theResources = theTaskList.TheResources;
+
+			theResourcedActivityWorkItemUnitTypeMap = theTaskList.ActivityWorkItemUnitTypeMap;
+			
+			refreshList();
+			
+			jQuery.publish('kimble.task-list-working-end');	
+		}
+		
+		function refreshList()
+		{
+			jQuery('.task-list-container').html(getTaskListHtml());
+		}
+		
+		function getTaskListHtml()
+		{
+			var html = '';
+			
+			html += '<div class="task-list-table">';
+			
+			var theActivitiesLength = theActivities.length;
+			for(var i = 0; i < theActivitiesLength; i++)
+			{
+				var theActivityItem = theActivities[i];
+
+				var actualUnits = 0;
+				var forecastUnits = 0;
+				var remainingUnits = 0;
+				
+				var workItemUnitType = theActivityItem.WorkItemUnitType;
+				
+				var activityHtml = '';
+				activityHtml += '<div node-id="' + theActivityItem.ResourcedActivityId + '" scoping-id="' + theActivityItem.ResourcedActivityId + '" class="activity-item list-item">';
+
+				activityHtml += '<div class="ai-table">';
+				activityHtml += '<div class="ai-row">';
+			
+				activityHtml += '<div class="ai-act-name">' + theActivityItem.ActivityName + '</div>';
+
+				activityHtml += '<div class="ai-status-details">';
+				activityHtml += '<div class="ai-start-date">' + kimble.formatDate(theActivityItem.StartDateUTC) + '</div>';
+				activityHtml += '<div class="ai-end-date">' + kimble.formatDate(theActivityItem.EndDateUTC) + '</div>';
+				activityHtml += '</div>';
+
+				activityHtml += '</div>';
+				activityHtml += '</div>';
+								
+				var workItemHtml = '';
+				
+				var theWorkItemLength = theActivityItem.WorkItems.length;
+				workItemHtml += '<ul class="work-items activity-work-items" node-id="' + theActivityItem.ResourcedActivityId + '" scoping-id="' + theActivityItem.ResourcedActivityId + '">';
+				for(var j = 0; j < theWorkItemLength; j++)
+				{
+					var theWorkItem = theActivityItem.WorkItems[j];
+					workItemMap[theWorkItem.WorkItemId] = theWorkItem;
+					
+					workItemHtml += getWorkItemHtml(theWorkItem, workItemUnitType);
+				}
+				workItemHtml += '</ul>';
+
+				activityHtml += '</div>';
+
+				html += activityHtml + workItemHtml;
+			}
+			
+			var theTasksLength = theTasks.length;
+			for(var i = 0; i < theTasksLength; i++)
+			{
+				var taskHtml = '';
+				
+				var theTaskItem = theTasks[i];
+				taskMap[theTaskItem.TaskId] = theTaskItem;
+
+				var highlightClass = getHighlightClass(theTaskItem.Status, theTaskItem.StartDateUTC, theTaskItem.EndDateUTC);
+				
+				var startDateClass = (theTaskItem.Status == 'NotStarted' && theTaskItem.StartDateUTC != undefined && theTaskItem.StartDateUTC.toDate() < new Date() ? highlightClass : '');
+				var endDateClass = (theTaskItem.Status == 'NotStarted' && theTaskItem.EndDateUTC != undefined && theTaskItem.EndDateUTC.toDate() < new Date() ? highlightClass : '');
+				
+ 				taskHtml += '<div node-id="' + theTaskItem.TaskId + '" parent-node-id="' + theTaskItem.TrackingPlanId + '" scoping-id="' + theTaskItem.ResourcedActivityId + '" class="task-item list-item' + (theTaskItem.IsIteration ? ' Iteration' : '') + '" item-status="' + theTaskItem.Status + '">';
+
+				taskHtml += '<div class="ti-table">';
+				taskHtml += '<div class="ti-row">';
+				
+				taskHtml += '<div class="ti-name-details">';
+				taskHtml += '<div class="ti-name">' + theTaskItem.Name + '</div>';
+				taskHtml += '<div class="ti-act-name">' + theTaskItem.ActivityName + '</div>';
+				taskHtml += '</div>';
+
+				taskHtml += '<div class="ti-status-details">';
+				taskHtml += '<div class="ti-start-date' + startDateClass + '">' + kimble.formatDate(theTaskItem.StartDateUTC) + '</div>';
+				taskHtml += '<div class="ti-end-date' + endDateClass + '">' + kimble.formatDate(theTaskItem.EndDateUTC) + '</div>';
+				taskHtml += '</div>';
+
+				taskHtml += '<div class="ti-status' + highlightClass + '">' + getStatusHtml(theTaskItem) + '</div>';
+				
+				taskHtml += '</div>';
+				taskHtml += '</div>';				
+				
+				if(theTaskItem.AcceptWorkItems)
+				{
+					var workItemHtml = '';
+					
+					var workItemUnitType = theTaskItem.WorkItemUnitType;
+				
+					var theWorkItemLength = theTaskItem.WorkItems.length;
+					workItemHtml += '<ul class="work-items task-work-items" node-id="' + theTaskItem.TaskId + '" scoping-id="' + theTaskItem.ResourcedActivityId + '">';				
+					for(var j = 0; j < theWorkItemLength; j++)
+					{
+						var theWorkItem = theTaskItem.WorkItems[j];
+						workItemMap[theWorkItem.WorkItemId] = theWorkItem;
+						
+						workItemHtml += getWorkItemHtml(theWorkItem, workItemUnitType);
+					}
+					workItemHtml += '</ul>';
+
+					taskHtml += '</div>';
+					taskHtml += workItemHtml;
+				}
+				else
+				{
+					taskHtml += '</div>';
+				}
+				
+				html += taskHtml;
+			}
+			html += '</div>';
+			
+			return html;
+		}
+		
+		function getHighlightClass(status, startDate, endDate)
+		{
+			var highlightClass = '';
+			
+			if(status == 'NotStarted' && startDate != undefined && endDate != undefined)
+			{
+				if(startDate.toDate() < new Date() && endDate.toDate() < new Date())
+				{
+					highlightClass = ' red-highlight';
+				}
+				else if(startDate.toDate() < new Date() && endDate.toDate() > new Date())
+				{
+					highlightClass = ' amber-highlight';
+				}
+			}
+			return highlightClass;
+		}
+
+		function getWorkItemHtml(theWorkItem, workItemUnitType)
+		{
+			var html = '';
+
+			var workItemClass = 'work-item list-item';
+			html += '<li node-id="' + theWorkItem.WorkItemId + '" parent-node-id="' + (theWorkItem.TaskId != null ? theWorkItem.TaskId : theWorkItem.ResourcedActivityId) + '" item-status="' + theWorkItem.Status + '"  item-blocked="' + theWorkItem.IsBlocked + (theWorkItem.IsBlocked ? '"title="' + l['IsBlocked'] : ' ') + '" class="' + workItemClass + (theWorkItem.IsNew ? ' new last-added' : '') + '">';
+			html += '<div class="work-item-table">';
+			html += '<div class="work-item-row">';
+
+			html += '<div class="work-item-name">' + (theWorkItem.Name != undefined && theWorkItem.Name != '' ? theWorkItem.Name : '');
+
+			if(theWorkItem.Notes != undefined && theWorkItem.Notes != '')
+			{
+				html += '<div class="wi-add-details">';
+				html += '<i class="work-item-notes-ind fa fa-info-circle" title="' + (theWorkItem.Notes != undefined && theWorkItem.Notes != '' ? theWorkItem.Notes : '') + '"></i>';
+				html += '</div>';
+			}
+			if(theWorkItem.ActivityAssignmentId != null) 
+			{
+				html += '<div class="wi-add-owner">';
+				html += '<i class="work-item-owner-ind fa fa-user" title="' + (theResources.filter(function(x) {return x.id == theWorkItem.ActivityAssignmentId})[0] != undefined ? theResources.filter(function(x){return x.id == theWorkItem.ActivityAssignmentId})[0].text : '{!$Label.None}') + '"></i>';
+				html += '</div>';
+			}
+			html += '</div>';
+			html += '<div class="wi-status-details">' + getStatusHtml(theWorkItem) + '</div>';
+			html += '</div>';
+			html += '</div>';
+			html += '</li>';
+
+			return html;
+		}
+
+		function getStatusHtml(theTaskItem)
+		{
+			var html = '';
+			
+			html += '<div class="item-status ' + theTaskItem.Status + '">';
+			if(theTaskItem.Status == 'NotStarted') html += l['NotStarted'];
+			if(theTaskItem.Status == 'InProgress') html += l['InProgress'];
+			if(theTaskItem.Status == 'Completed') html += l['Completed'];
+			html += '</div>';
+			
+			return html;
+		}
+		
+		function initialiseActions()
+		{
+			jQuery.unsubscribe('kimble.task-list-working-start');
+			jQuery.subscribe('kimble.task-list-working-start', function(event, assignment){
+				showWorking();
+			});
+			
+			jQuery.unsubscribe('kimble.task-list-working-end');
+			jQuery.subscribe('kimble.task-list-working-end', function(event, assignment){
+				hideWorking();
+			});
+			
+			jQuery(document).off('click', '.task-list-container').on('click', '.task-list-container', jumpToTaskList);
+		}
+		
+		function hideWorking()
+		{
+			if(!disablePlan) jQuery('#toolbar-buttons>a').removeClass('disabled');
+			jQuery('#loadingIndicatorOuterContainer').hide();
+		}
+		
+		function showWorking()
+		{
+			jQuery('#toolbar-buttons>a').addClass('disabled');
+			jQuery('#loadingIndicatorOuterContainer').show();
+		}
+		
+		function jumpToTaskList()
+		{
+			safeRedirectParentToSForceURL(taskListURL);
+		}
+	</script>
+	
+	<apex:outputPanel id="ErrorMessages">
+		<apex:pageMessages escape="false"/>
+	</apex:outputPanel>
+	<div id="remote-action-error" style="display:none"><span><div class="message errorM3"><table border="0" cellpadding="0" cellspacing="0" class="messageTable" style="padding:0px;margin:0px;"><tbody><tr valign="top"><td><img alt="error" class="msgIcon" src="/s.gif" title="{!$Label.Error}"/></td><td class="messageCell"><div class="messageText" id="remote-action-error-text"><br/></div></td></tr><tr><td></td><td></td></tr></tbody></table></div></span></div>
+
+	<apex:pageBlock id="taskListPB">
+		<div id="loadingIndicatorOuterContainer" class="loadingIndicator" style="display:none">
+			<div id="loadingIndicatorInnerContainer">
+				<img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+			</div>
+		</div>
+		
+		<div class="task-list-container">
+			<div class="task-list-grid">
+			</div>
+		</div>
+	</apex:pageBlock>
+	
+</apex:define>
+
+</apex:composition>
+</apex:page>

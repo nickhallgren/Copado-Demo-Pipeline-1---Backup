@@ -1,0 +1,271 @@
+<apex:page controller="KimbleOne.SiteMasterController" contentType="text/javascript" cache="true"  showHeader="false" sidebar="false">
+
+var kimble;
+if (!kimble){
+	kimble = {};
+}
+
+//must be in lower case
+kimble.localeMapping = {'en-us' : '', 
+						'en-ca' : 'en-GB',
+						'en-ie-euro' : 'en-GB',
+						'lb' : 'fr', 
+						'fr-lu' : 'fr', 
+						'en-in' : 'en-GB',
+						'en-my' : 'en-GB',
+						'en-sg' : 'en-HK'};
+
+kimble.locale = '{!JSENCODE(Locale)}';
+kimble.dateLocale = kimble.locale;
+kimble.regional;
+kimble.user = {};
+kimble.labels = {};
+kimble.pages = {};
+
+	kimble.localeNumberFormat = function(val){
+		if (val === null || val === '' || val == undefined) return null;
+
+		var decimalVal = parseFloat(val);
+
+		return parseFloat(decimalVal.toFixed(1)).toLocaleString(kimble.locale);
+	}
+
+jQuery( document ).on( "pageinit", "[data-role='page'].timesheet-page", function()
+{
+    jQuery.datepicker.setDefaults($.datepicker.regional['']);
+	
+	// Luxembourgish date locale override
+	jQuery.datepicker.regional.lb.dateFormat = "mm/dd/yy";
+	// Polish date locale override
+	jQuery.datepicker.regional['pl-PL'] = jQuery.extend({}, jQuery.datepicker.regional.pl);
+	jQuery.datepicker.regional.pl.dateFormat = "yy-mm-dd";
+	// English Hong Kong date locale override
+	jQuery.datepicker.regional['en-HK'] = jQuery.extend({}, jQuery.datepicker.regional['']);
+	jQuery.datepicker.regional['en-HK'].dateFormat = "dd/mm/yy";
+		
+	var mappedLocale = kimble.localeMapping[kimble.dateLocale.toLowerCase()];
+	
+	if (mappedLocale != undefined)
+		kimble.dateLocale = mappedLocale;
+
+	if (jQuery.datepicker.regional[kimble.dateLocale] == null)
+		kimble.dateLocale = kimble.locale.split('-')[0];
+		
+	if (jQuery.datepicker.regional[kimble.dateLocale] == null)
+		kimble.dateLocale = '';
+		
+	kimble.regional = jQuery.datepicker.regional[kimble.dateLocale];
+	
+	kimble.parseId = function (val)
+	{
+		if (val === null || val === '' || val == undefined) return null;
+		
+		return val;
+	}
+	
+	kimble.parseNumber = function (val, format)
+	{
+		if (val === null || val === '' || val == undefined) return null;
+		
+		return jQuery.parseNumber(val,{format:format, locale:kimble.locale, isFullLocale:false}).valueOf(); 
+	}
+	
+	kimble.formatNumber = function (val, format)
+	{
+		if (val === null || val === '' || val == undefined) return null;
+		
+		return jQuery.formatNumber(val, {format: format, locale:kimble.locale, isFullLocale:false});
+	}
+	
+	kimble.parseDate = function (val, asDate)
+	{
+		if (val == null || val == '') return null;
+		
+		var dte = jQuery.datepicker.parseDate(kimble.regional.dateFormat, val);
+		
+		if (asDate) return dte;
+		
+		return dte.toKimbleUTC();
+	}
+	
+	kimble.formatDate = function (val)
+	{	
+		if (val == '' || val == null) return '';
+		
+		return jQuery.datepicker.formatDate(kimble.regional.dateFormat, val.toDate())
+	}
+	
+	kimble.formatDateTime = function (val)
+	{	
+		if (val == '' || val == null) return '';
+		
+		// the JqueryUI datepicker only supports date so here we use it to format
+		// the date and then append the time to the end (as that has no regional format)
+		return jQuery.datepicker.formatDate(kimble.regional.dateFormat, val.toDateDiscardTime()) + ' ' + val.getTimeFromDateTime()
+	}		
+
+	kimble.formatDateWithFormat = function (val, format)
+	{	
+		if (val == '' || val == null) return '';
+		
+		return jQuery.datepicker.formatDate(format, val.toDate())
+	}	
+
+	kimble.formatDates = function ()
+	{
+		jQuery.each(jQuery('.kimble-format-date'), function (i, obj) {
+			var $o = jQuery(obj);
+			$o.text(kimble.formatDate($o.text())).removeClass('kimble-format-date');
+		});
+	}
+	
+	kimble.formatDateTimes = function ()
+	{
+		jQuery.each(jQuery('.kimble-format-date-time'), function (i, obj) {
+			var $o = jQuery(obj);
+			$o.text(kimble.formatDateTime($o.text())).removeClass('kimble-format-date-time');
+		});
+	}
+	
+	kimble.formatCurrencies = function ()
+	{
+		jQuery.each(jQuery('.kimble-format-currency'), function (i, obj) {
+			var $o = jQuery(obj);
+			var currencyCode = '';
+			
+			if ($o.attr("data-currency") != null) currencyCode = $o.attr("data-currency") + ' ';
+			
+			if ($o.is('input'))
+			{
+				if ($o.val() != '') $o.val(kimble.formatNumber($o.val(), '#,##0.00'));				
+			}
+			else
+			{
+				if ($o.text() != '') $o.text(currencyCode + kimble.formatNumber($o.text(), '#,##0.00'));
+			}
+			
+			$o.removeClass('kimble-format-currency');
+		});
+	}
+	
+	kimble.replaceNull = function (val, def)
+	{
+		return (val == null?def:val);
+	}
+	
+	kimble.replaceValue = function (val, nullVal)
+	{
+		return (val == nullVal || val == null ? null : val);
+	}
+	
+	jQuery('.format-as-currency-value').each(function(i, obj)
+	{
+		obj.val(kimble.formatNumber(obj.val(), '#,##0.##'));
+	});
+});								
+
+	$(document).ready(initFunctions)
+	
+	function initFunctions(){	
+		
+		if (typeof DatePicker != 'undefined')
+		{
+		DatePicker.prototype.position = function () {
+		    if ($(this.myElement).hasClass('kimbleDatePicker'))
+		    {
+		    	this.shim.setStyle('display','none');
+		    }
+		    else
+		    {
+			    var matched = false;
+			    for (var a = 0, b = 0, c = this.myElement; c != null &amp;&amp; c != this.calendarDiv.offsetParent;) {
+			        a += c.offsetLeft;
+			        b += c.offsetTop;
+			        c = c.offsetParent;
+			        if (c == this.calendarDiv.offsetParent)
+			        	matched = true;
+			    }
+			    if (getObjY(this.myElement) + this.calendarDiv.offsetHeight > getScrollY() + getWindowHeight()) b -= this.calendarDiv.offsetHeight;
+			    else b += this.myElement.offsetHeight;
+			    c = "left";
+			    if (LC.isRtlPage()) {
+			        c = "right";
+			        a = this.calendarDiv.offsetParent.offsetWidth - a - this.myElement.offsetWidth
+			    }
+			    if (!matched)
+			    	b = b - $('.bodyDiv').offset().top;
+			    	
+			    this.shim.setStyle(c, a + "px");
+			    this.shim.setStyle("top", b + "px");
+			    $(this.calendarDiv).css('z-index', '2000');
+			 }
+		};
+		}
+		
+		String.prototype.format = function() {
+    		var s = this,
+        	i = arguments.length;
+
+    		while (i--) {
+        		s = s.replace(new RegExp('\\{' + i + '\\}', 'gm'), arguments[i]);
+    		}
+    		return s;
+		};
+		
+		String.prototype.toDate = function () {
+			
+			var parts = this.split('-');
+			if (parts.length != 3) return null;
+			
+			return new Date(parts[0], parts[1] - 1, parts[2]);
+			
+		};
+
+		String.prototype.toDateDiscardTime = function () {
+			
+			var datetimeparts = this.split('T');
+			var dateparts = datetimeparts[0].split('-');
+
+			if (dateparts.length != 3) return null;
+			
+			return new Date(dateparts[0], dateparts[1] - 1, dateparts[2]);
+		};
+				
+		String.prototype.getTimeFromDateTime = function (includeSeconds) {
+			
+			var datetimeparts = this.split('T');
+			var dateparts = datetimeparts[0].split('-');
+			var timeparts = datetimeparts[1].split(':');
+
+			if (dateparts.length != 3) return null;
+			
+			// time portion will depend on whether the time has been recorded with seconds
+			var theTimeString = '';
+			for(var counter = 0; counter &lt; timeparts.length; counter++)
+			{
+				if(counter==0) theTimeString = timeparts[counter].padToTwoDigits();
+				else if(counter==1) theTimeString += ':' + timeparts[counter].padToTwoDigits();
+				else if(counter==2 &amp;&amp; includeSeconds) theTimeString += ':' + timeparts[counter].replace('Z', '').padToTwoDigits();
+			}
+			
+			return theTimeString;
+			
+		};
+		
+		String.prototype.padToTwoDigits = function () {
+		    return this > 9 ? "" + this: "0" + this;
+		}
+				
+		Date.prototype.toKimbleUTC = function () {
+			
+			return this.getFullYear() + '-' + (this.getMonth() + 1) + '-' + this.getDate();
+			
+		};
+		
+		Date.prototype.kimbleAddDays = function(days){
+			return new Date(this.getFullYear(), this.getMonth(), this.getDate() + days, 0, 0, 0, 0);
+    	}
+		///
+	};
+
+</apex:page>

@@ -1,0 +1,1643 @@
+<apex:page controller="KimbleOne.TrackingPeriodCloseController" action="{!RedirectOnLoad}" extensions="KimbleOne.SecurityController,KimbleOne.TooltipsController" sidebar="false" tabstyle="PeriodManagement__tab">
+
+	<apex:composition template="KimbleOne__SiteMaster">
+
+		<apex:define name="Menu">
+
+			<c:Menu DefaultHelpPage="CloseTrackingPeriod.html" MenuContextType="Organisation" MenuContextName="Period Management" ChildName="{!timePeriod.Name} - ({!timePeriod.KimbleOne__StartDate__c} {!$Label.kimbleone__to} {!timePeriod.KimbleOne__EndDate__c})"/>
+
+		</apex:define>
+
+		<apex:define name="Content">
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__jQueryBarGraph, 'jqBarGraph.1.1.min.js')}"/>
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+
+			<!-- Kimble Guidance -->
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+			<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+				<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/TrackingPeriodCloseNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+				<apex:outputPanel layout="none" rendered="{!TrackingPeriodCloseTipOverrideEnabled}">
+					<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+				</apex:outputPanel>
+			</apex:outputPanel>
+			
+			<style>
+				.go-date-btn {
+					position: absolute;
+					left: 0px;
+					background-color: transparent;
+					top: 0px;
+					width: 32px;
+					border: 0px;
+					margin: 0px;
+					padding: 0px;
+					cursor: pointer;
+					height:30px;
+					outline:0;
+					color:transparent;
+				}
+				#initial-focus {
+					width: 0;
+					border: 0;
+					outline: 0;
+				}
+				div.toolbar-button {
+						display: inline-block;
+						padding: 6px 10px 6px 10px;
+						background-color: white;
+						border: 1px solid #ccc;
+						border-radius: 2px;
+						cursor: pointer;
+					}
+					div.toolbar-button.active {
+						text-decoration: none;
+						color: white;
+						background-color: #1A9EFF;
+					}
+					div.toolbar-button:not(.active):hover {
+						background-color: #f4f6f9;
+					}
+					div.toolbar-button.bigger-btn .fa {
+						font-size: 18px;
+						width: 20px;
+						text-align: center;
+					}
+					div.toolbar-button.bigger-btn{
+						padding: 6px;
+					}
+					.toolbar a {
+						margin-right: 3px;
+					}
+					.toolbar {
+						display: table;
+						width: 100%;
+					}
+					.filter-button.toolbar-button-selected {
+						text-decoration: none;
+						color: white;
+						background-color: #1A9EFF;
+					}
+					.control-cell {
+						display: table-cell;
+						vertical-align: middle;
+						position: relative;
+					}
+					div#toolbar-container {
+						margin-bottom: 6px;
+						max-width: 1310px;
+					}
+				div[class^='graphLabel'], div[class^='graphValuedivFor'] {
+					font-size: 10px;
+					white-space: nowrap;
+					font-weight: bold;
+					color: #4A4A56;
+				}
+				div[class^='graphLabeldivFor'] {
+					height:20px;
+				}
+				div[id^='graphHolder'] {
+					width: auto !important;
+				}
+				div[class^="graphLabel"] a,div[class^="graphLabel"] span {
+					white-space: normal;
+					text-overflow: ellipsis;
+					overflow: hidden;
+					display: -webkit-box;
+					-webkit-line-clamp: 2;
+					-webkit-box-orient: vertical;
+					text-align: center;
+					-moz-webkit-box-orient: vertical;
+				}
+				/* IE10+ specific styles */
+				@media screen and (-ms-high-contrast: active), screen and (-ms-high-contrast: none) {
+				    div[class^="graphLabel"] a,div[class^="graphLabel"] span {
+						white-space: nowrap;
+						display: block;
+					}
+				}
+				.summary-bars {
+					margin-right: 6px;
+				}
+				.graphTitle {
+					font-size: 12px;
+					height: 28px;
+					font-weight: bold;
+					color: #4A4A56;
+					margin-bottom:4px;
+					margin-top: 4px;
+				}
+				.subBarsdivForUsageSummaryGraph {
+					padding-top:3px;
+					font-size: 10px !important;
+				}
+				.business-unit-breakdown th {
+					font-size: 12px;
+					white-space: nowrap;
+					font-weight: bold;
+					color: #4A4A56;
+					margin-bottom: 4px;
+				}
+				.business-unit-breakdown th:nth-child(2), .business-unit-breakdown td:nth-child(2) {
+					 text-align:center;
+				}
+
+				.business-unit-breakdown td {height:25px;}
+
+				.business-unit-breakdown td:first-child {
+					text-overflow: ellipsis;
+					white-space: nowrap;
+					max-width: 180px;
+					overflow: hidden;
+				}
+				.business-unit-breakdown tbody tr {
+					cursor:pointer;
+				}
+				.business-unit-breakdown tbody tr:nth-child(odd) {
+					background-color: #ededed;
+				}
+				table.business-unit-breakdown {
+					margin: 10px;
+					width: auto;
+					table-layout: fixed;
+					border-collapse: collapse;
+					width: 0; /* otherwise Chrome will not increase table size */
+
+				}
+				.business-unit-breakdown th {
+					height: 25px;
+				}
+				.graph-clickable:hover {
+					outline: 3px solid #FF9C00;
+					cursor: pointer;
+				}
+				.business-unit-breakdown td:hover {
+					color: #FF9C00 !important;
+					font-weight: bold;
+				}
+				.summary-cell {
+					background-color:#FFF;
+					border-right: 9px solid #F8F8F8;
+				}
+
+				/* Mutton */
+				.hover-mutton {
+				  display: inline-block;
+				  position: relative;
+				}
+
+				.dd-btn {
+					display: inline-block;
+					border: 1px solid gray;
+					border-radius: 4px;
+					padding: 10px 30px 10px 20px;
+					background-color: #ffffff;
+					cursor: pointer;
+					white-space: nowrap;
+					padding-right: 36px !important;
+				}
+
+				.dd-btn:after {
+				  content: '';
+				  position: absolute;
+				  top: 50%;
+				  right: 15px;
+				  transform: translateY(-50%);
+				  width: 0;
+				  height: 0;
+				  border-left: 5px solid transparent;
+				  border-right: 5px solid transparent;
+				  border-top: 5px solid black;
+				}
+
+				.dd-btn:hover {
+				  background-color: #f4f6f9;
+				}
+
+				.dd-menu {
+				  position: absolute;
+				  top: 23px;
+				  left: 0px;
+				  border: 1px solid #ccc;
+				  border-radius: 4px;
+				  padding: 0;
+				  margin: 2px 0 0 0;
+				  box-shadow: 0 0 6px 0 rgba(0,0,0,0.1);
+				  background-color: #ffffff;
+				  list-style-type: none;
+				  text-align: left;
+				  z-index: 99;
+				}
+
+				.dd-menu li.disabled {
+					color: lightgray;
+					cursor: default;
+				}
+
+				.dd-btn > .dd-menu {
+				  display: none;
+				}
+
+				.dd-btn:hover > .dd-menu {
+				  display: block;
+				}
+
+				.dd-menu li {
+				  padding: 10px 20px;
+				  cursor: pointer;
+				  white-space: nowrap;
+				  margin-left: 0px;
+				}
+
+				.dd-menu li:hover {
+				  background-color: #f4f6f9;
+				}
+
+				.dd-menu li a {
+				  display: block;
+				  margin: -10px -20px;
+				  padding: 10px 20px;
+				}
+
+				div#FilterPopup {
+					position: absolute;
+					top: 37px;
+					padding: 5px;
+					width: 349px;
+					height: 219px;
+					z-index: 999;
+					border-color: #ddd;
+					border-style: solid;
+					border-width: 0px 1px 1px 1px;
+					background-color: #fff;
+					box-shadow: rgba(31, 31, 31, 0.16) 4px 3px 8px;
+					left: 0px;
+					overflow-y: auto;
+				}
+
+				.filter-header {
+					font-weight: bold;
+					font-size: 14px;
+					padding: 10px;
+					background-color: #F5F5F5;
+					border: 1px solid #DDD;
+					border-radius: 4px;
+					margin-left: 2px;
+					margin-right: 2px;
+				}
+
+				i.filter-collapse-btn.fa.fa-angle-double-up {
+					color: #BBB;
+					cursor: pointer;
+					padding-right: 6px;
+					position: absolute;
+					right: 13px;
+					top: 13px;
+					font-size: 26px;
+				}
+
+				input#applyFilterButton {
+					margin-top: 10px;
+				}
+				.string-filter {
+					border: 2px solid #e0e0e0;
+					height: 25px;
+					padding-right: -14px;
+
+				}
+
+				/* SELECT 2 STYLING */
+				.select2-results li {margin-left:0px;}
+				.select2-container-multi .select2-choices
+				{
+					border: 2px solid rgb(224,224,224);
+					background-image:none;
+				}
+				.select2-container-multi .select2-choices .select2-search-choice {
+					border: 1px solid #aaaaaa;
+					border-radius: 4px;
+					padding: 5px 20px 5px 5px;
+					background-image:none;
+				}
+
+				.select2-container-multi .select2-search-choice-close {
+					background-image:  url({!URLFOR($Resource.KimbleOne__AssignmentImages, 'assignmentSprite.png')});
+					background-position: -2px -29px;
+					background-repeat: no-repeat;
+					left:auto;
+				}
+
+				.select2-container-multi .select2-choices .select2-search-choice .select2-search-choice-close:hover {
+					background-position: -2px -1px;
+				}
+		</style>
+
+			<apex:outputPanel layout="none" id="ErrorMessagesSection">
+				<apex:pageMessages escape="false"/>
+			</apex:outputPanel>
+
+			<apex:form id="JobForDeleteAssignmentForm">
+				<div id="JobForDeleteAssignmentPopup" style="display:none; height:300px;">
+					<apex:outputPanel id="JobForDeleteAssignmentPopupPanel">
+						<div id="jobsPanel" style="height:250px; width:550px;"></div>
+					</apex:outputPanel>
+				</div>
+			</apex:form>
+
+			<apex:pageMessage summary="{!$Label.kimbleone__errors}" severity="error" strength="2" rendered="{!!ISBLANK(errorsList) && errorsList.size>0}">
+				<ul style=" margin:0px ;padding:0">
+					<apex:repeat value="{!errorsList}" var="msg">
+						<li id="" >
+							<apex:outputText value="{!msg.Message}"/>
+							<apex:outputPanel rendered="{!msg.SubMessageLinks.Size>0}">
+								<ul style=" margin:0px ;padding:0">
+									<li>
+										<apex:repeat value="{!msg.SubMessageLinks}" var="msglink">
+											<apex:outputLink target="expenseview"  value="{!$Page.KimbleOne__ExpenseClaimApprove}?Id={!msglink.link}">
+												<apex:outputText value="{!msglink.SubMessageText}"/>
+											</apex:outputLink>&nbsp; &nbsp;
+										</apex:repeat>
+									</li>
+								</ul>
+							</apex:outputPanel>
+						</li>
+					</apex:repeat>
+				</ul>
+			</apex:pageMessage>
+
+			<apex:form id="TheForm">
+				<div style="position:relative">
+					<div>
+
+						<div id="FilterPopup" style="display:none;">
+
+							<div id="Filters">
+								<div class="filter-header">{!$Label.kimbleone__filter}<i onclick="jQuery('#FilterPopup').hide();" class="filter-collapse-btn fa fa-angle-double-up" title="{!$Label.kimbleone__close}"></i></div>
+
+								<apex:repeat value="{!TheFilterCriteriaOptions}" var="criterion">
+
+									<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'REFERENCE'}">
+										<div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!criterion.Name}</div>
+										<input class="criteria-filter lookup-filter" data-key="{!criterion.Key}" data-lookup-object-type="{!criterion.LookupObjectType}" data-object-type="{!criterion.ObjectType}" data-data-source="{!criterion.DataSource}" data-field-name="{!criterion.FieldName}" data-display-type="{!criterion.DisplayType}" type="hidden" id="criterion-{!JSINHTMLENCODE(criterion.Name)}" style="width:100%"/>
+									</apex:outputPanel>
+
+									<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'PICKLIST' || criterion.DisplayType == 'MULTIPICKLIST'}">
+										<div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!criterion.Name}</div>
+										<input class="criteria-filter picklist-filter" data-key="{!criterion.Key}" data-display-type="{!criterion.DisplayType}" type="hidden" id="criterion-{!JSINHTMLENCODE(criterion.Name)}" style="width:100%"/>
+									</apex:outputPanel>
+
+									<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'BOOLEAN'}">
+										<div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!JSINHTMLENCODE(criterion.Name)}<input data-key="{!criterion.Key}" data-object-type="{!criterion.ObjectType}" data-field-name="{!criterion.FieldName}" data-display-type="{!criterion.DisplayType}" style="margin-bottom: 0px; vertical-align: bottom;" type="checkbox"  id="criterion-{!criterion.Name}" class="criteria-filter boolean-filter"/></div>
+									</apex:outputPanel>
+
+									<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'NUMERIC' || criterion.DisplayType == 'DATE'}" >
+										<div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!JSINHTMLENCODE(criterion.Name)}</div>
+										<table border="0" cellpadding="0" cellspacing="0" style="font-size: 11px;color: #4a4a56;" data-key="{!criterion.Key}" data-display-type="{!criterion.DisplayType}" class="criteria-filter {!criterion.DisplayType}-filter"  id="{!JSINHTMLENCODE(criterion.Name)}">
+											<tr>
+												<td><span style="margin-left: 4px;">{!$Label.LessThanLabel}</span></td>
+												<td><span style="margin-left: 4px;">{!$Label.EqualToLabel}</span></td>
+												<td><span style="margin-left: 4px;">{!$Label.GreaterThanLabel}</span></td>
+											</tr>
+											<tr>
+												<td style="padding-right: 2px;">
+													<div style="border: 2px solid #E0E0E0;height: 25px;width: 57px;padding-left: 4px;vertical-align: middle;display: table-cell;">
+														<input id="{!JSINHTMLENCODE(criterion.Name)}-lt-filter" type="text" style="width: 57px;font-size: 11px;border: 0;outline: 0;" data-key="{!criterion.Key}" data-display-type="{!criterion.DisplayType}" />
+													</div>
+												</td>
+												<td style="padding-right: 2px;">
+													<div style="border: 2px solid #E0E0E0;height: 25px;width: 57px;padding-left: 4px;vertical-align: middle;display: table-cell;">
+														<input id="{!JSINHTMLENCODE(criterion.Name)}-eq-filter" type="text" style="width: 57px;font-size: 11px;border: 0;outline: 0;" data-key="{!criterion.Key}" data-display-type="{!criterion.DisplayType}"/>
+													</div>
+												</td>
+												<td style="padding-right: 2px;">
+													<div style="border: 2px solid #E0E0E0;height: 25px;width: 57px;padding-left: 4px;vertical-align: middle;display: table-cell;">
+														<input id="{!JSINHTMLENCODE(criterion.Name)}-gt-filter" type="text" style="width: 57px;font-size: 11px;border: 0;outline: 0;" data-key="{!criterion.Key}" data-display-type="{!criterion.DisplayType}"/>
+													</div>
+												</td>
+
+											</tr>
+										</table>
+									</apex:outputPanel>
+
+								</apex:repeat>
+
+								<input class="btn" id="applyFilterButton" onclick="applyFilter();" type="Button" value="{!$Label.GoButton}"/>
+
+								<input class="btn" id="clearFilterButton" onclick="clearFilter();" type="Button" value="{!$Label.ClearAllLabel}"/>
+
+								<span>
+                			<label>Save this as my default</label>
+                			<input type="checkbox" id="saveAsDefault"/>
+           				</span>
+
+							</div>
+
+							<apex:actionFunction action="{!saveFilter}" name="SaveFilterParam" reRender="TheForm">
+								<apex:param name="filterParam" value="" />
+								<apex:param name="urlDetail" value="" />
+							</apex:actionFunction>
+
+							<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+							<div style="display:none;" kimble-tip="null"></div>
+
+							<script>
+
+                var filterApplied = false;
+                var basePageUrl;
+
+                function initialiseFilter(pageUrl)
+                {
+                    basePageUrl = pageUrl;
+                    <apex:repeat value="{!TheFilterCriteriaOptions}" var="criterion">
+
+                        <apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'REFERENCE'}">
+                            jQuery('[id="criterion-{!criterion.Name}"]').select2({
+                                    minimumInputLength: 1,
+                                    multiple: true,
+                                    query: function (query) {
+                                        var $t = this;
+                                        var find = function() {lookupCriterion($t.element.data(), query);};
+                                        find();
+                                    }
+                                });
+                                //needs to be json format {id: "a2K1t0000009X04EAE", text: "Director"}
+                            jQuery('[id="criterion-{!criterion.Name}"]').select2('data', lookupObjectNames('{!criterion.LookupObjectType}', '{!criterion.DefaultValue}'));
+
+                        </apex:outputPanel>
+
+                        <apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'BOOLEAN'}">
+
+                            if ('{!criterion.DefaultValue}'){
+                                jQuery('[id="criterion-{!criterion.Name}"]').prop('checked', true);
+                                filterApplied = true;
+                            }
+
+                        </apex:outputPanel>
+
+                        <apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'NUMERIC' || criterion.DisplayType == 'DATE'}">
+							if('{!criterion.DefaultValue}')
+							{
+							     var defaultValues = '{!criterion.DefaultValue}'.split(':');
+
+            					defaultValues.forEach(function(item){
+            					    if(item.includes('lessThan')){jQuery('[id="{!criterion.Name}-lt-filter"]').val(item.replace('lessThan',''));}
+									if(item.includes('equalTo')){jQuery('[id="{!criterion.Name}-eq-filter"]').val(item.replace('equalTo',''));}
+									if(item.includes('greaterThan')){jQuery('[id="{!criterion.Name}-gt-filter"]').val(item.replace('greaterThan',''));}
+                 				});
+                 				filterApplied = true;
+       						}
+
+       						if('{!criterion.DisplayType}' == 'DATE')
+       						{
+       						    jQuery('[id="{!criterion.Name}"] :input').each(function(){jQuery(this).addClass('kimbleDatePicker');});
+             				}
+
+                     	</apex:outputPanel>
+
+                     	<apex:outputPanel layout="none" rendered="{!criterion.DisplayType == 'PICKLIST' || criterion.DisplayType == 'MULTIPICKLIST'}">
+
+                     		var optionData = [];
+                     		<apex:repeat value="{!criterion.TheOptions}" var="opt">
+                     			var optItem = {id:'{!opt.Value}',text:'{!opt.Label}'};
+                     			optionData.push(optItem);
+                     		</apex:repeat>
+
+                            jQuery('[id="criterion-{!criterion.Name}"]').select2({
+                                    minimumInputLength: 1,
+                                    multiple: true,
+									data: optionData
+                                });
+
+                            jQuery('[id="criterion-{!criterion.Name}"]').select2('val','{!criterion.DefaultValue}'.split(','));
+                            if('{!criterion.DefaultValue}'){filterApplied = true;}
+
+                     	</apex:outputPanel>
+                    </apex:repeat>
+
+                    if (filterApplied)
+                    {
+                        jQuery('.filter-button').addClass('toolbar-button-selected');
+                    }
+
+                }
+
+				function clearFilter()
+				{
+					var url = basePageUrl;
+
+					jQuery.each(jQuery('.criteria-filter:not(div)'), function(i, obj) {
+						var $obj = jQuery(obj);
+                        url += '&' + $obj.data().key + '=';
+						$obj.select2("val", "");
+
+					jQuery('[id="' + $obj.attr('id') + '"] :input').each(function(){
+					    	jQuery(this).val('');
+     					});
+					});
+
+					jQuery.each(jQuery(".boolean-filter"), function(i,obj) {
+					    var $obj = jQuery(obj);
+					    $obj.prop("checked", false);
+					});
+
+					jQuery("#saveAsDefault").prop('checked', false);
+				}
+
+				function applyFilter()
+				{
+					jQuery('#FilterPopup').hide();
+
+					var url = basePageUrl;
+					var jsonVal = '{ \"Tracking\": {';
+					var data = jQuery('.criteria-filter:not(div)');
+
+					jQuery.each(jQuery('.criteria-filter:not(div)'), function(i, obj) {
+
+						var isLastElement = i == data.length -1;
+						var $obj = jQuery(obj);
+
+						if($obj.data().displayType == 'REFERENCE' || $obj.data().displayType == 'PICKLIST' || $obj.data().displayType == 'MULTIPICKLIST'){
+							url += '&' + $obj.data().key + '=' + $obj.val();
+      					}
+      					else if($obj.data().displayType == 'BOOLEAN'){
+      						if($obj.prop('checked')){url += '&' + $obj.data().key + '=' + true;}
+           				}
+           				else if($obj.data().displayType == 'NUMERIC' || $obj.data().displayType == 'DATE'){
+
+           				    	var critString = '&' + $obj.data().key + '=';
+
+								var assembledValues = assembleNumericFilters($obj);
+
+								if(assembledValues.hasValues)
+								{
+									critString += assembledValues.stringValue;
+									url += critString;
+        						}
+               			}
+
+                        if ($('#saveAsDefault').is(":checked"))
+						{
+
+						    if($obj.data().displayType == 'REFERENCE' || $obj.data().displayType == 'PICKLIST' || $obj.data().displayType == 'MULTIPICKLIST'){
+						        jsonVal += '\"'+$obj.data().key+'\" :';
+								jsonVal += '\"'+$obj.val()+'\"';
+          					}
+          					else if($obj.data().displayType == 'BOOLEAN'){
+          						jsonVal += '\"'+$obj.data().key+'\" :';
+
+									if($obj.prop('checked')){
+										jsonVal += '\"'+$obj.prop('checked')+'\"';
+									}else{
+										jsonVal += '\"'+'\"';
+									}
+               				}
+               				else if($obj.data().displayType == 'NUMERIC' || $obj.data().displayType == 'DATE'){
+								jsonVal += '\"'+$obj.data().key+'\" :';
+
+								var assembledDefaultValues = assembleNumericFilters($obj);
+
+								if(assembledValues.hasValues)
+								{
+								    jsonVal += '\"'+assembledValues.stringValue+'\"';
+        						}else{
+        						    jsonVal += '\"'+'\"';
+              					}
+                  			}
+
+							if (!isLastElement) {
+								jsonVal += ',';
+							}
+						}
+					});
+
+					if ($('#saveAsDefault').is(":checked"))
+					{
+						jsonVal += '}}';
+						SaveFilterParam(jsonVal, url);
+
+					}
+					else
+						safeNavigateToSForceURL(url);
+				}
+
+				function assembleNumericFilters($obj){
+
+					var returnString = '';
+					var hasCriteria = false;
+					var isFirst = true;
+
+						jQuery('[id="' + $obj.attr('id') + '"] :input').each(function(){
+
+							var item = jQuery(this);
+
+							var itemValue = '';
+
+							if(item.val()){itemValue = getFormattedValue(item,$obj.data().displayType)};
+
+							if(itemValue.length > 0){
+								if(!isFirst){returnString += ':';}
+								returnString += getOperator(item) + itemValue;
+								hasCriteria = true;
+								isFirst = false;
+							}
+						})
+
+						var returnItem = {stringValue: returnString, hasValues : hasCriteria};
+						return returnItem;
+				}
+
+				function getFormattedValue(item,displayType){
+
+					var returnValue = '';
+
+					if(displayType == 'DATE'){returnValue = item.val();}
+					if(displayType == 'NUMERIC'){returnValue = item.val().replace(/\s/g,'').replace(/\D/g,'');}
+
+					return returnValue;
+
+				}
+
+				function getOperator(obj){
+
+				    var operatorString;
+				    var id = obj.attr('id');
+
+				    if(id.endsWith('-lt-filter')){operatorString = 'lessThan';}
+				    if(id.endsWith('-eq-filter')){operatorString = 'equalTo';}
+				    if(id.endsWith('-gt-filter')){operatorString = 'greaterThan';}
+
+				    return operatorString;
+    			}
+
+				function lookupCriterion(d, query)
+                {
+                    Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TrackingPeriodCloseController.FindLookupValues}',
+                        d.lookupObjectType, d.dataSource, d.fieldName, query.term,
+                            function(result, event){
+                                 if (event.status)
+                                 {
+                                    var data = {};
+
+                                    data.results = result;
+                                    query.callback(data);
+                                }
+                                else if (event.type === 'exception')
+                                {
+                                    alert(event.message);
+                                }
+                                else
+                                {
+                                    alert(event.message);
+                                }
+                        },
+                        {escape: false, timeout: 60000}
+                    );
+                }
+
+                function lookupObjectNames(objectType, values)
+                {
+                    //build sforce.connection.query to lookup values
+                    if (values == '') return values;
+
+                    var param = values.split(',').join('\',\'');
+
+                    var result = sforce.connection.query("SELECT Id, Name FROM " + objectType + " WHERE Id IN ('" + param + "')");
+
+                    var records = [];
+
+                    if (!jQuery.isArray(result.records))
+                        records.push(result.records);
+                    else
+                        records = result.records;
+
+                    var data = [];
+
+                    for (var i=0;i<records.length;i++)
+                    {
+                        data.push({id:records[i].Id, text:records[i].Name});
+                    }
+
+                    filterApplied = true;
+
+                    return data;
+                }
+
+                function selectOrUnselectAllResource(theControl){
+                    var control = jQuery(theControl);
+                    if(control.is(':checked')){
+                        jQuery('.Resources').prop('checked', true);
+                    }
+					else{
+					    jQuery('.Resources').prop('checked', false);
+					}
+                }
+
+				function deselectResourceHeader(theControl){
+					var control = jQuery(theControl);
+                    if(!control.is(':checked')){
+                        jQuery('.AllResources').prop('checked', false);
+                    }
+                }
+
+				function defaultResourceCheckBoxes(){
+					jQuery('.AllResources').prop('checked', true); jQuery('.Resources').prop('checked', true);
+				}
+
+				function handleTypeFilterChange()
+				{
+				    jQuery('.Resources').prop('checked',false);
+				    applyTypeFilter();
+				    selectOrUnselectAllResource(jQuery('.AllResources'));
+    			}
+    	</script>
+	</div>
+
+					</div>
+
+					<div style="position: relative;">
+
+						<div id="toolbar-container">
+							<div class="toolbar">
+								<div id="nav-bar" class="control-cell no-select" style="font-size:0px;">
+									<input type="text" id="initial-focus"/>
+									<apex:outputLink value="javascript:void(0);" onclick="GoPreviousPeriod()" title="{!$Label.kimbleone__previousperiod}"><div id="previous-period" class="toolbar-button bigger-btn"><i class="fa fa-angle-double-left"></i></div></apex:outputLink>
+									<div class="toolbar-button bigger-btn" style="position:relative;margin-right: 3px;"><i class="fa fa-calendar"></i><apex:inputText styleClass="datepicker go-date-btn calendar-tip" value="{!GoDate.KimbleOne__InputDate__c}"><apex:actionSupport event="onchange" action="{!TrackingPeriodChange}" /></apex:inputText></div>
+
+									<apex:outputLink value="javascript:void(0);" onclick="GoNextPeriod()" title="{!$Label.kimbleone__nextperiod}"><div id="next-period" class="toolbar-button bigger-btn"><i class="fa fa-angle-double-right"></i></div></apex:outputLink>
+
+									<apex:outputLink value="javascript:void(0);" onclick="jQuery('#FilterPopup').show();SetupDatePicker();" title="{!$Label.kimbleone__filter}"><div class="toolbar-button bigger-btn filter-button filter-button-tip"><i class="fa fa-filter"></i></div></apex:outputLink>
+
+								</div>
+							</div>
+						</div>
+
+						<span>
+
+							<script>
+
+							$(window).load(function(){
+								$('.datepicker').datepicker({
+										dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+										showOtherMonths: true,
+										selectOtherMonths: true
+										});
+								});
+						</script></span>
+
+					</div>
+
+				</div>
+				<apex:pageBlock title="{!$Label.kimbleone__periodsummaryheading}">
+					<table cellpadding="0" cellspacing="0" border="0" width="100%">
+						<tr>
+
+							<td valign="top" class="summary-cell">
+								<div id="divForPeriodSummaryGraph" class="summary-bars"></div>
+							</td>
+							<td valign="top" class="summary-cell">
+								<div id="divForTimesheetSummaryGraph" class="summary-bars"></div>
+							</td>
+							<td valign="top" class="summary-cell">
+								<div id="divForActiveUsageSummaryGraph" class="summary-bars"></div>
+							</td>
+							<td valign="top" class="summary-cell">
+								<div id="divForInActiveUsageSummaryGraph" class="summary-bars"></div>
+							</td>
+							<apex:outputPanel layout="none" rendered="{!MultipleBUG}">
+								<td valign="top" class="summary-cell">
+									<div id="divForOtherBUGUsageSummaryGraph" class="summary-bars"></div>
+								</td>
+							</apex:outputPanel>
+						</tr>
+					</table>
+
+				</apex:pageBlock>
+				<script>
+		var summaryData;
+
+	 	$(document).ready(function(){
+		 	initialiseFilter('{!JSENCODE($Page.TrackingPeriodClose)}?id={!JSENCODE($CurrentPage.parameters.id)}&filterid={!JSENCODE($CurrentPage.parameters.filterid)}');
+
+		 	summaryData = jQuery.parseJSON('<apex:outputText value="{!JSENCODE(ThePeriodSummaryJson)}"/>');
+
+		 	var businessUnitTableHtmlStart = '<div style="max-height: 260px;overflow-y: auto;overflow-x: hidden;"><table cellpadding="2" border="0" cellspacing="0" class="business-unit-breakdown"><colgroup><col width="180px"/><col width="50px"/></colgroup><thead><tr><th><apex:outputText value="{!$ObjectType.KimbleOne__BusinessUnit__c.Label}"/></th><th>{!$Label.HrsLabel}</th></tr></thead><tbody>';
+		 	var businessUnitTableHtmlEnd = '</tbody></table></div>';
+
+		 	//Calculate summary totals
+		 	summaryData.ExpectedHours = 0;
+
+		 	summaryData.IncompleteHours = 0;
+		 	summaryData.IncompleteHoursHtml = businessUnitTableHtmlStart;
+
+		 	summaryData.ApprovedHours = 0;
+
+		 	summaryData.DraftHours = 0;
+		 	summaryData.DraftHoursHtml = businessUnitTableHtmlStart;
+
+		 	summaryData.PendingApprovalHours = 0;
+		 	summaryData.PendingApprovalHoursHtml = businessUnitTableHtmlStart;
+
+		 	summaryData.DraftRemainingUsageHours = 0;
+		 	summaryData.DraftRemainingUsageHoursHtml = businessUnitTableHtmlStart;
+
+		 	summaryData.OtherBUGRemainingUsageHours = 0;
+		 	summaryData.OtherBUGRemainingUsageHoursHtml = businessUnitTableHtmlStart;
+
+		 	summaryData.GenericActiveRemainingUsageHours = 0;
+		 	summaryData.GenericActiveRemainingUsageHoursHtml = businessUnitTableHtmlStart;
+
+		 	summaryData.SpecificActiveRemainingUsageHours = 0;
+		 	summaryData.SpecificActiveRemainingUsageHoursHtml = businessUnitTableHtmlStart;
+
+		 	summaryData.GroupActiveRemainingUsageHours = 0;
+		 	summaryData.GroupActiveRemainingUsageHoursHtml = businessUnitTableHtmlStart;
+
+		 	jQuery.each(summaryData.OrderedBusinessUnits, function (i, key) {
+		 		summaryData.ExpectedHours += summaryData.BusinessUnits[key].ExpectedHours;
+
+			 	summaryData.IncompleteHours += summaryData.BusinessUnits[key].IncompleteHours;
+
+			 	if (summaryData.BusinessUnits[key].IncompleteHours > 0 || key != 'null')
+			 		summaryData.IncompleteHoursHtml += "<tr onclick=\"changeView('IncompleteTimesheets', '" + key + "')\"><td>" + summaryData.BusinessUnits[key].Name + "</td><td>" + summaryData.BusinessUnits[key].IncompleteHours + "</td></tr>";
+
+			 	summaryData.ApprovedHours += summaryData.BusinessUnits[key].ApprovedHours;
+
+			 	summaryData.DraftHours += summaryData.BusinessUnits[key].DraftHours;
+			 	if (summaryData.BusinessUnits[key].DraftHours > 0 || key != 'null')
+			 		summaryData.DraftHoursHtml += "<tr onclick=\"changeView('DraftTimesheets', '" + key + "')\"><td>" + summaryData.BusinessUnits[key].Name + "</td><td>" + summaryData.BusinessUnits[key].DraftHours + "</td></tr>";
+
+			 	summaryData.PendingApprovalHours += summaryData.BusinessUnits[key].PendingApprovalHours;
+			 	if (summaryData.BusinessUnits[key].PendingApprovalHours > 0 || key != 'null')
+			 		summaryData.PendingApprovalHoursHtml += "<tr onclick=\"changeView('PendingApprovalTimesheets', '" + key + "')\"><td>" + summaryData.BusinessUnits[key].Name + "</td><td>" + summaryData.BusinessUnits[key].PendingApprovalHours + "</td></tr>";
+
+			 	summaryData.DraftRemainingUsageHours += summaryData.BusinessUnits[key].DraftRemainingUsageHours;
+			 	if (summaryData.BusinessUnits[key].DraftRemainingUsageHours > 0 || key != 'null')
+			 		summaryData.DraftRemainingUsageHoursHtml += "<tr onclick=\"changeView('DraftForecastUsage', '" + key + "')\"><td>" + summaryData.BusinessUnits[key].Name + "</td><td>" + summaryData.BusinessUnits[key].DraftRemainingUsageHours + "</td></tr>";
+
+			 	summaryData.OtherBUGRemainingUsageHours += summaryData.BusinessUnits[key].OtherBUGRemainingUsageHours;
+			 	if (summaryData.BusinessUnits[key].OtherBUGRemainingUsageHours > 0 || key != 'null')
+			 		summaryData.OtherBUGRemainingUsageHoursHtml += "<tr onclick=\"changeView('OtherBUGroupForecastUsage', '" + key + "')\"><td>" + summaryData.BusinessUnits[key].Name + "</td><td>" + summaryData.BusinessUnits[key].OtherBUGRemainingUsageHours + "</td></tr>";
+
+			 	summaryData.GenericActiveRemainingUsageHours += summaryData.BusinessUnits[key].GenericActiveRemainingUsageHours;
+			 	if (summaryData.BusinessUnits[key].GenericActiveRemainingUsageHours > 0 || key != 'null')
+			 		summaryData.GenericActiveRemainingUsageHoursHtml += "<tr onclick=\"changeView('ActiveForecastUsageGeneric', '" + key + "')\"><td>" + summaryData.BusinessUnits[key].Name + "</td><td>" + summaryData.BusinessUnits[key].GenericActiveRemainingUsageHours + "</td></tr>";
+
+			 	summaryData.SpecificActiveRemainingUsageHours += summaryData.BusinessUnits[key].SpecificActiveRemainingUsageHours;
+			 	if (summaryData.BusinessUnits[key].SpecificActiveRemainingUsageHours > 0 || key != 'null')
+			 		summaryData.SpecificActiveRemainingUsageHoursHtml += "<tr onclick=\"changeView('ActiveForecastUsageSpecific', '" + key + "')\"><td>" + summaryData.BusinessUnits[key].Name + "</td><td>" + summaryData.BusinessUnits[key].SpecificActiveRemainingUsageHours + "</td></tr>";
+
+			 	summaryData.GroupActiveRemainingUsageHours += summaryData.BusinessUnits[key].GroupActiveRemainingUsageHours;
+			 	if (summaryData.BusinessUnits[key].GroupActiveRemainingUsageHours > 0 || key != 'null')
+			 		summaryData.GroupActiveRemainingUsageHoursHtml += "<tr onclick=\"changeView('ActiveForecastUsageGroup', '" + key + "')\"><td>" + summaryData.BusinessUnits[key].Name + "</td><td>" + summaryData.BusinessUnits[key].GroupActiveRemainingUsageHours + "</td></tr>";
+
+		 	});
+
+		 	summaryData.IncompleteHoursHtml += businessUnitTableHtmlEnd;
+		 	summaryData.DraftHoursHtml += businessUnitTableHtmlEnd;
+		 	summaryData.PendingApprovalHoursHtml += businessUnitTableHtmlEnd;
+		 	summaryData.DraftRemainingUsageHoursHtml += businessUnitTableHtmlEnd;
+		 	summaryData.OtherBUGRemainingUsageHoursHtml += businessUnitTableHtmlEnd;
+		 	summaryData.GenericActiveRemainingUsageHoursHtml += businessUnitTableHtmlEnd;
+		 	summaryData.SpecificActiveRemainingUsageHoursHtml += businessUnitTableHtmlEnd;
+		 	summaryData.GroupActiveRemainingUsageHoursHtml += businessUnitTableHtmlEnd;
+
+		 	var summaryGraphData = new Array(
+		   		 [summaryData.ExpectedHours,'<span title="{!JSENCODE($Label.ExpectedHoursGraphHeading)}" id="timesheetCompletionExpected">{!JSENCODE($Label.ExpectedHoursGraphHeading)}</span>','#BBB'],
+		   	 	 [summaryData.IncompleteHours,'<a title="{!JSENCODE($Label.IncompleteHoursGraphHeading)}" id="timesheetCompletionIncomplete" href="javascript:void(0)" onclick="changeView(\'IncompleteTimesheets\')">{!$Label.IncompleteHoursGraphHeading}</a>','#B42D34'],
+		   	 	 [summaryData.ApprovedHours,'<span title="{!JSENCODE($Label.ApprovedHoursGraphHeading)}" id="timesheetCompletionApproved">{!JSENCODE($Label.ApprovedHoursGraphHeading)}</span>','#008752']);
+
+		 	$('#divForPeriodSummaryGraph').jqBarGraph({ data: summaryGraphData,title: '<div class="graphTitle">{!$Label.TimesheetCompletionHeading}</div>', height:150, width:280, animate: false, barSpace: 6});
+
+		 	jQuery.each($('div.graphValuedivForPeriodSummaryGraph'),function(i,obj){
+		 		$(obj).text($.formatNumber($(obj).text(), {format: "#,##0", locale:kimble.locale, isFullLocale:false}));
+		 	});
+
+		 	var timesheetGraphData = new Array(
+		   		 [summaryData.DraftHours,'<a title="{!$Label.DraftHoursGraphHeading}" id="timesheetsProgressDraft" href="javascript:void(0)" onclick="changeView(\'DraftTimesheets\')">{!$Label.DraftHoursGraphHeading}</a>','#729BC7'],
+		   	 	 [summaryData.PendingApprovalHours,'<a title="{!$Label.PendingApprovalHoursGraphHeading}" id="timesheetsProgressPending" href="javascript:void(0)" onclick="changeView(\'PendingApprovalTimesheets\')">{!$Label.PendingApprovalHoursGraphHeading}</a>','#E58E1A']);
+
+		 	$('#divForTimesheetSummaryGraph').jqBarGraph({ data: timesheetGraphData,title: '<div class="graphTitle">{!$Label.TimesheetsInProgressHeading}</div>', height:150, width:210, animate: false, barSpace: 6});
+
+		 	jQuery.each($('div.graphValuedivForTimesheetSummaryGraph'),function(i,obj){
+		 		$(obj).text($.formatNumber($(obj).text(), {format: "#,##0", locale:kimble.locale, isFullLocale:false}));
+		 	});
+
+		 	var draftUsageGraphData = new Array(
+		 		[summaryData.DraftRemainingUsageHours, '<a title="{!$Label.UnactivatedHoursGraphHeading}" id="forecastRemainingUnactivated" href="javascript:void(0)" onclick="changeView(\'DraftForecastUsage\')">{!$Label.UnactivatedHoursGraphHeading}</a>', '#BBB']
+		 	);
+
+		 	$('#divForInActiveUsageSummaryGraph').jqBarGraph({ data: draftUsageGraphData,title: '<div class="graphTitle">{!$Label.UnActivatedForecastRemainingHeading}</div>', height:150, width:119, animate: false, barSpace: 6});
+
+		 	jQuery.each($('div.graphValuedivForInActiveUsageSummaryGraph'),function(i,obj){
+		 		$(obj).text($.formatNumber($(obj).text(), {format: "#,##0", locale:kimble.locale, isFullLocale:false}));
+		 	});
+
+		 	var OtherBUGUsageGraphData = new Array(
+		 		[summaryData.OtherBUGRemainingUsageHours, '<a title="{!$Label.OtherBUGroup}" href="javascript:void(0)" onclick="changeView(\'OtherBUGroupForecastUsage\')">{!$Label.OtherBUGroup}</a>', '#BBB']
+		 	);
+
+		 	<apex:outputPanel layout="none" rendered="{!MultipleBUG}">
+		 	$('#divForOtherBUGUsageSummaryGraph').jqBarGraph({ data: OtherBUGUsageGraphData,title: '<div class="graphTitle">{!$Label.OtherBUGroupRemaining}</div>', height:150, width:114, animate: false, barSpace: 6});
+
+		 	jQuery.each($('div.graphValuedivForOtherBUGUsageSummaryGraph'),function(i,obj){
+		 		$(obj).text($.formatNumber($(obj).text(), {format: "#,##0", locale:kimble.locale, isFullLocale:false}));
+		 	});
+		 	</apex:outputPanel>
+
+		 	var activeUsageGraphData = new Array(
+		 		[summaryData.GenericActiveRemainingUsageHours, '<a title="{!$Label.UnresourcedHoursGraphHeading}" id="forecastRemainingUnresourced" href="javascript:void(0)" onclick="changeView(\'ActiveForecastUsageGeneric\')">{!$Label.UnresourcedHoursGraphHeading}</a>', '#F0BB75'],
+		 		[summaryData.SpecificActiveRemainingUsageHours, '<a title="{!$Label.ResourcedHoursGraphHeading}" id="forecastRemainingResourced" href="javascript:void(0)" onclick="changeView(\'ActiveForecastUsageSpecific\');">{!$Label.ResourcedHoursGraphHeading}</a>', '#729BC7'],
+		 		[summaryData.GroupActiveRemainingUsageHours, '<a title="{!$Label.GroupHoursGraphHeading}" id="forecastRemainingGroup" href="javascript:void(0)" onclick="changeView(\'ActiveForecastUsageGroup\')">{!$Label.GroupHoursGraphHeading}</a>', '#A7C1DC']
+		 	);
+
+		 	$('#divForActiveUsageSummaryGraph').jqBarGraph({ data: activeUsageGraphData,title: '<div class="graphTitle">{!$Label.ActiveForecastRemainingHeading}</div>', height:150, width:280, animate: false, barSpace: 6});
+
+		 	jQuery.each($('div.graphValuedivForActiveUsageSummaryGraph'),function(i,obj){
+		 		$(obj).text($.formatNumber($(obj).text(), {format: "#,##0", locale:kimble.locale, isFullLocale:false}));
+		 	});
+
+		 	jQuery('#graphFieldBar1divForPeriodSummaryGraph').addClass('graph-clickable').qtip({content:{text:summaryData.IncompleteHoursHtml},
+						show: 'click',
+						hide: 'unfocus',
+						position: {my: 'bottom center', at: 'bottom center'},
+						style: {classes: 'qtip-light qtip-shadow qtip-rounded'}});
+
+			jQuery('#graphFieldBar0divForTimesheetSummaryGraph').addClass('graph-clickable').qtip({content:{text:summaryData.DraftHoursHtml},
+						show: 'click',
+						hide: 'unfocus',
+						position: {my: 'bottom center', at: 'bottom center'},
+						style: {classes: 'qtip-light qtip-shadow qtip-rounded'}});
+
+			jQuery('#graphFieldBar1divForTimesheetSummaryGraph').addClass('graph-clickable').qtip({content:{text:summaryData.PendingApprovalHoursHtml},
+						show: 'click',
+						hide: 'unfocus',
+						position: {my: 'bottom center', at: 'bottom center'},
+						style: {classes: 'qtip-light qtip-shadow qtip-rounded'}});
+
+			jQuery('#graphFieldBar0divForActiveUsageSummaryGraph').addClass('graph-clickable').qtip({content:{text:summaryData.GenericActiveRemainingUsageHoursHtml},
+						show: 'click',
+						hide: 'unfocus',
+						position: {my: 'bottom center', at: 'bottom center'},
+						style: {classes: 'qtip-light qtip-shadow qtip-rounded'}});
+
+			jQuery('#graphFieldBar1divForActiveUsageSummaryGraph').addClass('graph-clickable').qtip({content:{text:summaryData.SpecificActiveRemainingUsageHoursHtml},
+						show: 'click',
+						hide: 'unfocus',
+						position: {my: 'bottom center', at: 'bottom center'},
+						style: {classes: 'qtip-light qtip-shadow qtip-rounded'}});
+
+			jQuery('#graphFieldBar2divForActiveUsageSummaryGraph').addClass('graph-clickable').qtip({content:{text:summaryData.GroupActiveRemainingUsageHoursHtml},
+						show: 'click',
+						hide: 'unfocus',
+						position: {my: 'bottom center', at: 'bottom center'},
+						style: {classes: 'qtip-light qtip-shadow qtip-rounded'}});
+
+			jQuery('#graphFieldBar0divForInActiveUsageSummaryGraph').addClass('graph-clickable').qtip({content:{text:summaryData.DraftRemainingUsageHoursHtml},
+						show: 'click',
+						hide: 'unfocus',
+						position: {my: 'bottom center', at: 'bottom center'},
+						style: {classes: 'qtip-light qtip-shadow qtip-rounded'}});
+
+            jQuery(document).off('click', 'li#select-page:not(.disabled)').on('click', 'li#select-page:not(.disabled)', selectPage);
+            jQuery(document).off('click', 'li#select-all-pages:not(.disabled)').on('click', 'li#select-all-pages:not(.disabled)', selectAllPages);
+            
+            initialisePageTips();
+	 	});
+
+        function selectPage()
+        {
+			if(confirm('{!JSENCODE($Label.AreYouSure)}' + ' ' + '{!JSENCODE($Label.TrackingPeriodCloseRemoveForecastUsageMessage)}'))
+            	deleteAllAssignmentUsage();
+        }
+
+        function selectAllPages()
+        {
+			if(confirm('{!JSENCODE($Label.AreYouSure)}' + ' ' + '{!JSENCODE($Label.TrackingPeriodCloseRemoveAllForecastUsageMessage)}'))
+			{
+                deleteAllRecords();
+			}
+        }
+
+		function hideWorking()
+		{
+			window.location.reload(true);
+		}
+
+	 	function deleteAllAssignmentUsage()
+	 	{
+	 		var periodId = '{!JSENCODE(timePeriod.Id)}';
+
+	 		deleteAssignmentUsage($('.deleteAssignment:first'), periodId, $('.deleteAssignment:first').attr('assignmentId'), true);
+
+	 	}
+
+	 	function deleteAssignmentUsage(obj, periodId, assignmentId, removeAll)
+	 	{
+	 		var context = $(obj);
+	 		context.data('removeAll', removeAll);
+	 		context.hide();
+	 		context.next().show();
+
+	 		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TrackingPeriodCloseController.DeleteForecastUsage}',
+            periodId, assignmentId,
+            function(result, event){
+
+                if (event.status)
+                {
+                	var assignmentId = event.result;
+                	var context = $('[assignmentId=' + assignmentId + ']');
+
+                	context.removeClass('deleteAssignment');
+                	context.closest('tr').hide();
+
+                	if (context.data('removeAll'))
+                		deleteAllAssignmentUsage();
+            	}
+            	else if (event.type === 'exception')
+            	{
+                	var assignmentId = event.data[1];
+                	var context = $('[assignmentId=' + assignmentId + ']');
+                	context.removeClass('deleteAssignment');
+                	context.addClass('assignmentError');
+                	context.next().hide();
+                	context.next().next().attr('title',event.message);
+                	context.next().next().show();
+                	if (context.data('removeAll'))
+                		deleteAllAssignmentUsage();
+            	}
+            	else
+            	{
+                	alert(event.message);
+            	}
+            },
+            {escape: true, timeout: 60000}
+        );
+	 	}
+
+	 	function showEmailPopup()
+	 	{
+	 		initialiseModalBoxy('#sendEmailPopup', '{!JSENCODE($Label.TimesheetReminderEmailTitle)}', jQuery('[id$=\'TheViews\']'));
+	 		refreshEmailList();
+	 	};
+
+	 	function showMobileNotificationPopup()
+	 	{
+	 	    initialiseModalBoxy('#sendMobileNotificationPopup', '{!JSENCODE($Label.TimesheetReminderMobileNotificationTitle)}', jQuery('[id$=\'TheViews\']'));
+	 		refreshMobileNotificationList();
+   		};
+	 	
+		/* Tooltips */
+		var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+		var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+		var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+		var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+		var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+		var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+	
+		function initialisePageTips()
+		{
+			ApplyTipAttributes();
+			initialiseTips();
+		}
+		
+		// add tip attributes to elements
+		function ApplyTipAttributes()
+		{
+			if(enableTips)
+			{
+				// active forecast remaining 
+				jQuery('[id$="forecastRemainingActionheader"]').attr('kimble-tip','FR_Del');
+				jQuery('[id$="forecastRemainingFixedheader"]').attr('kimble-tip','FR_Fixed');
+				jQuery('[id$="forecastRemainingRemainingheader"]').attr('kimble-tip','FR_Remaining');
+				jQuery('.remove-all-usage-dropdowns').attr('kimble-tip','FR_RemoveAll');
+				jQuery('[id$="forecastRemainingResourceheader"]').attr('kimble-tip','FR_Resource');
+				jQuery('[id$="forecastRemainingRoleheader"]').attr('kimble-tip','FR_Role');
+				
+				// incomplete timesheets
+				jQuery('[id$="sendEmailBtn"]').attr('kimble-tip','IT_SendReminderEmail').attr('kimble-tip-extended-text','IT_SendReminderEmailExtendedText');
+				jQuery('[id$="incompleteTimesheetsBusinessUnit"]').attr('kimble-tip','IT_BusinessUnit');
+				jQuery('[id$="incompleteTimesheetsResourceType"]').attr('kimble-tip','IT_ResourceType');
+				jQuery('[id$="incompleteTimesheetsExpected"]').attr('kimble-tip','IT_Expected');
+				jQuery('[id$="incompleteTimesheetsDraft"]').attr('kimble-tip','IT_Draft');
+				jQuery('[id$="incompleteTimesheetsPending"]').attr('kimble-tip','IT_Pending');
+				jQuery('[id$="incompleteTimesheetsActual"]').attr('kimble-tip','IT_Actual');
+				jQuery('[id$="incompleteTimesheetsToBeActualised"]').attr('kimble-tip','IT_ToBeActualised');
+				jQuery('[id$="incompleteTimesheetsResource"]').attr('kimble-tip','IT_Resource');
+				jQuery('[id$="incompleteTimesheetsRemaining"]').attr('kimble-tip','IT_Remaining');
+				jQuery('[id$="incompleteTimesheetsScopedWith"]').attr('kimble-tip','IT_ScopedWith');
+				
+				// period summary
+				jQuery('.calendar-tip').attr('kimble-tip','PS_Calendar');
+				jQuery('.filter-button-tip').attr('kimble-tip','PS_Filter');
+				jQuery('[id$="next-period"]').attr('kimble-tip','PS_Next');
+				jQuery('[id$="previous-period"]').attr('kimble-tip','PS_Previous');
+				jQuery('[id$="timesheetCompletionApproved"]').parent().parent().attr('kimble-tip','PS_Approved').attr('kimble-tip-help-link','CloseTrackingPeriodHelpLink').attr('kimble-tip-help-link','CloseTrackingPeriodHelpLink');
+				jQuery('[id$="timesheetsProgressDraft"]').parent().parent().attr('kimble-tip','PS_Draft').attr('kimble-tip-help-link','CloseTrackingPeriodHelpLink');
+				jQuery('[id$="timesheetCompletionExpected"]').parent().parent().attr('kimble-tip','PS_Expected').attr('kimble-tip-extended-text','PS_ExpectedExtendedText').attr('kimble-tip-help-link','CloseTrackingPeriodHelpLink');
+				jQuery('[id$="forecastRemainingGroup"]').parent().parent().attr('kimble-tip','PS_Group').attr('kimble-tip-extended-text','PS_GroupExtendedText').attr('kimble-tip-help-link','CloseTrackingPeriodHelpLink');
+				jQuery('[id$="timesheetCompletionIncomplete"]').parent().parent().attr('kimble-tip','PS_Incomplete').attr('kimble-tip-extended-text','PS_IncompleteExtendedText').attr('kimble-tip-help-link','CloseTrackingPeriodHelpLink');
+				jQuery('[id$="timesheetsProgressPending"]').parent().parent().attr('kimble-tip','PS_PendingApproval').attr('kimble-tip-help-link','CloseTrackingPeriodHelpLink');
+				jQuery('[id$="forecastRemainingResourced"]').parent().parent().attr('kimble-tip','PS_Resourced').attr('kimble-tip-extended-text','PS_ResourcedExtendedText').attr('kimble-tip-help-link','CloseTrackingPeriodHelpLink');
+				jQuery('[id$="forecastRemainingUnactivated"]').parent().parent().attr('kimble-tip','PS_Unactivated').attr('kimble-tip-help-link','CloseTrackingPeriodHelpLink');
+				jQuery('[id$="forecastRemainingUnresourced"]').parent().parent().attr('kimble-tip','PS_Unresourced').attr('kimble-tip-help-link','CloseTrackingPeriodHelpLink');
+			}
+		}
+		
+		function updateTipsConfigSetting(newTipSetting)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+				newTipSetting,
+					function(result, event){
+						if (event.status)
+						{
+							var data = {};
+							data.results = result;
+							loadGuidance();
+						}
+						else
+						{
+							alert(event.message);
+						}
+				},
+				{escape: false, timeout: 60000}
+			);
+		}
+
+		function SetupDatePicker()
+		{
+		    jQuery('.kimbleDatePicker').datepicker({
+					   	dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+						showOtherMonths: true,
+						selectOtherMonths: true
+					});
+  		}
+
+	</script>
+
+				<apex:actionStatus id="ViewLoadingStatus">
+					<apex:facet name="start">
+						<div style="margin-top:20px; margin-bottom:20px;margin-left:12px">
+							<span style="font-weight: bold;color: #4A4A56;font-size: 91%;"><img src="{!URLFOR($Resource.KimbleOne__LoadingImage)}" style="margin-right: 8px;position: relative;top: 2px;"/>{!$Label.kimbleone__loading}</span>
+						</div>
+					</apex:facet>
+					<apex:facet name="stop">
+						<apex:outputPanel id="TheViews" rendered="{!TheSelectedView != ''}">
+
+							<apex:pageBlock rendered="{!TheSelectedView != ''}">
+								<apex:outputPanel layout="none" rendered="{!TheSelectedView = IncompleteTimesheets}">
+
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$Label.kimbleone__incompletetimesheetsheading} {!TheBusinessUnitFilterName}" ></apex:pageBlockSection>
+									<apex:outputPanel layout="none" rendered="{!TheEmailTemplates.size > 0}">
+										<input id="sendEmailBtn" class="btn" type="button" onclick="showEmailPopup();" value="{!$Label.SendTimesheetReminderEmailButton}" />
+									</apex:outputPanel>
+                                    <apex:outputPanel layout="none" rendered="{!IsMobileTimeReminderNotificationEnabled}">
+                                        <input id="sendNotificationBtn" class="btn" type="button" onclick="showMobileNotificationPopup();" value="{!$Label.SendTimesheetReminderMobileNotificationButton}" />
+                                    </apex:outputPanel>
+
+									<apex:outputPanel rendered="{!TheIncompleteTimesheets.CanGoPrevious || TheIncompleteTimesheets.CanGoNext}">
+										<div  style="margin: 5px 1px;">
+											<div style="text-align:left; width:50%; display:inline-block;">
+												<apex:outputText value="{!TheIncompleteTimesheets.CurrentPageDescription}"/>
+											</div>
+											<div style="text-align:right; width:50%; display:inline-block;">
+												<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!TheIncompleteTimesheets.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+												<apex:outputText styleclass="greyedLink" rendered="{!!TheIncompleteTimesheets.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+												&nbsp;|&nbsp;
+												<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!TheIncompleteTimesheets.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+												<apex:outputText styleclass="greyedLink" rendered="{!!TheIncompleteTimesheets.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+											</div>
+										</div>
+									</apex:outputPanel>
+
+                                    <apex:pageBlockTable value="{!TheIncompleteTimesheets.TheRecords}" var="itm">
+										<apex:column >
+
+										</apex:column>
+										<apex:column id="incompleteTimesheetsResource" value="{!itm.ResourcePeriod.KimbleOne__Resource__c}"/>
+										<apex:column id="incompleteTimesheetsBusinessUnit" value="{!itm.ResourcePeriod.Resource__r.KimbleOne__BusinessUnit__c}"/>
+										<apex:column id="incompleteTimesheetsResourceType" value="{!itm.ResourcePeriod.Resource__r.KimbleOne__ResourceType__c}"/>
+										<apex:column id="incompleteTimesheetsExpected" headerValue="{!$Label.kimbleone__expectedhourslabel}">
+											<apex:outputField value="{!itm.ExpectedHours.KimbleOne__InputDecimal__c}" />
+										</apex:column>
+										<apex:column id="incompleteTimesheetsDraft" headerValue="{!$Label.kimbleone__drafthrslabel}">
+											<apex:outputField value="{!itm.DraftHours.KimbleOne__InputDecimal__c}" />
+										</apex:column>
+										<apex:column id="incompleteTimesheetsPending" headerValue="{!$Label.kimbleone__pendingapprovalhrslabel}">
+											<apex:outputField value="{!itm.PendingApprovalHours.KimbleOne__InputDecimal__c}" />
+										</apex:column>
+										<apex:column id="incompleteTimesheetsActual" headerValue="{!$Label.kimbleone__actualhourslabel}">
+											<apex:outputField value="{!itm.ActualHours.KimbleOne__InputDecimal__c}" />
+										</apex:column>
+										<apex:column id="incompleteTimesheetsToBeActualised" headerValue="{!$Label.kimbleone__tobeactualisedlabel}">
+											<apex:outputText value="{!$Label.kimbleone__none}" rendered="{!itm.ActivityPeriodAssignments.size = 0}"/>
+											<apex:pageBlockTable value="{!itm.ActivityPeriodAssignments}" var="apa" rendered="{!itm.ActivityPeriodAssignments.size != 0}">
+												<apex:column id="incompleteTimesheetsScopedWith" headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ResourcedActivity__c.Label}" style="width:100px">
+													<apex:outputText value="{!apa.TrackingPeriodAssignment.ActivityAssignment__r.ResourcedActivity__r.KimbleOne__FullName__c}" />
+												</apex:column>
+												<apex:column id="incompleteTimesheetsRemaining" headerValue="{!$Label.kimbleone__remaininghourslabel}" value="{!apa.RemainingUsageInHours.KimbleOne__InputDecimal__c}" style="width:25px"/>
+											</apex:pageBlockTable>
+										</apex:column>
+									</apex:pageBlockTable>
+
+									<div style="margin: 5px 0px 0px 1px;">
+										<div style="text-align:left; width:50%; display:inline-block;">
+											<apex:outputText value="{!TheIncompleteTimesheets.CurrentPageDescription}"/>
+										</div>
+										<div style="text-align:right; width:50%; display:inline-block;">
+											<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!TheIncompleteTimesheets.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+											<apex:outputText styleclass="greyedLink" rendered="{!!TheIncompleteTimesheets.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+											&nbsp;|&nbsp;
+											<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!TheIncompleteTimesheets.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+											<apex:outputText styleclass="greyedLink" rendered="{!!TheIncompleteTimesheets.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+										</div>
+									</div>
+
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheSelectedView = DraftTimesheets}">
+
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$Label.kimbleone__drafttimesheetsheading} {!TheBusinessUnitFilterName}"></apex:pageBlockSection>
+
+									<apex:outputPanel rendered="{!ThePagedDraftTimesheets.CanGoPrevious || ThePagedDraftTimesheets.CanGoNext}">
+										<div  style="margin: 5px 1px;">
+											<div style="text-align:left; width:50%; display:inline-block;">
+												<apex:outputText value="{!ThePagedDraftTimesheets.CurrentPageDescription}"/>
+											</div>
+											<div style="text-align:right; width:50%; display:inline-block;">
+												<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedDraftTimesheets.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+												<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedDraftTimesheets.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+												&nbsp;|&nbsp;
+												<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedDraftTimesheets.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+												<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedDraftTimesheets.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+											</div>
+										</div>
+									</apex:outputPanel>
+
+									<apex:pageBlockTable value="{!ThePagedDraftTimesheets.TheRecords}" var="entry" rendered="{!TheSelectedView = DraftTimesheets}">
+										<apex:column headerValue="{!$ObjectType.KimbleOne__Resource__c.Fields.Name.Label}">
+											<apex:outputLink value="/{!entry.ResourceId}"><apex:outputText value="{!entry.ResourceName}"/></apex:outputLink>
+										</apex:column>
+										<apex:column value="{!entry.ResourcedActivityName}" headerValue="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.Name.Label}"/>
+										<apex:column headerValue="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__EntryUnits__c.Label}">
+											<apex:outputField value="{!entry.EntryUnits.KimbleOne__InputDecimal__c}"/><apex:outputText value=" {!entry.UsageUnitType}"/>
+										</apex:column>
+									</apex:pageBlockTable>
+
+									<div style="margin: 5px 0px 0px 1px;">
+										<div style="text-align:left; width:50%; display:inline-block;">
+											<apex:outputText value="{!ThePagedDraftTimesheets.CurrentPageDescription}"/>
+										</div>
+										<div style="text-align:right; width:50%; display:inline-block;">
+											<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedDraftTimesheets.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+											<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedDraftTimesheets.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+											&nbsp;|&nbsp;
+											<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedDraftTimesheets.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+											<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedDraftTimesheets.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+										</div>
+									</div>
+
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheSelectedView = PendingApprovalTimesheets}">
+
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$Label.kimbleone__timesheetspendingapprovalheading} {!TheBusinessUnitFilterName}" ></apex:pageBlockSection>
+									<apex:commandButton id="manageAllTimesheetsBtn" action="{!ManageAllTimesheetsPendingApproval}" value="{!$Label.kimbleone__managealllabel}" rendered="{!ThePendingApprovalTimesheets.TheRecords.size > 0}"/>
+
+									<apex:outputPanel rendered="{!ThePendingApprovalTimesheets.CanGoPrevious || ThePendingApprovalTimesheets.CanGoNext}">
+										<div  style="margin: 5px 1px;">
+											<div style="text-align:left; width:50%; display:inline-block;">
+												<apex:outputText value="{!ThePendingApprovalTimesheets.CurrentPageDescription}"/>
+											</div>
+											<div style="text-align:right; width:50%; display:inline-block;">
+												<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePendingApprovalTimesheets.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+												<apex:outputText styleclass="greyedLink" rendered="{!!ThePendingApprovalTimesheets.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+												&nbsp;|&nbsp;
+												<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePendingApprovalTimesheets.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+												<apex:outputText styleclass="greyedLink" rendered="{!!ThePendingApprovalTimesheets.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+											</div>
+										</div>
+									</apex:outputPanel>
+
+									<apex:pageBlockTable value="{!ThePendingApprovalTimesheets.TheRecords}" var="t" rendered="{!TheSelectedView = PendingApprovalTimesheets}">
+										<apex:column headerValue="{!$ObjectType.KimbleOne__Timesheet__c.Fields.Name.Label}">
+											<apex:outputLink value="/{!t.Id}">
+												<apex:outputText value="{!t.Resource__r.Name} - " />
+												<apex:outputText value="{!t.ResourcedActivity__r.Name}"/>
+
+												<apex:variable var="Counter" value="{!1}"/>
+												<apex:repeat value="{!t.TimeEntries__r}" var="entry">
+													<apex:outputText value=" ({!entry.TimePeriod__r.Name}" rendered="{!(Counter == 1)}"/>
+													<apex:outputText value="    --   {!entry.TimePeriod__r.Name} )"  rendered="{!(Counter == t.TimeEntries__r.size)}"/>
+													<apex:variable var="Counter" value="{!Counter+1}"/>
+												</apex:repeat>
+											</apex:outputLink>
+										</apex:column>
+										<apex:column value="{!t.KimbleOne__Resource__c}" headerValue="{!$ObjectType.KimbleOne__Resource__c.Fields.Name.Label}"/>
+										<apex:column value="{!t.ResourcedActivity__r.Name}"  headerValue="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.Name.Label}"/>
+										<apex:column value="{!t.KimbleOne__Approver1User__c}" headerValue="{!$ObjectType.KimbleOne__Timesheet__c.Fields.KimbleOne__Approver1User__c.Label}"/>
+										<apex:column value="{!t.KimbleOne__Approver2User__c}" headerValue="{!$ObjectType.KimbleOne__Timesheet__c.Fields.KimbleOne__Approver2User__c.Label}"/>
+									</apex:pageBlockTable>
+
+									<div style="margin: 5px 0px 0px 1px;">
+										<div style="text-align:left; width:50%; display:inline-block;">
+											<apex:outputText value="{!ThePendingApprovalTimesheets.CurrentPageDescription}"/>
+										</div>
+										<div style="text-align:right; width:50%; display:inline-block;">
+											<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePendingApprovalTimesheets.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+											<apex:outputText styleclass="greyedLink" rendered="{!!ThePendingApprovalTimesheets.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+											&nbsp;|&nbsp;
+											<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePendingApprovalTimesheets.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+											<apex:outputText styleclass="greyedLink" rendered="{!!ThePendingApprovalTimesheets.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+										</div>
+									</div>
+
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheSelectedView = ActiveForecastUsageSpecific || TheSelectedView = ActiveForecastUsageGeneric || TheSelectedView = ActiveForecastUsageGroup}">
+
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$Label.kimbleone__resourcedactiveforecastremainingheading} {!TheBusinessUnitFilterName}" rendered="{!TheSelectedView = ActiveForecastUsageSpecific}"></apex:pageBlockSection>
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$Label.kimbleone__unresourcedactiveforecastremainingheading} {!TheBusinessUnitFilterName}" rendered="{!TheSelectedView = ActiveForecastUsageGeneric}"></apex:pageBlockSection>
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$Label.kimbleone__groupactiveforecastremainingheading} {!TheBusinessUnitFilterName}" rendered="{!TheSelectedView = ActiveForecastUsageGroup}"></apex:pageBlockSection>
+
+									<apex:outputPanel layout="none" rendered="{!ThePagedActiveForecastUsage.TheRecords.size > 0}">
+									<div id="action-buttons" class="control-cell no-select remove-all-usage-dropdowns">
+										<label class="hover-mutton select-btn">
+											<div class="dd-btn toolbar-button">{!JSENCODE($Label.RemoveAllUsageButton)}
+												<ul class="dd-menu">
+													<li id="select-page">{!$Label.ForecastUsageRemovePageButton}</li>
+													<li id="select-all-pages">{!$Label.ForecastUsageRemoveAllPagesButton}</li>
+												</ul>
+											</div>
+										</label>
+									</div>
+									</apex:outputPanel>
+
+									<apex:outputPanel rendered="{!ThePagedActiveForecastUsage.CanGoPrevious || ThePagedActiveForecastUsage.CanGoNext}">
+										<div  style="margin: 5px 1px;">
+											<div style="text-align:left; width:50%; display:inline-block;">
+												<apex:outputText value="{!ThePagedActiveForecastUsage.CurrentPageDescription}"/>
+											</div>
+											<div style="text-align:right; width:50%; display:inline-block;">
+												<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedActiveForecastUsage.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+												<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedActiveForecastUsage.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+												&nbsp;|&nbsp;
+												<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedActiveForecastUsage.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+												<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedActiveForecastUsage.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+											</div>
+										</div>
+									</apex:outputPanel>
+
+									<apex:pageBlockTable value="{!ThePagedActiveForecastUsage.TheRecords}" var="itm">
+										<apex:column headerValue="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.Name.Label}">
+											<apex:outputLink value="{!$Page.KimbleOne__ActivityAssignmentsDelivery}?id={!itm.TheActivity.DeliveryElement__r.KimbleOne__DeliveryGroup__c}&filterid={!itm.TheActivity.Id}" rendered="{!!ISBLANK(itm.TheActivity.KimbleOne__DeliveryElement__c)}"><apex:outputText value="{!itm.TheActivity.KimbleOne__FullName__c}"/></apex:outputLink>
+											<apex:outputLink value="{!$Page.KimbleOne__BidTeamAssignments}?id={!itm.TheActivity.Id}" rendered="{!!ISBLANK(itm.TheActivity.KimbleOne__Proposal__c)}"><apex:outputText value="{!itm.TheActivity.KimbleOne__FullName__c}"/></apex:outputLink>
+											<apex:outputLink value="{!$Page.KimbleOne__ActivityAssignmentsOther}?id={!itm.TheActivity.Id}" rendered="{!ISBLANK(itm.TheActivity.KimbleOne__DeliveryElement__c) && ISBLANK(itm.TheActivity.KimbleOne__Proposal__c)}"><apex:outputText value="{!itm.TheActivity.KimbleOne__FullName__c}"/></apex:outputLink>
+										</apex:column>
+										<apex:column value="{!itm.TheActivity.OwnerId}"/>
+										<apex:column headerValue="{!$Label.kimbleone__remainingusageheading}">
+											<apex:pageBlockTable value="{!itm.ActivityPeriodAssignments}" var="apa">
+												<apex:column id="forecastRemainingAction" headerValue="{!$Label.kimbleone__actionlinksheader}">
+													<a class="deleteAssignment" assignmentId="{!JSENCODE(apa.TrackingPeriodAssignment.ActivityAssignment__c)}" href="javascript:void(0)" onclick="deleteAssignmentUsage(this, '{!JSENCODE(timePeriod.Id)}','{!JSENCODE(apa.TrackingPeriodAssignment.ActivityAssignment__c)}', false)">{!$Label.Delete}</a>
+													<span style="display:none;"><img src="{!URLFOR($Resource.LoadingImage)}" /></span>
+													<span style="display:none;"><img src="{!URLFOR($Resource.JobImages, 'failed16.gif')}" /></span>
+												</apex:column>
+												<apex:column id="forecastRemainingResource" value="{!apa.TrackingPeriodAssignment.KimbleOne__Resource__c}" style="width:115px"/>
+												<apex:column id="forecastRemainingRole" value="{!apa.TrackingPeriodAssignment.ActivityAssignment__r.KimbleOne__ActivityRole__c}" style="width:115px"/>
+												<apex:column id="forecastRemainingFixed" headerValue="{!$Label.kimbleone__fixedlabel}" value="{!apa.TrackingPeriodAssignment.ActivityAssignment__r.UsageBehaviourRule__r.KimbleOne__PreserveUsageOnActualisation__c}" style="width:50px"/>
+												<apex:column id="forecastRemainingRemaining" headerValue="{!$Label.kimbleone__remaininghoursheading}" value="{!apa.RemainingUsageInHours.KimbleOne__InputDecimal__c}" style="width:25px"/>
+											</apex:pageBlockTable>
+										</apex:column>
+									</apex:pageBlockTable>
+
+									<div style="margin: 5px 0px 0px 1px;">
+										<div style="text-align:left; width:50%; display:inline-block;">
+											<apex:outputText value="{!ThePagedActiveForecastUsage.CurrentPageDescription}"/>
+										</div>
+										<div style="text-align:right; width:50%; display:inline-block;">
+											<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedActiveForecastUsage.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+											<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedActiveForecastUsage.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+											&nbsp;|&nbsp;
+											<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedActiveForecastUsage.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+											<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedActiveForecastUsage.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+										</div>
+									</div>
+
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheSelectedView = DraftForecastUsage}">
+
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$Label.kimbleone__draftforecastremainingheading} {!TheBusinessUnitFilterName}" ></apex:pageBlockSection>
+
+									<apex:outputPanel rendered="{!ThePagedDraftForecastUsage.CanGoPrevious || ThePagedDraftForecastUsage.CanGoNext}">
+										<div  style="margin: 5px 1px;">
+											<div style="text-align:left; width:50%; display:inline-block;">
+												<apex:outputText value="{!ThePagedDraftForecastUsage.CurrentPageDescription}"/>
+											</div>
+											<div style="text-align:right; width:50%; display:inline-block;">
+												<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedDraftForecastUsage.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+												<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedDraftForecastUsage.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+												&nbsp;|&nbsp;
+												<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedDraftForecastUsage.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+												<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedDraftForecastUsage.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+											</div>
+										</div>
+									</apex:outputPanel>
+
+									<apex:pageBlockTable value="{!ThePagedDraftForecastUsage.TheRecords}" var="itm">
+										<apex:column headerValue="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.Name.Label}">
+											<apex:outputLink value="{!$Page.KimbleOne__ActivityAssignmentsDelivery}?id={!itm.TheActivity.DeliveryElement__r.KimbleOne__DeliveryGroup__c}&filterid={!itm.TheActivity.Id}" rendered="{!!ISBLANK(itm.TheActivity.KimbleOne__DeliveryElement__c)}"><apex:outputText value="{!itm.TheActivity.KimbleOne__FullName__c}"/></apex:outputLink>
+											<apex:outputLink value="{!$Page.KimbleOne__BidTeamAssignments}?id={!itm.TheActivity.Id}" rendered="{!ISBLANK(itm.TheActivity.KimbleOne__DeliveryElement__c)}"><apex:outputText value="{!itm.TheActivity.KimbleOne__FullName__c}"/></apex:outputLink>
+										</apex:column>
+										<apex:column value="{!itm.TheActivity.OwnerId}"/>
+										<apex:column headerValue="{!$Label.kimbleone__remainingusageheading}">
+											<apex:pageBlockTable value="{!itm.ActivityPeriodAssignments}" var="apa">
+												<apex:column value="{!apa.TrackingPeriodAssignment.KimbleOne__Resource__c}" style="width:115px"/>
+												<apex:column value="{!apa.TrackingPeriodAssignment.ActivityAssignment__r.KimbleOne__ActivityRole__c}" style="width:115px"/>
+												<apex:column headerValue="{!$Label.kimbleone__fixedlabel}" value="{!apa.TrackingPeriodAssignment.ActivityAssignment__r.UsageBehaviourRule__r.KimbleOne__PreserveUsageOnActualisation__c}" style="width:50px"/>
+												<apex:column headerValue="{!$Label.kimbleone__remaininghoursheading}" value="{!apa.RemainingUsageInHours.KimbleOne__InputDecimal__c}" style="width:25px"/>
+											</apex:pageBlockTable>
+										</apex:column>
+									</apex:pageBlockTable>
+
+									<div style="margin: 5px 0px 0px 1px;">
+										<div style="text-align:left; width:50%; display:inline-block;">
+											<apex:outputText value="{!ThePagedDraftForecastUsage.CurrentPageDescription}"/>
+										</div>
+										<div style="text-align:right; width:50%; display:inline-block;">
+											<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedDraftForecastUsage.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+											<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedDraftForecastUsage.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+											&nbsp;|&nbsp;
+											<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedDraftForecastUsage.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+											<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedDraftForecastUsage.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+										</div>
+									</div>
+
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheSelectedView = OtherBUGroupForecastUsage}">
+
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$Label.kimbleone__resourcedactiveforecastremainingheading} {!TheBusinessUnitFilterName}" rendered="{!TheSelectedView = ActiveForecastUsageSpecific}"></apex:pageBlockSection>
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$Label.kimbleone__unresourcedactiveforecastremainingheading} {!TheBusinessUnitFilterName}" rendered="{!TheSelectedView = ActiveForecastUsageGeneric}"></apex:pageBlockSection>
+									<apex:pageBlockSection collapsible="false" columns="1" title="{!$Label.kimbleone__groupactiveforecastremainingheading} {!TheBusinessUnitFilterName}" rendered="{!TheSelectedView = ActiveForecastUsageGroup}"></apex:pageBlockSection>
+
+									<apex:outputPanel rendered="{!ThePagedOtherBUGroupForecastUsage.CanGoPrevious || ThePagedOtherBUGroupForecastUsage.CanGoNext}">
+										<div  style="margin: 5px 1px;">
+											<div style="text-align:left; width:50%; display:inline-block;">
+												<apex:outputText value="{!ThePagedOtherBUGroupForecastUsage.CurrentPageDescription}"/>
+											</div>
+											<div style="text-align:right; width:50%; display:inline-block;">
+												<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedOtherBUGroupForecastUsage.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+												<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedOtherBUGroupForecastUsage.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+												&nbsp;|&nbsp;
+												<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedOtherBUGroupForecastUsage.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+												<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedOtherBUGroupForecastUsage.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+											</div>
+										</div>
+									</apex:outputPanel>
+
+									<apex:pageBlockTable value="{!ThePagedOtherBUGroupForecastUsage.TheRecords}" var="itm">
+										<apex:column headerValue="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.Name.Label}">
+											<apex:outputLink value="{!$Page.KimbleOne__ActivityAssignmentsDelivery}?id={!itm.TheActivity.DeliveryElement__r.KimbleOne__DeliveryGroup__c}&filterid={!itm.TheActivity.Id}" rendered="{!!ISBLANK(itm.TheActivity.KimbleOne__DeliveryElement__c)}"><apex:outputText value="{!itm.TheActivity.KimbleOne__FullName__c}"/></apex:outputLink>
+											<apex:outputLink value="{!$Page.KimbleOne__BidTeamAssignments}?id={!itm.TheActivity.Id}" rendered="{!!ISBLANK(itm.TheActivity.KimbleOne__Proposal__c)}"><apex:outputText value="{!itm.TheActivity.KimbleOne__FullName__c}"/></apex:outputLink>
+											<apex:outputLink value="{!$Page.KimbleOne__ActivityAssignmentsOther}?id={!itm.TheActivity.Id}" rendered="{!ISBLANK(itm.TheActivity.KimbleOne__DeliveryElement__c) && ISBLANK(itm.TheActivity.KimbleOne__Proposal__c)}"><apex:outputText value="{!itm.TheActivity.KimbleOne__FullName__c}"/></apex:outputLink>
+										</apex:column>
+										<apex:column value="{!itm.TheActivity.KimbleOne__BusinessUnit__c}"/>
+										<apex:column value="{!itm.TheActivity.OwnerId}"/>
+										<apex:column headerValue="{!$Label.kimbleone__remainingusageheading}">
+											<apex:pageBlockTable value="{!itm.ActivityPeriodAssignments}" var="apa">
+												<apex:column value="{!apa.TrackingPeriodAssignment.KimbleOne__Resource__c}" style="width:115px"/>
+												<apex:column value="{!apa.TrackingPeriodAssignment.ActivityAssignment__r.KimbleOne__ActivityRole__c}" style="width:115px"/>
+												<apex:column headerValue="{!$Label.kimbleone__remaininghoursheading}" value="{!apa.RemainingUsageInHours.KimbleOne__InputDecimal__c}" style="width:25px"/>
+											</apex:pageBlockTable>
+										</apex:column>
+									</apex:pageBlockTable>
+
+									<div style="margin: 5px 0px 0px 1px;">
+										<div style="text-align:left; width:50%; display:inline-block;">
+											<apex:outputText value="{!ThePagedOtherBUGroupForecastUsage.CurrentPageDescription}"/>
+										</div>
+										<div style="text-align:right; width:50%; display:inline-block;">
+											<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rerender="TheViews" rendered="{!ThePagedOtherBUGroupForecastUsage.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+											<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedOtherBUGroupForecastUsage.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+											&nbsp;|&nbsp;
+											<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rerender="TheViews" rendered="{!ThePagedOtherBUGroupForecastUsage.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+											<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedOtherBUGroupForecastUsage.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+										</div>
+									</div>
+
+								</apex:outputPanel>
+
+							</apex:pageBlock>
+
+							<div id="sendEmailPopup" style="display:none">
+								<apex:outputPanel id="sendEmailPanel">
+									<apex:pageBlock rendered="{!ShowEmailPopup}">
+										<div id="sendEmailErrors"><apex:pageMessages escape="false"/></div>
+										<apex:pageBlockButtons location="bottom">
+											<apex:commandButton value="{!$Label.kimbleone__ok}" styleclass="DisableButtonWhileBusy" action="{!SendEmail}" oncomplete="hideModalBoxyWithErrorCheck('#sendEmailErrors')" rerender="sendEmailPanel" />
+											<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}" />
+										</apex:pageBlockButtons>
+										<apex:pageBlockSection columns="1">
+
+											<apex:pageBlockSectionItem >
+												<apex:outputLabel value="{!$Label.kimbleone__emailtemplatelabel}"></apex:outputLabel>
+												<apex:selectList id="emailTemplate" value="{!TheSelectedEmailTemplateId}" size="1">
+													<apex:selectOptions value="{!TheEmailTemplates}" />
+												</apex:selectList>
+											</apex:pageBlockSectionItem>
+
+											<apex:pageBlockSectionItem rendered="{!TheResourceTypes.size > 1}">
+												<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourceType__c.LabelPlural}"/>
+												<apex:selectList value="{!TheSelectedResourceTypeId}" size="1" onChange="handleTypeFilterChange();">
+													<apex:selectOptions value="{!TheResourceTypes}"/>
+												</apex:selectList>
+											</apex:pageBlockSectionItem>
+
+										</apex:pageBlockSection>
+										<div style="max-height:300px;overflow-y:auto">
+											<apex:outputPanel id="resourceTablePanel" layout="none">
+												<apex:pageBlockTable value="{!TheResourcesToEmailFiltered}" var="resource">
+													<apex:column >
+														<apex:facet name="header">
+															<input type="checkbox" class="AllResources" onchange="selectOrUnselectAllResource(this)" checked="checked"/>
+														</apex:facet>
+														<apex:inputField value="{!TheTimesheetReminderEmailsToSend[resource.Id].InputCheckbox__c}" onChange="deselectResourceHeader(this)" styleClass="Resources"/>
+													</apex:column>
+													<apex:column value="{!resource.Name}"/>
+												</apex:pageBlockTable>
+											</apex:outputPanel>
+										</div>
+									</apex:pageBlock>
+								</apex:outputPanel>
+							</div>
+
+							<div id="sendMobileNotificationPopup" style="display:none">
+								<apex:outputPanel id="sendMobileNotificationPanel">
+									<apex:pageBlock rendered="{!ShowNotificationPopup}">
+										<div id="sendMobileNotificationErrors"><apex:pageMessages escape="false"/></div>
+										<apex:pageBlockButtons location="bottom">
+											<apex:commandButton value="{!$Label.kimbleone__ok}" styleclass="DisableButtonWhileBusy" action="{!SendMobileNotifications}" oncomplete="hideModalBoxyWithErrorCheck('#sendMobileNotificationErrors')" rerender="sendMobileNotificationPanel" />
+											<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}" />
+										</apex:pageBlockButtons>
+
+										<apex:pageBlockSection columns="1">
+
+											<apex:pageBlockSectionItem rendered="{!TheResourceTypes.size > 1}">
+												<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourceType__c.LabelPlural}"/>
+												<apex:selectList value="{!TheSelectedResourceTypeId}" size="1" onChange="handleTypeFilterChange();">
+													<apex:selectOptions value="{!TheResourceTypes}"/>
+												</apex:selectList>
+											</apex:pageBlockSectionItem>
+
+										</apex:pageBlockSection>
+
+										<div style="max-height:300px;overflow-y:auto">
+											<apex:outputPanel id="resourceTablePanelMobile" layout="none">
+												<apex:pageBlockTable value="{!TheResourcesToEmailFiltered}" var="resource">
+													<apex:column >
+														<apex:facet name="header">
+																<input type="checkbox" class="AllResources" onchange="selectOrUnselectAllResource(this)" checked="checked"/>
+														</apex:facet>
+														<apex:inputField value="{!TheTimesheetReminderEmailsToSend[resource.Id].InputCheckbox__c}" styleClass="Resources" onChange="deselectResourceHeader(this)" />
+													</apex:column>
+													<apex:column value="{!resource.Name}"/>
+												</apex:pageBlockTable>
+											</apex:outputPanel>
+										</div>
+
+									</apex:pageBlock>
+									<div style="width:350px;">
+										<apex:pageMessage summary="{!$Label.kimbleone__configurationsetting4}" severity="info" strength="3"/>
+									</div>
+								</apex:outputPanel>
+							</div>
+						</apex:outputPanel>
+					</apex:facet>
+				</apex:actionStatus>
+
+				<apex:pageBlock rendered="{!CanClosePeriod || (CanReopenPeriod)}" >
+					<apex:commandButton rendered="{!CanClosePeriod && HasPermission['CloseTrackingPeriod']}" id="closeTrackingPeriodBtn" onclick="var d = confirmDelete();if(!d) return false;" action="{!closePeriod}" value="{!$Label.kimbleone__close}" oncomplete="SetFilterOptions();"/>
+					<apex:commandButton rendered="{!CanReopenPeriod && HasPermission['RevertClosedTrackingPeriod']}" id="reOpenTrackingPeriodBtn" onclick="var d = confirmDelete();if(!d) return false;" action="{!reOpenPeriod}" value="{!$Label.kimbleone__reopenbutton}"/>
+				</apex:pageBlock>
+
+				<apex:actionFunction action="{!ChangeView}" name="changeView" rerender="ViewLoadingStatus" Status="ViewLoadingStatus" oncomplete="initialisePageTips();">
+					<apex:param name="viewName" value="" />
+					<apex:param name="businessUnitId" value=""/>
+				</apex:actionFunction>
+				<apex:actionFunction action="{!RemoveAllForecastUsageInPages}" name="deleteAllRecords"/>
+				<apex:actionFunction action="{!GoPreviousPeriod}" name="GoPreviousPeriod" />
+				<apex:actionFunction action="{!GoNextPeriod}" name="GoNextPeriod" />
+				<apex:actionFunction action="{!ShowEmailPopup}" name="refreshEmailList" reRender="sendEmailPanel, sendMobileNotificationPanel" oncomplete="showModalBoxy(); handleTypeFilterChange();"/>
+				<apex:actionFunction action="{!ShowNotificationPopup}" name="refreshMobileNotificationList" reRender="sendEmailPanel, sendMobileNotificationPanel" oncomplete="showModalBoxy();"/>
+				<apex:actionFunction action="{!SetFilterOptions}" name="SetFilterOptions"/>
+				<apex:actionFunction action="{!ApplyResourceTypeFilter}" name="applyTypeFilter" reRender="resourceTablePanel,resourceTableNoResultsPanel,resourceTablePanelMobile" onComplete="selectOrUnselectAllResource(jQuery('.AllResources'))"/>
+
+			</apex:form>
+
+		</apex:define>
+
+	</apex:composition>
+
+</apex:page>

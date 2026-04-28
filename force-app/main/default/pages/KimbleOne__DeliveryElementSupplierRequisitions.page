@@ -1,0 +1,124 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.DeliveryElementSupplierRequisitionsCntrl" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__ReferenceData__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+     <c:Menu MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryGroup__c.Id}" MenuContextName="{!KimbleOne__DeliveryGroup__c.Name}"/> 
+    </apex:define>
+    
+    <apex:define name="Content">
+    	
+	<apex:form id="TheForm">
+	
+	    <apex:pageMessages escape="False" />
+	    
+	    <apex:pageBlock title="{!$ObjectType.KimbleOne__SupplierPurchaseOrderRule__c.Label}" id="SupplierPORulesBlock">
+
+			<apex:pageBlockTable value="{!RequisitionedElements}" var="de" >
+            	<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+	            	<apex:outputPanel layout="none" rendered="{!!DeliveryElementsWithRequisitions[de.Id]}">
+						<apex:outputLink styleClass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#SupplierPORulePopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__SupplierPurchaseOrderRule__c.label}');readDeliveryElement('{!de.Id}')">{!$Label.kimbleone__edit}</apex:outputLink>
+					</apex:outputPanel>
+						
+					<apex:outputPanel layout="none" rendered="{!!ISBLANK(de.KimbleOne__ResourcedActivity__c)}">
+					<apex:outputPanel layout="none" rendered="{!!DeliveryElementsWithRequisitions[de.Id]}">&nbsp;|&nbsp;</apex:outputPanel>
+					<apex:outputLink styleClass="actionLink" value="javascript:void(0)" onclick="requisitionUnplanned('{!de.Id}')">{!$Label.kimbleone__requisitionunplannedcost}</apex:outputLink>							
+					</apex:outputPanel>
+				</apex:column>
+				<apex:column value="{!de.Name}"/>
+				<apex:column headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__SupplierPurchaseOrderRule__c.Label}" >
+					<apex:outputField value="{!de.SupplierPurchaseOrderRule__r.Name}" />
+				</apex:column>
+			</apex:pageBlockTable>
+          
+       	</apex:pageBlock>
+    	
+	    <!--   Get field for use in controller -->
+    	<apex:pageBlock title="{!$ObjectType.KimbleOne__SupplierRequisition__c.label}">
+            <apex:pageBlockButtons location="top" >
+				<apex:commandButton id="NewPlannedSupplierRequisition" action="{!NewPlannedSupplierRequisition}" value="{!$Label.kimbleone__requisitionplannedcost}" />
+				
+            </apex:pageBlockButtons>
+
+            <apex:pageBlockTable value="{!supplierRequisitions}" var="req" >
+              <apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+				<apex:outputPanel layout="none" rendered="{!req.Status__r.KimbleOne__Enum__c == 'Draft'}">
+					<apex:outputLink styleClass="actionLink" value="#" onclick="viewRequisition('{!JSINHTMLENCODE(req.Id)}')">{!$Label.kimbleone__view}</apex:outputLink>&nbsp;|&nbsp;
+					<apex:outputLink styleClass="actionLink" value="#" onclick="editRequisition('{!JSINHTMLENCODE(req.Id)}')">{!$Label.kimbleone__edit}</apex:outputLink>&nbsp;|&nbsp;
+					<apex:outputLink styleClass="actionLink" value="#" onclick="deleteRequisition('{!JSINHTMLENCODE(req.Id)}')">{!$Label.kimbleone__delete}</apex:outputLink>
+				</apex:outputPanel>
+				<apex:outputPanel layout="none" rendered="{!req.Status__r.KimbleOne__Enum__c != 'Draft'}">
+					<apex:outputLink styleClass="actionLink" value="#" onclick="viewRequisition('{!JSINHTMLENCODE(req.Id)}')">{!$Label.kimbleone__view}</apex:outputLink>
+				</apex:outputPanel>
+              </apex:column>
+               <apex:column value="{!req.Name}" headerValue="{!$ObjectType.KimbleOne__SupplierRequisition__c.Fields.Name.label}"/>
+              <apex:column value="{!req.KimbleOne__SupplierAccount__c}" headerValue="{!$ObjectType.KimbleOne__SupplierRequisition__c.Fields.KimbleOne__SupplierAccount__c.label}"/>
+			  <apex:column value="{!req.KimbleOne__SupplierContact__c}" headerValue="{!$ObjectType.KimbleOne__SupplierRequisition__c.Fields.KimbleOne__SupplierContact__c.label}"/>
+			  <apex:column value="{!req.Status__r.Name}" headerValue="{!$ObjectType.KimbleOne__SupplierRequisition__c.Fields.KimbleOne__Status__c.label}"/>
+			  <apex:column value="{!req.SupplierPurchaseOrder__r.Name}" headerValue="{!$ObjectType.KimbleOne__SupplierRequisition__c.Fields.KimbleOne__SupplierPurchaseOrder__c.label}"/>
+			  <apex:column value="{!req.SupplierRequisitionVersion__r.KimbleOne__NetAmount__c}" headerValue="{!$ObjectType.KimbleOne__SupplierRequisitionVersion__c.Fields.KimbleOne__NetAmount__c.label}"/>
+            </apex:pageBlockTable> 
+		
+          </apex:pageBlock>
+          
+          <apex:actionFunction action="{!NewUnplannedSupplierRequisition}" name="requisitionUnplanned" oncomplete="showModalBoxy()">
+			<apex:param name="deliveryElementId" value=""/>
+		</apex:actionFunction>
+          
+          
+          <apex:actionFunction action="{!ReadDeliveryElement}" name="readDeliveryElement" reRender="SupplierPORuleDetails" oncomplete="showModalBoxy()">
+			<apex:param name="deliveryElementId" value=""/>
+		</apex:actionFunction>
+          
+          <apex:actionFunction action="{!SendForApproval}" name="sendForApproval" reRender="TheForm">
+			<apex:param name="supplierRequisitionId" value=""/>
+		</apex:actionFunction>
+		<apex:actionFunction action="{!EditRequisition}" name="editRequisition" reRender="TheForm">
+			<apex:param name="supplierRequisitionId" value=""/>
+		</apex:actionFunction>
+		<apex:actionFunction action="{!ViewRequisition}" name="viewRequisition" reRender="TheForm">
+			<apex:param name="supplierRequisitionId" value=""/>
+		</apex:actionFunction>
+		<apex:actionFunction action="{!DeleteRequisition}" name="deleteRequisition" reRender="TheForm">
+			<apex:param name="supplierRequisitionId" value=""/>
+		</apex:actionFunction>
+		
+    </apex:form>
+    
+	<div id="SupplierPORulePopup" style="display: none;">
+		
+		<apex:outputPanel id="SupplierPORuleDetails">
+			
+			<apex:form >
+				
+				<div id="SupplierPORuleErrors">
+					<apex:pageMessages escape="false" />
+				</div>
+				
+				<apex:pageBlock >
+					
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton value="{!$Label.kimbleone__save}" styleclass="DisableButtonWhileBusy"  action="{!SaveSupplierPurchaseOrderRule}" oncomplete="hideModalBoxyWithErrorCheck('#SupplierPORuleErrors')" rerender="SupplierPORuleDetails, TheForm" />
+						<input type="button" onclick="hideModalBoxy()" class="btn" value="{!$Label.Cancel}" />
+					</apex:pageBlockButtons>
+					
+					<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+						<apex:outputField value="{!TheDeliveryElement.Name}"/>
+						
+						<apex:selectRadio layout="pageDirection" value="{!TheDeliveryElement.KimbleOne__SupplierPurchaseOrderRule__c}">
+				            <apex:selectOptions value="{!SupplierPurchaseOrderRules}"/>
+				        </apex:selectRadio>					
+					</apex:pageblockSection>
+					
+				</apex:pageBlock>
+			
+			</apex:form>
+		
+		</apex:outputPanel>
+	
+	</div>
+    
+    </apex:define>
+    
+</apex:composition>
+
+</apex:page>

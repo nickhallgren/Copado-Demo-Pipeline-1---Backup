@@ -1,0 +1,1292 @@
+<apex:page standardController="KimbleOne__BusinessUnit__c" extensions="KimbleOne.BusinessUnitTrendAnalysisController" sidebar="false" >
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+  	<c:Menu DefaultHelpPage="TrendAnalysisandDiagnostics.html" MenuContextName="{!$Label.kimbleone__businessunitdiagnosticscharmtitle}" BreadCrumbLink="{!$Page.KimbleOne__BusinessUnitHome}?Id={!KimbleOne__BusinessUnit__c.Id}" BreadCrumbName="{!KimbleOne__BusinessUnit__c.Name}"/> 
+</apex:define>
+	
+<apex:define name="Content">
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__ChartJs)}" />
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>	
+
+	<style>
+		canvas {
+			-moz-user-select: none;
+			-webkit-user-select: none;
+			-ms-user-select: none;
+		}
+		div#trend-analysis-container {
+			margin-top: 8px;
+			margin-bottom: 10px;
+			min-height: 400px;
+			width: 99%;
+		}
+		div#trend-analysis-levels-container {
+			margin-bottom: 170px;
+		}		
+		div#trend-analysis-chart-container {
+		    width: 600px;
+		    height: 400px;
+			margin-top: 5px;
+			display: inline-block;
+		    position: absolute;
+		    top: 0;
+		    padding: 15px;
+		    box-shadow: rgba(31, 31, 31, 0.16) 1px 2px 5px 1px;
+		    background-color: #FFF;
+		    border-radius: 2px;		    
+		}
+		div#trend-analysis-chart-container[fact-level="1"] {
+			left: 440px;			
+		}
+		div#trend-analysis-chart-container[fact-level="2"] {
+			left: 470px;			
+		}
+		div#trend-analysis-chart-container[fact-level="3"] {
+			left: 500px;			
+		}
+		div#trend-analysis-chart-container[fact-level="4"] {
+			left: 530px;			
+		}
+		div#trend-analysis-chart-container[fact-level="5"] {
+			left: 560px;			
+		}
+		.trend-level-item {
+			padding-right: 10px;
+		    width: 300px;
+			position: relative;		    
+		}
+		.trend-level-chart {
+			position: absolute;
+			top: 160px;
+		}		
+		.filter-items {
+			position: absolute;
+			left: 440px;
+			top: 7px;
+			width: 830px;
+		}
+		select#forecastStatus, select#analysisDimension {
+		    margin-right: 10px;
+		}   		
+		.filter-items label {
+		    font-weight: bold;
+		    font-size: 12px;
+		    margin-right: 9px;
+		}
+		.fact-card.parent:not(.expanded):not(.minimised):hover {
+			background-color: #e1f6ff;
+		}
+		.fact-card.parent:not(.expanded):not(.minimised) {
+			cursor: pointer;
+		}
+		.fact-container {
+			position: relative;
+		}
+		.fact-card {
+		    margin-top: 10px;
+		    padding: 15px;
+		    box-shadow: rgba(31, 31, 31, 0.16) 1px 2px 5px 1px;
+		    background-color: #FFF;
+		    border-radius: 2px;
+		    position: relative;
+    		width: 350px;
+    		z-index: 20;
+		}
+		.fact-card[fact-level="1"] {
+			margin-left: 10px;
+		}
+		.fact-card[fact-level="2"] {
+			margin-left: 40px;
+		}
+		.fact-card[fact-level="3"] {
+			margin-left: 70px;
+		}
+		.fact-card[fact-level="4"] {
+			margin-left: 100px;
+		}
+		.fact-card[fact-level="5"] {
+			margin-left: 130px;
+		}
+		.fact-impact-pct {
+		    position: absolute;
+		    top: 15px;
+		    right: 10px;
+		    font-size: 14px;
+		    font-weight: bold;
+		}
+		.change-ind {
+			font-size: 20px;
+			margin-right: 5px;
+		}
+		.fact-change {
+		    font-size: 14px;
+		    display: inline-block;
+		    margin-left: 5px;
+		    font-weight: normal;		    
+		}
+		.fact-this {
+		    margin-top: 6px;
+			font-weight: bold;
+		    font-size: 14px;
+		}
+		.fact-last {
+		    font-size: 14px;
+		    margin-top: 6px;
+		    display: inline-block;
+		}
+		.fact-narrative {
+		    margin-top: 10px;
+	        margin-right: 14px;
+		}
+		.narrative-ind {
+		    font-size: 16px;
+		    margin-right: 5px;
+		    color: #428BCA;
+		}
+		i.history-ind {
+		    display: inline-block;
+		    margin-left: 5px;
+		    font-size: 16px;
+		    cursor: pointer;
+		    color: #428BCA;
+		}
+		.parent-expander {
+		    position: absolute;
+		    right: 10px;
+		    bottom: 6px;
+		    font-size: 22px;
+            color: #5d5d5d;
+	        transform: rotate(90deg);
+		}
+		.fact-card.expanded .parent-expander {
+		    display: none;
+		}
+		.fact-title {
+		    font-weight: bold;
+		    font-size: 14px;
+		    margin-bottom: 10px;
+	        display: inline-block;
+            vertical-align: middle;
+		}
+		.fact-context {
+			font-weight: normal;
+			font-size: 12px;
+			margin-top: 2px;
+			font-style: italic;
+		}
+		.tool-bar form {
+		    display: inline-block;
+		}
+		.tool-bar {
+		    position: relative;
+		    width: 98%;
+		    padding-left: 10px;
+		    padding-top: 3px;
+		    padding-bottom: 2px;		    
+		}
+		.action-btn {
+			cursor: pointer;
+			display: inline-block;
+		    padding: 5px 9px 4px 8px;
+		    background-color: #fff;
+		    border: 1px solid #b0b0b0;
+		    border-radius: 4px;
+		    font-size: 16px;
+			color: #6b6b6b;
+		    box-shadow: rgba(31, 31, 31, 0.32) 0px 1px 0px;
+		}
+		.level-up.action-btn {
+		    position: absolute;
+		    left: 433px;
+		    top: 1px;
+		}
+		span.time-period-name {
+		    font-size: 16px;
+		    margin-right: 10px;
+		}
+		div#ui-datepicker-div {
+		    z-index: 99 !important;
+		}
+		.fact-card.positive-change i.change-ind,
+		.fact-card.positive-change .fact-change {
+		    color: #008752;
+		}
+		.fact-card.negative-change i.change-ind,
+		.fact-card.negative-change .fact-change {
+		    color: #B42B33;
+		}
+		.fact-card.neutral-change i.change-ind,
+		.fact-card.neutral-change .fact-change {
+		    color: #939290;
+		}
+		.fact-card.negative-change {
+		    border: 5px solid #f7eaea;
+		}
+		.fact-card.positive-change {
+		    border: 5px solid #e5f3ed;
+		}
+		.fact-card.neutral-change {
+		    border: 5px solid #f1f1f1;
+		}
+		.fact-card.minimised {
+			display: none;
+		}
+		.fact-card.not-minimised {
+		    margin-left: 10px !important;
+		}
+		div#trend-analysis-history-chart-container {
+			display: none;
+		    width: 1000px;
+		    height: 300px;
+		    position: absolute;
+		    background-color: white;
+		    padding: 10px;
+		    border-radius: 5px;
+		    z-index: 999;
+			box-shadow: 1px 1px 3px 1px rgba(0,0,0,.15);
+		}
+		#the-trend-history-loading {
+			display: none;
+			text-align: center;
+			font-size: 200px;
+			padding: 50px;
+			color: lightgrey;
+		}
+		#the-trend-data-loading {
+			display: none;
+			text-align: center;
+			font-size: 200px;
+			padding: 50px;
+			color: lightgrey;
+		}
+		a.qtip-close.qtip-icon {
+		    border-color: #CCC;
+		    background: #F1F1F1;
+		    color: #777;
+		}
+	</style>
+
+	<div class="tool-bar card">
+	<apex:form id="TheForm">
+		<div>
+			<div style="position: relative;">
+				<span style="font-weight:bold;position:relative;top:-8px;"><span class="time-period-name">{!JSENCODE(CurrentTimePeriod.Name)}</span>{<apex:outputField value="{!CurrentTimePeriod.KimbleOne__StartDate__c}"/>&nbsp;-&nbsp;<apex:outputField value="{!CurrentTimePeriod.KimbleOne__EndDate__c}"/>}</span>
+					&nbsp;&nbsp;&nbsp;&nbsp;
+					<apex:outputLink value="#" onclick="previousPeriod()" title="{!$Label.kimbleone__previousperiod}">
+						<apex:image url="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'PreviousButtonSquare.png')}"
+							alt="{!$Label.kimbleone__previousperiod}" width="30" height="30" />
+					</apex:outputLink> 
+					
+					<span>
+						<apex:inputText styleClass="datepicker" onchange="changeForecastingPeriod()" style="width:0px;border:0px; margin:0px; padding:0px;" value="{!GoDate.KimbleOne__InputDate__c}"/>
+					</span>
+					
+				<apex:outputLink value="#" onclick="nextPeriod()" title="{!$Label.kimbleone__nextperiod}">
+					<apex:image url="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'NextButtonSquare.png')}"
+						alt="{!$Label.kimbleone__nextperiod}" width="30" height="30" />
+				</apex:outputLink>
+				
+				<div class="filter-items">
+				<apex:outputLabel value="{!$ObjectType.KimbleOne__ForecastStatus__c.Fields.KimbleOne__Probability__c.Label}" />
+				<select id="forecastStatus">
+				<apex:repeat value="{!TheForecastStatuses}" var="option">
+					<apex:outputPanel layout="none" rendered="{!!ISBLANK(ForecastStatus) && option.Value == ForecastStatus}">
+					<option value="{!JSENCODE(option.Value)}" selected="selected">{!JSENCODE(option.Label)}</option>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!ISBLANK(ForecastStatus) || option.Value != ForecastStatus}">
+					<option value="{!JSENCODE(option.Value)}">{!JSENCODE(option.Label)}</option>
+					</apex:outputPanel>
+				</apex:repeat>
+				</select>
+				<apex:outputLabel value="{!$ObjectType.KimbleOne__PerformanceAnalysisTrend__c.Fields.KimbleOne__AnalysisDimension__c.Label}" />
+				<select id="analysisDimension">
+				<apex:repeat value="{!TheAnalysisDimensions}" var="option">
+					<apex:outputPanel layout="none" rendered="{!!ISBLANK(AnalysisDimensionId) && option.Value == AnalysisDimensionId}">
+					<option value="{!JSENCODE(option.Value)}" selected="selected">{!JSENCODE(option.Label)}</option>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!ISBLANK(AnalysisDimensionId) || option.Value != AnalysisDimensionId}">
+					<option value="{!JSENCODE(option.Value)}">{!JSENCODE(option.Label)}</option>
+					</apex:outputPanel>
+				</apex:repeat>
+				</select>
+				<apex:outputLabel value="{!$ObjectType.KimbleOne__PerformanceAnalysisTrend__c.Fields.KimbleOne__AnalysisFact__c.Label}" />
+				<select id="rootAnalysisFact">
+				</select>				
+				</div>
+			</div>
+		</div>
+
+		<apex:actionFunction action="{!ForecastingPeriodChange}" name="ForecastingPeriodChange" rerender="TheForm">
+			<apex:param name="forecastStatusIn" value="" />
+			<apex:param name="analysisDimensionIdIn" value="" />
+			<apex:param name="RootAnalysisFactNameIn" value="" />
+		</apex:actionFunction>
+		<apex:actionFunction action="{!GoPreviousPeriod}" name="GoPreviousPeriod" rerender="TheForm">
+			<apex:param name="forecastStatusIn" value="" />
+			<apex:param name="analysisDimensionIdIn" value="" />
+			<apex:param name="RootAnalysisFactNameIn" value="" />
+		</apex:actionFunction>
+		<apex:actionFunction action="{!GoNextPeriod}" name="GoNextPeriod" rerender="TheForm">
+			<apex:param name="forecastStatusIn" value="" />
+			<apex:param name="analysisDimensionIdIn" value="" />
+			<apex:param name="RootAnalysisFactNameIn" value="" />
+		</apex:actionFunction>
+		
+	</apex:form>
+	</div>
+
+	<div id="trend-analysis-container" class="card">
+		<div id="the-trend-data-loading"><i class="fa fa-circle-o-notch fa-spin"></i></div>
+		<div id="trend-analysis-levels-container">
+		</div>
+	</div>
+	
+	<div id="trend-analysis-history-chart-container">
+		<canvas id="the-trend-history-chart"></canvas>
+		<div id="the-trend-history-loading"><i class="fa fa-circle-o-notch fa-spin"></i></div>
+		<a class="trend-history-close qtip-close qtip-icon" title="{!$Label.Close}" role="button"><span class="ui-icon ui-icon-close">×</span></a>
+	</div>
+
+	<script>
+		var labelMap = {};
+		labelMap['this'] = '{!JSENCODE($Label.ThisLabel)}';
+		labelMap['last'] = '{!JSENCODE($Label.LastLabel)}';
+		labelMap['change'] = '{!JSENCODE($Label.ChangeLabel)}';
+		labelMap['impact-pct'] = '{!JSENCODE($Label.ImpactLabel)}';
+		labelMap['expand'] = '{!JSENCODE($Label.Expand)}';
+		labelMap['trend-impact'] = '{!JSENCODE($Label.TrendImpactLabel)}';
+		labelMap['all'] = '{!JSENCODE($Label.All)}';
+		labelMap['history-chart-title'] = '{!JSENCODE($Label.TrendValuesByPeriodLabel)}';
+
+		var allNarrativeParts = '{!JSENCODE($Label.TrendNarrativeParts)}';
+		var narrativeParts = allNarrativeParts.split('|');
+		
+		var narrativeLabels = {}
+		narrativeLabels['has'] = narrativeParts[0];
+		narrativeLabels['fallen'] = narrativeParts[1];
+		narrativeLabels['risen'] = narrativeParts[2];
+		narrativeLabels['rise'] = narrativeParts[3];
+		narrativeLabels['fall'] = narrativeParts[4];
+		narrativeLabels['of'] = narrativeParts[5];
+		narrativeLabels['thisPeriod'] = narrativeParts[6];
+		narrativeLabels['primaryReason'] = narrativeParts[7];
+		
+		var timePeriodId = '{!JSENCODE(CurrentTimePeriod.Id)}';
+		var timePeriodName = '{!JSENCODE(CurrentTimePeriod.Name)}';
+		
+		var targetForecastStatus = '{!JSENCODE(ForecastStatus)}';
+		var targetAnalysisDimensionId = '{!JSENCODE(AnalysisDimensionId)}';
+		var targetRootAnalysisFactName = '{!JSENCODE(RootAnalysisFactName)}';
+		
+		var parentId = 'ROOT';
+		var forecastLevel = (targetForecastStatus != '' ? targetForecastStatus : 'P1');
+		var chartFactLevel;
+		
+		var chartMinumumFactLevel = 2;
+		
+		var analysisDimensionId = (targetAnalysisDimensionId != '' ? targetAnalysisDimensionId : '');
+
+		var theAnalysis;
+		var theDisplaySequences;
+		
+		var barChartData = {};
+		var theTrendAnalysisDatasets = [];
+		var theTrendAnalysisDatasetDataItems = [];
+		
+		var nullDisplaySequenceVal = 1000000;
+		
+		var factColors = {};
+		factColors['MarginAmount'] = '#008752';
+
+		factColors['Revenue'] = '#E68F1A';
+		factColors['Cost'] = '#729bc7';
+
+		factColors['NumberOfBusinessDays'] = '#bbb';
+		factColors['DeliveryResourceCount'] = '#008752';
+		factColors['DeliveryUtilisationPct'] = '#72c6c8';
+		factColors['AverageRevenueRate'] = '#729bc7';
+		factColors['AverageCostRate'] = '#729bc7';
+
+		factColors['SalesUtilisationPct'] = '#B42D34';
+		factColors['OtherUtilisationPct'] = '#BBBBBB';
+		
+		var factDisplayTextMap = kimble.parseJSON("{!JSENCODE(FactDisplayTextJson)}");
+		
+		jQuery(window).load(function()
+		{
+			initialise();
+			getBusinessUnitTrendAnalysis();
+		});
+		
+		function initialise()
+		{
+			jQuery(document).off('click', '.fact-card.parent:not(.expanded)').on('click', '.fact-card.parent:not(.expanded)', drillDown);
+			jQuery(document).off('change', '#forecastStatus').on('change', '#forecastStatus', changeForecastStatus);
+			jQuery(document).off('change', '#analysisDimension').on('change', '#analysisDimension', changeAnalysisDimension);
+			jQuery(document).off('change', '#rootAnalysisFact').on('change', '#rootAnalysisFact', changeRootAnalysisFact);
+			
+			jQuery(document).off('mouseover', '.history-ind').on('mouseover', '.history-ind', showHistoryChart);
+			jQuery(document).off('click', '.trend-history-close').on('click', '.trend-history-close', closeHistoryPopup);
+			
+			jQuery('.datepicker').datepicker({
+				dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+				showOtherMonths: true,
+				selectOtherMonths: true,
+				buttonText: '{!JSENCODE($Label.OpenTimePeriodDropdownToolTip)}',
+				buttonImageOnly: true,
+				buttonImage: '{!URLFOR($Resource.AssignmentImages, 'CalendarButtonSquare.png')}',
+				showOn: "button",
+			});
+		}
+		
+		function getHistoryChartContainerHtml()
+		{
+			var html = '';
+			
+			html += '<div id="trend-analysis-history-chart-container">';
+			html += '<canvas id="the-trend-history-chart"></canvas>';
+			html += '<div id="the-trend-history-loading"><i class="fa fa-circle-o-notch fa-spin"></i></div>';
+			html += '</div>';
+			
+			return html;
+		}
+		
+		var displayedHistoryFact = '';
+		
+		function showHistoryChart()
+		{
+			var factEnum = jQuery(this).closest('.fact-card').attr('fact-enum');
+			
+			if(displayedHistoryFact != factEnum)
+			{
+				displayedHistoryFact = factEnum;
+				
+				var factLevel = jQuery(this).closest('.fact-card').attr('fact-level');
+				var parentFactEnum  = jQuery(this).closest('.fact-card').attr('parent-fact-enum');
+				var gradeId = (jQuery(this).attr('grade-id') != undefined ? jQuery(this).attr('grade-id') : '');
+				var resourceTypeId = (jQuery(this).attr('resource-type-id') != undefined ? jQuery(this).attr('resource-type-id') : '');
+				getFactHistory(jQuery(this), factEnum, (parentFactEnum != '' && parentFactEnum != 'undefined' ? parentFactEnum : null), factLevel, gradeId, resourceTypeId);
+				
+				jQuery(document).on('click', 'body', closeHistoryPopup);
+			}
+		}
+		
+		function closeHistoryPopup()
+		{
+			displayedHistoryFact = '';
+			jQuery('#trend-analysis-history-chart-container').hide();
+
+			jQuery(document).off('click', 'body');
+		}
+
+		var factHierarchyMap;
+		var factHierarchySet;;
+		var factDataMap = {};
+		var factNarrativeMap = {};
+		
+		function parseTrendAnalysis()
+		{
+			factHierarchyMap = {};
+			factHierarchySet = new Set();
+			factDataMap = {};
+			var displaySequencesByParent = {};
+			
+			for(var counter = 0; counter < theAnalysis.length; counter++)
+			{
+				var theAnalysisItem = theAnalysis[counter];
+								
+				factDataMap[theAnalysisItem.Id] = theAnalysisItem;
+				
+				var parentKey = (theAnalysisItem.ParentId != null ? theAnalysisItem.ParentId : 'ROOT');
+				var parentFactEnum = (theAnalysisItem.ParentFactEnum != null ? theAnalysisItem.ParentFactEnum : 'ROOT');
+				
+				var analysisFactMemberName = (parentFactEnum!= 'ROOT' ? parentFactEnum + ':' : '') + theAnalysisItem.FactEnum;
+				var displaySequence = theDisplaySequences.filter(function(x){return x.Name == analysisFactMemberName})[0].ThisDisplaySequence;
+				if(displaySequence == undefined) displaySequence = nullDisplaySequenceVal;
+				
+				if(!(parentKey in displaySequencesByParent)) displaySequencesByParent[parentKey] = []
+				displaySequencesByParent[parentKey].push({id: theAnalysisItem.Id, displaySequence: displaySequence});
+				
+				if(!factHierarchySet.has(parentFactEnum + ':' + theAnalysisItem.FactEnum)) factHierarchySet.add(parentFactEnum + ':' + theAnalysisItem.FactEnum);
+			}
+			
+			sortFactCards(displaySequencesByParent);
+			buildFactDropdown();
+			buildAllNarratives();
+		}
+		
+		function sortFactCards(displaySequencesByParent) {
+			for(var parent in displaySequencesByParent)
+			{
+				factHierarchyMap[parent] = []
+				if(displaySequencesByParent[parent].length > 1) {
+					displaySequencesByParent[parent].sort(function(a,b) {return a.displaySequence - b.displaySequence;});
+					
+					//put facts with undefined display sequences into gaps in sequencing
+					var freeIndex = 0;
+					for(var k = 0; k <displaySequencesByParent[parent].length; k++) 
+					{ 
+						if(displaySequencesByParent[parent][k].displaySequence == nullDisplaySequenceVal) displaySequencesByParent[parent][k].displaySequence = freeIndex++;
+						else if (displaySequencesByParent[parent][k].displaySequence == freeIndex) freeIndex++;
+					}
+					displaySequencesByParent[parent].sort(function(a,b) {return a.displaySequence - b.displaySequence;});
+					
+					for(var j = 0; j < displaySequencesByParent[parent].length; j++) factHierarchyMap[parent].push(displaySequencesByParent[parent][j].id);
+				}
+				else factHierarchyMap[parent].push(displaySequencesByParent[parent][0].id);
+			}
+		}
+		
+		function buildFactDropdown()
+		{
+			jQuery('#rootAnalysisFact').find('option').remove();
+			
+			jQuery('#rootAnalysisFact').append($("<option></option>")
+					.attr("value", '')
+					.text(labelMap['all']));
+			
+			// first find if we have duplicate facts (if we do we need to make sure the user visible version is unique)
+			var factCountMap = {};
+			for (let factEnum of factHierarchySet)
+			{
+				var factParts = factEnum.split(':');
+				var thisFactEnum = factParts[1];
+				
+				if(!(thisFactEnum in factCountMap))
+				{
+					factCountMap[thisFactEnum] = 1;
+				}
+				else
+				{
+					factCountMap[thisFactEnum] = factCountMap[thisFactEnum] + 1;
+				}
+			}
+			
+			for (let factEnum of factHierarchySet)
+			{			
+				var factParts = factEnum.split(':');
+				var parentFactEnum = factParts[0];
+				var thisFactEnum = factParts[1];
+				jQuery('#rootAnalysisFact').append($("<option></option>")
+					.attr("value", factEnum)
+					.text(factDisplayTextMap[thisFactEnum] + (parentFactEnum != undefined && parentFactEnum != '' && parentFactEnum != 'ROOT' && factCountMap[thisFactEnum] > 1 ? ' (' + factDisplayTextMap[parentFactEnum] + ')' : '')));
+			}
+			
+			jQuery('#rootAnalysisFact').val(targetRootAnalysisFactName);
+		}
+		
+		function buildAllNarratives()
+		{
+			factNarrativeMap = {};
+			
+			for(var counter = 0; counter < theAnalysis.length; counter++)
+			{
+				var theAnalysisItem = theAnalysis[counter];
+				buildNarrativeForFactId(theAnalysisItem.Id);
+			}
+		}
+		
+		function getBusinessUnitTrendAnalysis()
+		{
+			jQuery('#the-trend-data-loading').toggle();
+			jQuery('#trend-analysis-levels-container').toggle();
+			
+			if(analysisDimensionId == '') analysisDimensionId = jQuery('select#analysisDimension').val();
+			
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.BusinessUnitTrendAnalysisController.GetBusinessUnitTrendAnalysis}',
+				'{!BusinessUnit__c.Id}', timePeriodId, analysisDimensionId, 
+				function(result, event)
+				{
+					if (event.status) 
+					{
+						theAnalysis = result.theAnalyses;
+						theDisplaySequences = result.theDisplaySequences;
+
+						drawTrendAnalysis();
+						jQuery('#the-trend-data-loading').toggle();
+						jQuery('#trend-analysis-levels-container').toggle();
+					} 
+					else if (event.type === 'exception') 
+					{
+						jQuery('#the-trend-data-loading').toggle();
+						jQuery('#trend-analysis-levels-container').toggle();
+						alert(event.message);
+					} 
+					else 
+					{
+						jQuery('#the-trend-data-loading').toggle();
+						jQuery('#trend-analysis-levels-container').toggle();
+						alert(event.message);
+					}
+				}, 
+				{escape: true, timeout: 60000});
+		}
+		
+		var factHistory;
+		
+		function getFactHistory(triggerElement, factEnum, parentFactEnum, level, gradeId, resourceTypeId)
+		{
+			jQuery('#trend-analysis-history-chart-container').hide();
+			
+			jQuery('#trend-analysis-history-chart-container').css('left', jQuery(triggerElement).offset().left + 16);
+			jQuery('#trend-analysis-history-chart-container').css('top', jQuery(triggerElement).offset().top - 225);
+			
+			jQuery('#trend-analysis-history-chart-container').show('slow');
+			jQuery('#the-trend-history-chart').hide();
+			jQuery('#the-trend-history-loading').show();
+						
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.BusinessUnitTrendAnalysisController.GetFactHistory}',
+					'{!BusinessUnit__c.Id}', factEnum, parentFactEnum, parseInt(level), timePeriodId, analysisDimensionId, gradeId, resourceTypeId,  
+				function(result, event)
+				{
+					if (event.status) 
+					{
+						factHistory = result;
+						populateHistoryChart(triggerElement);
+					} 
+					else if (event.type === 'exception') 
+					{
+						alert(event.message);
+					} 
+					else 
+					{
+						alert(event.message);
+					}
+				}, 
+				{escape: true, timeout: 60000});
+		}
+		
+		function drawTrendAnalysis(ignoreParse)
+		{
+			if(theAnalysis.length)
+			{
+				if(!ignoreParse) parseTrendAnalysis();
+				
+				jQuery('#trend-analysis-levels-container').html(getTrendAnalysisHtml(parentId, (targetRootAnalysisFactName != '')));
+				
+				populateCharts();
+
+				if(targetRootAnalysisFactName != '')
+				{
+					jQuery('.fact-card[fact-filter != "' + targetRootAnalysisFactName + '"]').addClass('minimised').removeClass('not-minimised');
+					jQuery('.fact-card[fact-filter = "' + targetRootAnalysisFactName + '"]').removeClass('minimised').addClass('not-minimised');
+				}
+				else
+				{
+					jQuery('.fact-card').removeClass('minimised');
+				}
+				
+				kimble.formatCurrencies();
+			}
+		}
+		
+		function getTrendAnalysisHtml(theParentId, recurse)
+		{
+			var html = '';
+
+			theTrendAnalysisDatasets = [];
+			theTrendAnalysisDatasetDataItems = [];
+			
+			html += drawTrendAnalysisChildren(theParentId, recurse);
+			
+			if(!recurse)
+			{
+				if(theTrendAnalysisDatasets.length)
+				{
+					html += '<div class="trend-level-chart">';
+					
+					html += getTrendChartContainerHtml();
+					
+					barChartData = {
+						labels: [timePeriodName],
+						datasets: theTrendAnalysisDatasets
+					}
+	
+					html += '</div>';
+				}
+				
+				html += '</div>';
+			}
+
+			return html;
+		}
+		
+		function drawTrendAnalysisChildren(theParentId, recurse)
+		{
+			var html = '';
+			
+			var currentFactChildren = factHierarchyMap[theParentId];
+			
+			html += '<div class="trend-level-container">';
+			for(var counter = 0; counter < currentFactChildren.length; counter++)
+			{
+				var itemId = currentFactChildren[counter];
+				html += getTrendAnalysisHtmlForItem(itemId);
+				
+				if(recurse && itemHasChildren(itemId)) html += drawTrendAnalysisChildren(itemId, recurse);
+			}
+			html += '</div>';
+			
+			return html;
+		}
+		
+		function getTrendAnalysisHtmlForItem(theItemId)
+		{
+			var html = ''
+			
+			var factData = factDataMap[theItemId];
+			
+			var thisValue = '';
+			var lastValue = '';
+			var changeValue = '';
+			var positivityClass = ' positive-change';
+			
+			var narrative = '';
+			
+			var factValues;
+
+			if(forecastLevel == 'P1')
+			{
+				factValues = factData.P1;
+			}
+			else if(forecastLevel == 'P2')
+			{
+				factValues = factData.P2;
+			}
+			else if(forecastLevel == 'P3')
+			{
+				factValues = factData.P3;
+			}
+			
+			if(factNarrativeMap[theItemId] != undefined && factNarrativeMap[theItemId] != null) narrative = factNarrativeMap[theItemId];
+			
+			var valueWrapperHtml = '';
+			if(factData.IsCurrency)
+			{
+				thisValue = factValues.ThisCurrencyValue;
+				lastValue = factValues.LastCurrencyValue;
+				changeValue = factValues.CurrencyAmount;
+				
+				valueWrapperHtml = '<span class="kimble-format-currency" data-currency="' + factData.CurrencyIsoCode + '">';
+			}
+			else
+			{
+				thisValue = kimble.formatNumber(factValues.ThisValue);
+				lastValue = kimble.formatNumber(factValues.LastValue);
+				changeValue = kimble.formatNumber(factValues.Amount);
+				
+				valueWrapperHtml = '<span class="kimble-format-number">';
+			}
+			
+			if(changeValue == 0)
+			{
+				positivityClass = ' neutral-change';
+			}
+			else if((factData.ContributionFactor < 0 && changeValue > 0) || (factData.ContributionFactor > 0 && changeValue < 0))
+			{
+				positivityClass = ' negative-change';
+			}
+			
+			var hasChildren = itemHasChildren(factData.Id);
+			
+			html += '<div class="trend-level-item">';
+
+			html += '<div class="fact-container">';	
+			var factFilter = (factData.ParentFactEnum != undefined && factData.ParentFactEnum != null && factData.ParentFactEnum != '' ? factData.ParentFactEnum : 'ROOT') + ':' + factData.FactEnum;
+			html += '<div class="fact-card' + (hasChildren ? ' parent' : '') + positivityClass + '" fact-level="' + factData.Level + '" fact-filter="' + factFilter + '" fact-enum="' + factData.FactEnum + '" parent-fact-enum="' + factData.ParentFactEnum + '" fact-id="' + factData.Id + '" fact-parent-id="' + factData.ParentId + '">';
+
+			var factContextHtml = (factData.HasGrade ? '<div class="fact-context">' + factData.GradeName + '</div>' : (factData.HasResourceType ? '<div class="fact-context">' + factData.ResourceTypeName + '</div>' : ''));
+			var cardIconClass = 'fa ' + (changeValue == undefined || changeValue == 0 || changeValue == 0.00 ? 'fa-minus-circle' : 'fa-arrow-circle-' + (changeValue > 0 ? 'up' : 'down'));
+			html += '<i class="change-ind ' + cardIconClass + '"></i>';
+			html += '<div class="fact-title">' + factDisplayTextMap[factData.FactEnum] + factContextHtml + '</div>';
+
+			var changeHtml = '<div class="fact-change">' + '(' + labelMap['change'] + ': ' + valueWrapperHtml + changeValue + '</span>)</div>';
+					
+			html += '<div class="fact-this">' + labelMap['this'] + ': ' + valueWrapperHtml + thisValue + '</span>' + changeHtml + '</div>';
+			html += '<div class="fact-last">' + labelMap['last'] + ': ' + valueWrapperHtml + lastValue + '</span></div>';
+			
+			var gradeHistoryHtml = (factData.HasGrade ? ' grade-id="' + factData.GradeId + '"' : '');
+			var resourceTypeHistoryHtml = (factData.HasResourceType ? ' resource-type-id="' + factData.ResourceTypeId + '"' : '');
+			
+			html += '<i class="history-ind fa fa-bar-chart"' + gradeHistoryHtml + resourceTypeHistoryHtml + '></i>';
+			if(factData.ParentId != undefined) html += '<div class="fact-impact-pct">' + labelMap['impact-pct'] + ': ' + factValues.ImpactPercentage + '%</div>';
+			
+			if(narrative != '')
+			{
+				html += '<div class="fact-narrative"><i class="narrative-ind fa fa-info-circle"></i>' + narrative + '</div>';
+			}
+			
+			if(hasChildren)
+			{
+				html += '<i class="fa fa-expand parent-expander" title="' + labelMap['expand'] + '"></i>';
+			}
+			html += '</div>';
+			html += '</div>';
+			html += '</div>';
+			
+			if(factData.Level >= chartMinumumFactLevel)
+			{
+				chartFactLevel = factData.Level; 
+				var dataItems = [factValues.ImpactPercentage];
+				theTrendAnalysisDatasetDataItems[theTrendAnalysisDatasetDataItems.length] = factData.FactEnum;			
+				theTrendAnalysisDatasets.push({label: factDisplayTextMap[factData.FactEnum], backgroundColor: factColors[factData.FactEnum], data: dataItems});
+			}
+			
+			return html;
+		}
+		
+		function getTrendChartContainerHtml()
+		{
+			jQuery('#trend-analysis-chart-container').remove();
+			
+			var html = '';
+
+			var factLevelHtml = (chartFactLevel != null ? ' fact-level="' + chartFactLevel + '"' : '');
+
+			html += '<div id="trend-analysis-chart-container"' + factLevelHtml + '>';
+			html += '<canvas id="the-trend-chart"></canvas>';
+			html += '</div>';
+			
+			return html;
+		}
+		
+		function itemHasChildren(theItemId)
+		{
+			return (theItemId in factHierarchyMap && factHierarchyMap[theItemId].length); 
+		}
+		
+		function drillDown()
+		{		
+			var thisItemId = jQuery(this).attr('fact-id');
+			
+			removeChildren(thisItemId);
+			
+			jQuery('.header-fact.expanded').animate({ width: 350 }, 'fast');
+			jQuery('.expanded').removeClass('expanded');
+			jQuery(this).closest('.trend-level-item').append(getTrendAnalysisHtml(thisItemId));
+
+			populateCharts();
+
+			var newHeaderWidth = jQuery('#trend-analysis-container').width() - parseInt(jQuery(this).css('margin-left')) - 50; 
+			jQuery(this).animate({ width: newHeaderWidth }, 'slow').addClass('header-fact').addClass('expanded');
+			
+			jQuery('html,body').animate({scrollTop: jQuery(this).offset().top - 20},'slow');
+
+			kimble.formatCurrencies();
+		}
+		
+		function populateCharts()
+		{
+			populateTrendChart();
+		}
+		
+		function populateTrendChart(factEnum)
+		{			
+			if(theTrendAnalysisDatasets.length)
+			{
+				if(document.getElementById("the-trend-chart") == null) return;
+			
+				var ctx = document.getElementById("the-trend-chart").getContext("2d");
+			
+				if(window.myTrendBar != undefined) window.myTrendBar.destroy();
+				
+				window.myTrendBar = new Chart(ctx, {
+					type: 'bar',
+					data: barChartData,
+					events: ['click'],
+					options: {
+						title:{
+							display: true,
+							text: labelMap['trend-impact']
+						},
+						tooltips: {
+							mode: 'index',
+							intersect: false,
+							callbacks: {
+					            label: function (tooltipItems, data) {
+					                return factDisplayTextMap[theTrendAnalysisDatasetDataItems[tooltipItems.datasetIndex]] + ': ' + tooltipItems.yLabel + '%';
+					            }
+					        }
+						},
+						responsive: true,
+						scales: {
+							xAxes: [{
+								stacked: false
+							}],
+							yAxes: [{
+								stacked: false,
+								gridLines : {
+									zeroLineWidth: 2
+								},
+								ticks: {
+									beginAtZero: true,
+				                    callback: function(value, index, values) {
+				                        return value + '%';
+				                    }
+				                }
+							}]
+						},
+						legend: {
+							position: 'right'
+						},
+						maintainAspectRatio: false
+					}
+				});
+			}
+		}
+
+		/* trendline calcs */		
+		function TrendCalculator()
+		{
+		    this.count = 0;
+		    this.sumX = 0;
+		    this.sumX2 = 0;
+		    this.sumXY = 0;
+		    this.sumY = 0;
+		}
+		
+		TrendCalculator.prototype = {
+		    'add': function(x, y)
+		    {
+		        this.count++;
+		        this.sumX += x;
+		        this.sumX2 += x*x;
+		        this.sumXY += x*y;
+		        this.sumY += y;
+		    },
+		    'calcTrend': function(x)
+		    {
+		        var det = this.count * this.sumX2 - this.sumX * this.sumX;
+		        var offset = (this.sumX2 * this.sumY - this.sumX * this.sumXY) / det;
+		        var scale = (this.count * this.sumXY - this.sumX * this.sumY) / det;
+		        return offset + x * scale;
+		    }
+		};
+		
+		function linearProject(data)
+		{
+		    var trendCalc = new TrendCalculator();
+		    
+		    var trendLineData = [];
+		    
+		    for (var i = 0; i < data.length; i++)
+		    {
+		        trendCalc.add(i, data[i]);
+		    }
+		    
+			for (var i = 0; i < data.length; i++)
+		    {
+				trendLineData.push(roundDecimal(trendCalc.calcTrend(i), 2));
+		    }
+		    
+		    return trendLineData;
+		}
+
+		function roundDecimal(value, decimals) {
+		  return Number(Math.round(value+'e'+decimals)+'e-'+decimals);
+		}
+		
+		/* trendline calcs */
+		
+		function populateHistoryChart(triggerElement)
+		{
+			if(factHistory != null && factHistory.length)
+			{
+				jQuery('#the-trend-history-chart').show();
+				jQuery('#the-trend-history-loading').hide();
+
+				var labels = [];
+				var fact = {};
+				fact.label = factDisplayTextMap[factHistory[0].FactEnum];
+				fact.backgroundColor = factColors[factHistory[0].FactEnum];
+				fact.data = [];
+				
+				for(counter = 0; counter < factHistory.length; counter++)
+				{
+					var factData = factHistory[counter];
+					labels.push(factData.PeriodName);
+					
+					var factValues;
+
+					if(forecastLevel == 'P1')
+					{
+						factValues = factData.P1;
+					}
+					else if(forecastLevel == 'P2')
+					{
+						factValues = factData.P2;
+					}
+					else if(forecastLevel == 'P3')
+					{
+						factValues = factData.P3;
+					}
+					
+					var factValue = (factData.IsCurrency ? factValues.ThisCurrencyValue : factValues.ThisValue); 
+					
+					fact.data.push(factValue);
+				}
+				
+				var trendFact = {};
+				trendFact.label = 'Trend';
+				trendFact.backgroundColor = 'yellow';
+				trendFact.data = linearProject(fact.data);
+				trendFact.type = 'line';
+				trendFact.fill = false;
+
+				var facts = [];
+				facts.push(fact);
+				facts.push(trendFact);
+				
+				var ctx = document.getElementById("the-trend-history-chart").getContext("2d");
+				
+				var historyChartData = {
+					labels: labels,
+					datasets: facts
+				}
+				
+				if(window.myHistoryBar != undefined) window.myHistoryBar.destroy();
+				
+				window.myHistoryBar = new Chart(ctx, {
+					type: 'bar',
+					data: historyChartData,
+					events: ['click'],
+					options: {
+						title:{
+							display: true,
+							text: labelMap['history-chart-title']
+						},
+						tooltips: {
+							mode: 'index',
+							intersect: false
+						},
+						responsive: true,
+						scales: {
+							xAxes: [{
+								stacked: false
+							}],
+							yAxes: [{
+								stacked: false,
+								gridLines : {
+									zeroLineWidth: 2
+								},
+								ticks: {
+				                    beginAtZero: true
+				                }
+							}]
+						},
+						legend: {
+							position: 'right'
+						},
+						maintainAspectRatio: false
+					}
+				});
+			}
+		}
+		
+		function changeForecastStatus()
+		{
+			forecastLevel = jQuery(this).val();
+			
+			buildAllNarratives();
+			
+			drawTrendAnalysis(true);
+		}
+		
+		function changeRootAnalysisFact()
+		{
+			targetRootAnalysisFactName = jQuery(this).val();
+		
+			drawTrendAnalysis(true);
+		}
+		
+		function changeAnalysisDimension()
+		{
+			analysisDimensionId = jQuery(this).val();
+			
+			getBusinessUnitTrendAnalysis();
+		}
+		
+		function removeChildren(theParentId)
+		{
+			jQuery('div[fact-parent-id="' + theParentId + '"]').closest('.trend-level-container').remove();
+			
+			if(itemHasChildren(theParentId))
+			{
+				var currentFactChildren = factHierarchyMap[theParentId];
+				
+				for(var counter = 0; counter < currentFactChildren.length; counter++)
+				{
+					removeChildren(currentFactChildren[counter]);
+				}
+			}
+		}
+				
+		function buildNarrativeForFactId(factId)
+		{
+			// currently only building narrative if there are child facts as the current
+			// narrative logic is only of use to summarise the impact of the children
+			if(!(factId in factHierarchyMap)) return;
+
+			var narrativeParts = [];
+			
+			// get the fact
+			var factData = factDataMap[factId];
+			
+			var factValues;
+		
+			if(forecastLevel == 'P1')
+			{
+				factValues = factData.P1;
+			}
+			else if(forecastLevel == 'P2')
+			{
+				factValues = factData.P2;
+			}
+			else if(forecastLevel == 'P3')
+			{
+				factValues = factData.P3;
+			}
+		
+			var thisValue = '';
+			var lastValue = '';
+			var changeValue = '';	
+		
+			if(factData.IsCurrency)
+			{
+				thisValue = factValues.ThisCurrencyValue;
+				lastValue = factValues.LastCurrencyValue;
+				changeValue = factValues.CurrencyAmount;
+			}
+			else
+			{
+				thisValue = kimble.formatNumber(factValues.ThisValue);
+				lastValue = kimble.formatNumber(factValues.LastValue);
+				changeValue = kimble.formatNumber(factValues.Amount);
+			}
+			
+			if(changeValue != 0)
+			{
+				var narrativePart = [];
+				
+				narrativePart.push(factDisplayTextMap[factData.FactEnum]);
+				narrativePart.push(narrativeLabels['has']);
+	
+				narrativePart.push((changeValue < 0 ? narrativeLabels['fallen'] : narrativeLabels['risen']));
+				narrativePart.push(narrativeLabels['thisPeriod']);
+				
+				narrativeParts.push(narrativePart);
+			}
+
+			// iterate the children		
+			if(factId in factHierarchyMap)
+			{
+				var factChildren = factHierarchyMap[factId];
+				var primaryFactEnum = '';
+				var primaryImpactPct = 0;
+				var primaryImpactAmt = 0;
+				var primaryImpactAmtAbs = 0;
+
+				for(var childCounter = 0; childCounter < factChildren.length; childCounter++)
+				{
+					var childFactData = factDataMap[factChildren[childCounter]];
+					
+					var childFactValues;
+		
+					if(forecastLevel == 'P1')
+					{
+						childFactValues = childFactData.P1;
+					}
+					else if(forecastLevel == 'P2')
+					{
+						childFactValues = childFactData.P2;
+					}
+					else if(forecastLevel == 'P3')
+					{
+						childFactValues = childFactData.P3;
+					}
+					
+					var childThisValue = '';
+					var childLastValue = '';
+					var childChangeValue = '';	
+				
+					if(childFactData.IsCurrency)
+					{
+						childThisValue = childFactValues.ThisCurrencyValue;
+						childLastValue = childFactValues.LastCurrencyValue;
+						childChangeValue = childFactValues.CurrencyAmount;
+					}
+					else
+					{
+						childThisValue = kimble.formatNumber(childFactValues.ThisValue);
+						childLastValue = kimble.formatNumber(childFactValues.LastValue);
+						childChangeValue = kimble.formatNumber(childFactValues.Amount);
+					}
+					
+					if((changeValue < 0 && childFactValues.ImpactPercentage < primaryImpactPct) || (changeValue > 0 && childFactValues.ImpactPercentage > primaryImpactPct))
+					{
+						primaryImpactPct = childFactValues.ImpactPercentage;
+						primaryFactEnum = childFactData.FactEnum;
+						primaryImpactAmt = childChangeValue;
+						primaryImpactAmtAbs =  Math.abs(childChangeValue);
+					}
+				}
+				
+				if(primaryFactEnum != '')
+				{
+					var narrativePart = [];
+
+					narrativePart.push(narrativeLabels['primaryReason']);
+					narrativePart.push((primaryImpactAmt < 0 ? narrativeLabels['fall'] : narrativeLabels['rise']));
+					narrativePart.push(factDisplayTextMap[primaryFactEnum]);
+					narrativePart.push(narrativeLabels['of']);
+					narrativePart.push(primaryImpactAmtAbs);
+					
+					narrativeParts.push(narrativePart);
+				}
+			}
+			
+			factNarrativeMap[factId] = buildNarrative(narrativeParts);
+		}
+		
+		function buildNarrative(parts)
+		{
+			var partParts = [];
+
+			for(var sentenceCounter = 0; sentenceCounter < parts.length; sentenceCounter++)
+			{
+				partParts.push(parts[sentenceCounter].join(' '));
+			}
+							
+			return partParts.join('. ');
+		}
+		
+		/* Time Period Navigation */
+		function changeForecastingPeriod()
+		{
+			jQuery('#the-trend-data-loading').toggle();
+			jQuery('#trend-analysis-levels-container').toggle();
+
+			ForecastingPeriodChange(forecastLevel, analysisDimensionId, targetRootAnalysisFactName);
+		}
+
+		function previousPeriod()
+		{
+			jQuery('#the-trend-data-loading').toggle();
+			jQuery('#trend-analysis-levels-container').toggle();
+
+			GoPreviousPeriod(forecastLevel, analysisDimensionId, targetRootAnalysisFactName);
+		}
+
+		function nextPeriod()
+		{
+			jQuery('#the-trend-data-loading').toggle();
+			jQuery('#trend-analysis-levels-container').toggle();
+
+			GoNextPeriod(forecastLevel, analysisDimensionId, targetRootAnalysisFactName);
+		}
+				
+	</script>
+</apex:define>
+</apex:composition>
+</apex:page>

@@ -1,0 +1,274 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.CustomerDeliveryGroupContactsCntrl"  showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__DeliveryGroup__c">
+	<apex:composition template="KimbleOne__SiteMaster">
+	    <apex:define name="Menu">
+	     	
+	     	<c:Menu DefaultHelpPage="CustomerCommunity.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryGroup__c.Id}" MenuContextName="{!KimbleOne__DeliveryGroup__c.Name}" />
+	     	 
+	    </apex:define>
+	    
+	    <apex:define name="Content">
+
+		<style>
+			/* Only show this if trackingwith forecast time entries and at least one custom field defined*/	
+			.user-active
+			{
+				color:green;
+				font-size:15px;
+				text-align:center;
+			}
+			.user-inactive
+			{
+				color:red;
+				font-size:15px;
+				text-align:center;
+			}
+			.eng-accessible
+			{
+				color:green;
+				font-size:15px;
+				text-align:center;
+			}
+			.eng-inaccessible
+			{
+				color:red;
+				font-size:15px;
+				text-align:center;
+			}
+			.user-new
+			{
+				color:gray;
+				font-size:15px;
+				text-align:center;
+			}
+		</style>
+			
+					    
+			<apex:outputPanel id="CommunityContactUsersPanel">
+       			<div id="CustomerContactsErrors">
+           			<apex:pageMessages escape="False"/>
+           		</div>
+
+				<apex:form >
+					<apex:pageBlock title="{!$ObjectType.KimbleOne__CustomerDeliveryGroup__c.Label}">
+					<apex:pageBlockButtons location="top" >
+						<apex:commandButton action="{!SaveCustomerDeliveryGroup}" value="{!$Label.kimbleone__save}"/>
+					</apex:pageBlockButtons>
+					<apex:pageBlockSection columns="2">
+						<apex:inputField value="{!TheCustomerDeliveryGroup.Name}"/>
+						<apex:inputField value="{!KimbleOne__DeliveryGroup__c.KimbleOne__SharedWithCustomer__c}"/>
+						<apex:inputField value="{!TheCustomerDeliveryGroup.KimbleOne__FinancialsSharedWithCustomer__c}"/>
+						<apex:inputField value="{!TheCustomerDeliveryGroup.KimbleOne__TimesheetsSharedWithCustomer__c}"/>
+					</apex:pageBlockSection>
+					</apex:pageBlock>
+			        <apex:pageBlock id="contactsPageBlock" rendered="{!!ISBLANK(TheCustomerDeliveryGroup.Id)}">
+			
+			            <apex:pageBlockButtons location="top" >
+			            	<apex:outputPanel layout="none" rendered="{!AccountOwnerHasRole}">
+			            		<input type="button" class="btn" value="{!$Label.New} {!$Label.Community} {!$ObjectType.User.Label}" onclick="initialiseModalBoxy('#NewCommunityContactUserPopup', '{!JSENCODE($Label.kimbleone__new)} Community User');initialiseCommunityContactUser('');"/>
+			          		</apex:outputPanel>
+			            </apex:pageBlockButtons>
+						
+ 	             		<apex:pageblockSection title="{!TheCustomerDeliveryGroup.DeliveryGroup__r.Name} - {!$Label.kimbleone__community} {!$ObjectType.User.LabelPlural}" rendered="{!!ISBLANK(EngagementCommunityUsers) && EngagementCommunityUsers.size>0}" collapsible="false" columns="1">
+
+							<apex:pageBlockTable value="{!EngagementCommunityUsers}" var="communityUser" >
+
+				              <apex:column style="text-align:center" headerValue="{!$Label.kimbleone__accesslabel}" width="5%">
+								<apex:outputLink value="javascript:void(0)" onclick="revokeEngagementAccess('{!JSINHTMLENCODE(communityUser.Usr.Id)}');" title="{!$Label.kimbleone__revokeaccesstoengagement}">
+									<span class="fa fa-unlock-alt eng-accessible"></span>
+								</apex:outputLink>
+							  </apex:column>
+				              <apex:column style="text-align:center" headerValue="{!$ObjectType.User.Label}" width="5%">
+								<apex:outputPanel title="{!$Label.kimbleone__activelabel} {!$ObjectType.User.Label}">
+									<a href="/{!communityUser.Usr.Id}" target="_blank">
+										<span class="fa fa-user user-active"></span>
+									</a>
+								</apex:outputPanel>
+							  </apex:column>
+				              <apex:column style="text-align:center" headerValue="{!$Label.kimbleone__kimblelicense}" width="5%">
+								<apex:outputPanel title="{!$Label.kimbleone__nokimblelicense}" rendered="{!!communityUser.hasKimbleLicense}">
+									<span class="fa fa-close user-inactive"></span>
+								</apex:outputPanel>
+								<apex:outputPanel title="{!$Label.kimbleone__nokimblelicense}" rendered="{!communityUser.hasKimbleLicense}">
+									<span class="fa fa-check user-active"></span>
+								</apex:outputPanel>
+							  </apex:column>
+				              <apex:column width="25%" headerValue="{!$ObjectType.Contact.Fields.Name.Label}">
+								<a href="/{!communityUser.Cntct.Id}" target="_blank">
+									<apex:outputText value="{!communityUser.Name}"/>
+								</a>
+				              </apex:column>
+				              <apex:column width="25%" value="{!communityUser.Username}" headerValue="{!$ObjectType.User.Fields.Username.Label}"/>
+				              <apex:column width="25%" value="{!communityUser.Email}" headerValue="{!$ObjectType.User.Fields.Email.Label}"/>
+				              <apex:column width="15%" value="{!communityUser.CommunityNickname}" headerValue="{!$ObjectType.User.Fields.CommunityNickname.Label}"/>
+	
+							</apex:pageBlockTable>
+
+						</apex:pageblockSection>
+
+  	             		<apex:pageblockSection title="{!TheCustomerDeliveryGroup.DeliveryGroup__r.Account__r.Name} - {!$Label.kimbleone__community} {!$ObjectType.User.LabelPlural}" collapsible="false" columns="1">
+
+							<apex:pageBlockTable value="{!AccountCommunityUsers}" var="communityUser" >
+
+				              <apex:column style="text-align:center" headerValue="{!$Label.kimbleone__accesslabel}" width="5%">
+								<apex:outputLink value="javascript:void(0)" onclick="grantEngagementAccess('{!JSINHTMLENCODE(communityUser.Usr.Id)}');" title="{!$Label.kimbleone__grantaccesstoengagement}">
+									<span class="fa fa-lock eng-inaccessible"></span>
+								</apex:outputLink>
+							  </apex:column>
+				              <apex:column style="text-align:center" headerValue="{!$ObjectType.User.Label}" width="5%">
+								<apex:outputPanel title="{!$Label.kimbleone__activelabel} {!$ObjectType.User.Label}">
+									<a href="/{!communityUser.Usr.Id}" target="_blank">
+										<span class="fa fa-user user-active"></span>
+									</a>
+								</apex:outputPanel>
+							  </apex:column>
+				              <apex:column style="text-align:center" headerValue="{!$Label.kimbleone__kimblelicense}" width="5%">
+								<apex:outputPanel title="{!$Label.kimbleone__nokimblelicense}" rendered="{!!communityUser.hasKimbleLicense}">
+									<span class="fa fa-close user-inactive"></span>
+								</apex:outputPanel>
+								<apex:outputPanel title="{!$Label.kimbleone__nokimblelicense}" rendered="{!communityUser.hasKimbleLicense}">
+									<span class="fa fa-check user-active"></span>
+								</apex:outputPanel>
+							  </apex:column>
+				              <apex:column width="25%" headerValue="{!$ObjectType.Contact.Fields.Name.Label}">
+								<a href="/{!communityUser.Cntct.Id}" target="_blank">
+									<apex:outputText value="{!communityUser.Name}"/>
+								</a>
+				              </apex:column>
+				              <apex:column width="25%" value="{!communityUser.Username}" headerValue="{!$ObjectType.User.Fields.Username.Label}"/>
+				              <apex:column width="25%" value="{!communityUser.Email}" headerValue="{!$ObjectType.User.Fields.Email.Label}"/>
+				              <apex:column width="15%" value="{!communityUser.CommunityNickname}" headerValue="{!$ObjectType.User.Fields.CommunityNickname.Label}"/>
+	
+ 							</apex:pageBlockTable>
+
+						</apex:pageblockSection>
+
+               			<apex:pageblockSection title="{!TheCustomerDeliveryGroup.DeliveryGroup__r.Account__r.Name} - {!$ObjectType.Contact.LabelPlural}" collapsible="false" columns="1">
+							
+							<apex:pageBlockTable value="{!AccountContactsNoUsers}" var="contact" rendered="{!ShowContactsTable}">
+
+				              <apex:column style="text-align:center" headerValue="{!$Label.kimbleone__actionlinksheader}" width="5%">
+								<apex:outputLink rendered="{!contact.Usr == null}" value="javascript:void(0)" onclick="initialiseModalBoxy('#NewCommunityContactUserPopup', '{!JSENCODE($Label.kimbleone__new)} Community User');initialiseCommunityContactUser('{!JSINHTMLENCODE(contact.Cntct.Id)}');" title="{!$Label.kimbleone__addcontacttocommunityandgrantaccesslink}">
+									<span class="fa fa-user-plus user-new"></span>
+								</apex:outputLink>
+							  </apex:column>
+				              <apex:column style="text-align:center" headerValue="{!$ObjectType.User.Label}" width="5%">
+								<apex:outputPanel rendered="{!contact.Usr != null && !contact.IsUserActive}" title="{!$Label.kimbleone__inactivelabel} {!$ObjectType.User.Label}">
+									<a href="/{!contact.Usr.Id}" target="_blank">
+										<span class="fa fa-user-times user-inactive"></span>
+									</a>
+								</apex:outputPanel>
+							  </apex:column>
+							  
+				              <apex:column width="50%" headerValue="{!$ObjectType.Contact.Fields.Name.Label}">
+								<a href="/{!contact.Cntct.Id}" target="_blank">
+									<apex:outputText value="{!contact.Name}"/>
+								</a>
+				              </apex:column>
+				              <apex:column width="40%" value="{!contact.Email}" headerValue="{!$ObjectType.User.Fields.Email.Label}"/>
+	
+							</apex:pageBlockTable>
+							
+							<apex:pageBlockSectionItem rendered="{!!ShowContactsTable}">
+								<apex:outputLink value="javascript:void(0)" onclick="initialiseModalBoxy('#NewCommunityContactUserPopup', '{!JSENCODE($Label.kimbleone__new)} Community User');initialiseCommunityContactUser('');" title="{!$Label.kimbleone__addcontacttocommunityandgrantaccesslink}">
+									<span class="fa fa-user-plus" style="padding-right:2px;"></span>{!$Label.Add} {!$Label.Community} {!$ObjectType.User.Label} {!$Label.FromLabel} {!$ObjectType.Contact.Label}
+								</apex:outputLink>
+							</apex:pageBlockSectionItem>
+
+						</apex:pageblockSection>
+
+					</apex:pageBlock>
+ 
+					<apex:actionFunction action="{!InitialiseCommunityContactUser}" name="initialiseCommunityContactUser" rerender="NewCommunityContactUserPopupPanel"	oncomplete="PopulateTheUserFields(); showModalBoxy();">
+						<apex:param name="contactId" value="" />
+					</apex:actionFunction>
+
+					<apex:actionFunction action="{!RevokeCommunityUserAccessToEngagement}" name="revokeEngagementAccess" rerender="CommunityContactUsersPanel">
+						<apex:param name="cuId" value="" />
+					</apex:actionFunction>
+					<apex:actionFunction action="{!GrantCommunityUserAccessToEngagement}" name="grantEngagementAccess" rerender="CommunityContactUsersPanel">
+						<apex:param name="cuId" value="" />
+					</apex:actionFunction>
+					
+				</apex:form>           		
+			</apex:outputPanel>		
+
+			<div id="NewCommunityContactUserPopup" style="display:none">
+				<apex:outputPanel id="NewCommunityContactUserPopupPanel">
+		     	  <apex:form >
+		           		<apex:pageBlock >
+		           			<div id="NewCommunityContactUserPopUpErrors">
+		           				<apex:pageMessages escape="False"/>
+		           			</div>
+		 
+		            		<apex:pageBlockButtons location="bottom">
+								<apex:commandButton styleclass="DisableButtonWhileBusy" action="{!SaveCommunityContactUser}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#NewCommunityContactUserPopUpErrors');" rerender="NewCommunityContactUserPopupPanel"/>
+								<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+							</apex:pageBlockButtons>
+							
+		             		<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+								<apex:inputField rendered="{!!ShowContactsTable}" styleclass="kimbleSearch" value="{!SelectedContact.KimbleOne__Contact__c}" html-data-typename="AccountContactNoUsers" html-data-filter="{!'AccountId:' +TheCustomerDeliveryGroup.DeliveryGroup__r.KimbleOne__Account__c + ';DeliveryGroupId:'+TheCustomerDeliveryGroup.KimbleOne__DeliveryGroup__c}">
+									<apex:actionSupport event="onchange" action="{!SelectedContactChanged}" rerender="NewCommunityContactUserPopupPanel" />
+								</apex:inputField>
+								<apex:pageblockSectionItem >
+									<apex:outputLabel value="{!$ObjectType.User.Fields.FirstName.Label}"/>
+		               				<apex:inputText id="FirstNameInput" value="{!NewCommunityContactUser.FirstName}" onkeyup="PopulateTheUserFields();"/>                 			             			
+		               			</apex:pageblockSectionItem>
+								<apex:pageblockSectionItem >
+									<apex:outputLabel value="{!$ObjectType.User.Fields.LastName.Label}"/>
+		               				<apex:inputText id="LastNameInput" value="{!NewCommunityContactUser.LastName}" onkeyup="PopulateTheUserFields();"/>                 			             			
+		               			</apex:pageblockSectionItem>
+								<apex:pageblockSectionItem >
+									<apex:outputLabel value="{!$ObjectType.User.Fields.Username.Label}"/>
+		               				<apex:inputText id="UsernameInput" value="{!NewCommunityContactUser.Username}"/>                 			             			
+		               			</apex:pageblockSectionItem>
+								<apex:pageblockSectionItem >
+									<apex:outputLabel value="{!$ObjectType.User.Fields.Email.Label}"/>
+		               				<apex:inputText id="EmailInput" value="{!NewCommunityContactUser.Email}"/>                 			             			
+		               			</apex:pageblockSectionItem>
+								<apex:pageblockSectionItem >
+									<apex:outputLabel value="{!$ObjectType.User.Fields.Alias.Label}"/>
+		               				<apex:inputText id="AliasInput" value="{!NewCommunityContactUser.Alias}"/>                 			             			
+		               			</apex:pageblockSectionItem>
+								<apex:pageblockSectionItem >
+									<apex:outputLabel value="{!$ObjectType.User.Fields.CommunityNickname.Label}"/>
+		               				<apex:inputText id="CommunityNicknameInput" value="{!NewCommunityContactUser.CommunityNickname}"/>                 			             			
+		               			</apex:pageblockSectionItem>
+				            </apex:pageBlockSection>
+
+		        		</apex:pageBlock>
+						<script>
+							String.prototype.format = function() {
+								var str = this;
+								for (var i = 0; i < arguments.length; i++) {       
+									var reg = new RegExp("\\{" + i + "\\}", "gm");             
+									str = str.replace(reg, arguments[i]);
+								}
+								return str;
+							}
+							
+							function PopulateTheUserFields()
+							{
+								var firstName = $("input[id$='FirstNameInput']").val();
+								var lastName = $("input[id$='LastNameInput']").val();
+								var usernamePattern = '{!JSENCODE(DefaultUsernamePattern)}';
+								if (firstName && lastName)
+								{
+									var username = usernamePattern.format(firstName.toLowerCase(), lastName.toLowerCase()).replace(/\s/g,'');
+									
+									// set the Username
+									$("input[id$='UsernameInput']").val(username);
+									// set the Alias
+									$("input[id$='AliasInput']").val(firstName[0].toLowerCase() + lastName.substring(0,7).toLowerCase().replace(/\s/g,''));
+									// set the Nickname
+									$("input[id$='CommunityNicknameInput']").val(firstName[0].toLowerCase() + lastName.substring(0,38).replace(/\s/g,''));
+								}
+							}
+						</script>
+
+		        	</apex:form>
+		        </apex:outputPanel>
+			</div>	
+
+		</apex:define>
+	</apex:composition>
+</apex:page>

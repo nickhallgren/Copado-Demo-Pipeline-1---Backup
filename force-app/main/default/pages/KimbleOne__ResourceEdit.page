@@ -1,0 +1,694 @@
+<apex:page standardController="KimbleOne__Resource__c" extensions="KimbleOne.ResourceEditController2,KimbleOne.TooltipsController" sidebar="false" action="{!CheckRedirect}">
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+	<c:Menu rendered="{!!ISBLANK(KimbleOne__Resource__c.Id)}" DefaultHelpPage="MaintainResource.html" MenuContextType="Resource" MenuContextId="{!KimbleOne__Resource__c.Id}" MenuContextName="{!KimbleOne__Resource__c.Name}"/> 
+</apex:define>
+    
+<apex:define name="Content">
+
+	<!-- Kimble Guidance -->
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+	<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/ResourceEditNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+		<apex:outputPanel layout="none" rendered="{!ResourceEditTipOverrideEnabled}">
+			<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+		</apex:outputPanel>
+	</apex:outputPanel>
+	
+	<apex:outputPanel layout="none" rendered="{!record.Id == null}">
+		<apex:sectionHeader title="{!$ObjectType.KimbleOne__Resource__c.Label}" subtitle="{!$Label.kimbleone__new} {!$ObjectType.KimbleOne__Resource__c.label}"/>
+	</apex:outputPanel>
+
+	<apex:form id="TheForm">
+
+	<apex:outputPanel id="resourceErrorsContainer">
+		<div id="resourceErrors">
+			<apex:pageMessages escape="false"/>
+		</div>
+		<div id="later-effective-date" style="display:none;">
+			<apex:pageMessage summary="{!$Label.kimbleone__resourcehaslatereffectivedate}" severity="warning" strength="1"></apex:pageMessage>
+
+            <apex:pageMessage rendered="{!AssignmentsEndingAfterEffectiveDate}" escape="false" summary="{!AssignmentsEndingAfterEffectiveDateCostChangeMessage}" severity="warning" strength="1"></apex:pageMessage>
+		</div>
+
+		<div id="time-pattern-change-warning" style="display:none;">
+			<apex:pageMessage summary="{!ResourceTPVChangeDeliveryAssignmentsMessage}" escape="false" severity="warning" strength="1" rendered="{!!ISBLANK(ResourceAssignmentsUrl)}"></apex:pageMessage>
+		</div>
+
+	</apex:outputPanel>
+	
+	<!--  Resource Type selection -->
+	<apex:outputPanel layout="none" rendered="{!RenderResourceTypeSelection}">
+
+		<apex:pageBlock >
+
+			<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+				
+				<!-- Resource Type field (dropdown) -->
+				<apex:pageBlockSectionItem >
+
+					<apex:outputText value="{!$ObjectType.KimbleOne__ResourceType__c.Label}" />
+					<apex:selectList id="resourceType" value="{!KimbleOne__Resource__c.KimbleOne__ResourceType__c}" required="true" size="1">
+						<apex:selectOptions value="{!AllResourceTypes}"/>
+					</apex:selectList> 
+
+				</apex:pageBlockSectionItem>
+
+			</apex:pageblockSection>
+				
+		</apex:pageBlock>
+		
+		<apex:pageBlock >
+			<apex:commandButton action="{!NewResource}" value="{!$Label.kimbleone__gobutton}"/>
+		</apex:pageBlock>
+
+	</apex:outputPanel>
+	
+	<!-- Resource Edit / New section -->
+	<apex:outputPanel id="ResourceBlock" rendered="{!RenderResourceTypeSelection == false}">
+		
+		<!-- Portal User -->
+		<apex:variable var="PortalRendered" value="{!TheResourceType.KimbleOne__PortalEnabled__c && KimbleOne__Resource__c.Id != null}"/>
+		<apex:inputHidden value="{!KimbleOne__Resource__c.KimbleOne__Contact__c}"/>
+		<apex:variable var="TimePatternId" value="{!KimbleOne__Resource__c.KimbleOne__TimePattern__c}"/>
+
+		<apex:outputText style="display:none" value="{!KimbleOne__Resource__c.ResourceType__r.KimbleOne__IsAssignable__c}"/>
+
+		<apex:pageBlock >
+			<apex:pageBlockButtons styleclass="ResourceButtonPanel" location="bottom">
+				<input class="btn " type="button" onclick="DisableButtonPanel('ResourceButtonPanel','',[]); updateResourceFullName(); save();" value="{!$Label.Save}" />
+				<input class="btn " type="button" onclick="DisableButtonPanel('ResourceButtonPanel','',[]); updateResourceFullName(); saveAndNew();" value="{!$Label.SaveAndNew}" />
+				<input class="btn " type="button" onclick="DisableButtonPanel('ResourceButtonPanel','',[]); updateResourceFullName(); saveAndClone();" value="{!$Label.SaveAndClone}" />
+			</apex:pageBlockButtons>
+			
+			<apex:pageblockSection collapsible="false" showheader="false" columns="2">						
+				
+				<!-- Resource Name -->
+				<apex:pageBlockSectionItem rendered="{!TheResourceType.KimbleOne__IsGeneric__c == false}" >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.Name.Label}" />
+					<apex:outputPanel layout="none">
+						<apex:outputLabel id="ResourceFullName" value="{!KimbleOne__Resource__c.Name}" />
+						<apex:inputHidden id="HiddenResourceFullName" value="{!KimbleOne__Resource__c.Name}" />
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+					
+				<apex:pageBlockSectionItem rendered="{!TheResourceType.KimbleOne__IsGeneric__c}" >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.Name.Label}" />
+					<apex:inputField id="genericResourceName" styleclass="requiredField" required="false" value="{!KimbleOne__Resource__c.Name}" />
+				</apex:pageBlockSectionItem>
+				
+				<!-- Allowable Resource Types -->
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__ResourceType__c.Label}" />
+					<apex:outputPanel layout="none">
+						<apex:selectList id="resource-type" value="{!KimbleOne__Resource__c.KimbleOne__ResourceType__c}" size="1" required="true">
+							<apex:selectOptions value="{!AllowableResourceTypes}" />
+						</apex:selectList>
+						<span class="fa fa-calendar resource-type-effective-date"><input type="text" style="width:10px;visibility:hidden"/></span>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+				
+				<!-- FirstName field (required) -->
+				<apex:inputfield id="FirstName" styleclass="ResourceFirstName requiredField" value="{!KimbleOne__Resource__c.KimbleOne__FirstName__c}" required="false" onchange="updateResourceFullName();" rendered="{!TheResourceType.KimbleOne__IsGeneric__c == false}" />
+					 
+				<!-- LastName field (required) -->	
+				<apex:inputfield id="LastName" styleclass="ResourceLastName requiredField" value="{!KimbleOne__Resource__c.KimbleOne__LastName__c}" required="false" onchange="updateResourceFullName();" rendered="{!TheResourceType.KimbleOne__IsGeneric__c == false}" />
+				
+				<apex:pageBlockSectionItem rendered="{!PortalRendered}">
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__ActiveLicenseType__c.Label}" />
+					<apex:selectList value="{!KimbleOne__Resource__c.KimbleOne__ActiveLicenseType__c}" size="1" required="true">
+							<apex:actionSupport event="onchange" action="{!LicenseTypeChange}" rerender="ResourceBlock" oncomplete="RefreshModalBoxy()"/>
+							<apex:selectOptions value="{!ActiveLicenseTypes}" />
+						</apex:selectList>
+				</apex:pageBlockSectionItem>
+				
+				<apex:pageBlockSectionItem rendered="{!PortalRendered}">
+					<apex:outputLabel value=""/>
+					<apex:outputLabel value=""/>
+				</apex:pageBlockSectionItem>
+				
+				<apex:outputField rendered="{!ShowPortalUser && KimbleOne__Resource__c.KimbleOne__PortalUser__c != null}" value="{!KimbleOne__Resource__c.KimbleOne__PortalUser__c}"/>
+				
+				<apex:pageBlockSectionItem rendered="{!ShowPortalUser && KimbleOne__Resource__c.KimbleOne__PortalUser__c != null}" >
+					<apex:outputLabel value=""/>
+					<apex:outputLabel value=""/>
+				</apex:pageBlockSectionItem>
+				
+				<apex:pageBlockSectionItem rendered="{!ShowPortalUser && KimbleOne__Resource__c.KimbleOne__PortalUser__c == null}" >
+					<apex:outputLabel value="{!$ObjectType.User.Fields.Email.Label}" />
+					<apex:inputField styleclass="requiredField" required="false" value="{!ThePortalUser.Email}" onchange="onChangeEmail();"/>
+				</apex:pageBlockSectionItem>
+				
+				<apex:pageBlockSectionItem rendered="{!ShowPortalUser && KimbleOne__Resource__c.KimbleOne__PortalUser__c == null}" >
+					<apex:outputLabel value="{!$ObjectType.User.Fields.Username.Label}" />
+					<apex:inputField id="UserNameField" styleclass="requiredField" required="false" value="{!ThePortalUser.Username}" />
+				</apex:pageBlockSectionItem>
+				
+				<apex:pageBlockSectionItem rendered="{!ShowPortalUser && KimbleOne__Resource__c.KimbleOne__PortalUser__c == null}" >
+					<apex:outputLabel value="{!$ObjectType.User.Fields.Alias.Label}" />
+					<apex:inputField styleclass="requiredField"  required="false" value="{!ThePortalUser.Alias}" />
+				</apex:pageBlockSectionItem>
+			
+				<apex:pageBlockSectionItem rendered="{!ShowPortalUser && KimbleOne__Resource__c.KimbleOne__PortalUser__c == null}" >							
+					<apex:outputLabel value=""/>
+					<apex:outputLabel value=""/>									    
+				</apex:pageBlockSectionItem>
+				
+				<!-- User field (dropdown) -->
+				<apex:pageBlockSectionItem rendered="{!ShowPortalUser == false && TheResourceType.KimbleOne__IsGeneric__c == false}" ><!-- //Employee -->								
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__User__c.Label}" />
+					<apex:inputText id="sfUser" value="{!KimbleOne__Resource__c.KimbleOne__User__c}" styleclass="kimblecustomlookup GetUsersWithoutResourceWithPlatformLicense {!IF(KimbleOne__Resource__c.KimbleOne__User__c!=null,KimbleOne__Resource__c.KimbleOne__User__c,'null')} false true UserEmployeeRowClass" />									    
+				</apex:pageBlockSectionItem>
+				
+				<apex:inputField id="Contact" value="{!KimbleOne__Resource__c.KimbleOne__Contact__c}" rendered="{!!isAutomaticContactCreationEnabled}"/>
+				
+				<apex:pageBlockSectionItem rendered="{!ShowPortalUser == false && TheResourceType.KimbleOne__IsGeneric__c == false}">
+					<apex:outputLabel value=""/>
+					<apex:outputLabel value=""/>
+				</apex:pageBlockSectionItem>
+			
+			</apex:pageBlockSection>
+			<apex:outputPanel id="ResourceProperties">
+			
+			<apex:actionRegion >
+
+				<apex:pageBlockSection rendered="{!TheResourceType.KimbleOne__IsSupplier__c}">
+					<apex:pageBlockSectionItem >
+						<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__IsSupplier__c.Label}" />
+						<apex:inputField required="false" value="{!KimbleOne__Resource__c.KimbleOne__IsSupplier__c}"/>
+					</apex:pageBlockSectionItem>
+
+					<apex:pageBlockSectionItem >
+						<apex:outputLabel value="" />
+						<apex:outputLabel value=""/>
+					</apex:pageBlockSectionItem>
+				</apex:pageBlockSection>
+
+				<apex:pageBlockSection >
+					<!-- Business Unit -->
+					<apex:pageBlockSectionItem >
+						<apex:outputLabel value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.Name.Label}" />
+						<apex:outputPanel layout="none">
+							<div class="requiredInput">
+								<apex:outputPanel layout="none" rendered="{!PrimaryBURequired}"><div class="requiredBlock"></div></apex:outputPanel>
+								<apex:selectList html-data-object-type="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__BusinessUnit__c.Name}" required="{!PrimaryBURequired}" id="primaryBusinessUnit" value="{!KimbleOne__Resource__c.KimbleOne__BusinessUnit__c}" size="1" styleclass="temporal-value">
+									<apex:actionSupport event="onchange" action="{!BusinessUnitChange}" rerender="resourceCalendar,resourceCalendar2,resourceAllowanceScheme,resourceCurrencies,expenseCurrency" oncomplete="initialiseAll()" />
+									<apex:selectOptions value="{!PrimaryBusinessUnits}" />
+								</apex:selectList>	
+							</div>
+						</apex:outputPanel>							  
+					</apex:pageBlockSectionItem>
+					<!-- Secondary Business Unit -->
+					<apex:pageBlockSectionItem >
+						<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__BusinessUnitSecondary__c.Label}" />								  
+						<apex:outputPanel layout="none">
+							<div class="requiredInput">
+								<apex:outputPanel layout="none" rendered="{!SecondaryBURequired}"><div class="requiredBlock"></div></apex:outputPanel>
+								<apex:selectList html-data-object-type="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__BusinessUnitSecondary__c.Name}" required="{!SecondaryBURequired}" id="secondaryBusinessUnit" value="{!KimbleOne__Resource__c.KimbleOne__BusinessUnitSecondary__c}" size="1" styleclass="temporal-value">
+									<apex:selectOptions value="{!SecondaryBusinessUnits}" />
+								</apex:selectList>						
+							</div>
+						</apex:outputPanel>							  
+					</apex:pageBlockSectionItem>
+			
+				</apex:pageBlockSection>
+			</apex:actionRegion>
+				
+			<apex:pageBlockSection >
+				<!-- Grade -->
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__Grade__c.Label}" />
+					<apex:outputPanel layout="none">
+						<div class="requiredInput">
+							<apex:outputPanel layout="none" rendered="{!GradeRequired}"><div class="requiredBlock"></div></apex:outputPanel>
+							<apex:selectList html-data-object-type="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__Grade__c.Name}" required="{!GradeRequired}" id="resourceGrade" value="{!KimbleOne__Resource__c.KimbleOne__Grade__c}" size="1" styleclass="temporal-value">
+								<apex:selectOptions value="{!Grades}" />
+							</apex:selectList>
+						</div>
+					</apex:outputPanel>							  
+				</apex:pageBlockSectionItem>
+				
+				<!-- Location - use enhanced lookup if configured -->
+	    		<apex:pageBlockSectionItem rendered="{!!UseLocationEnhancedLookup}" >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__Location__c.Label}" />
+					<apex:outputPanel layout="none">
+						<div class="requiredInput">
+							<apex:outputPanel layout="none" rendered="{!LocationRequired}"><div class="requiredBlock"></div></apex:outputPanel>
+							<apex:selectList html-data-object-type="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__Location__c.Name}" id="resourceLocationDropdown" required="{!LocationRequired}" value="{!KimbleOne__Resource__c.KimbleOne__Location__c}" size="1" styleclass="temporal-value">
+								<apex:selectOptions id="LocationInput" value="{!Locations}" />
+							</apex:selectList>
+						</div>
+					</apex:outputPanel>							  
+				</apex:pageBlockSectionItem>														
+				<apex:pageBlockSectionItem rendered="{!UseLocationEnhancedLookup}" >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__Location__c.Label}" />
+					<apex:inputField html-data-object-type="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__Location__c.Name}" id="resourceLocationLookup" required="{!LocationRequired}" value="{!KimbleOne__Resource__c.KimbleOne__Location__c}" styleclass="kimbleSearch" />
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem rendered="{!IsResourceManagerEnabled && !ShowResourceManagersAsDropdown}">
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__ResourceManager__c.Label}"/>
+					<apex:outputPanel layout="none">
+						<apex:inputField id="enhanced-input-resource-mgr" value="{!KimbleOne__Resource__c.KimbleOne__ResourceManager__c}" styleclass="kimbleSearch" html-data-typename="ResourceManagerResourceSearch"/>
+						<a href="javacript:void(0)" onclick="clearResourceMgr(); ">{!$Label.kimbleone__remove}</a>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem rendered="{!IsResourceManagerEnabled && ShowResourceManagersAsDropdown}">
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__ResourceManager__c.Label}"/>
+					<apex:outputPanel layout="none">
+						<apex:selectList id="ResourcingMgrList" value="{!KimbleOne__Resource__c.KimbleOne__ResourceManager__c}"  size="1" >
+							<apex:selectOptions value="{!ResourceManagerOptions}" />
+						</apex:selectList>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+
+			</apex:pageBlockSection>
+			
+			<apex:pageBlockSection rendered="{!ActivityRoleRequired || ActivityRoles.size > 1}">
+				<!-- Activity Role -->
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__ActivityRole__c.Label}" />
+					<apex:outputPanel layout="none">
+						<div class="requiredInput">
+							<apex:outputPanel layout="none" rendered="{!ActivityRoleRequired}"><div class="requiredBlock"></div></apex:outputPanel>
+							<apex:selectList html-data-object-type="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__ActivityRole__c.Name}" required="{!ActivityRoleRequired}" id="resourceRole" value="{!KimbleOne__Resource__c.KimbleOne__ActivityRole__c}" size="1" styleclass="temporal-value">
+								<apex:selectOptions value="{!ActivityRoles}" />
+							</apex:selectList>
+						</div>
+					</apex:outputPanel>							  
+				</apex:pageBlockSectionItem>
+				
+	    		<apex:pageBlockSectionItem >
+				</apex:pageBlockSectionItem>														
+			</apex:pageBlockSection>
+
+			<apex:pageBlockSection id="resourceCalendar">
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__Calendar__c.Label}" />
+					<apex:selectList html-data-object-type="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__Calendar__c.Name}" id="resourceCalendar2" value="{!KimbleOne__Resource__c.KimbleOne__Calendar__c}" required="true" size="1">
+						<apex:selectOptions value="{!Calendars}" />
+					</apex:selectList>
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__TimePatternVariant__c.Label}" />
+					<apex:selectList onchange="validateTimePatternChange()" id="TimePatternVariantInput" html-data-object-type="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__TimePatternVariant__c.Name}" value="{!KimbleOne__Resource__c.KimbleOne__TimePatternVariant__c}" size="1" required="true" styleclass="temporal-value">
+						<apex:selectOptions value="{!AllTimePatternVariants}" />
+					</apex:selectList>
+				</apex:pageBlockSectionItem>
+	    	</apex:pageBlockSection>
+
+			<apex:pageBlockSection id="resourceAllowanceScheme" rendered="{!TheResourceType.KimbleOne__IsGeneric__c == false}" >
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__AllowanceScheme__c.Label}" />
+					<apex:selectList id="resourceAllowanceScheme" value="{!KimbleOne__Resource__c.KimbleOne__AllowanceScheme__c}" size="1">
+						<apex:selectOptions value="{!TheAllowanceSchemes}" />
+					</apex:selectList>
+				</apex:pageBlockSectionItem>
+	    	</apex:pageBlockSection>
+	    	
+			
+	    	<apex:pageBlockSection id="resourceCurrencies">			    	    				 			   						
+	    		<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.CurrencyIsoCode.Label}" />
+					<apex:selectList id="resourceCurrency" html-data-object-type="{!$ObjectType.KimbleOne__Resource__c.Fields.CurrencyIsoCode.Name}" value="{!KimbleOne__Resource__c.CurrencyIsoCode}" size="1">
+						<apex:selectOptions value="{!TheActiveCurrencies}" />
+					</apex:selectList>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__StandardRevenueCurrencyISOCode__c.Label}" />
+					<apex:selectList id="standardRevenueCurrency" value="{!KimbleOne__Resource__c.KimbleOne__StandardRevenueCurrencyISOCode__c}" size="1">
+						<apex:selectOptions value="{!TheActiveCurrencies}" />
+					</apex:selectList>
+				</apex:pageBlockSectionItem>
+
+	    	</apex:pageBlockSection>
+	    	
+	    	<apex:pageBlockSection rendered="{!TheResourceType.KimbleOne__IsGeneric__c == false}">			    	    				 			   						
+	    	
+				<!-- Show Expense Reimbursement Currency for Non-Generic Resource -->		 							
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__ExpenseReimbursementCurrencyIsoCode__c.Label}" />
+					<apex:selectList id="expenseCurrency" value="{!KimbleOne__Resource__c.KimbleOne__ExpenseReimbursementCurrencyIsoCode__c}" size="1">
+						<apex:selectOptions value="{!TheActiveCurrencies}" />
+					</apex:selectList>
+				</apex:pageBlockSectionItem>
+			</apex:pageBlockSection>
+			
+			<apex:pageBlockSection >			    	    				 			   						
+	    	
+				<!-- Actual Cost -->
+				<apex:inputField html-data-object-type="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__ActualCost__c.Name}" styleclass="temporal-value" id="actualCost" value="{!KimbleOne__Resource__c.KimbleOne__ActualCost__c}" required="{!ActualCostRequired}" rendered="{!ActualCostDisplayed}"/>
+				<apex:pageBlockSectionItem rendered="{!ActualCostDisplayed}">
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__ActualCostUnitType__c.Label}" />
+				 	<apex:outputPanel layout="none">
+						<div class="requiredInput">
+							<apex:outputPanel layout="none" rendered="{!ActualCostRequired}"><div class="requiredBlock"></div></apex:outputPanel>
+							<apex:selectList id="actualCostUnitType" value="{!KimbleOne__Resource__c.KimbleOne__ActualCostUnitType__c}" size="1" required="{!ActualCostRequired}">
+								<apex:selectOptions value="{!TheTimeUnits}" />
+							</apex:selectList>
+						</div>
+					</apex:outputPanel>							  
+				</apex:pageBlockSectionItem>							
+
+				<!-- Standard Cost only editable if can be maintained at Resource level -->
+				<apex:inputField html-data-object-type="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__StandardCost__c.Name}" id="standardCost" value="{!KimbleOne__Resource__c.KimbleOne__StandardCost__c}" required="true" rendered="{!StandardCostEditable}"/>
+			 	<apex:pageBlockSectionItem rendered="{!StandardCostUnitTypeEditable}">
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__StandardCostUnitType__c.Label}" />
+			 		<apex:outputPanel layout="block" styleclass="requiredInput">
+						<div class="requiredBlock"></div>
+						<apex:selectList id="standardCostUnitType" value="{!KimbleOne__Resource__c.KimbleOne__StandardCostUnitType__c}" size="1" required="true">
+							<apex:selectOptions value="{!TheTimeUnits}" />
+						</apex:selectList>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+				
+				<apex:pageBlockSectionItem rendered="{!StandardCostUnitTypeEditable && !StandardCostEditable}">
+				<!-- Forces Standard Revenue and Standard Revenue unit type be on same line -->
+				</apex:pageBlockSectionItem>
+				
+				<!-- Standard Revenue only editable if can be maintained at Resource level -->
+				<apex:inputField html-data-object-type="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__StandardRevenue__c.Name}" id="standardRevenue" value="{!KimbleOne__Resource__c.KimbleOne__StandardRevenue__c}" required="{!StandardRevenueEditable}" styleclass="{!IF(StandardRevenueEditable,'requiredField','')}" rendered="{!StandardRevenueEditable}"/>
+				<apex:pageBlockSectionItem rendered="{!StandardRevenueEditable}">
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__StandardRevenueUnitType__c.Label}" />
+					<apex:outputPanel layout="block" styleclass="requiredInput">
+							<div class="requiredBlock"></div>
+							<apex:selectList id="standardRevenueUnitType" value="{!KimbleOne__Resource__c.KimbleOne__StandardRevenueUnitType__c}" size="1" required="true">
+								<apex:selectOptions value="{!TheTimeUnits}" />
+							</apex:selectList>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>													
+
+				<!-- Start Date -->
+				<apex:inputfield id="startDate" styleclass="datePickerPopup kimbleDatePicker requiredField" value="{!KimbleOne__Resource__c.KimbleOne__StartDate__c}" required="false" rendered="{!NOT(TheResourceType.KimbleOne__IsGeneric__c)}" />
+				<!-- End Date -->
+				<apex:inputfield id="endDate" styleclass="datePickerPopup kimbleDatePicker" value="{!KimbleOne__Resource__c.KimbleOne__EndDate__c}" required="false" rendered="{!NOT(TheResourceType.KimbleOne__HasMembers__c)}" />
+				
+									
+			</apex:pageBlockSection>
+
+			<apex:pageBlockSection rendered="{!ShowAutomatedMatchingConfig_Demand}" id="numCandidates">
+				<apex:selectList html-data-object-type="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__AssignmentDemandFulfilmentMode__c.Name}" id="resourceFulfilmentMode" value="{!KimbleOne__Resource__c.KimbleOne__AssignmentDemandFulfilmentMode__c}" size="1">
+					<apex:actionSupport event="onchange" rerender="numCandidates"/>
+					<apex:selectOptions value="{!AssignmentDemandFulfilmentModes}" />
+				</apex:selectList>
+				<apex:inputField value="{!KimbleOne__Resource__c.KimbleOne__AutoMatchNumberOfCandidates__c}" rendered="{!IF(OR(KimbleOne__Resource__c.KimbleOne__AssignmentDemandFulfilmentMode__c == CandidateFulfilmentMode, KimbleOne__Resource__c.KimbleOne__AssignmentDemandFulfilmentMode__c == AutoMatchCandidateFulfilmentMode), true, false)}"/>
+			</apex:pageBlockSection>
+
+			<apex:pageBlockSection rendered="{!ShowAutomatedMatchingConfig_Supply}">
+				<apex:inputField value="{!KimbleOne__Resource__c.KimbleOne__ExcludeFromAutoMatch__c}"/>
+			</apex:pageBlockSection>
+
+			<apex:pageBlockSection rendered="{!ShowShareDemand}">
+				<apex:inputField value="{!KimbleOne__Resource__c.KimbleOne__ShareDemandWithConsultants__c}"/>
+			</apex:pageBlockSection>
+
+			<apex:pageBlockSection columns="1">
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__Notes__c.Label}" />
+						<apex:inputTextarea id="NotesInput" rows="4" cols="95" value="{!KimbleOne__Resource__c.KimbleOne__Notes__c}" style="margin-top: 2px; margin-bottom: 2px; height: 60px; margin-left: 2px; margin-right: 2px; width: 502px; "/>
+				</apex:pageBlockSectionItem>
+			</apex:pageBlockSection>
+				   			
+			<apex:pageBlockSection collapsible="false" rendered="{!((TheResourceType.KimbleOne__IsGeneric__c == false && $ObjectType.KimbleOne__Resource__c.FieldSets.KimbleOne__NonGenericResourceDetails.Size > 0) || (TheResourceType.KimbleOne__IsGeneric__c && $ObjectType.KimbleOne__Resource__c.FieldSets.KimbleOne__GenericResourceDetails.Size > 0))}">
+				<apex:repeat value="{!$ObjectType.KimbleOne__Resource__c.FieldSets.KimbleOne__NonGenericResourceDetails}" var="f" >
+			  		<apex:inputField value="{!KimbleOne__Resource__c[f]}" required="{!f.Required}"  styleClass="{!IF(AND($ObjectType.KimbleOne__Resource__c.Fields[f].type == 'date',$ObjectType.KimbleOne__Resource__c.Fields[f].updateable),'kimbleDatePicker','')}" rendered="{!KimbleOne__Resource__c.ResourceType__r.KimbleOne__IsGeneric__c==false && !CONTAINS(f.FieldPath,'.')}"/>
+					<apex:outputField value="{!KimbleOne__Resource__c[f]}"  rendered="{!KimbleOne__Resource__c.ResourceType__r.KimbleOne__IsGeneric__c==false && CONTAINS(f.FieldPath,'.')}"/>
+				</apex:repeat>
+			
+				<apex:repeat value="{!$ObjectType.KimbleOne__Resource__c.FieldSets.KimbleOne__GenericResourceDetails}" var="f" >
+			  		<apex:inputField value="{!KimbleOne__Resource__c[f]}" required="{!f.Required}"  styleClass="{!IF(AND($ObjectType.KimbleOne__Resource__c.Fields[f].type == 'date',$ObjectType.KimbleOne__Resource__c.Fields[f].updateable),'kimbleDatePicker','')}" rendered="{!KimbleOne__Resource__c.ResourceType__r.KimbleOne__IsGeneric__c==true && !CONTAINS(f.FieldPath,'.')}"/>
+					<apex:outputField value="{!KimbleOne__Resource__c[f]}" rendered="{!KimbleOne__Resource__c.ResourceType__r.KimbleOne__IsGeneric__c==true && CONTAINS(f.FieldPath,'.')}"/>
+				</apex:repeat>
+			</apex:pageBlockSection>
+			
+			<script>
+			var temporalFields;
+	 
+	 		<apex:outputPanel layout="none" rendered="{!!ISBLANK(TemporalFieldsJson)}">
+				temporalFields = <apex:outputText value="{!TemporalFieldsJson}"/>;
+			</apex:outputPanel>
+		
+			</script>
+			
+			</apex:outputPanel>
+		</apex:pageBlock>
+		<div style="display:none"><apex:inputfield id="effectiveDate" value="{!KimbleOne__Resource__c.KimbleOne__EffectiveDate__c}"/></div>
+		<div style="display:none;" kimble-tip="null"></div>
+		
+		<apex:actionFunction action="{!ResourceTypeChange}" name="resourceTypeChange" rerender="ResourceProperties" onComplete="initialiseAll();" />
+		<apex:actionFunction action="{!Save}" name="save" rerender="resourceErrorsContainer" onComplete="saveComplete(0);initialiseAll();" />
+		<apex:actionFunction action="{!Save}" name="saveAndNew" rerender="TheForm" onComplete="saveComplete(1);initialiseAll();" />
+		<apex:actionFunction action="{!Save}" name="saveAndClone" rerender="TheForm" onComplete="saveComplete(2);initialiseAll();" />
+		<apex:actionFunction action="{!PlatformUserActions}" name="platformUserActions" rerender="TheForm">
+			<apex:param name="redirectNew" value=""/>
+		</apex:actionFunction>
+
+		<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+	
+	</apex:outputPanel>		
+</apex:form>
+
+<script>
+
+	var timePatternChanges = '<apex:outputText value="{!TimePatternVariantsJson}"/>';
+	var resourceAssignmentsUrl = '<apex:outputText value="{!ResourceAssignmentsUrl}"/>';
+
+	$(window).load(function(){
+			initialiseAll();
+		});
+		
+	function initialiseAll()
+	{
+		RefreshModalBoxy();
+		initialiseMandatoryFields();	
+		initialisePageTips();
+	}
+
+	function validateTimePatternChange() {
+		if (timePatternChanges == null || timePatternChanges == '') return;
+
+		var id = jQuery('[id$="TimePatternVariantInput"]').val();
+
+		jQuery('#time-pattern-change-warning').find('a').attr('href', resourceAssignmentsUrl + '&fromDate=' + kimble.parseDate(jQuery('[id$="effectiveDate"]').val()));
+
+		if (JSON.parse(timePatternChanges)[id]) {
+		    jQuery('#time-pattern-change-warning').show();
+  		}
+  		else {
+  		    jQuery('#time-pattern-change-warning').hide();
+    	}
+ 	}
+
+	 function updateResourceFullName()
+	 {
+			$("[id*=':ResourceFullName']").text($('.ResourceFirstName').val()+' '+$('.ResourceLastName').val());
+			$("[id*=':HiddenResourceFullName']").val($('.ResourceFirstName').val()+' '+$('.ResourceLastName').val());
+	 }
+	 
+	 function onChangeEmail(){
+		$("[id*=':UserNameField']").val($("[id*=':UserEmailField']").val());
+	}
+	 
+	 function initialiseMandatoryFields()
+	 {
+	 	jQuery.each($('INPUT.requiredField'), function (i, obj){
+	 		
+	 		var requiredBlock = $(obj);
+	 		
+	 		var parent = requiredBlock.parent();
+	 		
+	 		while (!parent.is('td'))
+	 		{
+	 			requiredBlock = parent;
+	 			parent = requiredBlock.parent();
+	 		}
+	 		
+			var requiredBlockCopy = requiredBlock.clone(true, true); //clean copy
+				
+			parent.children().each(function(){
+				$(this).remove();
+			});
+
+			var firstchild = $("<div></div>").attr("class","requiredInput");
+			firstchild.append ( $("<div></div>").attr("class","requiredBlock") );
+			firstchild.append (  requiredBlockCopy );
+				
+			parent.append(firstchild);
+	 	});
+	 	
+	 	if (temporalFields != null)
+	 	{
+			for (var i=0;i<temporalFields.length;i++)
+			{
+				console.log(temporalFields[i]);
+
+				var obj = jQuery('[data-object-type="' + temporalFields[i] + '"]');
+				obj.addClass('temporal-tracker');
+
+				if (obj.parent().find('.effective-date').length == 0) {
+					obj.parent().children().last().after(jQuery('<span class="fa fa-calendar effective-date"><input type="text" style="width:10px;visibility:hidden"/></span>'));
+				}
+			}
+
+			var currentEffectiveDate = kimble.parseDate(jQuery('[id$="effectiveDate"]').val(), true);
+
+			jQuery(document).off('click', '.effective-date, .resource-type-effective-date');
+			jQuery(document).on('click', '.effective-date, .resource-type-effective-date', function (event) {
+				var inp = jQuery(this).find('input');
+
+				inp.datepicker({dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+														defaultDate: jQuery('[id$="effectiveDate"]').val(),
+														minDate:jQuery('[id$="startDate"]').val(),
+														altField: '[id$="effectiveDate"]',
+														showOtherMonths: true,
+														selectOtherMonths: true,
+														onSelect: function(dateText, inst) {
+														    if (kimble.parseDate(jQuery(this).val(), true).valueOf() < currentEffectiveDate.valueOf() ){
+														    	jQuery('#later-effective-date').show();
+														    }
+														    else {
+														        jQuery('#later-effective-date').hide();
+                  											}
+
+															//set date on tpv message
+															jQuery('#time-pattern-change-warning').find('a').attr('href', resourceAssignmentsUrl + '&fromDate=' + kimble.parseDate(jQuery(this).val()));
+
+														    jQuery(this).attr('title', dateText);
+														    inp.datepicker('destroy');}
+														});
+
+				inp.datepicker('show');
+			});
+
+			jQuery(document).off('change', '.temporal-tracker');
+			jQuery(document).on('change', '.temporal-tracker', function (event) {
+
+				var spn = jQuery(this).parent().find('.effective-date');
+
+				spn.show();
+
+				spn.click();
+
+			});
+
+			jQuery(document).off('change', '[id$="resource-type"]');
+			jQuery(document).on('change', '[id$="resource-type"]', function (event) {
+				var spn = jQuery(this).parent().find('.resource-type-effective-date');
+
+				spn.show();
+
+				spn.click();
+
+				resourceTypeChange();
+			});
+		}
+
+		jQuery('[id$="enhanced-input-resource-mgr"]').prop('disabled','disabled');
+
+		jQuery('.kimbleDatePicker').datepicker('destroy');
+	 	kimble.initialiseDatePickers();
+	 }
+	 
+	function saveComplete(redirectNew)
+	{
+		if (!isThereError('#resourceErrors')) 
+		{
+			platformUserActions(redirectNew);
+		} 
+	}
+	 
+	function isThereError(errorSelector)
+	{
+		if($(errorSelector + ' > span')[0].children.length == 0) {
+			return false; //no errors
+		}
+		else
+		{   EnableButtonPanel('ResourceButtonPanel');
+			return true; //errors
+		}
+	}
+
+	function clearResourceMgr()
+	{
+	    jQuery('[id$="enhanced-input-resource-mgr"]').val('');
+ 	}
+	
+	/* Tooltips */
+	var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+	var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+	var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+	var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+	var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+	var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+
+	function initialisePageTips()
+	{
+		ApplyTipAttributes();
+		initialiseTips();
+	}
+	
+	// add tip attributes to elements
+	function ApplyTipAttributes()
+	{
+		if(enableTips)
+		{
+			jQuery('[id$="actualCost"]').attr('kimble-tip','ActualCost').attr('kimble-tip-extended-text','ActualCostExtendedText').addClass('tip-right');
+			jQuery('[id$="actualCostUnitType"]').attr('kimble-tip','ActualCostUnitType').attr('kimble-tip-extended-text','ActualCostUnitTypeExtendedText');
+			jQuery('[id$="primaryBusinessUnit"]').attr('kimble-tip','BusinessUnit').attr('kimble-tip-extended-text','BusinessUnitExtendedText').addClass('tip-right');
+			jQuery('[id$="secondaryBusinessUnit"]').attr('kimble-tip','BusinessUnitSecondary').attr('kimble-tip-extended-text','BusinessUnitSecondaryExtendedText');
+			jQuery('[id$="resourceCalendar2"]').attr('kimble-tip','Calendar').attr('kimble-tip-extended-text','CalendarExtendedText').addClass('tip-right');
+			jQuery('[id$="resourceCurrency"]').attr('kimble-tip','Currency').attr('kimble-tip-extended-text','CurrencyExtendedText').addClass('tip-right');
+			jQuery('[id$="endDate"]').attr('kimble-tip','EndDate').attr('kimble-tip-extended-text','EndDateExtendedText');
+			jQuery('[id$="expenseCurrency"]').next().attr('kimble-tip','ExpenseReimbursementCurrency').attr('kimble-tip-help-link','ExpenseReimbursementCurrencyHelpLink').attr('kimble-tip-extended-text','ExpenseReimbursementCurrencyExtendedText').addClass('tip-right');
+			jQuery('[id$="resourceGrade"]').attr('kimble-tip','Grade').attr('kimble-tip-help-link','GradeHelpLink').attr('kimble-tip-extended-text','GradeExtendedText').addClass('tip-right');
+			jQuery('[id$="LastName"]').attr('kimble-tip','LastName');
+			jQuery('[id$="LocationInput"]').attr('kimble-tip','Location').attr('kimble-tip-help-link','LocationHelpLink').attr('kimble-tip-extended-text','LocationExtendedText');
+			jQuery('[id$="resourceLocationLookup"]').attr('kimble-tip','Location').attr('kimble-tip-help-link','LocationHelpLink').attr('kimble-tip-extended-text','LocationExtendedText');
+			jQuery('[id$="resourceLocationDropdown"]').attr('kimble-tip','Location').attr('kimble-tip-help-link','LocationHelpLink').attr('kimble-tip-extended-text','LocationExtendedText');
+			jQuery('[id$="NotesInput"]').attr('kimble-tip','Notes').addClass('tip-right');
+			jQuery('[id$="resourceRole"]').attr('kimble-tip','PrimaryRole').attr('kimble-tip-help-link','PrimaryRoleHelpLink').attr('kimble-tip-extended-text','PrimaryRoleExtendedText').addClass('tip-right');
+			jQuery('[id$="resource-type"]').attr('kimble-tip','ResourceType').attr('kimble-tip-extended-text','ResourceTypeExtendedText');
+			jQuery('[id$="standardRevenueCurrency"]').next().attr('kimble-tip','StandardRevenueCurrency').attr('kimble-tip-extended-text','StandardRevenueCurrencyExtendedText');
+			jQuery('[id$="startDate"]').attr('kimble-tip','StartDate').addClass('tip-right');
+			jQuery('[id$="TimePatternVariantInput"]').attr('kimble-tip','TimePatternVariant').attr('kimble-tip-extended-text','TimePatternVariantExtendedText');
+			jQuery('[id$="sfUser"]').next().attr('kimble-tip','User').attr('kimble-tip-help-link','UserHelpLink').attr('kimble-tip-extended-text','UserExtendedText').addClass('tip-right');
+		}
+	}
+
+	function updateTipsConfigSetting(newTipSetting)
+	{
+		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+			newTipSetting,
+				function(result, event){
+					if (event.status)
+					{
+						var data = {};
+						data.results = result;
+						loadGuidance();
+					}
+					else
+					{
+						alert(event.message);
+					}
+			},
+			{escape: false, timeout: 60000}
+		);
+	}
+</script>
+
+<style>
+	.effective-date, .resource-type-effective-date {
+    font-size: 16px;
+    margin-left: 4px;
+    cursor: pointer;
+    display:none;
+}
+</style>
+
+</apex:define>
+</apex:composition>
+</apex:page>

@@ -1,0 +1,156 @@
+<apex:page standardController="KimbleOne__SupplierRequisition__c" extensions="KimbleOne.ResourcedActivitySupplierReqEditCntrllr" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__SupplierRequisition__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    
+    <apex:define name="Menu">
+		<c:Menu MenuContextType="SupplierRequisition" MenuContextId="{!KimbleOne__SupplierRequisition__c.Id}" MenuContextName="{!KimbleOne__SupplierRequisition__c.Name}"/> 
+    </apex:define>
+    
+    <apex:define name="Content">
+    	
+    	<apex:form id="TheForm">
+    	
+    	<div id="pageErrors">
+    		<apex:pageMessages escape="False" />
+		</div>
+		
+		<apex:pageBlock title="{!$ObjectType.KimbleOne__SupplierRequisition__c.Label}">
+        
+           	<apex:pageBlockButtons location="top">
+           		<apex:commandButton action="{!Cancel}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__back}" rerender="TheForm" />
+           		<apex:commandButton action="{!Save}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__save}" onComplete="initialiseItems();" reRender="TheForm" />
+            </apex:pageBlockButtons>
+			
+			<apex:outputPanel style="display:none">
+			
+				<apex:outputText value="{!KimbleOne__SupplierRequisition__c.KimbleOne__ShippingAddress__c}"/>
+				<apex:outputText value="{!KimbleOne__SupplierRequisition__c.KimbleOne__ShippingCity__c}"/>
+				<apex:outputText value="{!KimbleOne__SupplierRequisition__c.KimbleOne__ShippingCountry__c}"/>
+				<apex:outputText value="{!KimbleOne__SupplierRequisition__c.KimbleOne__ShippingState__c}"/>
+				<apex:outputText value="{!KimbleOne__SupplierRequisition__c.KimbleOne__ShippingStreetName__c}"/>
+				<apex:outputText value="{!KimbleOne__SupplierRequisition__c.KimbleOne__ShippingPostalCode__c}"/>
+			
+			</apex:outputPanel>
+			
+			<apex:pageblockSection showHeader="true" collapsible="false" title="{!$Label.kimbleone__requisitiondetailsheading}" columns="2" >		
+				
+				<apex:outputField value="{!KimbleOne__SupplierRequisition__c.KimbleOne__Resource__c}"/>
+				<apex:outputField value="{!KimbleOne__SupplierRequisition__c.KimbleOne__SupplierAccount__c}"/>
+
+				<apex:outputField id="resourcedActivity" value="{!KimbleOne__SupplierRequisition__c.KimbleOne__ResourcedActivity__c}" rendered="{!ISBLANK(KimbleOne__SupplierRequisition__c.KimbleOne__DeliveryElement__c)}"/>
+           		<apex:outputField id="deliveryGroup" value="{!KimbleOne__SupplierRequisition__c.DeliveryElement__r.KimbleOne__DeliveryGroup__c}" rendered="{!!ISBLANK(KimbleOne__SupplierRequisition__c.KimbleOne__DeliveryElement__c)}"/>
+           		<apex:outputField value="{!KimbleOne__SupplierRequisition__c.KimbleOne__SupplierContact__c}"/>
+    			
+    			<apex:outputField value="{!KimbleOne__SupplierRequisition__c.KimbleOne__RequisitionDate__c}"/>
+    			<apex:outputField value="{!KimbleOne__SupplierRequisition__c.KimbleOne__ExpectedReceiptDate__c}"/>
+    			
+           		<apex:outputField value="{!KimbleOne__SupplierRequisition__c.KimbleOne__Status__c}"/>
+    			<apex:outputField value="{!KimbleOne__SupplierRequisition__c.SupplierPurchaseOrder__r.Name}"/>
+    				
+				<apex:inputField value="{!SupplierPurchaseOrder.KimbleOne__ExpiryDate__c}" styleClass="kimbleDatePicker"/>
+				<apex:inputField value="{!SupplierPurchaseOrder.KimbleOne__Status__c}" />
+				
+				<apex:pageBlockSectionItem > 
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__SupplierRequisition__c.Fields.KimbleOne__ShippingAddress__c.Label}"/>
+					<c:AddressDetailsField addressObject="{!KimbleOne__SupplierRequisition__c}" addressFieldPrefix="Shipping" refreshList="SupplierRequisitionPanel" />
+				</apex:pageBlockSectionItem>
+				<apex:selectList value="{!KimbleOne__SupplierRequisition__c.KimbleOne__BusinessUnitTradingEntity__c}" size="1" required="true">
+					<apex:selectOptions value="{!TheTradingEntities}" />
+				</apex:selectList>
+				
+				<apex:inputField value="{!KimbleOne__SupplierRequisition__c.KimbleOne__SupplierNotes__c}" style="width: 300px;" />
+				<apex:inputField value="{!KimbleOne__SupplierRequisition__c.KimbleOne__Notes__c}" style="width: 300px;" />
+				
+			</apex:pageblockSection>
+			
+			<apex:pageBlockSection >
+	
+					<apex:repeat value="{!$ObjectType.KimbleOne__SupplierRequisition__c.FieldSets.KimbleOne__SupplierRequisitionDetails}" var="f" >
+	    	 			<apex:inputField value="{!KimbleOne__SupplierRequisition__c[f]}" rendered="{!!CONTAINS(f.FieldPath,'.')}" required="{!f.Required}" styleClass="{!IF(AND($ObjectType.KimbleOne__SupplierRequisition__c.Fields[f].type == 'date',$ObjectType.KimbleOne__SupplierRequisition__c.Fields[f].updateable),'kimbleDatePicker','')}" />
+						<apex:outputField value="{!KimbleOne__SupplierRequisition__c[f]}" rendered="{!CONTAINS(f.FieldPath,'.')}" />
+		   			</apex:repeat>
+
+			</apex:pageblockSection>
+			
+		</apex:pageBlock>
+		
+		<apex:pageblock id="ReqLinesPageBlock">
+		
+			<apex:pageblockSection collapsible="false">
+			
+				<apex:pageBlockTable value="{!TheOrderedRequisitionLines}" var="line">
+					<apex:column value="{!line.KimbleOne__LineNumber__c}" />
+					<apex:repeat value="{!$ObjectType.KimbleOne__SupplierRequisitionLine__c.FieldSets.KimbleOne__SupplierRequisitionLineDetails}" var="f">
+						<apex:column rendered="{!!CONTAINS(f.FieldPath,'.')}" headerValue="{!f.Label}">
+							<apex:inputField value="{!line[f]}" required="{!f.Required}" styleClass="{!IF(AND($ObjectType.KimbleOne__SupplierRequisitionLine__c.Fields[f].type == 'date',$ObjectType.KimbleOne__SupplierRequisitionLine__c.Fields[f].updateable),'kimbleDatePicker','')}"/>
+						</apex:column>
+					</apex:repeat>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__SupplierRequisitionLine__c.Fields.Name.Label}" width="340px" >
+						<apex:inputField style="width:320px" value="{!line.Name}" /> 
+					</apex:column>
+					<apex:column headervalue="{!$ObjectType.KimbleOne__SupplierRequisitionLine__c.Fields.KimbleOne__ActivityExpenseCategory__c.Label}" >
+      					<apex:selectList value="{!line.KimbleOne__ActivityExpenseCategory__c}" size="1" >
+							<apex:selectOptions value="{!TheExpenseCategories}" />
+						</apex:selectList>
+      				</apex:column>
+					
+	      			<apex:column headervalue="{!$ObjectType.KimbleOne__SupplierRequisitionLine__c.Fields.KimbleOne__RequisitionedUnits__c.Label}">
+    	  				<apex:actionRegion >
+				        <apex:inputField value="{!line.KimbleOne__RequisitionedUnits__c}" required="false">
+      						<apex:actionSupport event="onchange" action="{!UpdateRequisitionLine}" rerender="NetAmountField" />
+      					</apex:inputField>
+				        </apex:actionRegion>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__SupplierRequisitionLine__c.Fields.KimbleOne__UnitAmount__c.Label}">
+						<apex:actionRegion >
+				        <apex:inputField value="{!line.KimbleOne__UnitAmount__c}" required="false">
+      						<apex:actionSupport event="onchange" action="{!UpdateRequisitionLine}" rerender="NetAmountField" />
+      					</apex:inputField>
+						</apex:actionRegion>
+			        </apex:column>
+
+      				<apex:column headerValue="{!$ObjectType.KimbleOne__SupplierRequisitionLine__c.Fields.KimbleOne__NetAmount__c.Label}">
+      					<apex:outputField id="NetAmountField" value="{!line.KimbleOne__NetAmount__c}"/>
+      				</apex:column>
+
+				</apex:pageBlockTable>
+			
+			</apex:pageblockSection>
+		
+		</apex:pageBlock>
+	
+		</apex:form>
+		
+		<style>
+		.mainTitle {white-space:nowrap;}
+		</style>
+
+		<script>
+
+			jQuery(window).load(function()
+			{
+				initialiseItems();
+			});
+			function initialiseItems()
+			{
+				SetupDatePicker();
+				jQuery('[id$="ReqLinesPageBlock"]').find('.pbBody').css({'overflow-x':'auto'});
+			}
+			function SetupDatePicker()
+			{
+				//dateFormat: 'yy-mm-dd',
+				jQuery('.kimbleDatePicker').datepicker({
+						dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+						showOtherMonths: true,
+						selectOtherMonths: true,
+						changeMonth: true,
+						changeYear: true});
+			}
+
+		</script>
+		
+    </apex:define>
+    
+</apex:composition>
+
+</apex:page>

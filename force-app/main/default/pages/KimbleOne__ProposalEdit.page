@@ -1,0 +1,241 @@
+<apex:page standardcontroller="KimbleOne__Proposal__c" extensions="KimbleOne.ProposalEditController,KimbleOne.SecurityController,KimbleOne.TooltipsController" sidebar="false" >
+ 
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+	<c:Menu MenuContextType="Proposal" MenuContextId="{!KimbleOne__Proposal__c.Id}" MenuContextName="{!KimbleOne__Proposal__c.Name}" rendered="{!!ISBLANK(Proposal__c.Id) }"/>
+</apex:define>
+    
+<apex:define name="Content">
+
+			<!-- Kimble Guidance -->
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+			<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+				<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/ProposalEditNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+	
+				<apex:outputPanel layout="none" rendered="{!ProposalEditTipOverrideEnabled}">
+					<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+				</apex:outputPanel>
+			</apex:outputPanel>
+
+			<style>
+				.p-tip-qtip {
+					background-color: lemonchiffon;
+					padding: 2px;
+					font-size: 12px;
+				}
+				.extended-text {
+					display: none;
+				}
+				.tip-link-see-more {
+					color:rgb(0, 95, 178) !important;
+					cursor: pointer;
+					text-decoration: none;
+				}
+				.tip-link-kimble-help {
+					color:rgb(0, 95, 178) !important;
+					float:right;
+					text-decoration: none;
+				}
+				.hide-tip {
+					display: none;
+				}
+				.show-tip {
+					display: inline;
+				}
+				.qtip-content>ul , .extended-text>ul  {    
+					padding-inline-start: 0px;
+					margin-block-start: 0px;
+					display: inline-block;
+					margin-block-end: 0px;
+				}	
+				.disable-switch {
+					pointer-events: none;
+				}
+			</style>
+			<apex:form id="TheForm">
+
+		<apex:outputPanel layout="none" rendered="{!KimbleOne__Proposal__c.Id == null}">
+			<apex:sectionHeader title="{!$Label.kimbleone__kimblesalesheader}" subtitle="{!$Label.kimbleone__new} {!$ObjectType.KimbleOne__Proposal__c.label}"/>
+		</apex:outputPanel>
+       
+		<apex:outputPanel id="Error-panel" layout="none">
+			<apex:pagemessages escape="false"/>
+		</apex:outputPanel>
+
+		<apex:variable value="{!$ObjectType.KimbleOne__SalesOpportunity__c.Fields.KimbleOne__ResponseRequiredDate__c.Name}" var="responseRequiredDateFieldName" />        	
+		<apex:pageBlock mode="edit" >
+		        
+		<apex:pageBlockSection title="{!$Label.kimbleone__proposaldetailslabel}" >
+
+			<apex:pageBlockSectionItem rendered="{!CanManageProposal}">
+				<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__Account__c.Label}" />
+				<apex:actionRegion >
+					<span kimble-tip="null"></span>
+				 	<apex:inputField styleClass="account-tip" id="accountName" value="{!KimbleOne__Proposal__c.KimbleOne__Account__c}" required="true">
+						<apex:actionSupport event="onchange" action="{!AccountChanged}" rerender="proposalDetailsNewPanel,proposalBusinessUnit,proposalProposition,businessunit-panel" />
+           			</apex:inputField>
+				</apex:actionRegion>  
+			</apex:pageBlockSectionItem>
+			<apex:pageBlockSectionItem rendered="{!CanManageProposal}"/>
+
+			<apex:inputField styleClass="short-name-tip" id="proposalName" value="{!KimbleOne__Proposal__c.KimbleOne__ShortName__c}" required="true"/>
+			<apex:inputfield id="proposalAcceptanceDate" styleClass="acceptance-date-tip kimbleDatePicker" value="{!KimbleOne__Proposal__c.KimbleOne__AcceptanceDate__c}" required="true" rendered="{!CanManageProposal}"/>
+			<apex:pageBlockSectionItem rendered="{!!CanManageProposal}"/>
+			
+			<apex:pageBlockSectionItem rendered="{!CanManageProposal}">
+            	<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__BusinessUnit__c.Label}" />            
+				<apex:outputPanel layout="none">
+					<div class="requiredInput" id="businessUnit-reqd">
+						<div class="requiredBlock"></div>
+						<apex:actionRegion >
+							<apex:selectList id="proposalBusinessUnit" styleClass="business-unit-tip" value="{!KimbleOne__Proposal__c.KimbleOne__BusinessUnit__c}" size="1" required="true" rendered="{!!UseBusinessUnitEnhancedLookup}">
+								<apex:selectOptions value="{!TheBusinessUnits}" />
+								<apex:actionSupport event="onchange" rerender="proposalProposition"/>
+							</apex:selectList>
+						</apex:actionRegion>
+						<apex:actionRegion >
+							<apex:outputPanel id="businessunit-panel">
+								<apex:inputField id="enhanced-input-businessunit" value="{!KimbleOne__Proposal__c.KimbleOne__BusinessUnit__c}" styleclass="kimbleSearch business-unit-tip"  rendered="{!UseBusinessUnitEnhancedLookup}">
+									<apex:actionSupport onsubmit="disableButtons();" event="onchange" rerender="businessunit-panel, proposalProposition, Error-panel" oncomplete="enableButtons();"/>
+								</apex:inputField>
+							</apex:outputPanel>
+						</apex:actionRegion>							
+					</div>
+				</apex:outputPanel>
+			</apex:pageBlockSectionItem> 
+			<apex:pageBlockSectionItem rendered="{!CanManageProposal}"/>
+			
+			<apex:pageBlockSectionItem > 
+				<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__Proposition__c.Label}" />      
+				<apex:outputPanel layout="none">
+					<div class="requiredInput" id="proposition-reqd">
+						<div class="requiredBlock"></div>
+						<apex:selectList id="proposalProposition" styleClass="proposition-tip" value="{!KimbleOne__Proposal__c.KimbleOne__Proposition__c}" size="1" required="true" >
+							<apex:selectOptions value="{!ThePropositions}" />
+						</apex:selectList>          
+					</div>
+				</apex:outputPanel>
+			</apex:pageBlockSectionItem>
+			<apex:pageBlockSectionItem rendered="{!!CanManageProposal}"/>
+			
+			<apex:pageBlockSectionItem rendered="{!CanManageProposal && !(IsAccepted || IsRejected)}">
+	    	   	<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ForecastStatus__c.Label}"/>
+		         	<apex:selectRadio value="{!KimbleOne__Proposal__c.KimbleOne__ForecastStatus__c}" layout="pageDirection" border="0" styleClass="forecast-status-tip">
+					<apex:selectOptions value="{!TheForecastStatuses}" />
+				</apex:selectRadio>
+	 		</apex:pageBlockSectionItem>
+		 	<apex:pageBlockSectionItem rendered="{!CanManageProposal && (IsAccepted || IsRejected)}">
+		       	<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ForecastStatus__c.Label}"/>
+	    	 	<apex:outputField value="{!KimbleOne__Proposal__c.ForecastStatus__r.Name}" styleClass="forecast-status-tip"/>
+	        </apex:pageBlockSectionItem>
+				 				
+	        <apex:inputfield id="opportunitySummary" styleClass="summary-tip" style="width: 500px;" value="{!KimbleOne__Proposal__c.KimbleOne__Summary__c}"/>          
+			<apex:pageBlockSectionItem /> 
+			
+			<apex:inputfield id="opportunityDescription" styleClass="description-tip" style="width: 500px;" value="{!KimbleOne__Proposal__c.KimbleOne__Description__c}"/>          
+			<apex:pageBlockSectionItem /> 
+			
+         	<apex:repeat value="{!$ObjectType.KimbleOne__Proposal__c.FieldSets.KimbleOne__ProposalDetails}" var="f">
+   				<apex:inputField value="{!KimbleOne__Proposal__c[f]}" rendered="{!!CONTAINS(f.FieldPath,'.')}" required="{!f.Required}" styleClass="{!IF(AND($ObjectType.KimbleOne__Proposal__c.Fields[f].type == 'date',$ObjectType.KimbleOne__Proposal__c.Fields[f].updateable),'kimbleDatePicker','')}" />
+				<apex:outputField value="{!KimbleOne__Proposal__c[f]}" rendered="{!CONTAINS(f.FieldPath,'.')}"/>
+   			</apex:repeat>
+   			
+		</apex:pageBlockSection>
+
+		<apex:pageBlockButtons location="bottom" styleclass="ButtonPanel">
+			<input id="save" class="btn " type="button" onclick="DisableButtonPanel('ButtonPanel','',[]);saveForm()" value="{!$Label.Save}" />
+
+			<apex:outputPanel layout="none" rendered="{!CanRevert && HasPermission['RevertWonProposal']}">	
+				<input id="save" class="btn " type="button" onclick="DisableButtonPanel('ButtonPanel','',[]); revert()" value="{!$Label.ReOpenButton}" />
+			</apex:outputPanel>
+
+
+		</apex:pageBlockButtons>
+		
+		</apex:pageBlock>
+		
+		<apex:actionFunction action="{!SaveAndRedirect}" name="saveForm" rerender="TheForm" onComplete="getReferenceData(); initialiseItems();" />
+		<apex:actionFunction action="{!RevertProposal}" name="revert" rerender="TheForm" onComplete="getReferenceData()" />
+
+		<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialiseTips();"/>
+		
+	</apex:form>
+	
+	<script>
+		function disableButtons() {
+			jQuery('[id$="save"]').prop('disabled', true).addClass('btnDisabled');
+			
+		}
+		
+		function enableButtons() {
+			jQuery('[id$="save"]').prop('disabled', false).removeClass('btnDisabled');
+		}
+
+
+		jQuery(window).load(function()
+		{
+			initialiseTips();
+			initialiseItems();
+		});
+
+		/* Proposal Tooltips */
+		var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+		var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+		var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+		var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+		var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+		var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+		
+		// add tip attributes to elements in components
+		jQuery('.account-tip').attr('kimble-tip','Account').addClass('tip-right');
+		jQuery('.short-name-tip').attr('kimble-tip','ShortName').addClass('tip-right');
+		jQuery('.business-unit-tip').attr('kimble-tip','BusinessUnit').attr('kimble-tip-help-link','BusinessUnitHelpLink').addClass('tip-right');
+		jQuery('.proposition-tip').attr('kimble-tip','Proposition').attr('kimble-tip-extended-text','PropositionExtendedText').addClass('tip-right');
+		jQuery('.description-tip').attr('kimble-tip','Description').addClass('tip-right');
+		jQuery('.acceptance-date-tip').attr('kimble-tip','AcceptanceDate');
+		jQuery('.forecast-status-tip').attr('kimble-tip','ForecastStatus').attr('kimble-tip-help-link','ForecastStatusHelpLink').addClass('tip-bottom');
+  		
+		function updateTipsConfigSetting(newTipSetting)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+				newTipSetting,
+					function(result, event){
+						if (event.status)
+						{
+							var data = {};
+							data.results = result;
+							loadGuidance();
+						}
+						else
+						{
+							alert(event.message);
+						}
+				},
+				{escape: false, timeout: 60000}
+			);
+		}
+
+		function initialiseItems()
+		{
+		    SetupDatePicker();
+  		}
+		function SetupDatePicker()
+		{
+			//dateFormat: 'yy-mm-dd',
+			jQuery('.kimbleDatePicker').datepicker({
+					dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true,
+					selectOtherMonths: true,
+					changeMonth: true,
+					changeYear: true});
+		}
+
+
+	</script>
+  
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

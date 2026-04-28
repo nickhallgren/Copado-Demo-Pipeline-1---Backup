@@ -1,0 +1,1799 @@
+<apex:page standardController="KimbleOne__InvoiceFormat__c" extensions="KimbleOne.InvoiceFormatEditController" sidebar="false" showHeader="true">
+
+
+<apex:composition template="KimbleOne__SiteMaster">
+	<apex:define name="Menu">
+			<c:Menu id="menuPageTitle" DefaultHelpPage="CustomizingInvoiceFormats.html" MenuContextName="{!$ObjectType.KimbleOne__InvoiceFormat__c.Label}"/>
+	</apex:define>
+
+	<apex:define name="Content">	
+		<c:JQueryFieldSelectorAddIn />
+
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+		<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+	
+			
+<Style>
+.inp{
+	width: 200px;
+}			
+/* SELECT 2 STYLING */
+.select2-results li {margin-left:0px;}
+.select2-container-multi .select2-choices
+{
+	border: 2px solid rgb(224,224,224);
+	background-image:none;
+}
+.select2-container-multi .select2-choices .select2-search-choice {
+	border: 2px solid rgb(0, 148, 255);
+	border-radius: 6px;
+	padding: 5px 20px 5px 4px;
+	background-image:none;
+}
+
+.select2-container-multi .select2-search-choice-close {
+	background-image:  url({!URLFOR($Resource.KimbleOne__AssignmentImages, 'assignmentSprite.png')});
+	background-position: -2px -29px;
+	background-repeat: no-repeat;
+	left:auto;
+}
+
+.select2-container-multi .select2-choices .select2-search-choice .select2-search-choice-close:hover {
+	background-position: -2px -1px;
+}
+.GroupCriteriaSearch {
+	width: 530px;
+}
+
+
+.tabContainer {
+	
+}
+
+.fields {
+	padding-right: 20px;
+	display: inline-block;
+	display: table-column;
+}
+
+.buttons {
+	overflow: hidden;
+	display: inline-grid;
+	height: 90px;
+	width: 80px; 
+}
+
+.selectedFieldsListTable {
+	width: 90%;
+	table-layout: fixed;
+}
+
+.selectedFieldsListTable td {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	word-wrap: break-word;
+	white-space: normal;
+}
+
+.selectedFieldsListTable tr {
+	height: 30px;
+}
+
+.fieldsAndButtons {
+	display: grid;
+	grid-template-columns: auto auto;
+}
+
+.fieldsAndButtons-item {
+	border: 0px solid rgba(0, 0, 0, 0);
+	padding-right: 10px;
+}
+
+.fieldListActionBtn {
+	height: 25px;
+}
+
+
+/* Loading idicator */
+		.loadingIndicator img {
+	    	margin-right:9px;
+		}
+	
+		.loadingIndicator {
+		   top:0;
+		   right:0;
+		   width:100%;
+		   height:100%;
+		   font-weight: bold;
+		   position:absolute;
+		   text-align:center;
+		   /* IE filter */
+		   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+		   -moz-opacity:0.7;    /* Mozilla extension */
+		   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+		   opacity:0.7; /* CSS3 */
+		   z-index:1000;
+		   background-color:white;
+		}
+	
+		#loadingIndicatorInnerContainer { 
+		    position:absolute; 
+		    top:50%;
+		    height:10em; 
+		    margin-top:-2em;
+		    width:100%;
+		}
+		#loadingIndicatorOuterContainer { 
+			display:none;
+		}
+
+  		.GroupByPosition{
+		    border-radius: 5px;
+  			background: #909090;
+  			padding: 10px;
+			width: 230px;
+			position: absolute;
+  			right: 0px;
+  			margin-right: 2px;
+		}
+		.GroupByPositionSummary{
+		    border-radius: 5px;
+  			background: #909090;
+  			padding: 10px;
+			width: 230px;
+			color: white;
+		}
+</Style>
+
+			<apex:outputPanel layout="none" rendered="{!!ISBLANK(NoAccessMessage)}">
+				<apex:outputText value="{!NoAccessMessage}"/>
+			</apex:outputPanel>
+			
+			<apex:outputPanel layout="none" rendered="{!ISBLANK(NoAccessMessage)}">
+
+			<apex:form id="TheForm" >
+				<apex:actionFunction action="{!Cancel}" name="CancelInvoiceFormat"  rerender="TheForm" />
+				
+				<apex:outputPanel id="InvoiceFormatPanel">
+
+					<div id="InvoiceFormatErrors" style="display:none">
+						<apex:pageMessage summary="{!$Label.kimbleone__errors}" severity="warning" strength="2" rendered="true">
+							<ul id="InvoiceFormatErrorsMsg" style=" margin:0px ;padding:0">
+								
+							</ul>
+						</apex:pageMessage>
+					</div>
+					<apex:pagemessages escape="false" />
+
+					<div id="InvoiceFormatSaveSuccessful" style="display:none">
+						<apex:pageMessage summary="{!$ObjectType.KimbleOne__InvoiceFormat__c.label} {!$Label.kimbleone__changessavedmessage}" severity="confirm" strength="3" />
+					</div>
+					
+					<div>
+						<div id="loadingIndicatorOuterContainer" class="loadingIndicator">
+						    	<div id="loadingIndicatorInnerContainer">
+						        	<img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+						  	</div>
+						</div>
+						<div id="TheMainFormContainer">
+				
+				
+					<apex:pageBlock id="InvoiceFormatEditBlock"
+						title="{!$ObjectType.KimbleOne__InvoiceFormat__c.Label}">
+
+						<apex:pageBlockButtons location="both">
+							<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__InvoiceFormat__c.updateable}">
+								<input type="button" class="btn" onclick="SaveInvoiceFormat(); return false" value="{!$Label.Save}"/>
+							</apex:outputPanel>
+							<input class="btn" type="button" onclick="safeNavigateToSForceURL('/{!$ObjectType.InvoiceFormat__c.keyPrefix}');" value="{!$Label.Cancel}"/>
+						</apex:pageBlockButtons>
+
+						<apex:pageblockSection collapsible="false" showheader="false"
+							columns="2">
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.Name.Label}" styleClass="NameLbl"/>
+								<apex:outputPanel layout="block" styleClass="requiredInput">
+									<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+									<apex:inputText value="{!invoiceFormat.Name}" styleClass="Name inp"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem helpText="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__InvoiceMode__c.inlineHelpText}">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__InvoiceMode__c.Label}" styleClass="InvoiceModeLbl"/>
+								<apex:selectList value="{!invoiceFormat.KimbleOne__InvoiceMode__c}" size="1" styleclass="InvoiceMode" onChange="changeInvoiceMode()">
+									<apex:selectOptions value="{!InvoiceModeEnums}" />
+								</apex:selectList>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem helpText="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IsInternal__c.inlineHelpText}">
+ 								<apex:outputLabel value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IsInternal__c.Label}"/>
+								<apex:inputCheckbox value="{!invoiceFormat.KimbleOne__IsInternal__c}" styleclass="IsInternal"  onChange="showHideTabsBasedOnInternalOrSupplier()"/>
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem helpText="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IsSupplier__c.inlineHelpText}">
+ 								<apex:outputLabel value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IsSupplier__c.Label}"/>
+								<apex:inputCheckbox value="{!invoiceFormat.KimbleOne__IsSupplier__c}" styleclass="IsSupplier" onChange="showHideTabsBasedOnInternalOrSupplier()"/>
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__RoundingRule__c.Label}" styleClass="RoundingRuleLbl" />
+								<apex:outputPanel layout="block" styleClass="requiredInput">
+									<apex:outputPanel layout="block" styleClass="requiredBlock"/>
+									<apex:selectList value="{!invoiceFormat.KimbleOne__RoundingRule__c}" size="1" styleclass="RoundingRule">
+										<apex:selectOptions value="{!RoundingRules}" />
+									</apex:selectList>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem helpText="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__ShowContext__c.inlineHelpText}">
+ 								<apex:outputLabel value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__ShowContext__c.Label}"/>
+								<apex:inputCheckbox value="{!invoiceFormat.KimbleOne__ShowContext__c}" styleclass="ShowContext"/>
+							</apex:pageBlockSectionItem>
+
+						</apex:pageblockSection>
+						<apex:pageblockSection collapsible="false" showheader="true"
+							columns="2" title="Fixed Narrative Settings">
+							<apex:pageBlockSectionItem helpText="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__SingleDateNarrative__c.inlineHelpText}" >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__SingleDateNarrative__c.Label}" styleClass="SingleDateNarrativeLbl"/>
+								<apex:outputPanel layout="block" styleClass="requiredInput">
+									<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+									<apex:inputText value="{!invoiceFormat.KimbleOne__SingleDateNarrative__c}" styleClass="SingleDateNarrative inp"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem helpText="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__DateRangeNarrative__c.inlineHelpText}" >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__DateRangeNarrative__c.Label}" styleClass="DateRangeNarrativeLbl"/>
+								<apex:outputPanel layout="block" styleClass="requiredInput">
+									<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+								<apex:inputText value="{!invoiceFormat.KimbleOne__DateRangeNarrative__c}" styleClass="DateRangeNarrative inp"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem helpText="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__RatePerUnitNarrative__c.inlineHelpText}" >
+								<apex:outputPanel >
+									<apex:outputLabel value="{!$Label.kimbleone__costlabel} {!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__RatePerUnitNarrative__c.Label}" styleClass="CostOnly"/>
+									<apex:outputLabel value="{!$Label.kimbleone__revenuelabel} {!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__RatePerUnitNarrative__c.Label}" styleClass="RevenueOnly"/>
+								</apex:outputPanel>
+								<apex:outputPanel layout="block" styleClass="requiredInput">
+									<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+									<apex:inputText value="{!invoiceFormat.KimbleOne__RatePerUnitNarrative__c}" styleClass="RatePerUnitNarrative inp"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem helpText="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__RatePerUnitPerPeriodNarrative__c.inlineHelpText}" >
+								<apex:outputPanel >
+									<apex:outputLabel value="{!$Label.kimbleone__costlabel} {!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__RatePerUnitPerPeriodNarrative__c.Label}" styleClass="CostOnly"/>
+									<apex:outputLabel value="{!$Label.kimbleone__revenuelabel} {!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__RatePerUnitPerPeriodNarrative__c.Label}" styleClass="RevenueOnly"/>
+								</apex:outputPanel>
+								<apex:outputPanel layout="block" styleClass="requiredInput">
+									<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+								<apex:inputText value="{!invoiceFormat.KimbleOne__RatePerUnitPerPeriodNarrative__c}" styleClass="RatePerUnitPerPeriodNarrative inp"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem helpText="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__NumberOfUnitsNarrative__c.inlineHelpText}" >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__NumberOfUnitsNarrative__c.Label}" styleClass="NumberOfUnitsNarrativeLbl"/>
+								<apex:outputPanel layout="block" styleClass="requiredInput">
+									<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+								<apex:inputText value="{!invoiceFormat.KimbleOne__NumberOfUnitsNarrative__c}" styleClass="NumberOfUnitsNarrative inp"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem />
+							<apex:pageBlockSectionItem />
+						</apex:pageblockSection>
+
+						<apex:pageblockSection collapsible="true" showheader="true"  columns="1" title="{!$ObjectType.KimbleOne__InvoiceSection__c.Label}  Ordering">
+							<apex:pageBlockSectionItem >
+								<apex:outputPanel >
+									<apex:outputLabel value="Define Cost Type Order" styleClass="CostOnly"/>
+									<apex:outputLabel value="Define Revenue Type Order" styleClass="RevenueOnly"/>
+								</apex:outputPanel>
+								<apex:outputPanel layout="block">
+									<input type="checkbox" class="GroupByRevenueType" onclick="changeRevenueType()"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+
+
+							<apex:outputPanel layout="block" >
+								<div id="RevenueTypeSortPanel" class="fieldsAndButtons" style="display:none">
+									<div class="fields fieldsAndButtons-item">
+										<table border="0" cellpadding="0" cellspacing="0" class="list selectedFieldsListTable" style="table-layout: fixed;" width="50%">
+										<thead>
+											<tr class="headerRow">
+												<td style="width: 5%">Sequence</td> <td style="width: 85%;">Revenue Type</td>
+											</tr>
+										</thead>
+										<tbody> </tbody></table>
+							</div>
+							<div class="buttons fieldsAndButtons-item">
+								<input class="btn fieldListActionBtn" onclick="moveRevenueTypeUp()" type="button" value="Up"/> <input class="btn fieldListActionBtn" onclick="moveRevenueTypeDown()" type="button" value="Down"/>
+							</div>
+						</div>
+								</apex:outputPanel>
+						</apex:pageblockSection>
+						<div id="InvoicableItemsTabs">
+							<ul>
+								<apex:repeat var="item" value="{!InvoicableItems}">
+									<li item="{!item.value}" class="tab-title {!item.value}-tab-title"><a href="#{!item.value}-tab">{!item.label}</a></li>
+								</apex:repeat>
+							</ul>
+
+							<apex:repeat var="item" value="{!InvoicableItems}" id="TheRepeater">
+								<apex:variable var="invoicableItem" value="{!item.value}"/>
+								<div id="{!invoicableItem}-tab" class="tabContainer"  item="{!item.value}" label="{!item.label}">
+									<apex:pageblockSection collapsible="false" showHeader="false" columns="2">
+											<apex:pageBlockSectionItem rendered="{!item.value == TimeEntryObjectName}" helpText="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__ShowTimeInTabularFormat__c.inlineHelpText}">
+												<apex:outputLabel value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__ShowTimeInTabularFormat__c.Label}" for="ShowTimeInTabularFormat"/>
+												<apex:inputCheckbox id="ShowTimeInTabularFormat" value="{!invoiceFormat.KimbleOne__ShowTimeInTabularFormat__c}" onchange="changedShowTimeInTabularFormat()" styleClass="ShowTimeInTabularFormat"/>
+											</apex:pageBlockSectionItem>
+											<apex:pageBlockSectionItem rendered="{!invoicableItem == TimeEntryObjectName}" helpText="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__ShowResourceNumberOfUnitsInColumn__c.inlineHelpText}">
+												<apex:outputLabel for="ShowResourceNumberOfUnitsInColumn" value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__ShowResourceNumberOfUnitsInColumn__c.Label}"/>
+												<apex:inputCheckbox id="ShowResourceNumberOfUnitsInColumn" value="{!invoiceFormat.KimbleOne__ShowResourceNumberOfUnitsInColumn__c}" styleclass="ShowResourceNumberOfUnitsInColumn"/>
+											</apex:pageBlockSectionItem>
+											<apex:pageBlockSectionItem rendered="{!item.value == TimeEntryObjectName}" helpText="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__ShowResourceRateInColumn__c.inlineHelpText}">
+												<apex:outputLabel for="ShowResourceRateInColumn" value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__ShowResourceRateInColumn__c.Label}"/>
+												<apex:inputCheckbox id="ShowResourceRateInColumn" value="{!invoiceFormat.KimbleOne__ShowResourceRateInColumn__c}" styleClass="ShowResourceRateInColumn"/>
+											</apex:pageBlockSectionItem>
+											<apex:pageBlockSectionItem rendered="{!item.value == TimeEntryObjectName}">
+												<apex:outputLabel for="IncludeTimeEntry" value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeTimeEntry__c.Label}" title="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeTimeEntry__c.inlineHelpText}"/>
+												<apex:inputCheckbox id="IncludeTimeEntry" value="{!invoiceFormat.KimbleOne__IncludeTimeEntry__c}" styleClass="Include"/>
+											</apex:pageBlockSectionItem>
+											<apex:pageBlockSectionItem rendered="{!item.value == ExpenseObjectName}">
+												<apex:outputLabel for="IncludeExpenseItem" value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeExpenseItem__c.Label}" title="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeExpenseItem__c.inlineHelpText}"/>
+												<apex:inputCheckbox id="IncludeExpenseItem" value="{!invoiceFormat.KimbleOne__IncludeExpenseItem__c}" styleClass="Include"/>
+											</apex:pageBlockSectionItem>
+											<apex:pageBlockSectionItem rendered="{!item.value == PeriodRevenueObjectName}">
+												<apex:outputLabel for="IncludePeriodRevenue" value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludePeriodRevenue__c.Label}" title="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludePeriodRevenue__c.inlineHelpText}"/>
+												<apex:inputCheckbox id="IncludePeriodRevenue" value="{!invoiceFormat.KimbleOne__IncludePeriodRevenue__c}" styleClass="Include"/>
+											</apex:pageBlockSectionItem>
+											<apex:pageBlockSectionItem rendered="{!item.value == PeriodCostObjectName}">
+												<apex:outputLabel for="IncludePeriodCost" value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludePeriodCost__c.Label}" title="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludePeriodCost__c.inlineHelpText}"/>
+												<apex:inputCheckbox id="IncludePeriodCost" value="{!invoiceFormat.KimbleOne__IncludePeriodCost__c}" styleClass="Include"/>
+											</apex:pageBlockSectionItem>
+											<apex:pageBlockSectionItem rendered="{!item.value == MilestoneObjectName}">
+												<apex:outputLabel for="IncludeMilestone" value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeMilestone__c.Label}" title="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeMilestone__c.inlineHelpText}"/>
+												<apex:inputCheckbox id="IncludeMilestone" value="{!invoiceFormat.KimbleOne__IncludeMilestone__c}" styleClass="Include"/>
+											</apex:pageBlockSectionItem>
+											<apex:pageBlockSectionItem rendered="{!item.value == RevenueAdjustmentObjectName}">
+												<apex:outputLabel for="IncludeRevenueAdjustment" value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeRevenueAdjustment__c.Label}" title="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeRevenueAdjustment__c.inlineHelpText}"/>
+												<apex:inputCheckbox id="IncludeRevenueAdjustment" value="{!invoiceFormat.KimbleOne__IncludeRevenueAdjustment__c}" styleClass="Include"/>
+											</apex:pageBlockSectionItem>
+											<apex:pageBlockSectionItem rendered="{!item.value == DepositObjectName}">
+												<apex:outputLabel for="IncludeDeposit" value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeDeposit__c.Label}" title="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeDeposit__c.inlineHelpText}"/>
+												<apex:inputCheckbox id="IncludeDeposit" value="{!invoiceFormat.KimbleOne__IncludeDeposit__c}" styleClass="Include"/>
+											</apex:pageBlockSectionItem>
+											<apex:pageBlockSectionItem rendered="{!item.value == DepositAdjustmentObjectName}">
+												<apex:outputLabel for="IncludeDepositAdjustment" value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeDepositAdjustment__c.Label}" title="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeDepositAdjustment__c.inlineHelpText}"/>
+												<apex:inputCheckbox id="IncludeDepositAdjustment" value="{!invoiceFormat.KimbleOne__IncludeDepositAdjustment__c}" styleClass="Include"/>
+											</apex:pageBlockSectionItem>
+											<apex:pageBlockSectionItem rendered="{!item.value == CreditObjectName}">
+												<apex:outputLabel for="IncludeCredit" value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeCredit__c.Label}" title="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeCredit__c.inlineHelpText}"/>
+												<apex:inputCheckbox id="IncludeCredit" value="{!invoiceFormat.KimbleOne__IncludeCredit__c}" styleClass="Include"/>
+											</apex:pageBlockSectionItem>
+											<apex:pageBlockSectionItem rendered="{!item.value == CreditAdjustmentObjectName}">
+												<apex:outputLabel for="IncludeCreditAdjustment" value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeCreditAdjustment__c.Label}" title="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeCreditAdjustment__c.inlineHelpText}"/>
+												<apex:inputCheckbox id="IncludeCreditAdjustment" value="{!invoiceFormat.KimbleOne__IncludeCreditAdjustment__c}" styleClass="Include"/>
+											</apex:pageBlockSectionItem>
+											<apex:pageBlockSectionItem rendered="{!item.value == DiscountItemObjectName}">
+												<apex:outputLabel for="IncludeDiscountItem" value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeDiscountItem__c.Label}" title="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeDiscountItem__c.inlineHelpText}"/>
+												<apex:inputCheckbox id="IncludeDiscountItem" value="{!invoiceFormat.KimbleOne__IncludeDiscountItem__c}" styleClass="Include"/>
+											</apex:pageBlockSectionItem>
+											<apex:pageBlockSectionItem rendered="{!item.value == InternalRevenueShareObjectName}">
+												<apex:outputLabel for="IncludeInternalRevenueShare" value="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeInternalRevenueShare__c.Label}" title="{!$ObjectType.KimbleOne__InvoiceFormat__c.Fields.KimbleOne__IncludeInternalRevenueShare__c.inlineHelpText}"/>
+												<apex:inputCheckbox id="IncludeInternalRevenueShare" value="{!invoiceFormat.KimbleOne__IncludeInternalRevenueShare__c}" styleClass="Include"/>
+											</apex:pageBlockSectionItem>
+									</apex:pageblockSection>	
+									<apex:pageblockSection collapsible="false" showHeader="true"
+										columns="1" title="{!$Label.kimbleone__groupcriteria}">
+										<apex:outputPanel >
+											<div class="">
+												<input id="{!invoicableItem}-GroupCriteriaSearch" type="text"
+													class="{!invoicableItem}-GroupCriteriaSearch GroupCriteriaSearch" readonly="true"/>
+												
+												<button id="Sa"
+													class="btn addNewFieldToListButton fieldListActionBtn"
+													onclick="addNewGroupingCriteria('{!invoicableItem}');  return false">Add</button>
+
+												<hr />
+												<div class="fieldsAndButtons">
+													<div class="fields fieldsAndButtons-item">
+														<table class="list selectedFieldsListTable" border="0"
+															cellpadding="0" cellspacing="0" width="50%"
+															style="table-layout: fixed;">
+															<thead>
+																<tr class="headerRow">
+																	<td style="width: 5%"><apex:outputText value="{!$Label.kimbleone__sequence}" /></td>
+																	<td style="width: 85%;"><apex:outputText value="{!$Label.kimbleone__fieldname}" /></td>
+																</tr>
+															</thead>
+														</table>
+
+													</div>
+													<div class="buttons fieldsAndButtons-item">
+														<input type="button" id="" class="btn fieldListActionBtn"
+															value="{!$Label.UpLabel}"
+															onclick="moveGroupingCriteriaUp('{!invoicableItem}')"></input> <input
+															type="button" id="" class="btn fieldListActionBtn"
+															value="{!$Label.DownLabel}"
+															onclick="moveGroupingCriteriaDown('{!invoicableItem}')"></input> <input
+															type="button" id="" class="btn fieldListActionBtn"
+															value="{!$Label.Remove}"
+															onclick="removeGroupingCriteria('{!invoicableItem}')"></input>
+													</div>
+												</div>
+											</div>
+										</apex:outputPanel>
+									</apex:pageblockSection>
+
+									<apex:pageblockSection collapsible="false" showheader="true"
+										columns="1" title="Narratives">
+										<apex:pageBlockSectionItem >
+											<apex:outputLabel value="{!$Label.kimbleone__narrativefield}" styleClass="{!invoicableItem}-NarrativeLbl"/>
+											<apex:outputPanel layout="block" styleClass="requiredInput">
+											<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+											<apex:outputPanel style="width: 500px" >
+												<input type="hidden" style="width: 600px; display: none;" tabindex="-1" class="{!invoicableItem}-Narrative Narrative" item="{!invoicableItem}"/>
+												<button class="btn" onclick="displayNarrativeSourcesPopup('{!JSENCODE(invoicableItem)}'); return false" title="Narrative Sources">
+													<li class="fa fa-list-alt fa-2x"></li>
+												</button>
+											</apex:outputPanel>
+											</apex:outputPanel>
+										</apex:pageBlockSectionItem>
+										<apex:pageBlockSectionItem >
+											<apex:outputLabel value="{!$Label.kimbleone__groupnamenarrative}" styleclass="{!invoicableItem}-GroupNameNarrativeLbl"/>
+											<apex:outputPanel style="width:250px"  layout="none">
+												<input type="hidden" style="width: 600px;" tabindex="-1"  class="{!invoicableItem}-GroupNameNarrative GroupNameNarrative inp" item="{!invoicableItem}"/>
+											</apex:outputPanel>
+										</apex:pageBlockSectionItem>
+									</apex:pageblockSection>
+									<apex:pageblockSection id="DefaultNarrativeSources" collapsible="true" showheader="true" columns="2" title="Default Narrative Sources" 
+										rendered="{! invoicableItem == PeriodCostObjectName || invoicableItem == PeriodRevenueObjectName || invoicableItem == TimeEntryObjectName || invoicableItem == ExpenseObjectName || invoicableItem == MilestoneObjectName }">
+										<apex:pageBlockSectionItem >
+											<apex:outputPanel >
+												<apex:outputLabel for="DefaultUnitTypeNarrative" value="{!$Label.kimbleone__defaultunittypenarrative} ({!$Label.kimbleone__costlabel})" styleClass="CostOnly"/>
+												<apex:outputLabel for="DefaultUnitTypeNarrative" value="{!$Label.kimbleone__defaultunittypenarrative} ({!$Label.kimbleone__revenuelabel})" styleClass="RevenueOnly"/>
+											</apex:outputPanel>
+											<apex:outputPanel layout="block" styleClass="requiredInput">
+												<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+												<apex:inputText id="DefaultUnitTypeNarrative" styleClass="DefaultUnitTypeNarrative inp DefaultNarrativeField"/>
+											</apex:outputPanel>
+										</apex:pageBlockSectionItem>
+										<apex:pageBlockSectionItem >
+											<apex:outputPanel >
+												<apex:outputLabel for="DefaultUnitTypeId" value="{!$Label.kimbleone__defaultunittypeid} ({!$Label.kimbleone__costlabel})" styleClass="CostOnly"/>
+												<apex:outputLabel for="DefaultUnitTypeId" value="{!$Label.kimbleone__defaultunittypeid} ({!$Label.kimbleone__revenuelabel})" styleClass="RevenueOnly"/>
+											</apex:outputPanel>
+											<apex:outputPanel layout="block" styleClass="requiredInput">
+												<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+												<apex:inputText id="DefaultUnitTypeId" styleClass="DefaultUnitTypeId inp DefaultNarrativeField"/>
+											</apex:outputPanel>
+										</apex:pageBlockSectionItem>
+										<apex:pageBlockSectionItem rendered="{! invoicableItem == PeriodCostObjectName || invoicableItem == PeriodRevenueObjectName}">
+											<apex:outputPanel >
+												<apex:outputLabel for="DefaultPeriodUnitTypeNarrative" value="{!$Label.kimbleone__defaultperiodunittypenarrative} ({!$Label.kimbleone__costlabel})" styleClass="CostOnly"/>
+												<apex:outputLabel for="DefaultPeriodUnitTypeNarrative" value="{!$Label.kimbleone__defaultperiodunittypenarrative} ({!$Label.kimbleone__revenuelabel})" styleClass="RevenueOnly"/>
+											</apex:outputPanel>
+											<apex:outputPanel layout="block" styleClass="requiredInput">
+												<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+												<apex:inputText id="DefaultPeriodUnitTypeNarrative" styleClass="DefaultPeriodUnitTypeNarrative inp DefaultNarrativeField"/>
+											</apex:outputPanel>
+										</apex:pageBlockSectionItem>
+										<apex:pageBlockSectionItem rendered="{! invoicableItem == PeriodCostObjectName || invoicableItem == PeriodRevenueObjectName}">
+											<apex:outputPanel >
+												<apex:outputLabel for="DefaultPeriodUnitTypeId" value="{!$Label.kimbleone__defaultperiodunittypeid} ({!$Label.kimbleone__costlabel})" styleClass="CostOnly"/>
+												<apex:outputLabel for="DefaultPeriodUnitTypeId" value="{!$Label.kimbleone__defaultperiodunittypeid} ({!$Label.kimbleone__revenuelabel})" styleClass="RevenueOnly"/>
+											</apex:outputPanel>
+											<apex:outputPanel layout="block" styleClass="requiredInput">
+												<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+												<apex:inputText id="DefaultPeriodUnitTypeId" styleClass="DefaultPeriodUnitTypeId inp DefaultNarrativeField"/>
+											</apex:outputPanel>
+										</apex:pageBlockSectionItem>
+										<apex:pageBlockSectionItem rendered="{!invoicableItem != PeriodCostObjectName && invoicableItem != PeriodRevenueObjectName}">
+											<apex:outputPanel >
+												<apex:outputLabel for="DefaultRate" value="{!$Label.kimbleone__defaultrate} ({!$Label.kimbleone__costlabel})" styleClass="CostOnly"/>
+												<apex:outputLabel for="DefaultRate" value="{!$Label.kimbleone__defaultrate} ({!$Label.kimbleone__revenuelabel})" styleClass="RevenueOnly"/>
+											</apex:outputPanel>
+											<apex:outputPanel layout="block" styleClass="requiredInput">
+												<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+												<apex:inputText id="DefaultRate" styleClass="DefaultRate inp DefaultNarrativeField"/>
+											</apex:outputPanel>
+										</apex:pageBlockSectionItem>
+										<apex:pageBlockSectionItem rendered="{! invoicableItem == PeriodCostObjectName || invoicableItem == PeriodRevenueObjectName}">
+											<apex:outputPanel >
+												<apex:outputLabel for="DefaultPeriodRate" value="{!$Label.kimbleone__defaultperiodrate} ({!$Label.kimbleone__costlabel})" styleClass="CostOnly"/>
+												<apex:outputLabel for="DefaultPeriodRate" value="{!$Label.kimbleone__defaultperiodrate} ({!$Label.kimbleone__revenuelabel})" styleClass="RevenueOnly"/>
+											</apex:outputPanel>
+											<apex:outputPanel layout="block" styleClass="requiredInput">
+												<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+												<apex:inputText id="DefaultPeriodRate" styleClass="DefaultPeriodRate inp DefaultNarrativeField"/>
+											</apex:outputPanel>
+										</apex:pageBlockSectionItem>
+										<apex:pageBlockSectionItem >
+											<apex:outputPanel >
+												<apex:outputLabel for="DefaultInvoicingCurrency" value="{!$Label.kimbleone__defaultinvoicingcurrency} ({!$Label.kimbleone__costlabel})" styleClass="CostOnly"/>
+												<apex:outputLabel for="DefaultInvoicingCurrency" value="{!$Label.kimbleone__defaultinvoicingcurrency} ({!$Label.kimbleone__revenuelabel})" styleClass="RevenueOnly"/>
+											</apex:outputPanel>
+											<apex:outputPanel layout="block" styleClass="requiredInput">
+												<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+												<apex:inputText id="DefaultInvoicingCurrency" styleClass="DefaultInvoicingCurrency inp DefaultNarrativeField"/>
+											</apex:outputPanel>
+										</apex:pageBlockSectionItem>
+									</apex:pageblockSection>
+
+									<div id = "{!invoicableItem}-NarattiveSourcesPopup" style="display: none; width: 600px">
+									
+										<apex:pageBlock mode="edit">				
+											<apex:pageBlockButtons location="top">
+												<apex:outputPanel layout="none">
+													<input type="button" class="btn" onclick="displayNarrativeSourcePopup('{!invoicableItem}'); return false" value="{!$Label.New} {!$Label.NarrativeSource}"/>
+												</apex:outputPanel>
+											</apex:pageBlockButtons>
+											<apex:pageBlockButtons location="bottom">
+												<apex:outputPanel layout="none" >
+													<input type="button" class="btn" id="btnCancelNar" onclick="hideModalBoxy()"  value="{!$Label.Close}" style="width:60px;"/>
+												</apex:outputPanel>
+											</apex:pageBlockButtons>
+											<div style="height: 400px;overflow-y: scroll;">
+												<table class="list narrativeSourceListTable" border="0" cellpadding="0" cellspacing="0"  style="table-layout: fixed;">
+													<thead>
+														<tr class="headerRow">
+															<td style="width:8%">{!$Label.ActionLinksHeader}</td>
+															<td><apex:outputText value="Narrative Sources" /></td>
+															</tr>
+													</thead>
+												</table>
+											</div>
+										</apex:pageBlock>
+									</div>
+
+								</div>
+								
+								
+							</apex:repeat>
+						</div>
+
+					</apex:pageBlock>
+					
+						</div>
+					</div>
+					
+				</apex:outputPanel>
+			
+			<div id="ActionsPanel" style="display:none">
+				<a class="action-icon" title="{!$Label.ClickForActionsMessage}">
+					<i class="fa fa-cog fa-2x"></i>
+				</a>
+				<div class="toolbar-icons ActionIcons" style="display: none;" >
+					<a href="javascript:void(0);" onclick="editNarattiveSource(jQuery(this).attr('item'),jQuery(this).attr('sourceId'));" title="{!$Label.Edit}" class="actionLink"><i class="fa fa-pencil-square-o"></i></a>
+					<a href="javascript:void(0);" onclick="removeNarattiveSource(jQuery(this).attr('item'),jQuery(this).attr('sourceId'));" title="{!$Label.Remove}" class="actionLink"><i class="fa fa-trash-o"></i></a>
+				</div>
+			</div>
+
+			<div id = "NarattiveSourcePopup" style="display:none">
+			  	<div id="NarattiveSourceErrors" style="display:none">
+					<apex:pageMessage summary="{!$Label.kimbleone__errors}" severity="warning" strength="2" rendered="true">
+						<ul id="NarattiveSourceErrorsMsg" style=" margin:0px ;padding:0">
+							
+						</ul>
+					</apex:pageMessage>
+				</div>
+			
+				<apex:pageBlock mode="edit">				
+					<apex:pageBlockButtons location="bottom">
+							<apex:outputPanel layout="none" >
+								<input class="btn" type="button" id="btnSaveNa" onclick="saveNarattiveSource()" value="{!$Label.Save}" style="width:60px;"/>								
+							</apex:outputPanel>
+							<input class="btn" type="button" id="btnCancelNa" onclick="hideModalBoxy(); displayNarrativeSourcesPopup(currentItem)"  value="{!$Label.Cancel}" style="width:60px;"/>
+						</apex:pageBlockButtons>
+						<apex:pageblockSection collapsible="false" showheader="false" columns="2">	
+						
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$Label.kimbleone__source}" styleclass="NarattiveSourceNameLbl"/>
+									<apex:outputPanel layout="block" styleClass="requiredInput">
+										<apex:outputPanel layout="block" styleClass="requiredBlock"> </apex:outputPanel>
+										<input type="text" value="" class="NarattiveSourceName inp"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$Label.kimbleone__typelabel}" styleclass="NarattiveSourceTypeLbl"/>
+								<apex:outputPanel layout="block" styleClass="requiredInput">
+									<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+									<apex:selectList size="1" id="NarattiveSourceType" styleclass="NarattiveSourceType" onchange="selectInvoiceNarrativeSourceType()">
+										<apex:selectOptions value="{!InvoiceNarrativeSourceTypes}" />
+									</apex:selectList>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="Field" styleclass="NarattiveSourceFieldLbl"/>
+								<apex:outputPanel layout="block" styleClass="requiredInput">
+									<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+									<input type="text" value="" class="NarattiveSourceField inp" onchange="GetFieldAggregateFunctions()" onBlur="GetFieldAggregateFunctions()" readonly="true"/>	
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$Label.kimbleone__aggregate}" styleclass="NarattiveSourceAggregateLbl"/>
+								<apex:outputPanel layout="block" styleClass="requiredInput">
+									<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+									<select class="NarattiveSourceAggregate">
+									</select>	
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="Prefix" styleclass="NarattiveSourcePrefixLbl" />
+								<input type="text" value="" class="NarattiveSourcePrefix"/>	
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="Suffix" styleclass="NarattiveSourceSuffixLbl"/>
+								<input type="text" value="" class="NarattiveSourceSuffix"/>	
+							</apex:pageBlockSectionItem>
+							
+						</apex:pageblockSection>	
+					</apex:pageBlock>
+			 	</div>
+			 	<input type="hidden" class="NarattiveSourceId"/>
+			</apex:form>
+
+			<script>
+			//var cos = '{!$Component.TheForm.InvoiceFormatEditBlock.TheRepeater.0.DefaultNarrativeSources}';
+			
+			function collapseAllDefaultNarrativeSourcesSection(){
+				//TODO- This is Hacky, will need to make changes if salesforce code changes
+				jQuery.each(jQuery("img[id$='DefaultNarrativeSources']"), function(key, section){
+					jQuery(section).trigger('click');
+					jQuery(section).click(function(){ loadFieldSelector();  });
+				});
+			}
+	
+	function changeInvoiceMode(){
+		if (jQuery('.InvoiceMode').val() == '{!JSENCODE(InvoiceModeEnumAutoId)}'){
+			jQuery.each(jQuery(".Include"), function(k,v){
+				jQuery(v).show();
+				var id = jQuery(v).attr('id');
+				jQuery("label[for='"+id+"']").show();
+			});
+		}
+		else{
+			jQuery.each(jQuery(".Include"), function(k,v){
+				jQuery(v).hide();
+				var id = jQuery(v).attr('id');
+				jQuery("label[for='"+id+"']").hide();
+			});
+		}
+	}	
+			
+	var theInvoiceFormat;
+		
+	//JSENCODE(
+	function loadFieldSelector()
+	{
+		var tab = currentItem+"-tab";
+
+		var rootObject = '{!$ObjectType.InvoiceableItem__c.Name}';
+		if (currentItem == '{!$ObjectType.PeriodCost__c.Name}')
+			rootObject = '{!$ObjectType.SupplierInvoiceableItem__c.Name}';
+			
+		var filter = {
+			keep : 
+				function(field, object, path) {
+					var objectsToAllow = [currentItem, '{!$ObjectType.DeliveryElement__c.Name}'];
+					var fieldType =  field.type.toLowerCase() ;
+					if (object.name == '{!$ObjectType.InvoiceableItem__c.Name}' || object.name == '{!$ObjectType.SupplierInvoiceableItem__c.Name}')
+						return (objectsToAllow.includes(field.name) && fieldType == 'reference' ) || false;
+					else
+					return true;
+				}
+			};
+			jQuery("#"+tab).find(".GroupCriteriaSearch").fieldSelector({rootObject:rootObject, filter: filter});
+			jQuery.each(jQuery("#"+tab).find('.DefaultNarrativeField'),function(key, defaultfieldItem){
+				jQuery(defaultfieldItem).fieldSelector({rootObject:rootObject, filter: filter});
+			});
+			        
+	}
+	
+	
+	function changedShowTimeInTabularFormat(){
+	
+		if( jQuery('.ShowTimeInTabularFormat').prop( "checked")){
+			jQuery('.ShowResourceNumberOfUnitsInColumn').attr('disabled',false);
+			jQuery('.ShowResourceRateInColumn').attr('disabled',false);
+		}
+		else{
+			jQuery('.ShowResourceNumberOfUnitsInColumn').prop( "checked", false);
+			jQuery('.ShowResourceNumberOfUnitsInColumn').attr('disabled',true);
+			jQuery('.ShowResourceRateInColumn').prop( "checked", false);
+			jQuery('.ShowResourceRateInColumn').attr('disabled',true);
+		}
+	}
+	
+	
+	function addNewGroupingCriteria(item){
+		var tab = item+"-tab";
+		var value = jQuery("#"+tab).find(".GroupCriteriaSearch").val();
+		if (value != '' ){
+			if( theInvoiceFormat.Rules.GroupingRules[item].GroupCriterias == undefined)
+				theInvoiceFormat.Rules.GroupingRules[item].GroupCriterias = [];
+			
+			var maxPosition = 0;
+			var isAlreadyThere = undefined;
+			jQuery.each(theInvoiceFormat.Rules.GroupingRules[item].GroupCriterias,function(key,theField){
+				if( theField.Sequence > maxPosition)
+					maxPosition = theField.Sequence;
+				
+				if( theField.FieldName == value)
+					isAlreadyThere = true;
+			});
+			
+			if (isAlreadyThere)
+				return;
+			
+			var fieldInList = new Object();
+			fieldInList.Sequence = String(parseInt(maxPosition) + 1);
+			fieldInList.FieldName = value;
+			
+			jQuery("#"+tab).find(".GroupCriteriaSearch").val('');
+			
+			theInvoiceFormat.Rules.GroupingRules[item].GroupCriterias.push( fieldInList);
+			
+			refreshGroupingCriterias(item);
+		}
+	}
+
+	function refreshGroupingCriterias(item){
+		var tab = item+"-tab";
+		jQuery("#"+tab).find('.selectedFieldsListTable>tbody>tr').remove();
+		jQuery.each(getSortedGroupingCriterias(item),function(key,theField){
+			if (theField != undefined){
+				var tr= jQuery('<tr>').attr('fieldId',theField.Sequence);
+				tr.click(function(e){selectCurrentGroupingCriteria(jQuery(this).attr('fieldId'));e.preventDefault();});
+				tr.append(jQuery('<td>').text(theField.Sequence));
+				tr.append(jQuery('<td>').text(theField.FieldName));
+				jQuery("#"+tab).find(".selectedFieldsListTable").append(tr);
+			}
+		});
+	}
+	
+	var currentlySelectedKey;
+	
+	function selectCurrentGroupingCriteria(id)
+	{
+		jQuery('.selectedFieldsListTable>tbody>tr').css('background-color','#FFFFFF');
+	    jQuery('.selectedFieldsListTable>tbody>tr[fieldId='+id+']').css('background-color','#C0C0C0');
+	    currentlySelectedKey = id;
+	}
+	
+	function moveGroupingCriteriaUp(item){
+		if (currentlySelectedKey == 1)
+			return;
+			
+		var previousField = null;
+		var newKey = null;
+		
+		jQuery.each(theInvoiceFormat.Rules.GroupingRules[item].GroupCriterias,function(key,theField){
+			 if(theField.Sequence ==  currentlySelectedKey)
+        	 {
+        	 	
+        	 	newKey = parseInt(theField.Sequence) - 1;
+        	 	theField.Sequence = String(newKey); 
+        	 	previousField.Sequence = String(parseInt(previousField.Sequence) + 1);
+        	 	return false;
+        	 }	
+        	 previousField = theField;
+		});
+		
+		
+		refreshGroupingCriterias(item);
+		selectCurrentGroupingCriteria(newKey);
+        	 	
+	}
+	
+	function moveGroupingCriteriaDown(item){
+		if (currentlySelectedKey == theInvoiceFormat.Rules.GroupingRules[item].GroupCriterias.length)
+			return;
+	
+		var isFoundField = null;
+		var newKey = null;
+		
+		jQuery.each(theInvoiceFormat.Rules.GroupingRules[item].GroupCriterias,function(key,theField){
+			if(isFoundField){
+				theField.Sequence =  String(parseInt(theField.Sequence) - 1); 
+				return false;//break loop
+			}
+		
+			if(theField.Sequence == currentlySelectedKey)
+	        	{
+	        	 	newKey = parseInt(theField.Sequence) + 1;
+	        	 	theField.Sequence = String(newKey); 
+	        	 	selectCurrentGroupingCriteria(theField.Sequence);
+	        	 	isFoundField = true;
+	        	}	
+		});
+		
+		refreshGroupingCriterias(item);
+		selectCurrentGroupingCriteria(newKey);
+	}
+	
+	function removeGroupingCriteria(item){
+		
+		if (currentlySelectedKey == null)
+			return;
+		
+		var isFoundField = null;
+		var newKey = null;
+		
+		var indexToDelete = null;
+		jQuery.each(theInvoiceFormat.Rules.GroupingRules[item].GroupCriterias,function(key,theField){
+			if(theField.Sequence == currentlySelectedKey)
+        		indexToDelete = key;
+        });
+		var newSelectedFieldsForItems = [];
+		
+		jQuery.each(theInvoiceFormat.Rules.GroupingRules[item].GroupCriterias, function(key,theField){
+			if(key > indexToDelete)
+				theField.Sequence = String(parseInt( theField.Sequence) - 1); 
+			
+			if (key != indexToDelete)
+				newSelectedFieldsForItems.push(theField);
+		});
+		
+		theInvoiceFormat.Rules.GroupingRules[item].GroupCriterias = newSelectedFieldsForItems;
+		refreshGroupingCriterias(item);
+		currentlySelectedKey = null;
+	}
+	
+	function getSortedGroupingCriterias(item) 
+	{
+		var newSelectedFieldsForItems = [];
+		var mapPositionToSet = {};
+		var pos = [];
+		var count = 0;
+		if(theInvoiceFormat.Rules.GroupingRules[item] != undefined && theInvoiceFormat.Rules.GroupingRules[item].GroupCriterias != undefined){
+			jQuery.each(theInvoiceFormat.Rules.GroupingRules[item].GroupCriterias, function(key,theField){
+				 pos.push(theField.Sequence);
+	        	 	mapPositionToSet[theField.Sequence] = key;
+	        	 	count++;
+			});
+		}
+		
+	    	var possort = pos.sort(function(a, b){return a-b});
+	    	jQuery.each(possort,function(i,po){
+	    		var key = mapPositionToSet[po];
+	      	var value = theInvoiceFormat.Rules.GroupingRules[item].GroupCriterias[key];
+	      	newSelectedFieldsForItems.push(value);
+	    	});
+	    	theInvoiceFormat.Rules.GroupingRules[item].GroupCriterias = [];
+			
+	    	jQuery.each(newSelectedFieldsForItems,function(key,fieldMap){
+	    		  theInvoiceFormat.Rules.GroupingRules[item].GroupCriterias.push(fieldMap);
+	    	});
+    		return theInvoiceFormat.Rules.GroupingRules[item].GroupCriterias;
+	}
+	
+	function showOrHideNarattiveSourceType(){
+		if(jQuery('.NarattiveSourceType').val() != '{!JSENCODE(InvoiceNarrativeSourceField)}'){
+			jQuery(".NarattiveSourceAggregate").hide();
+			jQuery(".NarattiveSourceAggregateLbl").hide();
+			return false;
+		}
+		return true;
+	}
+	
+	function GetFieldAggregateFunctions(){
+	
+		if (!showOrHideNarattiveSourceType())
+			return;
+		
+		var fullName = jQuery('.NarattiveSourceField').val();
+		var distinctObjectsAndFields = [];
+		
+		var rootObject = '{!$ObjectType.InvoiceableItem__c.Name}';
+		if (currentItem == '{!$ObjectType.PeriodCost__c.Name}')
+			rootObject = '{!$ObjectType.SupplierInvoiceableItem__c.Name}';
+						
+		distinctObjectsAndFields.push(rootObject);
+		
+		jQuery.each(fullName.split('.'), function(key, objectOrField){
+			distinctObjectsAndFields.push(objectOrField);
+		});
+		
+		var previousObject = rootObject; 
+		jQuery.each(distinctObjectsAndFields, function(key, objectOrField){
+		
+			if ( previousObject != undefined){
+				var sfObject = sforce.connection.describeSObject(previousObject);
+				
+				if (objectOrField.endsWith('__r') || objectOrField ==  rootObject){
+					jQuery.each(sfObject.fields, function(index1, value) {
+						if (value.relationshipName == objectOrField){
+							previousObject = value.referenceTo;
+						}
+					});
+				}
+				else{
+					jQuery.each(sfObject.fields, function(index1, value) {
+						if(objectOrField == value.name){
+						
+							var fieldType = value.type;
+							jQuery('.NarattiveSourceAggregate>option').remove();
+								
+							if(fieldType=='numeric' || fieldType=='double' || fieldType=='decimal' || fieldType=='currency')
+							{
+								jQuery(".NarattiveSourceAggregate").append(jQuery('<option>').attr('value','').text(''));
+								jQuery(".NarattiveSourceAggregate").append(jQuery('<option>').attr('value','Min').text('Min'));
+								jQuery(".NarattiveSourceAggregate").append(jQuery('<option>').attr('value','Max').text('Max'));
+								jQuery(".NarattiveSourceAggregate").append(jQuery('<option>').attr('value','Sum').text('Sum'));
+								
+								jQuery(".NarattiveSourceAggregate").show();
+								jQuery(".NarattiveSourceAggregateLbl").show();
+							}
+							else if(fieldType=='date' || fieldType=='datetime')
+							{
+								jQuery(".NarattiveSourceAggregate").append(jQuery('<option>').attr('value','Min').text('Min'));
+								jQuery(".NarattiveSourceAggregate").append(jQuery('<option>').attr('value','Max').text('Max'));
+								jQuery(".NarattiveSourceAggregate").show();
+								jQuery(".NarattiveSourceAggregateLbl").show();
+							}
+							else
+							{
+								jQuery(".NarattiveSourceAggregate").hide();
+								jQuery(".NarattiveSourceAggregateLbl").hide();
+							}
+						}
+					});
+				}
+				
+			}
+				
+		});
+		
+		
+	}
+	
+	var currentItem = '{!$ObjectType.TimeEntry__c.Name}';
+	function displayNarrativeSourcesPopup(item){
+		initialiseModalBoxy('#'+item+'-NarattiveSourcesPopup', 'Narrative Sources');
+		showModalBoxy();
+		refreshSourceList(item);
+	}
+	
+	function displayNarrativeSourcePopup(item)
+	{
+		hideModalBoxy();
+		currentItem = item;
+		jQuery('.NarattiveSourceId').val('');
+		jQuery('.NarattiveSourceType').val('');
+		jQuery('.NarattiveSourceSuffix').val('');
+	 	jQuery('.NarattiveSourcePrefix').val('');
+		jQuery('.NarattiveSourceField').val('');
+		jQuery('.NarattiveSourceName').val('');
+		jQuery('#NarattiveSourceErrors').hide();
+		jQuery('.NarattiveSourceAggregate').val('');
+	   	initialiseModalBoxy('#NarattiveSourcePopup', '{!JSENCODE($Label.New)} {!$Label.NarrativeSource}');
+		showModalBoxy();
+	}
+	
+	function editNarattiveSource(item, sourceId){
+		hideModalBoxy();
+		currentItem = item;
+		jQuery.each(theInvoiceFormat.Rules.GroupingRules[item].NarrativeSources,function(key, theSource){
+				if(theSource.Id ==  sourceId){
+					jQuery('.NarattiveSourceId').val(theSource.Id);
+					jQuery('.NarattiveSourceType').val(theSource.Type);
+					jQuery('.NarattiveSourceSuffix').val(theSource.Suffix);
+				 	jQuery('.NarattiveSourcePrefix').val(theSource.Prefix);
+					jQuery('.NarattiveSourceField').val(theSource.NarrativeField);
+					jQuery('.NarattiveSourceName').val(theSource.Name);
+					jQuery('.NarattiveSourceAggregate').val(theSource.Aggregate);
+					return false;
+				}
+			});
+			selectInvoiceNarrativeSourceType();
+			GetFieldAggregateFunctions();
+		
+		//hide toolbar
+		jQuery(document).find('.tool-right').hide();
+		initialiseModalBoxy('#NarattiveSourcePopup', '{!JSENCODE($Label.New)} {!$Label.NarrativeSource}');
+
+		showModalBoxy();
+	}
+	function removeNarattiveSource(item, sourceId){
+		var newSources = {};
+		var isFoundSource = false;
+		jQuery.each(theInvoiceFormat.Rules.GroupingRules[item].NarrativeSources, function(key, theSource){
+			if(theSource.Id == sourceId)
+				isFoundSource = true;
+			else{
+				if(isFoundSource)
+					theSource.Id = String(parseInt(theSource.Id) - 1);
+				newSources[theSource.Id] = theSource ; 
+			}
+		});
+		theInvoiceFormat.Rules.GroupingRules[item].NarrativeSources = newSources;
+		var objectNarrative = '';
+		if (item == '{!$ObjectType.TimeEntry__c.Name}') theInvoiceFormat.TimeEntryNarrative = getNewNarrativeFieldValue(theInvoiceFormat.TimeEntryNarrative, sourceId);
+		else if (item == '{!$ObjectType.ExpenseItem__c.Name}') theInvoiceFormat.ExpenseItemNarrative = getNewNarrativeFieldValue(theInvoiceFormat.ExpenseItemNarrative, sourceId);
+		else if (item == '{!$ObjectType.Milestone__c.Name}') theInvoiceFormat.MilestoneNarrative = getNewNarrativeFieldValue(theInvoiceFormat.MilestoneNarrative, sourceId);
+		else if (item == '{!$ObjectType.PeriodRevenue__c.Name}') theInvoiceFormat.PeriodRevenueNarrative = getNewNarrativeFieldValue(theInvoiceFormat.PeriodRevenueNarrative, sourceId);
+		else if (item == '{!$ObjectType.PeriodCost__c.Name}') theInvoiceFormat.PeriodCostNarrative = getNewNarrativeFieldValue(theInvoiceFormat.PeriodCostNarrative, sourceId);
+		else if (item == '{!$ObjectType.RevenueAdjustment__c.Name}') theInvoiceFormat.RevenueAdjustmentNarrative = getNewNarrativeFieldValue(theInvoiceFormat.RevenueAdjustmentNarrative, sourceId);
+		else if (item == '{!$ObjectType.Deposit__c.Name}') theInvoiceFormat.DepositNarrative = getNewNarrativeFieldValue(theInvoiceFormat.DepositNarrative, sourceId);
+		else if (item == '{!$ObjectType.DepositAdjustment__c.Name}') theInvoiceFormat.DepositAdjustmentNarrative = getNewNarrativeFieldValue(theInvoiceFormat.DepositAdjustmentNarrative, sourceId);
+		else if (item == '{!$ObjectType.Credit__c.Name}') theInvoiceFormat.CreditNarrative = getNewNarrativeFieldValue(theInvoiceFormat.CreditNarrative, sourceId);
+		else if (item == '{!$ObjectType.CreditAdjustment__c.Name}') theInvoiceFormat.CreditAdjustmentNarrative = getNewNarrativeFieldValue(theInvoiceFormat.CreditAdjustmentNarrative, sourceId);
+		else if (item == '{!$ObjectType.DiscountItem__c.Name}') theInvoiceFormat.DiscountItemNarrative = getNewNarrativeFieldValue(theInvoiceFormat.DiscountItemNarrative, sourceId);
+		else if (item == '{!$ObjectType.InternalRevenueShare__c.Name}') theInvoiceFormat.InternalRevenueShareNarrative = getNewNarrativeFieldValue(theInvoiceFormat.InternalRevenueShareNarrative, sourceId);
+		
+		var rule = theInvoiceFormat.Rules.GroupingRules[item];
+		rule.GroupNameNarrative = getNewNarrativeFieldValue(rule.GroupNameNarrative, sourceId);
+		
+		refreshSourceList(item);
+		refreshGroupNameNarrative(item);
+		
+		//hide toolbar
+		jQuery(document).find('.tool-right').hide();
+	}
+			
+	function getNewNarrativeFieldValue(curentValue, toRemove){
+		var newObjectNarrativeStr = '';
+		var isFound = false;
+		if (curentValue != undefined){
+			jQuery.each( curentValue.split(" "), function(key, theSeq){
+				if (isFound && theSeq.startsWith('{') && theSeq.endsWith('}'))
+					theSeq = '{'+String(parseInt(theSeq.replace('{','').replace('}','')) - 1)+'}';
+					
+				if (theSeq != '{'+toRemove+'}' || isFound)
+					newObjectNarrativeStr = newObjectNarrativeStr + (newObjectNarrativeStr!=''?' ':'') + theSeq ; 
+					
+				if (theSeq == '{'+toRemove+'}') 
+					isFound = true;
+			});
+		}
+		return newObjectNarrativeStr;
+	}	
+	
+	function saveNarattiveSource()
+	{
+		var sourceId = jQuery('.NarattiveSourceId').val();
+		var item = currentItem;
+		jQuery('#NarattiveSourceErrors').hide();
+		
+		var toValidate =  ["NarattiveSourceName", "NarattiveSourceType", "NarattiveSourceField"];
+		
+		var errorMessages = '';
+		
+		jQuery.each(toValidate, function(i, toVali){
+			var cls = '.'+toVali;
+			if(jQuery(cls).val() == '')
+				errorMessages += '<li>'+('{!$label.RequiredValue}').replace('{0}', jQuery(cls+'Lbl').text())+'</li>';
+		});
+		  
+		 if( jQuery('.NarattiveSourceAggregate').is(":visible") && jQuery('.NarattiveSourceAggregate').val() == '')
+		 	errorMessages += '<li>'+('{!$label.RequiredValue}').replace('{0}', jQuery('.NarattiveSourceAggregateLbl').text())+'</li>';
+		  
+		if(errorMessages != ''){
+			jQuery('#NarattiveSourceErrorsMsg').html(errorMessages);
+			jQuery('#NarattiveSourceErrors').show();
+		}
+		else
+		{
+			if(sourceId == undefined || sourceId == ''){
+				if( theInvoiceFormat.Rules.GroupingRules[item].NarrativeSources == undefined)
+					theInvoiceFormat.Rules.GroupingRules[item].NarrativeSources = {};
+				
+				var maxPosition = -1;
+				jQuery.each(theInvoiceFormat.Rules.GroupingRules[item].NarrativeSources,function(key, theSource){
+					if(parseInt(theSource.Id) > maxPosition)
+						maxPosition = parseInt(theSource.Id);
+				});
+				
+				var narrativeSource = new Object();
+				narrativeSource.Type = jQuery('.NarattiveSourceType').val();
+				narrativeSource.Suffix = jQuery('.NarattiveSourceSuffix').val();
+				narrativeSource.Prefix = jQuery('.NarattiveSourcePrefix').val();
+				narrativeSource.NarrativeField = jQuery('.NarattiveSourceField').val();
+				narrativeSource.Name = jQuery('.NarattiveSourceName').val();
+				narrativeSource.Id = String(maxPosition + 1);
+				narrativeSource.Aggregate = jQuery('.NarattiveSourceAggregate').val();
+				theInvoiceFormat.Rules.GroupingRules[item].NarrativeSources[narrativeSource.Id]=narrativeSource;
+			}
+			else{
+				jQuery.each(theInvoiceFormat.Rules.GroupingRules[item].NarrativeSources,function(key, theSource){
+				if(theSource.Id ==  sourceId){
+					theSource.Type = jQuery('.NarattiveSourceType').val();
+					theSource.Suffix = jQuery('.NarattiveSourceSuffix').val();
+					theSource.Prefix = jQuery('.NarattiveSourcePrefix').val();
+					theSource.NarrativeField = jQuery('.NarattiveSourceField').val();
+					theSource.Name = jQuery('.NarattiveSourceName').val();
+					theSource.Aggregate = jQuery('.NarattiveSourceAggregate').val();
+					return false;
+				}
+			});
+			}
+			hideModalBoxy();
+			
+			refreshSourceList(item);
+			refreshGroupNameNarrative(item);
+			displayNarrativeSourcesPopup(item);
+		}
+	}
+	
+	function refreshSourceList(item){
+		var tab = item+"-NarattiveSourcesPopup";
+		var selectedChoiceSources = [];
+		jQuery("#"+tab).find('.narrativeSourceListTable>tbody>tr').find('.action-icon').toolbar.destroyAll();
+ 		jQuery("#"+tab).find('.narrativeSourceListTable>tbody>tr').remove();
+ 		if(theInvoiceFormat.Rules.GroupingRules[item].NarrativeSources != undefined){
+			jQuery.each(theInvoiceFormat.Rules.GroupingRules[item].NarrativeSources,function(key,theSource){
+				if (theSource != undefined){
+					var tr = jQuery('<tr>').attr('sourceId',theSource.Id);
+					var actionsPanel = jQuery(jQuery('#ActionsPanel').html());
+					
+					tr.append(jQuery('<td>').append(actionsPanel));
+					var theId = 'act-'+item+'-'+theSource.Id;
+					tr.find('.ActionIcons').attr('id',theId).attr('sourceId',theSource.Id);
+					tr.addClass('ActionsPanel');
+					tr.append(jQuery('<td>').text(theSource.Name));
+					jQuery("#"+tab).find(".narrativeSourceListTable").append(tr);
+				}
+			});
+		}
+		jQuery.each(jQuery("#"+tab).find(".ActionsPanel"), function(key,element){
+			var idd = jQuery(element).find('.ActionIcons').attr('id');
+			var sourceId = jQuery(element).find('.ActionIcons').attr('sourceId');
+			jQuery(element).find('.ActionIcons').find('a').attr('sourceId',sourceId).attr('item', item);
+ 			jQuery(element).find('.action-icon').toolbar({content: '#'+idd,
+		 						        		position: 'right',
+												event: 'click',
+												hideOnClick: true,
+												adjustment: -3,
+												zIndex: 2000});
+		});
+		
+		
+		var narrativeControlName = '.'+item+'-Narrative';
+		
+		if (item == '{!$ObjectType.TimeEntry__c.Name}' && theInvoiceFormat.TimeEntryNarrative != null)
+			selectedChoiceSources = convertNarativeToParts(theInvoiceFormat.TimeEntryNarrative);
+		else if (item == '{!$ObjectType.ExpenseItem__c.Name}' && theInvoiceFormat.ExpenseItemNarrative != null)
+			selectedChoiceSources = convertNarativeToParts(theInvoiceFormat.ExpenseItemNarrative);
+		else if (item == '{!$ObjectType.Milestone__c.Name}' && theInvoiceFormat.MilestoneNarrative != null)
+			selectedChoiceSources = convertNarativeToParts(theInvoiceFormat.MilestoneNarrative);
+		else if (item == '{!$ObjectType.PeriodRevenue__c.Name}' && theInvoiceFormat.PeriodRevenueNarrative != null)
+			selectedChoiceSources = convertNarativeToParts(theInvoiceFormat.PeriodRevenueNarrative);
+		else if (item == '{!$ObjectType.PeriodCost__c.Name}' && theInvoiceFormat.PeriodCostNarrative != null)
+			selectedChoiceSources = convertNarativeToParts(theInvoiceFormat.PeriodCostNarrative);
+		else if (item == '{!$ObjectType.RevenueAdjustment__c.Name}' && theInvoiceFormat.RevenueAdjustmentNarrative != null)
+			selectedChoiceSources = convertNarativeToParts(theInvoiceFormat.RevenueAdjustmentNarrative);
+		else if (item == '{!$ObjectType.Deposit__c.Name}' && theInvoiceFormat.DepositNarrative != null)
+			selectedChoiceSources = convertNarativeToParts(theInvoiceFormat.DepositNarrative);
+		else if (item == '{!$ObjectType.DepositAdjustment__c.Name}' && theInvoiceFormat.DepositAdjustmentNarrative != null)
+			selectedChoiceSources = convertNarativeToParts(theInvoiceFormat.DepositAdjustmentNarrative);
+		else if (item == '{!$ObjectType.Credit__c.Name}' && theInvoiceFormat.CreditNarrative != null)
+			selectedChoiceSources = convertNarativeToParts(theInvoiceFormat.CreditNarrative);
+		else if (item == '{!$ObjectType.CreditAdjustment__c.Name}' && theInvoiceFormat.CreditAdjustmentNarrative != null)
+			selectedChoiceSources = convertNarativeToParts(theInvoiceFormat.CreditAdjustmentNarrative);
+		else if (item == '{!$ObjectType.DiscountItem__c.Name}' && theInvoiceFormat.DiscountItemNarrative != null)
+			selectedChoiceSources = convertNarativeToParts(theInvoiceFormat.DiscountItemNarrative);
+		else if (item == '{!$ObjectType.InternalRevenueShare__c.Name}' && theInvoiceFormat.InternalRevenueShareNarrative != null)
+			selectedChoiceSources = convertNarativeToParts(theInvoiceFormat.InternalRevenueShareNarrative);
+		
+		CreateNarrativeControl(item, narrativeControlName, selectedChoiceSources);
+	}
+	
+	function convertNarativeToParts(narrativeStr){
+		var parts = [];
+		var word = '';
+		for (var i = 0; i < narrativeStr.length; i++) {
+			var thisChar = narrativeStr.charAt(i);
+			var added = false;
+			if( thisChar == '{')
+			{
+				if(word != '') {
+					parts.push(word);
+					word = '';
+				}
+			}
+			if( word.startsWith('{'))
+			{
+				word = word + thisChar;
+				if(thisChar == "}"){
+					parts.push(word);
+					word = '';
+					added = true;
+				}
+			}
+			else if( thisChar == ' '){
+				if(word != '') parts.push(word);
+				parts.push('[SPACE]');
+				word = '';
+				added = true;
+			}
+			else{
+			
+				if (thisChar == ',') word = word + '[COMMA]';
+				else word = word + thisChar;
+			}
+			if(!added && i == narrativeStr.length - 1)
+				parts.push(word);
+		}
+		return parts;
+	}
+	
+	function CreateNarrativeControl(item, narrativeControlName, selectChoicesArr){
+		/**Using select2 control. Contains hacks to allow it contain muiltiples words/characters of same value
+			Hack basically works by making it look same on the disaply but making it look different in values by appending values with a counter
+		**/
+		var selectChoicesArr_ = [];
+		var count = 0;
+		jQuery.each( selectChoicesArr, function(key, theSeq){
+			if (!theSeq.startsWith('{') && !theSeq.endsWith('}')){
+				count++; 
+				theSeq = String(count)+'[TEXTBODY]'+theSeq ;//JSON.stringify({id : String(count), text: theSeq })
+			}
+			selectChoicesArr_.push(theSeq);
+		});
+
+		var narrativeControl = jQuery(narrativeControlName);
+		var choiceSources = [];
+		if(theInvoiceFormat.Rules.GroupingRules[item].NarrativeSources != undefined){
+			jQuery.each(theInvoiceFormat.Rules.GroupingRules[item].NarrativeSources,function(key,theSource){
+				choiceSources.push({id:'{'+key+'}',	text: theSource.Name});//, type:
+			});
+		}
+		
+		narrativeControl.select2({
+			tags: choiceSources,
+			tokenSeparators: [",,","  "],
+			formatSelection: function (obj) {
+				if (obj.id != undefined && obj.id.startsWith('{') && obj.id.endsWith('}')) return '<b><<</b>'+obj.text+'<b>>></b>'; 
+				else {
+					if(obj.text.includes('[TEXTBODY]')) {
+						var textBody = (obj.text.split('[TEXTBODY]')[1]);
+						while(textBody.includes('[COMMA]')) textBody = textBody.replace("[COMMA]",",");
+						while(textBody.includes('[SPACE]')) textBody = textBody.replace("[SPACE]","&nbsp");
+						return textBody;
+					}
+					else return obj.text;
+				}
+			},
+			escapeMarkup: function(m) { return m; }
+		});
+		narrativeControl.select2('val', selectChoicesArr_);
+		narrativeControl.select2("container").find("ul.select2-choices").attr('parentcontrol', narrativeControlName );
+		narrativeControl.select2("container").find("ul.select2-choices").sortable({
+		    containment: 'parent',
+		    start: function() { jQuery(jQuery(this).attr('parentcontrol')).select2("onSortStart"); },
+		    update: function() { jQuery(jQuery(this).attr('parentcontrol')).select2("onSortEnd"); }
+		});
+		narrativeControl.on("change", function(e) {  
+			if (e.added != undefined){
+				var added = e.added.id;
+				var currentValues = jQuery(this).select2("val");
+				var count = 0; var newValues = []; var newItem = undefined; var i = 0;
+				if(!added.startsWith('{') && !added.endsWith('}') && !added.includes('[TEXTBODY]')){
+					newItem = added;
+					if (newItem == ' ') newItem = '[SPACE]';
+					if (newItem == ',') newItem = '[COMMA]';
+				}
+				jQuery.each( currentValues, function(key, theSeq){
+					if(theSeq.includes('[TEXTBODY]'))
+						count = parseInt(theSeq.split('[TEXTBODY]')[0]);
+					if(i < currentValues.length-1 && theSeq != '')
+						newValues.push(theSeq);
+					i++;
+				});
+				if(newItem != undefined){
+					count++;
+					newValues.push(String(count)+'[TEXTBODY]'+newItem);
+				}
+				else
+					newValues.push(added);
+				jQuery(this).select2("val", newValues);				
+			}
+		   narrativeControlChange(this);
+		});
+	}
+	
+	function narrativeControlChange(control){
+		var curentValue = jQuery(control).select2("val");
+		var val = '';
+		jQuery.each( curentValue, function(key, theSeq){
+			
+			if(theSeq.includes('[TEXTBODY]')) {
+				var textBody = (theSeq.split('[TEXTBODY]')[1]);
+				while(textBody.includes('[COMMA]'))  textBody = textBody.replace("[COMMA]",",");
+				while(textBody.includes('[SPACE]')) textBody = textBody.replace("[SPACE]"," ");
+				val = val + textBody;
+			}
+			else 
+				val = val + theSeq;
+		});
+		var rule = theInvoiceFormat.Rules.GroupingRules[jQuery(control).attr('item')];
+		if(jQuery(control).is('.GroupNameNarrative'))	rule.GroupNameNarrative = val;
+		else if (jQuery(control).is('.Narrative')){
+			if (jQuery(control).attr('item') == '{!$ObjectType.TimeEntry__c.Name}')	theInvoiceFormat.TimeEntryNarrative = val;
+			else if (jQuery(control).attr('item') == '{!$ObjectType.ExpenseItem__c.Name}') theInvoiceFormat.ExpenseItemNarrative = val;
+			else if (jQuery(control).attr('item') == '{!$ObjectType.Milestone__c.Name}') 	theInvoiceFormat.MilestoneNarrative = val;
+			else if (jQuery(control).attr('item') == '{!$ObjectType.PeriodRevenue__c.Name}') 	theInvoiceFormat.PeriodRevenueNarrative = val;
+			else if (jQuery(control).attr('item') == '{!$ObjectType.PeriodCost__c.Name}') theInvoiceFormat.PeriodCostNarrative = val;
+			else if (jQuery(control).attr('item') == '{!$ObjectType.RevenueAdjustment__c.Name}') 	theInvoiceFormat.RevenueAdjustmentNarrative = val;
+			else if (jQuery(control).attr('item') == '{!$ObjectType.Deposit__c.Name}') theInvoiceFormat.DepositNarrative = val;
+			else if (jQuery(control).attr('item') == '{!$ObjectType.DepositAdjustment__c.Name}') 	theInvoiceFormat.DepositAdjustmentNarrative = val;
+			else if (jQuery(control).attr('item') == '{!$ObjectType.Credit__c.Name}') 	theInvoiceFormat.CreditNarrative = val;
+			else if (jQuery(control).attr('item') == '{!$ObjectType.CreditAdjustment__c.Name}') 	theInvoiceFormat.CreditAdjustmentNarrative = val;
+			else if (jQuery(control).attr('item') == '{!$ObjectType.DiscountItem__c.Name}') 	theInvoiceFormat.DiscountItemNarrative = val;
+			else if ((jQuery(control).attr('item') == '{!$ObjectType.InternalRevenueShare__c.Name}') && ({!IsIntercompanyEnabled})) 	theInvoiceFormat.InternalRevenueShareNarrative = val;
+		}
+	}
+
+	function refreshGroupNameNarrative(item){
+		var rule = theInvoiceFormat.Rules.GroupingRules[item];
+		var selectedChoiceSources = [];
+		if ( rule.GroupNameNarrative != null)
+			selectedChoiceSources = convertNarativeToParts(rule.GroupNameNarrative);
+		CreateNarrativeControl(item,  '.'+item+'-GroupNameNarrative', selectedChoiceSources);
+	}
+	
+	function refreshOtherField(item){
+		var tab = item+"-tab";
+		var rule = theInvoiceFormat.Rules.GroupingRules[item];
+		jQuery("#"+tab).find('.RuleName').val(rule.Name);
+		jQuery("#"+tab).find('.GroupNameNarrative').val(rule.GroupNameNarrative);
+		refreshGroupNameNarrative(item);
+		
+		if (item == '{!JSENCODE(timeEntryObjectName)}'){
+			jQuery("#"+tab).find('.ShowResourceNumberOfUnitsInColumn').prop( "checked", theInvoiceFormat.ShowResourceNumberOfUnitsInColumn);
+			jQuery("#"+tab).find('.ShowResourceRateInColumn').prop( "checked", theInvoiceFormat.ShowResourceRateInColumn);
+			jQuery("#"+tab).find('.ShowTimeInTabularFormat').prop( "checked", theInvoiceFormat.ShowTimeInTabularFormat);
+		}
+
+		jQuery("#"+tab).find('.DefaultUnitTypeNarrative').val( rule.DefaultUnitTypeNarrative);
+		jQuery("#"+tab).find('.DefaultUnitTypeId').val( rule.DefaultUnitTypeId);
+		jQuery("#"+tab).find('.DefaultRate').val( rule.DefaultRate);
+		jQuery("#"+tab).find('.DefaultPeriodUnitTypeNarrative').val( rule.DefaultPeriodUnitTypeNarrative);
+		jQuery("#"+tab).find('.DefaultPeriodUnitTypeId').val( rule.DefaultPeriodUnitTypeId);
+		jQuery("#"+tab).find('.DefaultPeriodRate').val( rule.DefaultPeriodRate);
+		jQuery("#"+tab).find('.DefaultInvoicingCurrency').val( rule.DefaultInvoicingCurrency);	
+	}	
+	
+	var numberFieldTypes = ['numeric', 'double', 'decimal', 'currency'];
+	var dateFieldTypes = ['date', 'datetime'];
+	var filterObjectsForSourceType;
+	function selectInvoiceNarrativeSourceType()
+	{
+		showOrHideNarattiveSourceType();
+		
+		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InvoiceFormatEditController.GetInvoiceNarrativeSourceTypeObjects}',
+			jQuery('.NarattiveSourceType').val(),
+				function(result, event){          
+					if (event.status){
+			           	var data = {};
+			           	var filters = result;
+			           	filterObjectsForSourceType = result;
+			           	var rootObject = '{!$ObjectType.InvoiceableItem__c.Name}';
+						if (currentItem == '{!$ObjectType.PeriodCost__c.Name}')
+							rootObject = '{!$ObjectType.SupplierInvoiceableItem__c.Name}';
+						
+						var narattiveSourceTypeVal = jQuery('.NarattiveSourceType').val();
+						var fieldTypes = null;
+						if (narattiveSourceTypeVal == 'Date') fieldTypes = dateFieldTypes;
+						if (narattiveSourceTypeVal == 'NumberOfUnits' || narattiveSourceTypeVal == 'RatePerUnit' || narattiveSourceTypeVal == 'RatePerUnitPerPeriod' || narattiveSourceTypeVal == 'UnitSum') fieldTypes = numberFieldTypes;
+							
+			           	//jQuery('.NarattiveSourceField').fieldSelector({rootObject:rootObject, fieldFilters: filters});
+			           	
+			          	var filter = {
+							 	keep : function(field, object, path) {
+							 		var narattiveSourceTypeVal = jQuery('.NarattiveSourceType').val();
+							 		var fieldType =  field.type.toLowerCase() ;
+							 		
+							 		if (object.name == '{!$ObjectType.InvoiceableItem__c.Name}' || object.name == '{!$ObjectType.SupplierInvoiceableItem__c.Name}')
+							 			return (filterObjectsForSourceType.includes(field.name) && fieldType == 'reference' ) || false;
+							 		else {
+								 		if (narattiveSourceTypeVal == 'Field')
+											return true; 
+										else if (narattiveSourceTypeVal == 'Date')
+											return (fieldType == 'date' || fieldType == 'datetime');
+										else if (narattiveSourceTypeVal == 'NumberOfUnits' || narattiveSourceTypeVal == 'RatePerUnit' || narattiveSourceTypeVal == 'RatePerUnitPerPeriod' || narattiveSourceTypeVal == 'UnitSum') 
+											return (fieldType == 'numeric' || fieldType == 'double' || fieldType=='decimal' || fieldType=='currency');
+									}	
+								}
+							};
+			           	jQuery('.NarattiveSourceField').fieldSelector({rootObject:rootObject, filter: filter});
+			           
+			           	
+					} 
+				 	else if (event.type === 'exception') alert(event.message);
+			    		else  alert(event.message);
+			    }, 
+			    {escape: false, timeout: 60000});
+	}
+
+	function reloadAll()
+	{
+		var data = {};
+		jQuery('.Name').val(theInvoiceFormat.Name);
+		jQuery('.InvoiceMode').val(theInvoiceFormat.InvoiceMode);
+		jQuery('.ShowContext').prop( "checked", theInvoiceFormat.ShowContext);
+		jQuery('.IsInternal').prop( "checked", theInvoiceFormat.IsInternal);
+		jQuery('.IsSupplier').prop( "checked", theInvoiceFormat.IsSupplier);
+		jQuery('.RoundingRule').val(theInvoiceFormat.RoundingRule);
+		jQuery('.GroupByRevenueType').prop("checked", theInvoiceFormat.Rules.GroupByRevenueType);
+		jQuery('.SingleDateNarrative').val(theInvoiceFormat.SingleDateNarrative);
+		jQuery('.RatePerUnitNarrative').val(theInvoiceFormat.RatePerUnitNarrative);
+ 	 	jQuery('.NumberOfUnitsNarrative').val(theInvoiceFormat.NumberOfUnitsNarrative);
+ 	 	jQuery('.DateRangeNarrative').val(theInvoiceFormat.DateRangeNarrative);
+		jQuery('.RatePerUnitPerPeriodNarrative').val(theInvoiceFormat.RatePerUnitPerPeriodNarrative);
+		jQuery("input[id$='IncludeDepositAdjustment']").prop("checked", theInvoiceFormat.IncludeDepositAdjustment);
+		jQuery("input[id$='IncludeCredit']").prop("checked", theInvoiceFormat.IncludeCredit);
+		jQuery("input[id$='IncludeCreditAdjustment']").prop("checked", theInvoiceFormat.IncludeCreditAdjustment);
+		jQuery("input[id$='IncludeDiscountItem']").prop("checked", theInvoiceFormat.IncludeDiscountItem);
+		jQuery("input[id$='IncludeInternalRevenueShare']").prop("checked", theInvoiceFormat.IncludeInternalRevenueShare);
+		jQuery("input[id$='IncludeDeposit']").prop("checked", theInvoiceFormat.IncludeDeposit);
+		jQuery("input[id$='IncludeExpenseItem']").prop("checked", theInvoiceFormat.IncludeExpenseItem);
+		jQuery("input[id$='IncludeMilestone']").prop("checked", theInvoiceFormat.IncludeMilestone);
+		jQuery("input[id$='IncludePeriodRevenue']").prop("checked", theInvoiceFormat.IncludePeriodRevenue);
+		jQuery("input[id$='IncludeRevenueAdjustment']").prop("checked", theInvoiceFormat.IncludeRevenueAdjustment);
+		jQuery("input[id$='IncludeTimeEntry']").prop("checked", theInvoiceFormat.IncludeTimeEntry);
+		jQuery('.ShowResourceNumberOfUnitsInColumn').prop( "checked", theInvoiceFormat.ShowResourceNumberOfUnitsInColumn);
+		jQuery('.ShowResourceRateInColumn').prop( "checked", theInvoiceFormat.ShowResourceRateInColumn);
+		jQuery('.ShowTimeInTabularFormat').prop( "checked", theInvoiceFormat.ShowTimeInTabularFormat);
+		
+		changeInvoiceMode();
+		changedShowTimeInTabularFormat()
+		var orderedRevenueTypes = refreshRevenueTypeOrder();
+
+		if(theInvoiceFormat.Rules.GroupingRules != undefined){
+			jQuery.each(orderedRevenueTypes,function(key,revenueType){
+			    refreshGroupingCriterias(revenueType.ObjectType);
+				refreshSourceList(revenueType.ObjectType);
+				refreshOtherField(revenueType.ObjectType);
+			});
+		}
+	}
+
+	//Sorting revenue types
+	function changeRevenueType(){
+	    if(jQuery(".GroupByRevenueType").prop( "checked")){
+	        jQuery("#RevenueTypeSortPanel").show();
+     	}
+     	else{
+     	    jQuery("#RevenueTypeSortPanel").hide();
+      	}
+ 	}
+	function refreshRevenueTypeOrder(){
+	    var revenueTypeOrder = [];
+		jQuery.each(theInvoiceFormat.Rules.GroupingRules,function(key,theRule){
+			var theSortItem = {};
+			theSortItem.Sequence = theRule.Sequence;
+			theSortItem.ObjectType = theRule.ObjectType;
+			theSortItem.Label = jQuery("#"+theRule.ObjectType+"-tab").attr("label");
+			if (theSortItem.Label != undefined)
+			revenueTypeOrder.push(theSortItem);
+		});
+
+		revenueTypeOrder.sort(function (a, b) {
+			if(a.Sequence > b.Sequence)
+				return  1;
+			return -1;
+
+		});
+
+		changeRevenueType();
+
+		var revenueTypeOrderTable =  jQuery("#RevenueTypeSortPanel>div>table>tbody");
+		revenueTypeOrderTable.html("");
+
+		var newCurrentRevenueTypeLinksHtml = [];
+
+		jQuery.each(revenueTypeOrder,function(key,revenueType){
+		    var tr = jQuery('<tr>').attr('fieldId',revenueType.Sequence);
+			tr.click(function(e){selectRevenueType(jQuery(this).attr('fieldId'));e.preventDefault();});
+				tr.append(jQuery('<td>').text(revenueType.Sequence));
+				tr.append(jQuery('<td>').text(revenueType.Label));
+				revenueTypeOrderTable.append(tr);
+				newCurrentRevenueTypeLinksHtml.push(jQuery("#InvoicableItemsTabs>ul>li."+revenueType.ObjectType+"-tab-title"));
+		});
+
+		jQuery("#InvoicableItemsTabs>ul").html("");
+		jQuery.each(newCurrentRevenueTypeLinksHtml,function(key,newLi){
+		    jQuery("#InvoicableItemsTabs>ul").append(newLi);
+	   });
+
+		jQuery('#InvoicableItemsTabs').tabs('destroy');
+		constructTabs();
+		return revenueTypeOrder;
+ 	}
+
+ 	function moveRevenueTypeUp(){
+		if (currentlySelectedKey == 1)
+			return;
+
+		var previousField = null;
+		var newKey = null;
+		jQuery.each(theInvoiceFormat.Rules.GroupingRules,function(key,theRevenueTypeGroup){
+		    if(theRevenueTypeGroup.Sequence == currentlySelectedKey){
+        	 	newKey = parseInt(theRevenueTypeGroup.Sequence) - 1;
+        	 	theRevenueTypeGroup.Sequence  = newKey;
+        	 }
+        	 else if(theRevenueTypeGroup.Sequence == parseInt(currentlySelectedKey)-1)
+        	 	theRevenueTypeGroup.Sequence = parseInt(currentlySelectedKey);
+        });
+		refreshRevenueTypeOrder()
+		selectRevenueType(newKey);
+
+	}
+	function selectRevenueType(id){
+		jQuery('#RevenueTypeSortPanel>div>table>tbody>tr').css('background-color','#FFFFFF');
+	    jQuery('#RevenueTypeSortPanel>div>table>tbody>tr[fieldId='+id+']').css('background-color','#C0C0C0');
+	    currentlySelectedKey = id;
+	}
+	function moveRevenueTypeDown(){
+		if (currentlySelectedKey == Object.keys(theInvoiceFormat.Rules.GroupingRules).length)
+			return;
+
+		var isFoundField = null;
+		var newKey = null;
+
+		jQuery.each(theInvoiceFormat.Rules.GroupingRules,function(key,theRevenueTypeGroup){
+		    if(theRevenueTypeGroup.Sequence == currentlySelectedKey){
+        	 	newKey = parseInt(theRevenueTypeGroup.Sequence) + 1;
+        	 	theRevenueTypeGroup.Sequence = newKey;
+        	 }
+        	else if(theRevenueTypeGroup.Sequence == parseInt(currentlySelectedKey)+1)
+        	 	theRevenueTypeGroup.Sequence = currentlySelectedKey;
+		});
+
+		refreshRevenueTypeOrder()
+		selectRevenueType(newKey);
+	}
+	//end sorting revenue types
+	function showHideTabsBasedOnInternalOrSupplier(){
+	    var isInternal = jQuery('.IsInternal').prop("checked");
+	    var isSupplier = jQuery('.IsSupplier').prop("checked") ;
+
+		if(isSupplier){
+			jQuery('.CostOnly').show();
+			jQuery('.RevenueOnly').hide();
+		}
+		else{
+			jQuery('.CostOnly').hide();
+			jQuery('.RevenueOnly').show();
+		}
+
+	    var revenueTypeOrder = refreshRevenueTypeOrder();
+	    var firstVisibleKey = undefined;
+	    jQuery.each(revenueTypeOrder,function(key,revenueType){
+			var obj = revenueType.ObjectType;
+
+			if(obj == "{!$ObjectType.DepositAdjustment__c.Name}" || obj == "{!$ObjectType.CreditAdjustment__c.Name}" || obj == "{!$ObjectType.RevenueAdjustment__c.Name}"
+	        	|| obj == "{!$ObjectType.PeriodRevenue__c.Name}" || obj == "{!$ObjectType.Credit__c.Name}" || obj == "{!$ObjectType.DiscountItem__c.Name}"
+	        	|| obj == "{!$ObjectType.Deposit__c.Name}"){
+	        	if(isSupplier)
+	        		jQuery("#InvoicableItemsTabs>ul>li."+obj+"-tab-title").hide();
+	        	else{
+	        		jQuery("#InvoicableItemsTabs>ul>li."+obj+"-tab-title").show();
+	        		if(firstVisibleKey == undefined)
+	        			firstVisibleKey = key;
+	        	}
+          	}
+			else if(obj == "{!$ObjectType.InternalRevenueShare__c.Name}"){
+				if(!isInternal || isSupplier)
+					jQuery("#InvoicableItemsTabs>ul>li."+obj+"-tab-title").hide();
+				else{
+		    		jQuery("#InvoicableItemsTabs>ul>li."+obj+"-tab-title").show();
+		    		if(firstVisibleKey == undefined)
+	        			firstVisibleKey = key;
+		    	}
+			}
+			else if(obj == "{!$ObjectType.PeriodCost__c.Name}"){
+			    if(!isSupplier)
+					jQuery("#InvoicableItemsTabs>ul>li."+obj+"-tab-title").hide();
+				else{
+					jQuery("#InvoicableItemsTabs>ul>li."+obj+"-tab-title").show();
+					if(firstVisibleKey == undefined)
+	        			firstVisibleKey = key;
+				}
+			}
+			else{
+			    jQuery("#InvoicableItemsTabs>ul>li."+obj+"-tab-title").show();
+				if(firstVisibleKey == undefined)
+	        		firstVisibleKey = key;
+   			}
+		});
+
+		jQuery( "#InvoicableItemsTabs" ).tabs("option", "active", firstVisibleKey);
+
+
+ 	}
+	function GetInvoiceFormat()
+	{
+		jQuery('#loadingIndicatorOuterContainer').show();
+		var invoiceFormatId = '{!JSENCODE($CurrentPage.parameters.id)}';
+		if(invoiceFormatId == '') invoiceFormatId = null;
+		var cloneId = '{!JSENCODE($CurrentPage.parameters.cloneId)}'; 	
+		if(cloneId == '') cloneId = null;
+		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InvoiceFormatEditController.GetInvoiceFormat}',
+			invoiceFormatId, cloneId,
+				function(result, event){          
+					if (event.status) {
+						theInvoiceFormat = result;
+						reloadAll();
+						completeLoad();
+					}
+					else if (event.type === 'exception') alert(event.message);
+			    		else alert(event.message);
+			    		jQuery('#loadingIndicatorOuterContainer').hide();
+			    }, 
+			    {escape: false, timeout: 60000});
+	}
+	
+	function ErrorMsgLine(fieldname){
+		return '<li>'+('{!$label.RequiredValue}').replace('{0}', fieldname)+'</li>';
+	}
+	
+	function SaveInvoiceFormat(){
+		
+		var toValidate =  ["Name", "SingleDateNarrative", "DateRangeNarrative", "RatePerUnitNarrative", "RatePerUnitPerPeriodNarrative", "NumberOfUnitsNarrative", "RoundingRule"];
+		
+		var errorMessages = '';
+		
+		jQuery.each(toValidate, function(i, toVali){
+			var cls = '.'+toVali;
+			if(jQuery(cls).val() == '')
+				errorMessages += ErrorMsgLine(jQuery(cls+'Lbl').text());
+		});
+		 
+		jQuery.each(jQuery('.tabContainer'), function(key, panel){
+			var item = jQuery(panel).attr('item');
+			var objLabel = jQuery(panel).attr('label');
+			var cls = '.'+item+'-Narrative'
+			if(jQuery(cls).select2("val").length == 0)
+				errorMessages += ErrorMsgLine(objLabel+' - '+jQuery(cls+'Lbl').text());
+			var groupCriterias = theInvoiceFormat.Rules.GroupingRules[item].GroupCriterias;
+			if(groupCriterias != undefined && groupCriterias.length > 0){
+				var grpcls = '.'+item+'-GroupNameNarrative';
+				if(jQuery(grpcls).select2("val").length == 0)
+					errorMessages += ErrorMsgLine(objLabel+' - '+jQuery(grpcls+'Lbl').text());
+			}	
+			
+			jQuery.each(jQuery("#"+item+"-tab").find('.DefaultNarrativeField'),function(key, defaultfieldItem){
+				if(jQuery(defaultfieldItem).val() == ''){
+					var label = $("label[for='" + jQuery(defaultfieldItem).attr('id') + "']").text();
+					errorMessages += ErrorMsgLine(objLabel+' - '+label);
+				}
+			});
+		});
+			  
+		  
+		 if( jQuery('.NarattiveSourceAggregate').is(":visible") && jQuery('.NarattiveSourceAggregate').val() == '')
+		 	errorMessages += ErrorMsgLine(jQuery('.NarattiveSourceAggregateLbl').text());
+		 	
+		if(errorMessages != ''){
+			jQuery('#InvoiceFormatErrorsMsg').html(errorMessages);
+			jQuery('#InvoiceFormatErrors').show();
+			return;
+		}
+		jQuery('#InvoiceFormatErrors').hide();
+		jQuery('.GroupNameNarrative').select2("destroy");
+		jQuery('.Narrative').select2("destroy");
+		jQuery('#loadingIndicatorOuterContainer').show();
+		theInvoiceFormat.SingleDateNarrative = jQuery('.SingleDateNarrative').val();
+		theInvoiceFormat.DateRangeNarrative = jQuery('.DateRangeNarrative').val();
+		theInvoiceFormat.RatePerUnitNarrative = jQuery('.RatePerUnitNarrative').val();
+		theInvoiceFormat.NumberOfUnitsNarrative = jQuery('.NumberOfUnitsNarrative').val();
+		theInvoiceFormat.RatePerUnitPerPeriodNarrative = jQuery('.RatePerUnitPerPeriodNarrative').val();
+		
+		theInvoiceFormat.Name = jQuery('.Name').val();
+		theInvoiceFormat.InvoiceMode = jQuery('.InvoiceMode').val();
+		theInvoiceFormat.ShowContext =jQuery('.ShowContext').prop( "checked") ;
+		theInvoiceFormat.IsInternal =jQuery('.IsInternal').prop( "checked") ;
+		theInvoiceFormat.IsSupplier =jQuery('.IsSupplier').prop( "checked") ;
+		theInvoiceFormat.RoundingRule = jQuery('.RoundingRule').val();
+		theInvoiceFormat.Rules.GroupByRevenueType = jQuery('.GroupByRevenueType').prop( "checked");
+
+		theInvoiceFormat.ShowResourceNumberOfUnitsInColumn = jQuery('.ShowResourceNumberOfUnitsInColumn').prop( "checked");
+		theInvoiceFormat.ShowResourceRateInColumn = jQuery('.ShowResourceRateInColumn').prop( "checked");
+		theInvoiceFormat.ShowTimeInTabularFormat = jQuery('.ShowTimeInTabularFormat').prop( "checked");
+		
+		if (jQuery('.InvoiceMode').val() == '{!JSENCODE(InvoiceModeEnumAutoId)}'){
+			theInvoiceFormat.IncludeCredit = jQuery("input[id$='IncludeCredit']").prop("checked");
+			theInvoiceFormat.IncludeCreditAdjustment = jQuery("input[id$='IncludeCreditAdjustment']").prop("checked");
+			theInvoiceFormat.IncludeDiscountItem = jQuery("input[id$='IncludeDiscountItem']").prop("checked");
+			theInvoiceFormat.IncludeInternalRevenueShare = jQuery("input[id$='IncludeInternalRevenueShare']").prop("checked");
+			theInvoiceFormat.IncludeDepositAdjustment = jQuery("input[id$='IncludeDepositAdjustment']").prop("checked");
+			theInvoiceFormat.IncludeDeposit = jQuery("input[id$='IncludeDeposit']").prop("checked");
+			theInvoiceFormat.IncludeExpenseItem = jQuery("input[id$='IncludeExpenseItem']").prop("checked");
+			theInvoiceFormat.IncludeMilestone = jQuery("input[id$='IncludeMilestone']").prop("checked");
+			theInvoiceFormat.IncludePeriodRevenue = jQuery("input[id$='IncludePeriodRevenue']").prop("checked");
+			theInvoiceFormat.IncludePeriodCost = jQuery("input[id$='IncludePeriodCost']").prop("checked");
+			theInvoiceFormat.IncludeRevenueAdjustment = jQuery("input[id$='IncludeRevenueAdjustment']").prop("checked");
+			theInvoiceFormat.IncludeTimeEntry = jQuery("input[id$='IncludeTimeEntry']").prop("checked");
+		}
+		else{
+			theInvoiceFormat.IncludeDepositAdjustment = false; theInvoiceFormat.IncludeDeposit = false;
+			theInvoiceFormat.IncludeCreditAdjustment = false; theInvoiceFormat.IncludeCredit = false; theInvoiceFormat.IncludeDiscountItem = false; theInvoiceFormat.IncludeInternalRevenueShare = false;
+			theInvoiceFormat.IncludeExpenseItem = false; theInvoiceFormat.IncludeMilestone = false; theInvoiceFormat.IncludePeriodRevenue = false;
+			theInvoiceFormat.IncludePeriodCost = false; theInvoiceFormat.IncludeRevenueAdjustment = false; theInvoiceFormat.IncludeTimeEntry = false;
+		}
+		//GroupNameNarratives done
+		jQuery.each(jQuery('.tabContainer'), function(key, panel){
+			var item = jQuery(panel).attr('item');
+		 	var rule = theInvoiceFormat.Rules.GroupingRules[item];
+			if(rule == undefined){
+				theInvoiceFormat.Rules.GroupingRules[item] = Object();
+				rule = theInvoiceFormat.Rules.GroupingRules[item];
+			}
+			rule.Name = jQuery(panel).find(".RuleName").val();
+			rule.DefaultUnitTypeNarrative = jQuery(panel).find(".DefaultUnitTypeNarrative").val();
+			rule.DefaultUnitTypeId = jQuery(panel).find(".DefaultUnitTypeId").val();
+			rule.DefaultRate = jQuery(panel).find(".DefaultRate").val();
+			rule.DefaultInvoicingCurrency = jQuery(panel).find(".DefaultInvoicingCurrency").val();
+			
+			if (jQuery(panel).find(".DefaultPeriodRate").length > 0 ){
+				rule.DefaultPeriodUnitTypeId = jQuery(panel).find(".DefaultPeriodUnitTypeId").val();
+				rule.DefaultPeriodUnitTypeNarrative = jQuery(panel).find(".DefaultPeriodUnitTypeNarrative").val();
+			}
+			if (jQuery(panel).find(".DefaultPeriodRate").length > 0 )
+				rule.DefaultPeriodRate = jQuery(panel).find(".DefaultPeriodRate").val();
+				
+			
+		});
+		
+		var isNew = (theInvoiceFormat.Id == undefined);
+		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InvoiceFormatEditController.SaveInvoiceFormat}',
+			theInvoiceFormat,
+				function(result, event){          
+					if (event.status){
+						theInvoiceFormat = result;
+			         	if (isNew && theInvoiceFormat.Id != null)
+							safeNavigateToSForceURL('{!$Page.InvoiceFormatEdit}?id='+theInvoiceFormat.Id);
+			           	reloadAll();
+			           	rememberSelectedRevenueTab();
+  			           	displaySaveSuccessMsg();
+			        } 
+				 	else if (event.type === 'exception') alert(event.message);
+			    		else alert(event.message);
+			    		jQuery('#loadingIndicatorOuterContainer').hide();
+			    }, 
+			    {escape: false, timeout: 60000});
+	}
+		
+	function displaySaveSuccessMsg()
+	{
+	    jQuery('#InvoiceFormatSaveSuccessful').show();
+	    
+		setTimeout(function(){
+			jQuery('#InvoiceFormatSaveSuccessful').fadeOut('slow');
+		}, 3000);
+ 	}	
+		
+	 jQuery(function() {
+	 	GetInvoiceFormat();
+	  	collapseAllDefaultNarrativeSourcesSection();
+	  	constructTabs();
+	  });
+
+	 function constructTabs(){
+	     jQuery( "#InvoicableItemsTabs" ).tabs({ activate: function(event ,ui){
+	         	currentItem = ui.newTab.attr('item');
+	 				loadFieldSelector();
+            		currentlySelectedKey = undefined;
+            		refreshGroupingCriterias(currentItem);
+            }
+         });
+  	}
+
+  	function completeLoad(){
+  	    currentItem = jQuery(jQuery("#InvoicableItemsTabs>ul>li")[jQuery( "#InvoicableItemsTabs" ).tabs("option", "active")]).attr('item');
+		loadFieldSelector();
+	  	showHideTabsBasedOnInternalOrSupplier();
+   	}
+
+   	function rememberSelectedRevenueTab(){
+   	    jQuery.each(jQuery("#InvoicableItemsTabs>ul>li"),function(key,tab){
+			if (jQuery(tab).attr("item") == currentItem)
+				jQuery( "#InvoicableItemsTabs" ).tabs("option", "active", key);
+		});
+	}
+
+  	</script>
+			
+			</apex:outputPanel>
+		</apex:define>
+	</apex:composition>
+
+</apex:page>

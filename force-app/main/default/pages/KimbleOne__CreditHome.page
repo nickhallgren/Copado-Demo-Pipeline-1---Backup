@@ -1,0 +1,99 @@
+<apex:page standardController="KimbleOne__Credit__c" extensions="KimbleOne.CreditHomeController,KimbleOne.FilesAndAttachmentsController" showHeader="true" sidebar="false">
+	<apex:composition template="KimbleOne__SiteMaster">
+		<apex:define name="Menu">
+			<c:Menu DefaultHelpPage="Finance.html" MenuContextType="{!MenuContextType}" MenuContextId="{!MenuContextId}" MenuContextName="{!MenuContextName}" />
+		</apex:define>
+		<apex:define name="Content">
+			<apex:form id="CreditForm">
+				<apex:pageMessages escape="false"/>
+				<apex:pageBlock title="{!$ObjectType.KimbleOne__Credit__c.Label}">
+					<apex:pageBlockButtons location="top">
+						<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__Credit__c.updateable}">
+							<apex:commandButton id="editButton" action="{!EditRedirect}" value="{!$Label.kimbleone__edit}" rendered="{!CanEdit}" />
+							<apex:commandButton id="sendForApprovalBtn" action="{!SendForApproval}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__sendforapprovalbutton}" rerender="CreditForm" rendered="{!ISBLANK(TheCredit.KimbleOne__DeliveryElement__c) && TheCredit.Status__r.KimbleOne__Enum__c = 'Draft'}"/>
+						</apex:outputPanel>
+					</apex:pageBlockButtons>
+					<apex:pageBlockSection rendered="{!ISBLANK(TheCredit.KimbleOne__DeliveryElement__c)}">
+						<apex:outputfield value="{!TheCredit.KimbleOne__Account__c}" />
+					</apex:pageBlockSection>
+					<apex:pageblockSection collapsible="false" showheader="false" columns="2">
+						<apex:outputField value="{!TheCredit.Name}" />
+						<apex:pageBlockSectionItem />
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__Credit__c.Fields.KimbleOne__Status__c.Label}"/>
+							<apex:outputField value="{!TheCredit.KimbleOne__Status__c}"/>
+						</apex:pageBlockSectionItem>
+						<apex:outputField value="{!TheCredit.KimbleOne__ExpiryDate__c}" />
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel >{!$ObjectType.KimbleOne__Credit__c.Fields.KimbleOne__CreditValue__c.Label}</apex:outputLabel>
+							<apex:outputText styleclass="kimble-format-currency" html-data-currency="{!TheCredit.CurrencyIsoCode}" value="{!ROUND(TheCredit.KimbleOne__CreditValue__c, 2)}" />
+						</apex:pageBlockSectionItem>
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel >{!$ObjectType.KimbleOne__Credit__c.Fields.KimbleOne__AllocatedValue__c.Label}</apex:outputLabel>
+							<apex:outputText styleclass="kimble-format-currency" html-data-currency="{!TheCredit.CurrencyIsoCode}" value="{!TheCredit.KimbleOne__AllocatedValue__c}" />
+						</apex:pageBlockSectionItem>
+						<apex:pageBlockSectionItem rendered="{!!(ISBLANK(TheCredit.KimbleOne__DeliveryElement__c) && TheCredit.KimbleOne__CreditUnits__c != null && TheCredit.KimbleOne__CreditUnits__c > 0)}"/>
+                        <apex:pageBlockSectionItem rendered="{!ISBLANK(TheCredit.KimbleOne__DeliveryElement__c) && TheCredit.KimbleOne__CreditUnits__c != null && TheCredit.KimbleOne__CreditUnits__c > 0}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__Credit__c.Fields.KimbleOne__CreditUnits__c.Label}"/>
+                            <apex:outputtext value="{!TheCredit.KimbleOne__CreditUnits__c}" />
+                        </apex:pageBlockSectionItem>
+						<apex:pageBlockSectionItem rendered="{!ISBLANK(TheCredit.KimbleOne__DeliveryElement__c) && TheCredit.KimbleOne__CreditUnits__c != null && TheCredit.KimbleOne__CreditUnits__c > 0}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__Credit__c.Fields.KimbleOne__UnitValue__c.Label}"/>
+							<apex:outputText styleclass="kimble-format-currency" html-data-currency="{!TheCredit.CurrencyIsoCode}"  value="{!TheCredit.KimbleOne__UnitValue__c}" />
+						</apex:pageBlockSectionItem>
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel >{!$ObjectType.KimbleOne__Credit__c.Fields.KimbleOne__UnallocatedValue__c.Label}</apex:outputLabel>
+							<apex:outputText styleclass="kimble-format-currency" html-data-currency="{!TheCredit.CurrencyIsoCode}"  value="{!TheCredit.KimbleOne__UnallocatedValue__c}" />
+						</apex:pageBlockSectionItem>
+					</apex:pageBlockSection>
+					<apex:pageBlockSection rendered="{!!ISBLANK(TheCredit.KimbleOne__DeliveryElement__c)}">
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel >{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__InvoicingCurrencyCreditRevenue__c.Label}</apex:outputLabel>
+							<apex:outputText styleclass="kimble-format-currency" html-data-currency="{!DeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c}"  value="{!DeliveryElement.KimbleOne__InvoicingCurrencyCreditRevenue__c}" />
+						</apex:pageBlockSectionItem>
+					</apex:pageBlockSection>
+				</apex:pageBlock>
+			</apex:form>
+			<apex:pageBlock id="CreditAllocationsPageBlock" title="{!$ObjectType.KimbleOne__CreditAllocation__c.LabelPlural}" rendered="{!TheCredit.Status__r.KimbleOne__Enum__c=='ReadyForUse'}">
+				<apex:pageBlockTable value="{!creditAllocations}" var="crAlloc" >
+					<apex:column value="{!crAlloc.DeliveryElement__r.KimbleOne__DeliveryGroup__c}" headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.Name.Label}" />
+					<apex:column value="{!crAlloc.KimbleOne__DeliveryElement__c}" headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.Name.Label}" />
+					<apex:column value="{!crAlloc.KimbleOne__AllocatedUnits__c}"  headerValue="{!$ObjectType.KimbleOne__CreditAllocation__c.Fields.KimbleOne__AllocatedUnits__c.Label}" />
+					<apex:column value="{!crAlloc.KimbleOne__AllocatedValue__c}"  headerValue="{!$ObjectType.KimbleOne__CreditAllocation__c.Fields.KimbleOne__AllocatedValue__c.Label}" />
+				</apex:pageBlockTable>
+			</apex:pageBlock>
+			<apex:relatedList list="CombinedAttachments" title="{!$Label.kimbleone__notesandattachmentsheading}" rendered="{!AttachmentsEnabled}"/>
+			<apex:relatedList subject="{!TheCredit}" list="AttachedContentDocuments" rendered="{!FilesEnabled}"/>
+			<script>
+        jQuery(document).ready(function() {
+            if(isSFLightning()) jQuery('input[name="newNote"],input[name="attachFile"]').hide();
+        });
+    </script>
+			<apex:outputPanel layout="none" id="ApprovalHistoryPanel"  rendered="{!ISBLANK(TheCredit.KimbleOne__DeliveryElement__c)}">
+				<apex:relatedList list="ProcessSteps" id="CreditApprovalHistory"></apex:relatedList>
+				<script>
+                    $(document).ready(function(){
+                           $(function() {
+                               hideSalesForceApprovalProcessButtons();
+                           })
+                       });
+                       function hideSalesForceApprovalProcessButtons()
+                       {
+                               $('input[name="piSubmit"]').remove();
+                               $('input[name="piRemove"]').remove();
+                       }
+            </script>
+			</apex:outputPanel>
+			<style>
+            .kimble-format-currency {
+                display:none;
+            }
+        </style>
+			<script>
+            $(window).load(function(){
+                kimble.formatCurrencies();
+            });
+        </script>
+		</apex:define>
+	</apex:composition>
+</apex:page>

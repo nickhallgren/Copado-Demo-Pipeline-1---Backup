@@ -1,0 +1,903 @@
+<apex:page standardController="KimbleOne__ActivityAssignmentDemandSearch__c" extensions="KimbleOne.ActivityAssignmentDemandSearchController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__ReferenceData__c">
+
+    <apex:composition template="KimbleOne__SiteMaster">
+
+        <apex:define name="Menu">
+
+            <c:Menu DefaultHelpPage="WhatcanIdoinKimble.html" MenuContextName="{!$Label.kimbleone__mydemandsearches}" BreadCrumbLink="{!$Page.KimbleOne__ResourceCapabilitiesAndExperience}" BreadCrumbName="{!$Label.kimbleone__myskillsandexperience}" />
+
+        </apex:define>
+
+        <apex:define name="Content">
+
+            <apex:includeScript value="{!URLFOR($Resource.KimbleOne__Handlebars)}" />
+
+            <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+            <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+            <apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+            <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+            <apex:pageMessages escape="false"/>
+
+            <style>
+            /* progress */
+			.loadingIndicator {
+				right:0;
+				width:100%;
+				height:100%;
+				font-weight: bold;
+				position: fixed;
+				margin-top: 0px;
+				top: 0px;
+				text-align:center;
+				/* IE filter */
+				filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+				-moz-opacity:0.7;	/* Mozilla extension */
+				-khtml-opacity:0.7;  /* Safari/Conqueror extension */
+				opacity:0.7; /* CSS3 */
+				z-index:1000;
+				background-color:white;
+				display:none;
+			}
+			.loadingIndicator img {
+				margin-right:9px;
+			}
+			#loadingIndicatorInnerContainer,
+			#savingIndicatorInnerContainer{
+				position:absolute;
+				top:50%;
+				height:10em;
+				margin-top:-2em;
+				width:100%;
+			}
+
+                /* toolbar styling */
+                div#toolbar-container {
+                    display: table;
+                    padding: 6px 5px;
+                    margin: 6px 0px;
+                    position: relative;
+                    background-color: #f8f8f8;
+                    display: table;
+                    width: 100%;
+                }
+                div#filter-buttons,
+                div#action-buttons {
+                    display: table-cell;
+                    width: 50%;
+                    vertical-align: top;
+                }
+                div#action-buttons {
+                    text-align: right;
+                    padding-right: 60px;
+                }
+                .control-cell {
+                    vertical-align: middle;
+                }
+                input.filter-name {
+                    padding: 6px 6px 5px 6px;
+                    border: 1px solid #cccccc;
+                    border-radius: 2px;
+                    margin: 0px 2px;
+                    width: 300px;
+                }
+                .toolbar {
+                    display: table-row;
+                    width: 100%;
+                }
+                a.toolbar-button-single {
+                    padding-right: 3px;
+                }
+                a.toolbar-button-double > div {
+                    border-right-style: hidden;
+                }
+                div.toolbar-button {
+                    display: inline-block;
+                    padding: 6px 8px;
+                    background-color: white;
+                    border: 1px solid #ccc;
+                    border-radius: 2px;
+                    cursor: pointer;
+                }
+                div.toolbar-button.active-toolbar-button {
+                    color: white;
+                    background-color: #888;
+                }		
+                div.toolbar-button:hover {
+                    text-decoration: none;
+                    color: white;
+                    background-color: #1A9EFF;
+                }
+                div.toolbar-button .fa {font-size: 14px;}
+                div.toolbar-button.disabled {background-color: #ccc;color: darkgray;}
+                div.toolbar-button.disabled:hover {background-color: #ccc;color: darkgray;}
+                /* auto save */
+                .submit-actions {
+                    display: inline-block;
+                    position: relative;
+                }
+                .filter-name.has-changes,
+                .toolbar-button.has-changes {
+				    background-color: rgba(255, 165, 0, 0.55) !important;
+			    }
+                .auto-save-actions {
+                    display: inline-block;
+                    position: relative;
+                    width: 60px;
+                    text-align: center;
+                    vertical-align: top;
+                    margin-left: 10px;
+                }
+                .auto-save-actions div {
+                    width: 60px;
+                    text-overflow: ellipsis !important;
+                    overflow: hidden;
+                }
+                .auto-save-toggle {
+                    padding-top: 2px;
+                }
+                span.autoSaveMode {
+                    padding: 0px 4px;
+                    cursor: pointer;
+                }
+                .undecorated-link {
+                    cursor: pointer;
+                }
+                .auto-save-line {
+                    position: absolute;
+                    border: 1px solid rgba(255, 165, 0, 0.55) !important;
+                    width: 100%;
+                    border-radius: 2px;
+                    bottom: -4px;
+                }
+                /* SELECT 2 STYLING */
+                .select2-results li {margin-left:0px;}
+                .select2-container-multi .select2-choices
+                {
+                    border: 2px solid rgb(224,224,224);
+                    background-image:none;
+                }
+                .select2-container-multi .select2-choices .select2-search-choice {
+                    border: 1px solid #aaaaaa;
+                    border-radius: 4px;
+                    padding: 5px 20px 5px 5px;
+                    background-image:none;
+                }
+                
+                .select2-container-multi .select2-search-choice-close {
+                    background-image:  url({!URLFOR($Resource.AssignmentImages, 'assignmentSprite.png')});
+                    background-position: -2px -29px;
+                    background-repeat: no-repeat;
+                    left:auto;
+                }
+                
+                .select2-container-multi .select2-choices .select2-search-choice .select2-search-choice-close:hover {
+                    background-position: -2px -1px;
+                }
+                .select2-container.select2-container-multi {
+                    width: auto !important;
+                    min-width: 301px;
+                    display: block;
+                    max-width: 400px;
+                }
+                /* Page specific */
+                .nothing-here {
+                    padding: 20px;
+                    font-size: 14px;
+                    border: 2px dashed #bbbbbb;
+                    margin: 11px 2px;
+                    background-color: lemonchiffon;
+                    text-align: center;
+                }
+                .demands-hdr.d-row {
+                    font-size: 16px;
+                    font-weight: bold;
+                }
+                .demands-hdr.d-row .d-cell {
+                    background-color: #F5F5F5;
+                    border-top: 1px solid #ddd;
+                }
+                .demands-grid {
+                    /*display: table;*/
+                    width: 100%;
+                }
+                .d-row {
+                    /*display: table-row;*/
+                }
+                .d-cell {
+                    /*display: table-cell;*/
+                }
+                .itm-l {
+                    font-weight: bold;
+                    font-size: 12px;
+                    margin-bottom: 2px;
+                    margin-top: 4px;
+                }
+                .itm-val {
+                    font-size: 14px;
+                    padding: 1px;
+                }
+                /* Issue with each row being independant means we can't use standard hover styling */
+                .d-row:hover {
+                    /*background-color: #e3feff;*/
+                }
+                .d-row .d-cell {
+                    /*border-bottom: 2px solid #d5d5d5;*/
+                    padding: 10px;
+                    vertical-align: top;
+                }
+                .add-dets-row .d-cell {
+                    border-bottom: 8px solid #d5d5d5;
+                }
+                td.itm-req-cap-details.d-cell, td.itm-add-details.d-cell {
+                    padding-top: 0px;
+                }
+                td.itm-req-cap-details.d-cell:empty {
+                    padding: 0px !important;
+                }
+                .from-to div {
+                    display: inline-block;
+                }
+                .itm-units-l {
+                    display: inline-block;
+                }
+                .itm-basis {
+                    display: inline-block;
+                    font-style: italic;
+                }
+                .add-fld {
+                    display: inline-block;
+                    vertical-align: top;
+                    margin-right: 20px;
+                    margin-bottom: 10px;
+                    overflow: auto;
+                }
+                .add-fld.TEXTAREA {
+                    max-width: 50%;
+                    max-height: 120px;
+                }
+                /* pref btns */
+                .itm-pref {
+                    display: inline-block;
+                    font-size: 40px;
+                    display: inline-block;
+                    padding: 4px;
+                    border-radius: 4px;
+                }
+                .itm-pref:hover {
+                    background-color: #c9f9ff;
+                }
+                .itm-prefs {
+                    text-align: left;
+                    cursor: pointer;
+                    color: #adadad;
+                    vertical-align: middle;
+                }
+                .itm-pref.IdealRole.on {
+                    color: gold;
+                }
+                .itm-pref.Consider.on {
+                    color: #008852;
+                }
+                .itm-pref.DoNotConsider.on {
+                    color: #ff4040;
+                }
+                .itm-pref.no-pref.on {
+                    color: #323232;
+                }
+                div#FilterCriteriaPopup {
+                    position: absolute;
+                    top: 92px;
+                    padding: 5px;
+                    min-width:295px;
+                    height: auto;
+                    z-index: 999;
+                    border-color: #ddd;
+                    border-style: solid;
+                    border-width: 0px 1px 1px 1px;
+                    background-color: #fff;
+                    box-shadow: rgba(31, 31, 31, 0.16) 4px 3px 8px;
+                    left: 14px;
+                }
+            </style>
+
+            <script id="grid-itm-template" type="text/x-handlebars-template">
+                <tr class="d-itm d-row" d-id="{{Id}}" ad-id="{{ADId}}">
+                    <td class="itm-details d-cell">
+                        <div class="itm-acc-name itm-val"><div class="itm-l">{!JSENCODE($ObjectType.Account.Label)}:</div>{{{AccountName}}}</div>
+                        <div class="itm-opp-name itm-val"><div class="itm-l">{!JSENCODE($ObjectType.Opportunity.Label)}:</div>{{{OpportunityName}}}</div>
+                        <div class="itm-act-name itm-val"><div class="itm-l">{!JSENCODE($Label.Activity)}:</div>{{{ActivityName}}}</div>
+                    </td>
+                    <td class="itm-resdet d-cell">
+                        <div class="itm-resnme itm-val"><div class="itm-l">{!JSENCODE($ObjectType.ActivityAssignment__c.fields.Resource__c.Label)}:</div>{{{ResourceName}}}</div>
+                        {{#if RoleName}}<div class="itm-rolnme itm-val"><div class="itm-l">{!JSENCODE($ObjectType.ActivityAssignment__c.fields.ActivityRole__c.Label)}:</div>{{{RoleName}}}</div>{{/if}}
+                        {{#if LocationName}}<div class="itm-locnme itm-val"><div class="itm-l">{!JSENCODE($ObjectType.ActivityAssignment__c.fields.Location__c.Label)}:</div>{{{LocationName}}}</div>{{/if}}
+                    </td>
+                    <td class="itm-sched d-cell">
+                        <div class="itm-val">
+                            <div class="itm-dur">{{formatNum Duration}}
+                                <div class="itm-units-l">{{#if (gt Duration 1)}}days{{/if}}{{#if (eq Duration 1)}}day{{/if}}</div>
+                                {{#if Fulltime}}<div class="itm-basis">({!JSENCODE($Label.DemandSearchFulltime)})</div>{{/if}}
+                                {{#unless Fulltime}}<div class="itm-basis">({!JSENCODE($Label.DemandSearchParttime)} {{formatNum Effort}} {{#if (gt Effort 1)}}({!JSENCODE($Label.DaysHeading)}{{/if}}{{#if (eq Effort 1)}}({!JSENCODE($Label.Day)}{{/if}})</div>{{/unless}}
+                            </div>
+                        </div>
+                        <div class="itm-val from-to">
+                            <div class="itm-sd dte">{{formatUTCDate StartDateUTC}}</div>
+                            <div class="itm-l dte-sep">{!JSENCODE($Label.To)}</div>
+                            <div class="itm-ed dte">{{formatUTCDate EndDateUTC}}</div>
+                        </div>
+                    </td>
+                    <td class="itm-prefs d-cell">
+                        <div class="itm-pref IdealRole {{getState Id 'IdealRole'}}" title="{!JSENCODE($Label.DemandSearchIdeal)}"><i class="fa fa-star"></i></div>
+                        <div class="itm-pref Consider {{getState Id 'IdealRole'}} {{getState Id 'Consider'}}" title="{!JSENCODE($Label.DemandSearchConsider)}"><i class="fa fa-flip-horizontal fa-thumbs-o-up"></i></div>
+                        <apex:outputPanel layout="none" rendered="{!AllowNegPref}">
+                        <div class="itm-pref DoNotConsider {{getState Id 'DoNotConsider'}}" title="{!JSENCODE($Label.kimbleone__demandsearchdonotconsider)}"><i class="fa fa-flip-horizontal fa-thumbs-o-down"></i></div>
+                        </apex:outputPanel>
+                        <div class="itm-pref no-pref {{getState Id ''}}" title="{!JSENCODE($Label.DemandSearchNoPreference)}"><i class="fa fa-circle-thin"></i></div>
+                    </td>
+                </tr>
+                <tr class="d-itm d-row req-cap-dets-row" d-id="{{Id}}">
+                    <td class="itm-req-cap-details d-cell" colspan="4">{{{requiredCaps ADId}}}</td>
+                </tr>
+                <tr class="d-itm d-row add-dets-row" d-id="{{Id}}">
+                    <td class="itm-add-details d-cell" colspan="4">
+                        {{#each DisplayFieldVals}}
+                        {{> add-f-template parent=..}}
+                        {{/each}}
+                    </td>
+                </tr>
+            </script>
+            <script id="add-f-template" type="text/x-handlebars-template" partial="true">
+                <div class="add-fld {{fType}} itm-val"><div class="itm-l">{{fLabel}}:</div>
+                    <div class="add-fld-val">
+                    {{#if (isTextDisplayType fType)}}{{{fValue}}}{{/if}}
+                    {{#if (eq fType 'DATE')}}{{{formatUTCDate fValue}}}{{/if}}
+                    {{#if (isNumericDisplayType fType)}}{{{formatNum fValue}}}{{/if}}
+                    {{#if (eq fType 'BOOLEAN')}}{{#if (eq fValue 'true')}}{!JSENCODE($Label.Yes)}{{else}}{!JSENCODE($Label.No)}{{/if}}{{/if}}
+                    </div>
+                </div>
+            </script>
+
+            <script>
+        
+        var resId = '{!JSENCODE(TheResourceId)}';
+        var resName = '{!JSENCODE(TheResourceName)}';
+		var searchId = '{!JSENCODE(TheSearchCriteria.Id)}';
+		var searchNotes = '{!JSENCODE(TheSearchCriteria.Notes)}';
+		var searchCriteria = '{!JSENCODE(TheSearchCriteria.SearchCriteria.Criteria)}';
+		var showOnSummary = <apex:outputText value="{!ShowOnSummary}"/>;
+		var theDemands;
+
+		var autoSaveOn = true;
+
+		var textDisplayTypes = ['TEXTAREA','STRING','PICKLIST','MULTIPICKLIST','STRING','URL','EMAIL'];
+        var numericDisplayTypes = ['INTEGER','DOUBLE','LONG','PERCENT','CURRENCY'];
+
+		var l = {};
+		l['proj'] = '{!JSENCODE($Label.DemandSearchProjectDetails)}';
+		l['res'] = '{!JSENCODE($Label.DemandSearchResourcingDetails)}';
+		l['sched'] = '{!JSENCODE($Label.DemandSearchSchedule)}';
+		l['pref'] = '{!JSENCODE($Label.DemandSearchPreferences)}';
+		l['nodemands'] = '{!JSENCODE($Label.DemandSearchNoResults)}';
+		l['copy'] = '{!JSENCODE($Label.CopyLink)}';
+		l['unsubmittedchanges'] = '{!JSENCODE($Label.ExpressInterestNarrative01)}';
+		l['existingpref'] = '{!JSENCODE($Label.ExistingPreferences)}';
+		l['placeholder2'] = '{!JSENCODE($Label.ExpressInterestNarrative02)}';
+		l['placeholder3'] = '{!JSENCODE($Label.ExpressInterestNarrative03)}';
+		l['placeholder4'] = '{!JSENCODE($Label.ExpressInterestNarrative04)}';
+		l['placeholder5'] = '{!JSENCODE($Label.ExpressInterestNarrative05)}';
+
+		var handlebarsTemplates = {};
+
+		function getMatchingDemands()
+		{
+			showWorking();
+		
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentDemandSearchController.FindMatchingDemands}',
+	       		resId, searchCriteria,
+	      			function(result, event){
+	             		if (event.status) 
+			            {
+			             	theDemands = result;
+							populateDemands();
+			         	}
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+			         	
+						hideWorking();
+	         	}, 	
+	         {escape: false, timeout: 60000});
+		}
+
+		function getDemandDetailsHtml(aDemand)
+		{
+		    return handlebarsTemplates['grid-itm-template'].call(this, aDemand);
+		}
+
+		function getDemandsHtml()
+		{
+			var html = '';
+
+			var demandsLength = theDemands.TheOrderedDemandIds.length;
+
+			/* TODO 1.31 - modelled as a html table so we benefit from layout properties
+			will most likely be better as div but there is no enhanced table support for css tables
+			also no efficient alternative to colpsan required for the dynamic fields
+			*/
+			html += '<table class="demands-grid kimble-enhanced-table">';
+
+            html += '<tr class="demands-hdr d-row">';
+            html += '<th class="d-cell">' + l['proj'] + '</th>';
+            html += '<th class="d-cell">' + l['res'] + '</th>';
+            html += '<th class="d-cell">' + l['sched'] + '</th>';
+            html += '<th class="d-cell">' + l['pref'] + '</th>';
+            html += '</tr>';
+
+			for(var i=0; i < demandsLength;i++)
+			{
+				var theDemandId = theDemands.TheOrderedDemandIds[i];
+				html += getDemandDetailsHtml(theDemands.TheDemands[theDemandId]);
+			}
+
+			html += '</table>';
+
+			if(demandsLength == 0)
+			{
+			    html += '<div class="nothing-here">' + l['nodemands'] + '</div>';
+            }
+
+			return html;
+		}
+
+		function populateDemands()
+		{
+			jQuery('#grid-body-container').html(getDemandsHtml());
+		}
+		
+		function initialise()
+		{
+			initialiseActions();
+		}
+		
+		jQuery(window).load(function(){
+		    initialise();	
+			// done within load rather than ready as handlebar helpers require site master to be complete
+			getMatchingDemands();
+
+			initialiseHandlebars();
+
+			initialiseFilterCriteriaConfig('{!JSENCODE(FilterContextId)}');
+		});
+
+		function initialiseHandlebars()
+		{
+            //register templates
+            jQuery.each(jQuery('script[type="text/x-handlebars-template"]:not([partial]'), function (i, s) {
+                handlebarsTemplates[s.id] = Handlebars.compile(s.innerHTML);
+            });
+
+            //register partials
+            jQuery.each(jQuery('script[type="text/x-handlebars-template"][partial="true"]'), function (i, s) {
+                Handlebars.registerPartial(s.id, s.innerHTML);
+            });
+
+            Handlebars.registerHelper('formatNum', function(numVal){
+              return kimble.formatNumber(numVal, "#.##");
+            });
+
+            Handlebars.registerHelper('formatUTCDate', function(UTCDate){
+              return kimble.formatDate(UTCDate);
+            });
+
+            Handlebars.registerHelper('getState', function(demId, state){
+              return ((state == '' && !(demId in theDemands.ResourcePreferences.Preferences))
+                        || (demId in theDemands.ResourcePreferences.Preferences && theDemands.ResourcePreferences.Preferences[demId].PrefEnum == state) ? 'on' : '');
+            });
+
+            Handlebars.registerHelper('requiredCaps', function(demId){
+
+                var capHtml = '';
+
+                if(theDemands != null && theDemands.TheDemandCaps != null && demId in theDemands.TheDemandCaps != null && theDemands.TheDemandCaps[demId] != undefined)
+                {
+                    var lblHtml = '<div class="itm-l">{!JSENCODE($ObjectType.RequiredCapability__c.LabelPlural)}</div>';
+                    var ratings = [];
+                    for(var i=0; i < theDemands.TheDemandCaps[demId].length;i++)
+                    {
+                        var theCap = theDemands.TheDemandCaps[demId][i];
+                        var textRating = (theCap.MinimumNumericRatingText != null ? ' (' + theCap.MinimumNumericRatingText + ')' : '');
+                        var numericRating = (textRating == '' && theCap.MinimumNumericRating != null ? ' (' + theCap.MinimumNumericRating + ')' : '');
+                        ratings.push(theCap.TypeName + textRating + numericRating);
+                    }
+                    if(ratings.length > 0) capHtml = lblHtml + ratings.join(', ');
+                }
+
+                return capHtml;
+            });
+
+
+			Handlebars.registerHelper('isTextDisplayType', function(val) {
+                return textDisplayTypes.includes(val);
+            });
+
+			Handlebars.registerHelper('isNumericDisplayType', function(val) {
+                return numericDisplayTypes.includes(val);
+            });
+
+			Handlebars.registerHelper('eq', function(lvalue, rvalue) {
+                return lvalue==rvalue;
+            });
+
+            Handlebars.registerHelper('gt', function(lvalue, rvalue) {
+                return lvalue>rvalue;
+            });
+		}
+
+		function initialiseActions()
+		{
+			jQuery(document).off('click', '.itm-pref').on('click', '.itm-pref', function (event) {
+	 	        togglePreference(jQuery(this));
+            });
+
+            jQuery(document).off('click', '.save-filter-btn').on('click', '.save-filter-btn', saveAll);
+            jQuery(document).off('click', '.copy-filter-btn').on('click', '.copy-filter-btn', copyFilter);
+            jQuery(document).off('click', '.del-filter-btn').on('click', '.del-filter-btn', deleteFilter);
+            jQuery(document).off('change', '.filter-name').on('change', '.filter-name', filterChanged);
+		}
+
+		function togglePreference(obj)
+		{
+		    var cDemId = obj.parent().parent().attr('d-id');
+		    var aDemId = obj.parent().parent().attr('ad-id');
+            var newPref;
+
+            if(obj.hasClass('no-pref')) {
+                if(!obj.hasClass('on')) obj.toggleClass('on');
+                if(obj.hasClass('on')) obj.parent().find('.itm-pref:not(.no-pref)').removeClass('on');
+
+                if(obj.hasClass('on')) newPref = '';
+            }
+            else
+            {
+    		    obj.toggleClass('on');
+
+                if(obj.hasClass('IdealRole')) {
+                    obj.parent().find('.itm-pref.Consider').toggleClass('on', obj.hasClass('on'));
+                    obj.parent().find('.itm-pref.DoNotConsider').removeClass('on');
+
+                    if(obj.hasClass('on')) newPref = 'IdealRole';
+                }
+                else if(obj.hasClass('Consider')) {
+                    obj.parent().find('.itm-pref.DoNotConsider').removeClass('on');
+                    if(!obj.hasClass('on')) obj.parent().find('.itm-pref.IdealRole').removeClass('on');
+
+                    if(obj.hasClass('on')) newPref = 'Consider';
+                }
+                else if(obj.hasClass('DoNotConsider')) {
+                    if(obj.hasClass('on')) obj.parent().find('.itm-pref:not(.DoNotConsider)').removeClass('on');
+
+                    if(obj.hasClass('on')) newPref = 'DoNotConsider';
+                }
+
+                obj.parent().find('.itm-pref.no-pref').toggleClass('on', !obj.hasClass('on'));
+            }
+
+            // cache the updated preference
+            var pref = {};
+            if(cDemId in theDemands.ResourcePreferences.Preferences) pref = theDemands.ResourcePreferences.Preferences[cDemId];
+            pref.PrefEnum = newPref;
+            pref.ADId = aDemId;
+            theDemands.ResourcePreferences.Preferences[cDemId] = pref;
+
+            setHasChanges(false);
+        }
+
+        var saveTimer;
+        var countdownTimerVal;
+        var onPageTimerVal = 10;
+        var graceTimerVal = 15;
+        function setHasChanges(filterOnly)
+        {
+            if(!hasChanges())
+            {
+                jQuery(window).off('.has-changes').on('beforeunload.has-changes', function(){
+                    return kimble.labels['UnsavedChangesHeading'] + "\n\n" + kimble.labels['UnsavedChangesMessage'];
+                });
+
+                if(!filterOnly) jQuery('.submit-actions .toolbar-button').addClass('has-changes');
+            }
+            resetTimer();
+        }
+
+        function pauseTimer()
+        {
+            if(hasPrefChanges() || hasFilterChanges()) resetTimer();
+        }
+
+        function resetTimer()
+        {
+            clearTimer();
+
+            if(autoSaveOn)
+            {
+                startTimer();
+            }
+        }
+
+        function filterIsOpen()
+        {
+            return jQuery('#FilterCriteriaPopup:visible').length;
+        }
+
+        function hasPrefChanges()
+        {
+            return jQuery('.submit-actions').hasClass('has-changes');
+        }
+
+        function hasFilterChanges()
+        {
+            return jQuery('.filter-itms').hasClass('has-changes');
+        }
+
+        function hasChanges()
+        {
+            return hasPrefChanges() || hasFilterChanges();
+        }
+
+        function autoSave()
+        {
+            saveAll();
+        }
+
+        var changesReset = false;
+        function resetHasChanges()
+        {
+            changesReset = jQuery('.submit-actions .toolbar-button').hasClass('has-changes');
+
+            jQuery('.submit-actions .toolbar-button').removeClass('has-changes');
+            jQuery('.filter-itms').removeClass('has-changes');
+            jQuery(window).off('.has-changes');
+            clearTimer();
+        }
+
+        function startTimer()
+        {
+            countdownTimerVal = graceTimerVal;
+            saveTimer = setInterval(decrementCountdownTimer, 1000);
+            jQuery('.auto-save-line').addClass('hidden-item');
+            jQuery('.auto-save-line').css('width', '100%');
+        }
+
+        function clearTimer()
+        {
+            countdownTimerVal = graceTimerVal;
+            clearInterval(saveTimer);
+            jQuery('.auto-save-line').addClass('hidden-item');
+            jQuery('.auto-save-line').css('width', '100%');
+        }
+
+        var timerLineWidth;
+        function updateOnScreenTimer()
+        {
+            if(jQuery('.auto-save-line').hasClass('hidden-item'))
+            {
+                jQuery('.auto-save-line').removeClass('hidden-item');
+                timerLineWidth = jQuery('.auto-save-line').width();
+            }
+            jQuery('.auto-save-line').width((timerLineWidth / onPageTimerVal) * countdownTimerVal);
+        }
+
+        function decrementCountdownTimer()
+        {
+            // pause the timer whilst any popup or filter is open or the page is working
+            if(filterIsOpen() || jQuery('.boxy-content:visible').length > 0 || jQuery('.loadingIndicator:visible').length > 0) return;
+
+            countdownTimerVal = countdownTimerVal - 1;
+
+            if(countdownTimerVal <= onPageTimerVal && countdownTimerVal >= 0) updateOnScreenTimer(countdownTimerVal);
+
+            if(countdownTimerVal < 0)
+            {
+                clearTimer();
+                autoSave();
+            }
+        }
+
+        function toggleAutoSave() {
+            autoSaveOn = !autoSaveOn;
+            jQuery(".autoSaveMode").toggleClass('fa-toggle-off').toggleClass('fa-toggle-on');
+
+            if(!autoSaveOn) clearTimer();
+        }
+        function enableAutoSave(autoSaveOnIn) {
+            autoSaveOn = autoSaveOnIn;
+            jQuery(".autoSaveMode").toggleClass('fa-toggle-off', !autoSaveOn).toggleClass('fa-toggle-on', autoSaveOnIn);
+
+            if(!autoSaveOn) clearTimer();
+        }
+
+        function hideWorking()
+        {
+            jQuery('#loadingIndicatorOuterContainer').hide();
+        }
+
+        function showWorking()
+        {
+            jQuery('#loadingIndicatorOuterContainer').show();
+        }
+
+        function hideSaving()
+        {
+            jQuery('#savingIndicatorOuterContainer').hide();
+        }
+
+        function showSaving()
+        {
+            jQuery('#savingIndicatorOuterContainer').show();
+        }
+
+        function filterChanged()
+        {
+            jQuery('.filter-itms').addClass('has-changes');
+            setHasChanges(true);
+        }
+
+        function resetFilterChanged()
+        {
+            jQuery('.filter-itms').removeClass('has-changes');
+        }
+
+        var isCopy = false;
+        function copyFilter()
+        {
+            searchId = '';
+
+            isCopy = true;
+
+            saveAll();
+        }
+
+		function saveAll()
+        {
+			showSaving();
+
+			searchName = jQuery('.filter-name').val() + (!isCopy ? '' : ' ' + l['copy']);
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentDemandSearchController.SaveAll}',
+	       		searchId, searchName, searchCriteria, showOnSummary, resId, resName, theDemands.ResourcePreferences.Preferences,
+	      			function(result, event){
+	             		if (event.status)
+			         	{
+			         	    if(searchId != result)
+			         	    {
+			         	        resetHasChanges();
+			         	        safeNavigateToSObject(result);
+                            }
+                            else
+                            {
+			         	        resetHasChanges();
+			         	        getMatchingDemands();
+                                hideSaving();
+                            }
+                        }
+                        else
+                        {
+                            hideSaving();
+			             	alert(event.message);
+			         	}
+	         	},
+	         {escape: false, timeout: 60000});
+		}
+
+        function deleteFilter()
+        {
+            if (!confirm('{!JSENCODE($Label.AreYouSure)}')) return;
+
+            showSaving();
+
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentDemandSearchController.DeleteSearch}',
+	       		searchId,
+	      			function(result, event){
+	             		if (event.status)
+			         	{
+			         	    safeNavigateToSForceURL('{!$Page.KimbleOne__ResourceCapabilitiesAndExperience}');
+                        }
+                        else
+                        {
+                            hideSaving();
+			             	alert(event.message);
+			         	}
+	         	},
+	         {escape: false, timeout: 60000});
+		}
+
+        function showFilterCriteria()
+        {
+            if(hasPrefChanges())
+            {
+                alert(l['unsubmittedchanges']);
+            }
+            else
+            {
+                loadFilterCriteria(searchCriteria,
+           			function(){
+           			    jQuery("#FilterCriteriaPopup").show();
+           			}
+				   ,function(newFilter){
+					   jQuery("#FilterCriteriaPopup").hide();
+					   var newCriteria = JSON.stringify(newFilter);
+					   if  (searchCriteria != newCriteria)
+					   {
+					        filterChanged();
+                            searchCriteria = newCriteria;
+                            getMatchingDemands();
+                       }
+				   },
+				   function(){
+				       jQuery("#FilterCriteriaPopup").hide();
+       				});
+            }
+        }
+	</script>
+
+            <apex:outputPanel id="ErrorMessages">
+                <apex:pageMessages escape="false"/>
+            </apex:outputPanel>
+            <div id="remote-action-error" style="display:none"><span><div class="message errorM3"><table border="0" cellpadding="0" cellspacing="0" class="messageTable" style="padding:0px;margin:0px;"><tbody><tr valign="top"><td><img alt="error" class="msgIcon" src="/s.gif" title="{!$Label.Error}"/></td><td class="messageCell"><div class="messageText" id="remote-action-error-text"><br/></div></td></tr><tr><td></td><td></td></tr></tbody></table></div></span></div>
+
+
+            <div id="loadingIndicatorOuterContainer" class="loadingIndicator" style="display:none">
+                <div id="loadingIndicatorInnerContainer">
+                    <img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+                </div>
+            </div>
+
+            <div id="savingIndicatorOuterContainer" class="loadingIndicator" style="display:none">
+                <div id="savingIndicatorInnerContainer">
+                    <img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.SavingLabel}
+                </div>
+            </div>
+
+            <div id="layout-container">
+                <div id="grid-layout" class="ui-layout-center">
+                    <div id="grid-header-container">
+                        <div id="toolbar-container">
+                            <div class="toolbar">
+                                <div id="filter-buttons" class="control-cell no-text-select">
+                                    <a value="javascript:void(0);" class="toolbar-button-single" title="{!JSENCODE($Label.Filter)}"><div class="toolbar-button toggle-btn filter-btn filter-itms bigger-btn" onclick="showFilterCriteria();"><i class="fa fa-filter"></i></div></a>
+                                    <input class="filter-name filter-itms" value="{!JSENCODE(TheSearchCriteria.Name)}"/>
+                                    <a class="toolbar-button-single" title="{!JSENCODE($Label.Save)}"><div class="toolbar-button toggle-btn filter-itms save-filter-btn bigger-btn"><i class="fa fa-save"></i></div></a>
+                                    <a class="toolbar-button-single" title="{!JSENCODE($Label.CopyLink)}"><div class="toolbar-button toggle-btn filter-itms copy-filter-btn bigger-btn"><i class="fa fa-clone"></i></div></a>
+                                    <a class="toolbar-button-single" title="{!JSENCODE($Label.DeleteButton)}"><div class="toolbar-button toggle-btn filter-itms del-filter-btn bigger-btn"><i class="fa fa-trash"></i></div></a>
+                                </div>
+                                <div id="action-buttons" class="control-cell no-text-select">
+                                <apex:outputPanel layout="none">
+                                    <div class="submit-actions">
+                                        <div class="save-btn toolbar-button" onclick="saveAll()">{!JSENCODE($Label.DemandSearchSubmitPreferences)}</div>
+                                        <div class="auto-save-line hidden-item"></div>
+                                    </div>
+                                    <div class="auto-save-actions">
+                                        <div class="undecorated-link" onclick="toggleAutoSave();">{!$Label.AutoSaveLabel}</div>
+                                        <div class="auto-save-toggle">
+                                            <span class="undecorated-link" onclick="enableAutoSave(false);">{!$Label.OffLabel}</span><span onclick="toggleAutoSave();" class="autoSaveMode k-tgl fa fa-toggle-on"></span><span class="undecorated-link" onclick="enableAutoSave(true);">{!$Label.On}</span>
+                                        </div>
+                                    </div>
+                                </apex:outputPanel>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="grid-body-container">
+                    </div>
+                </div>
+            </div>
+
+            <div id="FilterCriteriaPopup" style="display:none;">
+                <apex:include pageName="{!$Page.FilterCriteria}"/>
+            </div>
+        </apex:define>
+
+    </apex:composition>
+
+</apex:page>

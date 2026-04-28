@@ -1,0 +1,1123 @@
+<apex:page standardController="KimbleOne__CreditNote__c" action="{!CheckStatus}" extensions="KimbleOne.CreditNoteLinesEditController" showHeader="true" sidebar="false" tabStyle="KimbleOne__CreditNote__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+      	<c:Menu DefaultHelpPage="ManagingCreditNotes.html" MenuContextType="CreditNote" MenuContextId="{!KimbleOne__CreditNote__c.Id}" MenuContextName="{!KimbleOne__CreditNote__c.KimbleOne__Reference__c}"/>
+    </apex:define>
+    
+    <apex:define name="Content">
+    	
+		<script>
+    	/**
+ * Multi-Select, Drag And Drop
+ * Work on all browser platform including IE6
+ * Version Alpha 0.1
+ * Its a plugin that combine all the jquery-ui (Drag,Drop,Select);
+ * You need the custom $.UI to be able to use this
+ * You need to add this to your style-sheet
+ * .ui-selectable-helper {}
+ * .ui-selectable-helper div {}
+ * There's no major change in $.UI since its just to adapt some of the plugins
+ * Please leave me some comment on anything!
+ * 
+ * Example :
+ * $('{container}').drag_drop_multi_select({
+ *     {setting}:'{value}'
+ * });
+ *
+ * Copyright (c) 2010 Samuel Cl?roux-Bouthillier
+ *
+ * Dual licensed under MIT and GNU General Public License version 3 (GPLv3)
+ * http://www.opensource.org/licenses
+ * Launch : September 2010
+ */
+(function($){
+    var $self;
+    $.fn.exists = function(){if(jQuery(this).length == 0){return false;}else{return true;}};
+    $.fn.drag_drop_multi_select = function(settings){
+        var config = $.fn.drag_drop_multi_select.defaults;
+        if (settings) config = $.extend($.fn.drag_drop_multi_select.defaults, settings);
+        return this.each(function(i) {
+            // DECLARE VAR
+            var unique_id = $.fn.drag_drop_multi_select.unique++;
+            var dragging = false;
+
+            // DECLARE DEFAULT VALUE
+            $self = $(this);
+            $self.attr('ddms',unique_id);
+
+            // START KEY CAPTURING
+            $.fn.captureKeys();
+
+            // DECLARE STACKS AND SETTING FOR EACH OBJECT
+            $.fn.drag_drop_multi_select.stack[unique_id]={"selected":[ ],"all":[ ]};
+            $.fn.drag_drop_multi_select.settings[unique_id] = config;
+
+            // BIND BASIC EVENTS TO EACH ELEMENT THAT WILL BE DRAGGABLE
+            $self.find(config.element_to_drag_drop_select).each(function(){
+                var $item = $(this);
+                var item_id = $.fn.drag_drop_multi_select.unique++;
+
+                $item.attr('ddms',item_id);
+
+                $.fn.drag_drop_multi_select.settings['item_'+$item.attr('ddms')] = {self:$item,parent_to_refer:$self};
+                $.fn.drag_drop_multi_select.stack[unique_id].all.push(item_id);
+
+                // BIND CLICK ITEM
+                $item.bind('click.ddms_item_clicked',function(){
+                    if($.fn.keyisPressed(CTRL_KEY)|| $.fn.keyisPressed(SHIFT_KEY)||($.fn.drag_drop_multi_select.stack[$.fn.drag_drop_multi_select.get_instance_id($(this).attr('ddms'))].selected.length == 1 && $item.hasClass($.fn.drag_drop_multi_select.settings[$.fn.drag_drop_multi_select.get_instance_id($item.attr('ddms'))].selectedClass))){
+                        $.fn.drag_drop_multi_select.toggle(item_id);//CTRLKEY IS DOWN - ADD ITEM TO SELECTION
+                    }else{
+                        $.fn.drag_drop_multi_select.replace(item_id);//CTRLKEY IS NOT DOWN - MAKE NEW SELECTION
+                    }
+                });
+
+                $item.bind('ddms.select',function(){
+                    $(this).addClass('ui-selected');
+                    $(this).addClass($.fn.drag_drop_multi_select.settings[$.fn.drag_drop_multi_select.get_instance_id($(this).attr('ddms'))].selectedClass);
+                    if($self.find('.ui-selected').size() == 0)
+                    $(config.element_to_show_result).text('');
+                    else
+                    $(config.element_to_show_result).text($self.find('.ui-selected').size()+" items are selected");
+                });
+
+                $item.bind('ddms.deselect',function(){
+                    $(this).removeClass('ui-selected');
+                    $(this).removeClass($.fn.drag_drop_multi_select.settings[$.fn.drag_drop_multi_select.get_instance_id($(this).attr('ddms'))].selectedClass);
+                    if($self.find('.ui-selected').size() == 0)
+                    $(config.element_to_show_result).text('');
+                    else
+                    $(config.element_to_show_result).text($self.find('.ui-selected').size()+" items are selected");
+                });
+            });
+
+            // MAKE ITEMS SELECTABLE
+            $self.selectable({
+                cancel: config.elements_to_cancel_select+","+config.element_to_drag_drop_select,
+                filter: $self.find(config.element_to_drag_drop_select),
+                selecting: function(ev,ui) {
+                    if($self.find('.ui-selecting').size() == 0)
+                    $(config.element_to_show_result).text('');
+                    else
+                    $(config.element_to_show_result).text($self.find('.ui-selecting').size()+" items are in the selection");
+                },
+                unselecting: function(ev,ui) {
+                    if($self.find('.ui-selecting').size() == 0)
+                    $(config.element_to_show_result).text('');
+                    else
+                    $(config.element_to_show_result).text($self.find('.ui-selecting').size()+" items are in the selection");
+                },
+                stop: function(ev,ui) {
+                    if($self.find('.ui-selected').size() == 0)
+                    $(config.element_to_show_result).text('');
+                    else
+                    $(config.element_to_show_result).text($self.find('.ui-selected').size()+" items are selected");
+                },
+                selected: function(ev,ui) {
+                    $.fn.drag_drop_multi_select.select(parseInt($(ui.selected).attr('ddms')));
+                },
+                unselected: function(ev,ui) {
+                    $.fn.drag_drop_multi_select.deselect(parseInt($(ui.unselected).attr('ddms')));
+                }
+            });
+
+            // MAKE ITEMS DRAGGABLE
+            $self.find(config.element_to_drag_drop_select).draggable({
+                helper:function(){
+                   $clicked_item = $(this);
+                   if(!$clicked_item.hasClass('ddms_selected') ){
+                       //TRIGGER THE CLICK
+                       $clicked_item.trigger('click.ddms_item_clicked');
+                   }
+                   // CREATE CLONE HELPER
+                   var instance_id = $.fn.drag_drop_multi_select.get_instance_id($clicked_item.attr('ddms'));
+                   var $helper = $('<div ddms_instance="'+instance_id+'"></div>').append('<div class="inside_helper" style="position:absolute;top:-'+$.fn.drag_drop_multi_select.getTopOffset( $clicked_item )+'px;left:-'+$.fn.drag_drop_multi_select.getLeftOffset( $clicked_item )+'px;" ></div>');
+                   $helper.find('.inside_helper').append($.fn.drag_drop_multi_select.getSelectedForDragging( $clicked_item.attr('ddms')));
+                   $.fn.drag_drop_multi_select.getListItems(instance_id).filter($.fn.drag_drop_multi_select.settings[instance_id].selectedClass).addClass($.fn.drag_drop_multi_select.settings[instance_id].ghostClass);
+                   return $helper;
+                },
+                cursor:'move',
+                revert:'invalid',
+                scroll: true,
+                start:function(e,ui){
+                    dragging = true;
+                },
+                drag:function(e,ui){
+
+                },
+                stop:function(e,ui){
+                   $clicked_item = $(this);
+                   var instance_id = $.fn.drag_drop_multi_select.get_instance_id($clicked_item.attr('ddms'));
+                   $.fn.drag_drop_multi_select.getListItems(instance_id).filter($.fn.drag_drop_multi_select.settings[instance_id].selectedClass).removeClass($.fn.drag_drop_multi_select.settings[instance_id].ghostClass);
+                },
+                containment:"#container"
+                
+            });
+
+            // MAKE ITEMS DROPPABLE
+            var array_of_selected = [];
+            var found = false;
+            $(config.elements_to_drop).droppable({
+                tolerance:'pointer',
+                over: function(e,ui) {
+                    var $target = $(e.target);
+                    var old_instance = parseInt(ui.helper.attr('ddms_instance'));
+                    found = false;
+                    array_of_selected = [];
+
+                    $.fn.drag_drop_multi_select.getListItems(old_instance).filter(config.selectedClass).each(function(){
+                        array_of_selected.push($(this).attr('ddms'));
+                    });
+
+                    if($.inArray($target.attr('ddms'),array_of_selected) > -1) {
+                        found = true;
+                    }
+
+                    $target.addClass($.fn.drag_drop_multi_select.settings[unique_id].hoverClass);
+                },
+                out: function(e,ui) {
+                    var $target = $(e.target);
+                    $target.removeClass($.fn.drag_drop_multi_select.settings[unique_id].hoverClass);
+                },
+                drop:function(e,ui){
+                    var $target = $(e.target);
+                    $target.removeClass($.fn.drag_drop_multi_select.settings[unique_id].hoverClass);
+
+                    var old_instance = parseInt(ui.helper.attr('ddms_instance'));
+
+                    ui.helper.find('.inside_helper .'+config.selectedClass).each(function(){
+                        var item_id = parseInt( $(this).attr('ddms_drag'));
+                        var $item_instance = $.fn.drag_drop_multi_select.settings['item_'+item_id].self;
+                        $.fn.drag_drop_multi_select.moveBetweenLists( item_id, $item_instance, old_instance, unique_id, e, ui);
+                    });
+                },
+                hoverClass: "hover-highlight",
+                accept: function(e,ui){
+			        if (!e.hasClass('ui-draggable') || e.isChildOf($(this)))
+			        	return false;
+			        return true;
+			    }
+                
+            });
+		});
+    };
+
+    // DEFAULTS SETTINGS OF PLUGINS
+    $.fn.drag_drop_multi_select.defaults={
+        element_to_drag_drop_select:'.ddms', // element that will be draggable,selectable,droppable
+        elements_to_cancel_select:'.cancel',// element that you dont want to do selectable
+        elements_to_drop:'.drop',// element that you can drop on it
+        element_to_show_result:'.items_selected', // element that will be showing how much are selected
+        moveOpacity: 0.5, //opacity of moving items
+        ghostClass: 'ddms_ghost', //class for "left-behind" item.
+        hoverClass: 'ddms_hover', //class for acceptable drop targets on hover
+        moveClass:  'ddms_move', //class to apply to items when moving them.
+        selectedClass: 'ddms_selected', // class to apply to items that will be select.
+        after_drop_action:function($item_instance,$old_container,$new_container,event,helper){}
+    };
+    $.fn.drag_drop_multi_select.unique=0;
+    $.fn.drag_drop_multi_select.stack=[];
+    $.fn.drag_drop_multi_select.settings=[];
+
+    // FUNCTION TO EXECUTE AFTER A DROP
+    $.fn.drag_drop_multi_select.moveBetweenLists=function(item_id, $item_instance, old_container, new_container, event, helper){
+        var instance_id = $.fn.drag_drop_multi_select.get_instance_id(item_id);
+        // DESELECT ITEMS
+        $.fn.drag_drop_multi_select.deselect(parseInt(item_id));
+        $($.fn.drag_drop_multi_select.settings[instance_id].element_to_show_result).text('');
+        // DECLAIRE VARIABLES TO SEND TO AFTER DROP FUNCTION
+        var $old_container = $('[ddms='+old_container+']');
+        var $new_container = $('[ddms='+new_container+']');
+        // CALL THE AFTER DROP ACTION FUNCTION
+        $.fn.drag_drop_multi_select.settings[instance_id].after_drop_action($item_instance,$old_container,$new_container,event,helper);
+        //REMOVING FROM OLD CONTAINER STACK
+        $.fn.drag_drop_multi_select.stack[old_container].all.splice( $.inArray( parseInt(item_id),$.fn.drag_drop_multi_select.stack[old_container].all ),1);
+        //ADDING TO THE NEW CONTAINER STACK
+        $.fn.drag_drop_multi_select.stack[new_container].all.push(parseInt(item_id));
+    };
+
+    // GET CLONE AND ALL ITEM THAT WILL BE DRAG
+    $.fn.drag_drop_multi_select.getSelectedForDragging=function(item_id){
+        var instance_id = $.fn.drag_drop_multi_select.get_instance_id(item_id);
+        var $clone_list = $.fn.drag_drop_multi_select.getListItems(instance_id).clone().each(function(){
+            var id = $(this).attr('ddms');
+            $(this).not("."+$.fn.drag_drop_multi_select.settings[instance_id].selectedClass).hide();
+            $(this).filter("."+$.fn.drag_drop_multi_select.settings[instance_id].selectedClass).addClass($.fn.drag_drop_multi_select.settings[instance_id].moveClass).css({opacity:$.fn.drag_drop_multi_select.settings[instance_id].moveOpacity});
+            $(this).attr('ddms_drag',$(this).attr('ddms'));
+            $(this).attr('ddms','');
+            $(this).css({'position':'absolute','left':$('[ddms="'+id+'"]').position().left,'top':$('[ddms="'+id+'"]').position().top});
+        });
+        return $clone_list;
+    };
+
+    // GET TOP OFFSET OF ITEMS CLIKED
+    $.fn.drag_drop_multi_select.getTopOffset=function($item){
+        //find this items offset and the first items offset.
+        var this_offset = $item.position().top;
+        var first_offset = $.fn.drag_drop_multi_select.getListItems($.fn.drag_drop_multi_select.get_instance_id($item.attr('ddms'))).eq(0).position().top;
+        return this_offset;
+    };
+
+    // GET LEFT OFFSET OF ITEMS CLIKED
+    $.fn.drag_drop_multi_select.getLeftOffset=function($item){
+        //find this items offset and the first items offset.
+        var this_offset = $item.position().left;
+        var first_offset = $.fn.drag_drop_multi_select.getListItems($.fn.drag_drop_multi_select.get_instance_id($item.attr('ddms'))).eq(0).position().left;
+        return this_offset;
+    };
+
+    // TOGGLE THE SELECT AND DESELECT FUNCTIONS
+    $.fn.drag_drop_multi_select.toggle=function(item_id){
+        if(!$.fn.drag_drop_multi_select.isSelected(item_id)){
+            $.fn.drag_drop_multi_select.select(item_id);
+        }else {
+            $.fn.drag_drop_multi_select.deselect(item_id);
+        }
+    };
+
+    // FUNCTION THAT SELECT ELEMENT IF ITS NOT ALREADY SELECTED AND ADD IT TO THE STACK OF SELECTED
+    $.fn.drag_drop_multi_select.select=function(item_id){
+        var instance_id = $.fn.drag_drop_multi_select.get_instance_id(item_id);
+        var $item_instance = $.fn.drag_drop_multi_select.settings['item_'+item_id].self;
+
+        if(!$.fn.drag_drop_multi_select.isSelected(item_id)){
+            $.fn.drag_drop_multi_select.stack[instance_id].selected.push(item_id);
+            $item_instance.trigger('ddms.select');
+        }
+    };
+
+    // FUNCTION THAT DESELECT ELEMENT FROM STACK
+    $.fn.drag_drop_multi_select.deselect=function(item_id){
+        var instance_id = $.fn.drag_drop_multi_select.get_instance_id(item_id);
+        var $item_instance = $.fn.drag_drop_multi_select.settings['item_'+item_id].self;
+
+        if($.fn.drag_drop_multi_select.isSelected(item_id)){
+            $.fn.drag_drop_multi_select.stack[instance_id].selected.splice($.inArray(item_id,$.fn.drag_drop_multi_select.stack[instance_id].selected),1);
+            $item_instance.trigger('ddms.deselect');
+        }
+    };
+
+    // FUNCTION THAT CHECK IF ELEMENT IS ALREADY IN STACK
+    $.fn.drag_drop_multi_select.isSelected=function(item_id){
+        var $item_instance = $.fn.drag_drop_multi_select.settings['item_'+item_id].self;
+        var instance_id = $.fn.drag_drop_multi_select.get_instance_id(item_id);
+        return $item_instance.hasClass($.fn.drag_drop_multi_select.settings[instance_id].selectedClass);
+    };
+
+    // FUNCTION THAT EMPTY THE STACK AND START A NEW ONE
+    $.fn.drag_drop_multi_select.replace=function(item_id){
+        var instance_id = $.fn.drag_drop_multi_select.get_instance_id(item_id);
+        $.fn.drag_drop_multi_select.selectNone(instance_id);
+        $.fn.drag_drop_multi_select.stack[instance_id].selected.push(item_id);
+        var $item_instance = $.fn.drag_drop_multi_select.settings['item_'+item_id].self;
+        $item_instance.trigger('ddms.select');
+    };
+
+    // FUNCTION THAT GET ALL ELEMENT THAT ARE IN A STACK
+    $.fn.drag_drop_multi_select.getListItems=function(instance_id){
+        var element_to_drag_drop_select = $.fn.drag_drop_multi_select.settings[instance_id].element_to_drag_drop_select;
+        return $('[ddms='+instance_id+'] '+element_to_drag_drop_select);
+    };
+
+    // FUNCTION THAT RETURN INSTANCE ID OF THE SELECTED ITEM
+    $.fn.drag_drop_multi_select.get_instance_id=function(item_id){
+        return parseInt($.fn.drag_drop_multi_select.settings['item_'+item_id].parent_to_refer.eq(0).attr('ddms'));
+    };
+
+    // FUNCTION THAT SERIALIZE AN ARRAY FROM THE RESULTS
+    $.fn.drag_drop_multi_select.serializeArray=function( list_id ){
+        var out = [];
+        $.fn.drag_drop_multi_select.getListItems(list_id).each(function(){
+            out.push($(this).attr('id'));
+        });
+        return out;
+    };
+    $.fn.drag_drop_multi_select.serialize=function( list_id ){
+            return $.fn.drag_drop_multi_select.serializeArray( list_id ).join(", ");
+    };
+
+    // FUNCTION THAT DESELECT ALL ELEMENT IN A STACK
+    $.fn.drag_drop_multi_select.selectNone=function(instance_id){
+        $.fn.drag_drop_multi_select.getListItems(instance_id).each(function(){
+            $.fn.drag_drop_multi_select.deselect( $(this).attr('ddms') );
+        });
+        return false;
+    };
+
+    // FUNCTION THAT SELECT ALL ELEMENT IN A STACK
+    $.fn.drag_drop_multi_select.selectAll=function(list_id){
+        $.fn.drag_drop_multi_select.getListItems(list_id).each(function(){
+            $.fn.drag_drop_multi_select.select( $(this).attr('ddms') );
+        });
+        return false;
+    };
+
+    // EXTEND TO ELEMENT SOME FUNCTION
+    $.extend({
+        ddms:{
+            selectAll:function(id){ return $.fn.drag_drop_multi_select.selectAll($('#'+id).attr('ddms')); },
+            selectNone:function(id){ return $.fn.drag_drop_multi_select.selectNone($('#'+id).attr('ddms')); },
+            serialize:function(id){ return $.fn.drag_drop_multi_select.serialize($('#'+id).attr('ddms')); }
+        }
+    });
+
+    // KEY CAPTURING DEFAULT KEYCODE
+    var CTRL_KEY = 17;
+    var ALT_KEY = 18;
+    var SHIFT_KEY = 16;
+
+    // FUNCTION THAT CAPTURE KEY AND CHECK WHAT IS DOWN
+    $.fn.captureKeys=function(){
+        if($.fn.captureKeys.capturing){ return; }
+        $(document).keydown(function(e){
+            if(e.keyCode == CTRL_KEY ){$.fn.captureKeys.stack.CTRL_KEY  = true}
+            if(e.keyCode == SHIFT_KEY){$.fn.captureKeys.stack.SHIFT_KEY = true}
+            if(e.keyCode == ALT_KEY  ){$.fn.captureKeys.stack.ALT_KEY   = true}
+        });
+        $(document).keyup(function(e){
+            if(e.keyCode == CTRL_KEY ){$.fn.captureKeys.stack.CTRL_KEY  = false}
+            if(e.keyCode == SHIFT_KEY){$.fn.captureKeys.stack.SHIFT_KEY = false}
+            if(e.keyCode == ALT_KEY  ){$.fn.captureKeys.stack.ALT_KEY   = false}
+        });
+
+    };
+    $.fn.captureKeys.stack={CTRL_KEY:false, SHIFT_KEY:false, ALT_KEY:false};
+    $.fn.captureKeys.capturing=false;
+    $.fn.keyisPressed=function(key){
+        switch(key){
+            case  CTRL_KEY: return $.fn.captureKeys.stack.CTRL_KEY;
+            case   ALT_KEY: return $.fn.captureKeys.stack.ALT_KEY;
+            case SHIFT_KEY: return $.fn.captureKeys.stack.SHIFT_KEY;
+            default: return false;
+        }
+    }
+})(jQuery);
+    	
+    	</script>
+    	<apex:form id="TheForm">
+    	<div id="pageErrors">
+    		<apex:pageMessages escape="False" />
+    		<div id="creditNote-error" style="display:none"><span><div class="message errorM3"><table border="0" cellpadding="0" cellspacing="0" class="messageTable" style="padding:0px;margin:0px;"><tbody><tr valign="top"><td><img alt="error" class="msgIcon" src="/s.gif" title="{!$Label.Error}"/></td><td class="messageCell"><div class="messageText" id="creditNote-error-text"><br/></div></td></tr><tr><td></td><td></td></tr></tbody></table></div></span></div>
+		</div>
+		
+		<apex:pageBlock title="{!$Label.kimbleone__editcreditnotelinesheading}">
+			<apex:pageblockButtons rendered="{!EditAllowed}">
+				
+				<input class="btn" type="button" value="{!$Label.CreditNoteLinesNewSectionButton}" onclick="newSection();"/>
+				<input class="btn" type="button" value="{!$Label.CreditNoteLinesNewLineButton}" onclick="newSectionLine();"/>
+				
+				<apex:commandButton action="{!Save}" value="{!$Label.kimbleone__save}" styleClass="saveAction"/>
+			</apex:pageblockButtons>
+			
+			<div id="container" >
+				<div id="theCreditNoteSections">
+				
+				</div>
+				<div style="clear:both"></div>
+			</div><!--Container End-->
+
+		</apex:pageBlock>
+			
+			<apex:inputText styleClass="JsonSectionsAndLines" style="display:none" value="{!TheJSONSectionsAndLines}"/>
+		</apex:form>
+		<style>
+			.pbBody{margin-left:0px !important}
+			.lineItem {line-height: 15px;vertical-align: middle;border: 1px solid #BBB;color: beige;font-weight: bold;margin: 2px 2px 2px 0;padding: 1px;float: left;width: 60px;height: 32px;font-size: 9px;text-align: center;overflow:hidden;}
+			.lineItem div {height: 10px;vertical-align: middle;line-height: 10px;overflow:hidden;}
+			.dragactive {background-color:#FFEF8F;}
+			.creditNoteLine {margin-top:4px; margin-left:4px;clear:both;}
+			.creditNoteLineHeader{text-align: left;background-color: #1797C0;color: white;font-weight: bold;height: 25px;line-height: 25px;padding-left: 4px;padding-right:4px;}
+			.narrative{float:left;min-width:700px;min-height:20px;}
+			.narrative INPUT{width:500px;}
+			.lineAmount{float:right}
+			.Services{background-color:#729BC7}
+			.Expenses{background-color:#E68F1A}
+			.Deposit {background-color:#B42B33}
+			.Adjustments{background-color:#232323}
+			.selectable{list-style-type: none; margin: 0; padding: 0;}
+			.selectable .ui-selecting { background: #FECA40; }
+			.selectable .ui-selected { background: #CCC; color: white; }
+			.ui-droppable {overflow:auto;}
+			.ui-draggable-dragging {z-index:100;}
+			.droppable{;min-height:38px;}
+			.line-drop-hover {margin-top:4px; margin-left:4px;clear:both;border-bottom: 4px solid #45A500;}
+			.hover-highlight {background: #FFEF8F url(images/ui-bg_highlight-soft_25_ffef8f_1x100.png) 50% top repeat-x;color: #363636;}
+			.creditNoteSection{position: relative; margin-left: 6px;margin-bottom:6px;}
+			.creditNoteSectionHeader {position: relative;width: 40px; background-color:#BBB;height: 100%;text-align: center;}
+			.creditNoteSectionLines {list-style-type: none;margin: 0px 0px 0px 40px;padding: 0; min-height:110px;}
+			.sectionText {position: absolute;
+bottom: 2px;
+-webkit-transform: rotate(-90deg) translate(0%,105%);
+-webkit-transform-origin: 0% 100%;
+-moz-transform: rotate(-90deg) translate(0%,105%);
+-moz-transform-origin: 0% 100%;
+-o-transform: rotate(-90deg) translate(0%,105%);
+-o-transform-origin: 0% 100%;
+width: 95px;
+overflow: hidden;
+height: 30px;
+line-height: 15px;
+vertical-align: middle;}
+			.creditNoteSectionName {
+height: 100%;
+position: absolute;
+min-width: 36px;
+/*bottom: 0px;*/
+background-color:#bbb;
+border:1px solid #bbb;
+}
+		.creditNoteSectionEdit {height: 25px;position: absolute;background-color:#bbb;width:420px; display:none;}
+		.creditNoteSectionEdit input {margin-left:6px; padding: 0;width: 321px;}
+		.creditNoteSection-selected {background-color:#eee; border:1px solid #bbb;}
+		.toggle {cursor:pointer;]}
+		
+		</style>
+		
+		<script>
+		var currencyCode = '{!JSENCODE(CreditNote__c.CurrencyISOCode)}';
+		
+		var creditNoteSectionHtml = '<div class="creditNoteSection"><div class="creditNoteSectionName"><div class="toggle ui-icon ui-icon-triangle-1-e"></div><div class="sectionText"></div></div><div class="creditNoteSectionEdit"><input maxlength="80"><button>{!$Label.Ok}</button><button>{!$Label.Cancel}</button></div><ul class="creditNoteSectionLines"></ul></div>';
+		
+		var creditNoteLineHtml = '<li class="creditNoteLine"><div class="creditNoteLineHeader"><div class="narrative"></div><div class="lineAmount"></div></div><div class="droppable" ><ul class="selectable"></ul><div style="clear:both"></div></div></li>';
+		var lineItemHtml = '<li class="lineItem"><div class="name"></div><div class="date"></div><div class="amount"></div></li>';
+		//var newJson = '{"NetAmount":0,"Narrative":"","CreditNoteLineItems":[],"Id":"new"}';
+		var newSectionJson = '{"Name":"","CreditNoteLines":[],"Id":"new"}';
+		var newLineJson = '{"NetAmount":0,"Narrative":"","CreditNoteLineItems":[],"Id":"new"}';
+		
+		$(document).ready(function(){
+		
+			jQuery('.saveAction').click(function(e) {
+            	if (updateJson()) return true;
+            	
+            	e.preventDefault();
+        	});
+		
+			var theSections = jQuery.parseJSON($('.JsonSectionsAndLines').val());
+			
+			//add 10 new blank sections
+			var counter = 0;
+			while (counter < 5)
+			{
+				theSections[theSections.length] = jQuery.parseJSON(newSectionJson);
+				counter ++;
+			}
+			
+			var container = $('#theCreditNoteSections');
+			
+			jQuery.each(theSections, function(i, section){
+				
+				var sectionInstance = $(creditNoteSectionHtml);
+				sectionInstance.data('jsonSection', section);
+				sectionInstance.attr('id', section.Id);
+				sectionInstance.find('.sectionText').text(section.Name).attr('title', section.Name);
+				
+				if (i == 0)
+					sectionInstance.find('.creditNoteSectionName').addClass('creditNoteSection-selected');
+				
+				if (section.Id == 'new')
+					sectionInstance.hide();
+				
+				var theEditSection = sectionInstance.find('.creditNoteSectionEdit');
+				theOkButton = $(theEditSection.find('button')[0]);
+				theCancelButton = $(theEditSection.find('button')[1]);
+				
+				theOkButton.click(function() {
+					var newText = $(this).parent().find('input').val();
+					sectionInstance.data('jsonSection').Name = newText;
+					$(this).parent().parent().find('.sectionText').text(newText);
+					$(this).parent().parent().find('.sectionText').attr('title', newText);
+					theEditSection.toggle('slide', {}, 700);
+					return false;
+				});
+				
+				theCancelButton.click(function() {
+					theEditSection.toggle('slide', {}, 700);
+					return false;
+				});
+				
+				var counter = 0;
+				while (counter < 10)
+				{
+					section.CreditNoteLines[section.CreditNoteLines.length] = jQuery.parseJSON(newLineJson);
+					counter ++;
+				}
+				
+				jQuery.each(section.CreditNoteLines, function(i, obj){
+					var lineInstance = $(creditNoteLineHtml);
+					lineInstance.data('jsonLine', obj);
+					lineInstance.attr('id',obj.Id);
+					lineInstance.find('.narrative').text(obj.Narrative);
+					lineInstance.find('.lineAmount').text($.formatNumber(new Number(obj.NetAmount), {format: currencyCode + " #,##0.00", locale:kimble.locale, isFullLocale:false}));
+					var itemsContainer = lineInstance.find('ul');
+					if (obj.CreditNoteLineItems == undefined)
+						obj.CreditNoteLineItems = new Array();
+						
+					jQuery.each(obj.CreditNoteLineItems, function(i, item){
+						var lineItem = $(lineItemHtml);
+						lineItem.data('jsonItem', item);
+						lineItem.addClass(item.Type);
+						lineItem.find('.name').text(item.Name);
+						lineItem.find('.date').text(item.StartDate);
+							
+						lineItem.find('.amount').text($.formatNumber(new Number(item.NetAmount), {format: currencyCode + " #,##0.00", locale:kimble.locale, isFullLocale:false}));
+						
+						var title = item.Name + '<br/>' + item.StartDate + '<br/>' + lineItem.find('.amount').text();
+						
+						if (item.Description != '')
+							title += ('<br/>' + item.Description);
+							
+						lineItem.attr('title', title);
+							
+						lineItem.appendTo(itemsContainer);
+					});
+					
+					if (obj.Id == 'new')
+						lineInstance.hide();
+					
+					//append line to section lines element
+					lineInstance.appendTo(sectionInstance.find('.creditNoteSectionLines'));
+					
+				});
+				
+				sectionInstance.appendTo(container);
+			});	
+			
+			jQuery('.lineItem').qtip({position: {
+					adjust: {
+						method: 'flip flip'
+					},
+					viewport: $(window)
+				},
+				style: {classes: 'qtip-light qtip-shadow qtip-rounded'}});
+			
+			$('.narrative').editable({
+                    type:'text',
+                    submit:'OK',
+                    cancel:'Cancel',
+                    onSubmit:onNarrativeSubmit,
+                    onEdit :onNarrativeEdit});
+        			
+        	// Set the default function - executes per dropped item
+    		$.fn.drag_drop_multi_select.defaults.after_drop_action = function($item,$old,$new,e,ui){
+        		// Possible param $item_instance, $old_container, $new_container, event, helper
+        		var $target = $(e.target);
+        		
+        		//source line - remove lineItem from source line items and subtract amount
+        		//$item.parent().parent().parent().data()
+        		var htmlLine =  $item.parent().parent().parent();
+        		var jsonLine = htmlLine.data('jsonLine');
+        		var jsonItem = $item.data('jsonItem');
+        		findAndRemove(jsonLine.CreditNoteLineItems, 'Id', jsonItem.Id);
+        		jsonLine.NetAmount -= jsonItem.NetAmount;
+        		htmlLine.find('.lineAmount').text($.formatNumber(new Number(jsonLine.NetAmount), {format: currencyCode + " #,##0.00", locale:kimble.locale, isFullLocale:false}));
+        		        		
+        		//target line - add lineItem to target and add amount
+        		//$target.data()
+        		var htmlLineTarget = $target.parent();
+        		jsonLine = htmlLineTarget.data('jsonLine');
+        		jsonLine.CreditNoteLineItems[jsonLine.CreditNoteLineItems.length] = jsonItem;
+        		jsonLine.NetAmount += jsonItem.NetAmount;
+        		htmlLineTarget.find('.lineAmount').text($.formatNumber(new Number(jsonLine.NetAmount), {format: currencyCode + " #,##0.00", locale:kimble.locale, isFullLocale:false}));
+        		
+        		$target.find('ul').append($item);
+        		
+    		};
+    		
+    		// Initiate the drag & drop
+   			
+   			$('#container').drag_drop_multi_select({
+        		element_to_drag_drop_select:'.creditNoteLine div ul li',
+        		elements_to_drop:'.creditNoteLine div.droppable',
+        		elements_to_cancel_select:'.creditNoteLine div.creditNoteLineHeader, div.creditNoteSectionName, div.creditNoteSectionEdit'
+    		});
+    		
+    		
+    		//border-bottom: 4px solid #45A500;
+			$( ".creditNoteSectionLines" ).sortable({
+				connectWith: "ul.creditNoteSectionLines",
+				placeholder: "line-drop-hover",
+				handle: '.creditNoteLineHeader',
+				stop: function () {
+				    // enable text select on inputs
+				    $(".creditNoteSectionLines").find("input")
+				     .bind('mousedown.ui-disableSelection selectstart.ui-disableSelection', function(e) {
+				      	e.stopImmediatePropagation();
+				    	});
+				    }
+			});
+
+			// enable text select on inputs
+			$(".creditNoteSectionLines").find("input")
+			 .bind('mousedown.ui-disableSelection selectstart.ui-disableSelection', function(e) {
+			  e.stopImmediatePropagation();
+			});
+			
+			
+			$('.creditNoteSectionName').click(function() {
+				var t = $(this);
+				$('.creditNoteSectionName').removeClass('creditNoteSection-selected');
+				t.addClass('creditNoteSection-selected');
+			});
+			
+			$('.creditNoteSectionName div.toggle').click(function() {
+				var options = {};
+				var theEditSection = $(this).parent().parent().find('.creditNoteSectionEdit');
+				var theSection = theEditSection.parent();
+				
+				theEditSection.find('input').val(theSection.data('jsonSection').Name);
+							
+				theEditSection.toggle('slide', options, 700);
+				
+				return false;
+			});
+			
+ 		});
+ 		
+ 		function onNarrativeSubmit(content)
+ 		{
+    		this.parent().parent().data('jsonLine').Narrative = content.current;
+		}
+		function onNarrativeEdit(content,aa)
+ 		{
+ 			$(this).find('input').val($('<span>'+content.current+'</span>').text());
+    	}
+		
+ 		function updateJson()
+ 		{
+ 			jQuery('#creditNote-error').hide();
+ 			
+ 			var theSections = new Array();
+ 			
+ 			var lineNumber = 1;
+ 			var lineError = false;
+ 			var sectionError = false;
+ 			
+ 			jQuery.each($('.creditNoteSection:visible'), function (i, section) {
+ 				
+ 				var theSection = $(section);
+ 				var theSectionJson = $(section).data('jsonSection');
+ 				theSectionJson.CreditNoteLines = new Array();
+ 				
+ 				var hasItems = false;
+ 				
+ 				jQuery.each(theSection.find('.creditNoteLine:visible'), function (j, line){
+	 				
+	 				var lineJson = $(line).data('jsonLine');
+	 				theSectionJson.CreditNoteLines[j] = lineJson;
+	 				
+	 				if(lineJson.CreditNoteLineItems.length > 0)
+	 				{ 
+	 					if( lineJson.Narrative == '')
+	 						lineError = true; 
+	 					else
+	 					{	
+	 						lineNumber ++;
+	 						hasItems = true;
+	 					}
+	 				}
+	 			});
+ 				
+ 				if (hasItems && theSectionJson.Name == '')
+ 					sectionError = true; 					
+ 				
+ 				theSections[i] = theSectionJson;
+ 			});
+ 			
+ 			var error = '';
+ 			
+ 			if(lineError)
+ 			{
+ 				error = 'CreditNote line narrative is required.';
+ 			}
+ 			else if(sectionError)
+ 			{
+ 				error = 'Section name is required.';
+ 			}
+ 			
+ 			if (error != '')
+ 			{
+ 				jQuery('#creditNote-error').show();
+       			jQuery('#creditNote-error-text').text(error);
+ 				return false; 			
+ 			}
+ 			
+ 			$('.JsonSectionsAndLines').val(JSON.stringify(theSections));
+ 			
+ 			return true;
+ 		}
+ 		
+ 		function newSection()
+ 		{
+ 			$('.creditNoteSection:hidden:first').show();
+ 		}
+ 		
+ 		function newSectionLine()
+ 		{
+ 			$('.creditNoteSection-selected').parent().find('.creditNoteLine:hidden:first').show();
+ 		}
+ 		
+ 		
+ function findAndRemove(array, property, value) {
+   $.each(array, function(index, result) {
+      if(result != undefined && result[property] == value) {
+      {
+          //Remove from array
+          array.splice(index, 1);
+          return;
+      }
+      }    
+   });
+}
+
+(function($) {
+    $.fn.extend({
+        isChildOf: function( filter_string ) {
+          
+          var parents = $(this).parents().get();
+         
+          for ( j = 0; j < parents.length; j++ ) {
+           if ( $(parents[j]).is(filter_string) ) {
+      return true;
+           }
+          }
+          
+          return false;
+        }
+    });
+})(jQuery);
+
+// Create a JSON object only if one does not already exist. We create the
+// methods in a closure to avoid creating global variables.
+
+if (typeof JSON !== 'object') {
+    JSON = {};
+}
+
+(function () {
+    'use strict';
+
+    function f(n) {
+        // Format integers to have at least two digits.
+        return n < 10 ? '0' + n : n;
+    }
+
+    if (typeof Date.prototype.toJSON !== 'function') {
+
+        Date.prototype.toJSON = function (key) {
+
+            return isFinite(this.valueOf())
+                ? this.getUTCFullYear()     + '-' +
+                    f(this.getUTCMonth() + 1) + '-' +
+                    f(this.getUTCDate())      + 'T' +
+                    f(this.getUTCHours())     + ':' +
+                    f(this.getUTCMinutes())   + ':' +
+                    f(this.getUTCSeconds())   + 'Z'
+                : null;
+        };
+
+        String.prototype.toJSON      =
+            Number.prototype.toJSON  =
+            Boolean.prototype.toJSON = function (key) {
+                return this.valueOf();
+            };
+    }
+
+    var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+        escapable = /[\\\"\x00-\x1f\x7f-\x9f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+        gap,
+        indent,
+        meta = {    // table of character substitutions
+            '\b': '\\b',
+            '\t': '\\t',
+            '\n': '\\n',
+            '\f': '\\f',
+            '\r': '\\r',
+            '"' : '\\"',
+            '\\': '\\\\'
+        },
+        rep;
+
+
+    function quote(string) {
+
+// If the string contains no control characters, no quote characters, and no
+// backslash characters, then we can safely slap some quotes around it.
+// Otherwise we must also replace the offending characters with safe escape
+// sequences.
+
+        escapable.lastIndex = 0;
+        return escapable.test(string) ? '"' + string.replace(escapable, function (a) {
+            var c = meta[a];
+            return typeof c === 'string'
+                ? c
+                : '\\u' + ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+        }) + '"' : '"' + string + '"';
+    }
+
+
+    function str(key, holder) {
+
+// Produce a string from holder[key].
+
+        var i,          // The loop counter.
+            k,          // The member key.
+            v,          // The member value.
+            length,
+            mind = gap,
+            partial,
+            value = holder[key];
+
+// If the value has a toJSON method, call it to obtain a replacement value.
+
+        if (value && typeof value === 'object' &&
+                typeof value.toJSON === 'function') {
+            value = value.toJSON(key);
+        }
+
+// If we were called with a replacer function, then call the replacer to
+// obtain a replacement value.
+
+        if (typeof rep === 'function') {
+            value = rep.call(holder, key, value);
+        }
+
+// What happens next depends on the value's type.
+
+        switch (typeof value) {
+        case 'string':
+            return quote(value);
+
+        case 'number':
+
+// JSON numbers must be finite. Encode non-finite numbers as null.
+
+            return isFinite(value) ? String(value) : 'null';
+
+        case 'boolean':
+        case 'null':
+
+// If the value is a boolean or null, convert it to a string. Note:
+// typeof null does not produce 'null'. The case is included here in
+// the remote chance that this gets fixed someday.
+
+            return String(value);
+
+// If the type is 'object', we might be dealing with an object or an array or
+// null.
+
+        case 'object':
+
+// Due to a specification blunder in ECMAScript, typeof null is 'object',
+// so watch out for that case.
+
+            if (!value) {
+                return 'null';
+            }
+
+// Make an array to hold the partial results of stringifying this object value.
+
+            gap += indent;
+            partial = [];
+
+// Is the value an array?
+
+            if (Object.prototype.toString.apply(value) === '[object Array]') {
+
+// The value is an array. Stringify every element. Use null as a placeholder
+// for non-JSON values.
+
+                length = value.length;
+                for (i = 0; i < length; i += 1) {
+                    partial[i] = str(i, value) || 'null';
+                }
+
+// Join all of the elements together, separated with commas, and wrap them in
+// brackets.
+
+                v = partial.length === 0
+                    ? '[]'
+                    : gap
+                    ? '[\n' + gap + partial.join(',\n' + gap) + '\n' + mind + ']'
+                    : '[' + partial.join(',') + ']';
+                gap = mind;
+                return v;
+            }
+
+// If the replacer is an array, use it to select the members to be stringified.
+
+            if (rep && typeof rep === 'object') {
+                length = rep.length;
+                for (i = 0; i < length; i += 1) {
+                    if (typeof rep[i] === 'string') {
+                        k = rep[i];
+                        v = str(k, value);
+                        if (v) {
+                            partial.push(quote(k) + (gap ? ': ' : ':') + v);
+                        }
+                    }
+                }
+            } else {
+
+// Otherwise, iterate through all of the keys in the object.
+
+                for (k in value) {
+                    if (Object.prototype.hasOwnProperty.call(value, k)) {
+                        v = str(k, value);
+                        if (v) {
+                            partial.push(quote(k) + (gap ? ': ' : ':') + v);
+                        }
+                    }
+                }
+            }
+
+// Join all of the member texts together, separated with commas,
+// and wrap them in braces.
+
+            v = partial.length === 0
+                ? '{}'
+                : gap
+                ? '{\n' + gap + partial.join(',\n' + gap) + '\n' + mind + '}'
+                : '{' + partial.join(',') + '}';
+            gap = mind;
+            return v;
+        }
+    }
+
+// If the JSON object does not yet have a stringify method, give it one.
+
+    if (typeof JSON.stringify !== 'function') {
+        JSON.stringify = function (value, replacer, space) {
+
+// The stringify method takes a value and an optional replacer, and an optional
+// space parameter, and returns a JSON text. The replacer can be a function
+// that can replace values, or an array of strings that will select the keys.
+// A default replacer method can be provided. Use of the space parameter can
+// produce text that is more easily readable.
+
+            var i;
+            gap = '';
+            indent = '';
+
+// If the space parameter is a number, make an indent string containing that
+// many spaces.
+
+            if (typeof space === 'number') {
+                for (i = 0; i < space; i += 1) {
+                    indent += ' ';
+                }
+
+// If the space parameter is a string, it will be used as the indent string.
+
+            } else if (typeof space === 'string') {
+                indent = space;
+            }
+
+// If there is a replacer, it must be a function or an array.
+// Otherwise, throw an error.
+
+            rep = replacer;
+            if (replacer && typeof replacer !== 'function' &&
+                    (typeof replacer !== 'object' ||
+                    typeof replacer.length !== 'number')) {
+                throw new Error('JSON.stringify');
+            }
+
+// Make a fake root object containing our value under the key of ''.
+// Return the result of stringifying the value.
+
+            return str('', {'': value});
+        };
+    }
+
+
+// If the JSON object does not yet have a parse method, give it one.
+
+    if (typeof JSON.parse !== 'function') {
+        JSON.parse = function (text, reviver) {
+
+// The parse method takes a text and an optional reviver function, and returns
+// a JavaScript value if the text is a valid JSON text.
+
+            var j;
+
+            function walk(holder, key) {
+
+// The walk method is used to recursively walk the resulting structure so
+// that modifications can be made.
+
+                var k, v, value = holder[key];
+                if (value && typeof value === 'object') {
+                    for (k in value) {
+                        if (Object.prototype.hasOwnProperty.call(value, k)) {
+                            v = walk(value, k);
+                            if (v !== undefined) {
+                                value[k] = v;
+                            } else {
+                                delete value[k];
+                            }
+                        }
+                    }
+                }
+                return reviver.call(holder, key, value);
+            }
+
+
+// Parsing happens in four stages. In the first stage, we replace certain
+// Unicode characters with escape sequences. JavaScript handles many characters
+// incorrectly, either silently deleting them, or treating them as line endings.
+
+            text = String(text);
+            cx.lastIndex = 0;
+            if (cx.test(text)) {
+                text = text.replace(cx, function (a) {
+                    return '\\u' +
+                        ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+                });
+            }
+
+// In the second stage, we run the text against regular expressions that look
+// for non-JSON patterns. We are especially concerned with '()' and 'new'
+// because they can cause invocation, and '=' because it can cause mutation.
+// But just to be safe, we want to reject all unexpected forms.
+
+// We split the second stage into 4 regexp operations in order to work around
+// crippling inefficiencies in IE's and Safari's regexp engines. First we
+// replace the JSON backslash pairs with '@' (a non-JSON character). Second, we
+// replace all simple value tokens with ']' characters. Third, we delete all
+// open brackets that follow a colon or comma or that begin the text. Finally,
+// we look to see that the remaining characters are only whitespace or ']' or
+// ',' or ':' or '{' or '}'. If that is so, then the text is safe for eval.
+
+            if (/^[\],:{}\s]*$/
+                    .test(text.replace(/\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g, '@')
+                        .replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, ']')
+                        .replace(/(?:^|:|,)(?:\s*\[)+/g, ''))) {
+
+// In the third stage we use the eval function to compile the text into a
+// JavaScript structure. The '{' operator is subject to a syntactic ambiguity
+// in JavaScript: it can begin a block or an object literal. We wrap the text
+// in parens to eliminate the ambiguity.
+
+                j = eval('(' + text + ')');
+
+// In the optional fourth stage, we recursively walk the new structure, passing
+// each name/value pair to a reviver function for possible transformation.
+
+                return typeof reviver === 'function'
+                    ? walk({'': j}, '')
+                    : j;
+            }
+
+// If the text is not JSON parseable, then a SyntaxError is thrown.
+
+            throw new SyntaxError('JSON.parse');
+        };
+    }
+}());
+		</script>
+
+	</apex:define>
+	
+	</apex:composition>
+	
+</apex:page>

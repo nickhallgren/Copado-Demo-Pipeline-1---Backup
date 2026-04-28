@@ -1,0 +1,453 @@
+<apex:page standardController="KimbleOne__SupplierInvoice__c" extensions="KimbleOne.SupplierInvoiceNewController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__SupplierInvoice__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu"></apex:define> 
+    
+    <apex:define name="Content">
+    	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__SupplierInvoiceManagement)}"/>
+
+		<style>
+			.mainTitle {white-space:nowrap;}
+			.tableStyle {border-collapse: collapse; border-spacing: 0px 0px; }
+	        .colStyle1 { width: 33%;text-align:right; padding-top:3px; padding-bottom:5px}
+	        .colStyle2 { width: 33%; padding-left:20px; padding-top:5px; padding-bottom:5px}
+	        .colStyle3 { width: 33%;text-align:right; padding-top:5px; padding-bottom:5px}
+	        .rowstyle { border-bottom-style:solid; border-bottom-width:1px;border-bottom-color:#E8E8E8 }
+
+			span.filter-items-off {color: #aaa; cursor: pointer;}
+			span.filter-items-on {color: #729bc7; cursor: pointer;}
+	    </style>
+
+    	<apex:form id="TheForm" enctype="multipart/form-data">
+    	<div id="pageErrors">
+    		<apex:pageMessages escape="False" />
+		</div>
+		<apex:pageBlock title="{!$Label.kimbleone__createsupplierinvoiceheading}" rendered="{!ISNULL(TheSupplierInvoiceNewWizard.TheSupplierInvoice)}">
+
+			<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__selectsupplierinvoiceoptions}"  columns="1">
+				<apex:inputField value="{!KimbleOne__SupplierInvoice__c.KimbleOne__IsSupplierRequisitioned__c}" />
+		    </apex:pageBlockSection>
+
+			<apex:pageBlockButtons location="bottom">
+           		<apex:commandButton action="{!Cancel}" value="{!$Label.kimbleone__cancel}"/>
+            	<apex:commandButton action="{!StartWizard}" value="{!$Label.kimbleone__next}"/>
+            </apex:pageBlockButtons>
+
+		</apex:pageBlock>
+
+		<apex:pageBlock title="{!$Label.kimbleone__createsupplierinvoiceheading}" rendered="{!!ISNULL(TheSupplierInvoiceNewWizard.TheSupplierInvoice)}">
+		
+			<apex:pageBlockButtons location="bottom" rendered="{!!TheSupplierInvoiceNewWizard.HasFinished}">
+           		
+           		<apex:commandButton action="{!Cancel}" value="{!$Label.kimbleone__cancel}" rendered="{!TheSupplierInvoiceNewWizard.CanCancel}"/>
+           		<apex:commandButton action="{!TheSupplierInvoiceNewWizard.GoPrevious}" value="{!$Label.kimbleone__previous}" rendered="{!TheSupplierInvoiceNewWizard.CanGoPrevious}"/>
+            	
+            	<apex:commandButton action="{!TheSupplierInvoiceNewWizard.GoNext}" value="{!TheSupplierInvoiceNewWizard.NextLabel}" rendered="{!TheSupplierInvoiceNewWizard.CanGoNext && TheSupplierInvoiceNewWizard.CurrentStep.StepName != 'ConfirmSupplierInvoice'}"/>
+            	<apex:commandButton action="{!TheSupplierInvoiceNewWizard.GoNext}" styleclass="DisableButtonWhileBusy theNextButton" value="{!TheSupplierInvoiceNewWizard.NextLabel}" reRender="TheForm" rendered="{!TheSupplierInvoiceNewWizard.CurrentStep.StepName == 'ConfirmSupplierInvoice'}"/>
+            
+            </apex:pageBlockButtons>
+			
+			
+			<!-- EnterSupplierOrPODetailsStep -->
+			<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__findrequisitionlinesbypoheading}"  columns="1" rendered="{!TheSupplierInvoiceNewWizard.CurrentStep.StepName == 'FindSupplierOrPO'}">
+
+				<apex:inputField value="{!TheSupplierInvoice.KimbleOne__InvoiceDate__c}" styleClass="kimbleDatePicker" required="true" />
+				
+				<apex:inputField value="{!TheSupplierInvoiceNewWizard.FindInvoice.KimbleOne__SupplierPurchaseOrder__c}"/>
+				
+				<apex:inputField value="{!TheSupplierInvoiceNewWizard.FindInvoice.KimbleOne__SupplierAccount__c}" />
+				
+				<apex:inputField value="{!TheSupplierInvoice.KimbleOne__IsSelfBill__c}" />
+
+		    </apex:pageBlockSection>
+
+			<!-- SelectResourceToSelfBillStep -->
+			<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__selectlabel} {!$ObjectType.KimbleOne__Resource__c.Label}"  columns="1" rendered="{!TheSupplierInvoiceNewWizard.CurrentStep.StepName == 'SelectResourceToSelfBill'}">
+				<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+					<apex:pageBlockSectionItem >
+						<apex:outputLabel value="{!$Label.kimbleone__supplier} {!$ObjectType.KimbleOne__Resource__c.Label}"/>
+						<apex:outputPanel >
+							<div class="requiredInput" id="resource-row">
+								<div class="requiredBlock"></div>
+
+								<apex:selectList id="simple-input-resource" value="{!TheSupplierInvoiceNewWizard.TheDummyResourceField.KimbleOne__Resource__c}" size="1" rendered="{!!TheSupplierInvoiceNewWizard.UseResourceEnhancedLookup}" >
+									<apex:selectOptions value="{!TheSupplierInvoiceNewWizard.TheResourceOptions}" />
+								</apex:selectList>
+
+								<apex:actionRegion >
+									<apex:outputPanel id="resource-panel">
+										<apex:inputField id="enhanced-input-resource" value="{!TheSupplierInvoiceNewWizard.TheDummyResourceField.KimbleOne__Resource__c}" styleclass="kimbleSearch" rendered="{!TheSupplierInvoiceNewWizard.UseResourceEnhancedLookup}"/>
+									</apex:outputPanel>
+								</apex:actionRegion>
+							</div>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+				</apex:pageblockSection>
+		    </apex:pageBlockSection>
+
+		    <!-- FindElementsWithSupplierInvoiceableItemsStep -->
+			<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__invoicedetailsheading}" columns="2" rendered="{!TheSupplierInvoiceNewWizard.CurrentStep.StepName == 'FindElementsWithSupplierInvoiceableItems'}">
+
+		    	<apex:outputField value="{!TheSupplierInvoiceNewWizard.TheDummyResourceField.KimbleOne__Resource__c}"/>
+
+		    	<apex:inputField value="{!TheSupplierInvoice.Name}" required="false" rendered="{!TheSupplierInvoice.KimbleOne__IsManualReference__c}"/>
+
+		    	<apex:pageBlockSectionItem >
+		            <apex:outputLabel value="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.KimbleOne__SupplierAccount__c.Label}"/>
+	                <apex:outputPanel >
+						<div class="requiredInput">
+							<div class="requiredBlock"/>
+			                <apex:selectList value="{!TheSupplierInvoice.KimbleOne__SupplierAccount__c}" size="1" required="true">
+			                    <apex:selectOptions value="{!TheSupplierInvoiceNewWizard.TheSupplierProductsForResource}" />
+			                </apex:selectList>
+						</div>
+	                </apex:outputPanel>
+			    </apex:pageBlockSectionItem>
+
+                <apex:inputField value="{!TheSupplierInvoice.KimbleOne__InvoiceDate__c}" required="true"/>
+
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.KimbleOne__TaxCode__c.Label}" />
+	                <apex:outputPanel >
+						<div class="requiredInput">
+							<div class="requiredBlock"/>
+							<apex:selectList id="taxCode" value="{!TheSupplierInvoice.KimbleOne__TaxCode__c}" size="1" required="true">
+			                    <apex:selectOptions value="{!TheTaxCodes}" />
+			                </apex:selectList>
+						</div>
+	                </apex:outputPanel>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.KimbleOne__InvoiceFormat__c.Label}" />
+	                <apex:outputPanel >
+						<div class="requiredInput">
+							<div class="requiredBlock"/>
+							<apex:selectList id="invoiceFormat" value="{!TheSupplierInvoice.KimbleOne__InvoiceFormat__c}" size="1" required="true">
+			                    <apex:selectOptions value="{!TheSupplierInvoiceFormats}" />
+			                </apex:selectList>
+						</div>
+	                </apex:outputPanel>
+				</apex:pageBlockSectionItem>
+
+		    </apex:pageBlockSection>
+
+            <apex:outputPanel id="elementsToInvoice" layout="none">
+                <apex:pageblockSection collapsible="false" showheader="false" columns="1" rendered="{!TheSupplierInvoiceNewWizard.CurrentStep.StepName == 'FindElementsWithSupplierInvoiceableItems' && TheSupplierInvoiceNewWizard.OrderedSupplierInvoiceableCostGroups.size > 0}">
+                    <apex:pageBlockTable value="{!TheSupplierInvoiceNewWizard.OrderedSupplierInvoiceableCostGroups}" var="costGroup">
+						<apex:column width="5%" headerValue="{!$Label.kimbleone__selectlabel}" >
+							<apex:inputField value="{!costGroup.Selected.KimbleOne__InputCheckbox__c}"/>
+						</apex:column>
+						<apex:column width="2%" style="text-align:center;" headerValue="{!$Label.kimbleone__filter}">
+							<span onclick="showFilter('{!costGroup.TheFilterItem.Key}')" class="fa fa-filter filter-items {!IF(costGroup.TheFilterItem.HasFilter, 'filter-items-on','filter-items-off')}"></span>
+						</apex:column>
+                        <apex:column value="{!costGroup.TheDeliveryElement.Name}"/>
+                        <apex:column headerValue="{!$Label.kimbleone__fromlabel}" value="{!costGroup.TheFilterItem.MinDate.KimbleOne__InputDate__c}"/>
+                        <apex:column headerValue="{!$Label.kimbleone__tolabel}" value="{!costGroup.TheFilterItem.MaxDate.KimbleOne__InputDate__c}"/>
+                        <apex:column headerValue="{!$Label.kimbleone__currency}" value="{!costGroup.TheFilterItem.CurrencyCode}"/>
+                        <apex:column headerValue="{!$Label.kimbleone__serviceslabel}" value="{!costGroup.TheFilterItem.TotalServices.KimbleOne__InputDecimal__c}"/>
+                        <apex:column headerValue="{!$Label.kimbleone__expenseslabel}" value="{!costGroup.TheFilterItem.TotalExpenses.KimbleOne__InputDecimal__c}"/>
+					</apex:pageBlockTable>
+                </apex:pageblockSection>
+
+				<div id="filter-panel-popup" style="display:none">
+					<apex:outputPanel id="TheFilter">
+						<apex:outputPanel rendered="{!!ISBLANK(TheSupplierInvoiceNewWizard.CurrentFilterKey)}">
+							<apex:pageblock >
+								<apex:pageBlockButtons location="top">
+									<input id="applyFilterButton" type="button" class="btn DisableButtonWhileBusy" value="{!JSENCODE($Label.ApplyFilter)}" onClick="applyElementFilter();"/>
+									<input id="clearFilterButton" type="button" class="btn DisableButtonWhileBusy" value="{!JSENCODE($Label.ClearAllLabel)}" onClick="clearElementFilter();"/>
+								</apex:pageBlockButtons>
+								<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+									<apex:pageBlockSectionItem rendered="{!TheSupplierInvoiceNewWizard.FilterItemTypes.size > 1}">
+										<apex:outputText value="" />
+										<apex:selectRadio value="{!TheSupplierInvoiceNewWizard.TheSupplierInvoiceableCostGroupsMap[TheSupplierInvoiceNewWizard.CurrentFilterKey].TheFilterItem.ItemType}" layout="horizontal" border="0" styleclass="deliveryStatus" >
+											<apex:selectOptions value="{!TheSupplierInvoiceNewWizard.FilterItemTypes}" />
+										</apex:selectRadio>
+									</apex:pageBlockSectionItem>
+									<apex:pageBlockSectionItem >
+										<apex:outputText value="{!$Label.kimbleone__invoicefromdate}" />
+										<apex:inputField styleclass="kimbleDatePicker filter" id="invoiceFromDate" value="{!TheSupplierInvoiceNewWizard.TheSupplierInvoiceableCostGroupsMap[TheSupplierInvoiceNewWizard.CurrentFilterKey].TheFilterItem.InvoiceFromDate.InputDate__c}"/>
+									</apex:pageBlockSectionItem>
+									<apex:pageBlockSectionItem >
+										<apex:outputText value="{!$Label.kimbleone__invoiceuptodate}" />
+										<apex:inputField styleclass="kimbleDatePicker filter" id="invoiceUpToDate" value="{!TheSupplierInvoiceNewWizard.TheSupplierInvoiceableCostGroupsMap[TheSupplierInvoiceNewWizard.CurrentFilterKey].TheFilterItem.InvoiceUpToDate.InputDate__c}"/>
+									</apex:pageBlockSectionItem>
+								</apex:pageblockSection>
+							</apex:pageblock>
+						</apex:outputPanel>
+					</apex:outputPanel>
+				</div>
+				<script type="text/javascript">
+
+					function showFilter(filterKey)
+					{
+						initialiseModalBoxy('#filter-panel-popup', '{!JSENCODE($Label.Filter)}', jQuery('form[id$=\'TheForm\']'));
+						selectCostGroupFilter(filterKey);
+					}
+
+					function filterLoadComplete()
+					{
+						jQuery('.kimbleDatePicker.filter').datepicker({
+								dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+									showOtherMonths: true,
+									selectOtherMonths: true
+						});
+
+						showModalBoxyWithFocus(jQuery('[id$="applyFilterButton"]'));
+					}
+				</script>
+
+				<apex:actionFunction action="{!TheSupplierInvoiceNewWizard.SelectCostGroupFilter}" name="selectCostGroupFilter" rerender="TheFilter" oncomplete="filterLoadComplete();">
+					<apex:param name="filterKey" value="" />
+				</apex:actionFunction>
+				<apex:actionFunction action="{!TheSupplierInvoiceNewWizard.ClearElementItemsFilter}" name="clearElementFilter" rerender="elementsToInvoice" oncomplete="hideModalBoxy()"/>
+				<apex:actionFunction action="{!TheSupplierInvoiceNewWizard.ApplyElementItemsFilter}" name="applyElementFilter" rerender="elementsToInvoice" oncomplete="hideModalBoxy()"/>
+			</apex:outputPanel>
+
+		    <!-- EnterInvoiceDetailsStep -->
+			<apex:pageBlockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__invoicedetailsheading}"  columns="2" rendered="{!TheSupplierInvoiceNewWizard.CurrentStep.StepName == 'EnterInvoiceDetailsAndSelectRequisitionLines'}">
+		    	
+		    	<apex:outputField value="{!TheSupplierInvoice.KimbleOne__SupplierAccount__c}" />
+		    	
+		    	<apex:outputField rendered="{!TheSupplierInvoiceNewWizard.FindInvoice.KimbleOne__SupplierPurchaseOrder__c != NULL}" value="{!TheSupplierInvoiceNewWizard.FindInvoice.KimbleOne__SupplierPurchaseOrder__c}" />
+		    	
+		    	<apex:pageBlockSectionItem rendered="{!TheSupplierInvoiceNewWizard.FindInvoice.KimbleOne__SupplierPurchaseOrder__c == NULL}">
+					<apex:outputLabel />	
+					<apex:outputText />
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem rendered="{!TheSupplierInvoiceNewWizard.TheSupplierInvoice.KimbleOne__IsManualReference__c}">
+					<apex:outputText value="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.Name.Label}"/>
+					<apex:outputPanel >
+							<div class="requiredInput">
+								<apex:outputPanel layout="none"><div class="requiredBlock"/></apex:outputPanel>
+								<apex:inputField value="{!TheSupplierInvoice.Name}" />
+							</div>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+		    	
+		    	<apex:outputField value="{!TheSupplierInvoice.KimbleOne__InvoiceDate__c}" />
+
+		    	<apex:pageBlockSectionItem rendered="{!!TheSupplierInvoice.KimbleOne__IsSelfBill__c}" >
+			    	<apex:outputLabel value="{!$Label.kimbleone__file}" for="file"/>
+			        <apex:inputFile value="{!TheSupplierInvoiceNewWizard.InvoiceAttachment.body}" filename="{!TheSupplierInvoiceNewWizard.InvoiceAttachment.name}" id="file"/>
+			    </apex:pageBlockSectionItem>
+			    
+		    </apex:pageBlockSection>
+		    	
+		    <apex:actionRegion >
+		    
+		    <apex:pageBlockSection id="InvoiceDetails" collapsible="false" showheader="false" columns="2" rendered="{!TheSupplierInvoiceNewWizard.CurrentStep.StepName == 'EnterInvoiceDetailsAndSelectRequisitionLines'}">
+		    	
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.KimbleOne__TaxCode__c.Label}" />
+	                <apex:outputPanel >
+						<div class="requiredInput">
+							<div class="requiredBlock"/>
+							<apex:selectList id="taxCode" value="{!TheSupplierInvoice.KimbleOne__TaxCode__c}" size="1" required="true">
+			                    <apex:selectOptions value="{!TheTaxCodes}" />
+			                </apex:selectList>
+						</div>
+	                </apex:outputPanel>
+				</apex:pageBlockSectionItem>
+				
+		    	<apex:pageBlockSectionItem rendered="{!!TheSupplierInvoice.KimbleOne__IsSelfBill__c}" >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.KimbleOne__NetAmount__c.Label} ({!TheSupplierInvoice.CurrencyIsoCode})" />
+					<apex:inputField required="false" value="{!TheSupplierInvoice.KimbleOne__NetAmount__c}" >
+		    			<apex:actionSupport event="onchange" action="{!TheSupplierInvoiceNewWizard.NetAmountChange}" rerender="InvoiceDetails" oncomplete="getReferenceData();" />
+		    		</apex:inputField>
+		    	</apex:pageBlockSectionItem>
+
+		    	<apex:pageBlockSectionItem rendered="{!TheSupplierInvoice.KimbleOne__IsSelfBill__c}">
+					<apex:outputLabel />	
+					<apex:outputText />
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.KimbleOne__InvoiceFormat__c.Label}" />
+	                <apex:selectList id="invoiceFormat" value="{!TheSupplierInvoice.KimbleOne__InvoiceFormat__c}" size="1" required="true">
+	                    <apex:selectOptions value="{!TheSupplierInvoiceFormats}" />
+	                </apex:selectList>
+				</apex:pageBlockSectionItem>
+				
+		    </apex:pageBlockSection>
+		    
+		    <apex:pageblockSection id="TheMatchingRequisitionLines" collapsible="false" showheader="true" title="{!$Label.kimbleone__matchingrequisitionlinesheading}" columns="1" rendered="{!TheSupplierInvoiceNewWizard.CurrentStep.StepName == 'EnterInvoiceDetailsAndSelectRequisitionLines'}">
+		    	
+		    	<apex:pageBlockTable value="{!TheSupplierInvoiceNewWizard.OrderedSupplierInvoiceableCostGroups}" var="line">
+					
+					<apex:column headerValue="{!$Label.kimbleone__selectlabel}" >
+						<apex:inputField value="{!line.Selected.KimbleOne__InputCheckbox__c}"/>
+					</apex:column>
+					<apex:column value="{!line.TheSupplierRequisitionLine.KimbleOne__SupplierRequisition__c}" />
+					<apex:column value="{!line.TheSupplierRequisitionLine.KimbleOne__LineNumber__c}" />
+					<apex:column value="{!line.TheSupplierRequisitionLine.Name}" width="340px"/>
+					<apex:column value="{!line.TheSupplierRequisitionLine.KimbleOne__UnitAmount__c}" />
+					<apex:column value="{!line.TheSupplierRequisitionLine.KimbleOne__RequisitionedUnits__c}" />
+					<apex:column value="{!line.TheSupplierRequisitionLine.KimbleOne__ReceivedUnits__c}" />
+					<apex:column value="{!line.TheSupplierRequisitionLine.KimbleOne__NetAmount__c}" />
+					<apex:column value="{!line.TheSupplierRequisitionLine.KimbleOne__UninvoicedNetAmount__c}" />
+					 
+				</apex:pageBlockTable>
+		    </apex:pageblockSection>
+		    
+		    <apex:outputPanel rendered="{!TheSupplierInvoiceNewWizard.HasFinished}">
+                 <script>
+		                safeNavigateToSForceURL('{!JSENCODE(RedirectLocation)}');
+		          </script>
+	               	   
+           	</apex:outputPanel>
+           	
+           	</apex:actionRegion>
+
+			<!-- SELECT SUPPLIER REQUISITION LINE ITEMS TO INCLUDE -->
+			<apex:outputPanel rendered="{!TheSupplierInvoiceNewWizard.CurrentStep.StepName == 'AllocateToSupplierInvoiceableItems' || TheSupplierInvoiceNewWizard.CurrentStep.StepName == 'SelectSupplierInvoiceableItems'}">
+			
+				<apex:outputPanel id="NetAmountPanel">
+					<apex:pageblockSection collapsible="false" showheader="false" columns="3">
+		           		
+	 	           		<apex:pageBlockSectionItem dataStyle="width:15%">
+		           			<apex:outputText value="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.KimbleOne__SupplierAccount__c.Label}" />
+		           			<apex:outputField value="{!TheSupplierInvoiceNewWizard.TheSupplierInvoice.KimbleOne__SupplierAccount__c}"/>
+		           		</apex:pageBlockSectionItem>
+		           		<apex:pageBlockSectionItem dataStyle="width:15%">
+		           			<apex:outputText value="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.KimbleOne__InvoiceDate__c.Label}" />
+		           			<apex:outputField value="{!TheSupplierInvoiceNewWizard.TheSupplierInvoice.KimbleOne__InvoiceDate__c}"/>
+		           		</apex:pageBlockSectionItem>
+						<apex:pageBlockSectionItem dataStyle="width:15%" rendered="{!!TheSupplierInvoice.KimbleOne__IsSelfBill__c}" >
+		           			<apex:outputText value="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.KimbleOne__NetAmount__c.Label}" />
+		           			<apex:outputField value="{!TheSupplierInvoiceNewWizard.TheSupplierInvoice.KimbleOne__NetAmount__c}"/>
+						</apex:pageBlockSectionItem>
+		           		<apex:pageBlockSectionItem dataStyle="width:15%">
+		           			<apex:outputText value="{!$ObjectType.KimbleOne__SupplierRequisitionLine__c.Label} {!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.KimbleOne__NetAmount__c.Label}" />
+		           			<span id="SupplierRequisitionLineSelectedItemsTotal"></span>	           			
+		           		</apex:pageBlockSectionItem>
+						<apex:pageBlockSectionItem dataStyle="width:15%" rendered="{!!TheSupplierInvoice.KimbleOne__IsSelfBill__c}" >
+							<apex:outputText value="{!$Label.kimbleone__remainingamounttobeallocatedlabel}"/>
+							<apex:outputPanel id="invoiceAmountRemaining" styleClass="invoiceAmountRemaining {!IF(TheSupplierInvoiceNewWizard.TotalAmountRemaining.KimbleOne__InputDecimal__c < 0, 'overAllocatedError',NULL)}">
+								<apex:outputField value="{!TheSupplierInvoiceNewWizard.TotalAmountRemaining.KimbleOne__InputDecimal__c}"/>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+						<apex:actionFunction name="refreshTotals" rerender="invoiceAmountRemaining"/>
+		           	</apex:pageblockSection>
+	           	</apex:outputPanel>
+           
+				<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__selectitemstoincludeforheading} {!TheSupplierInvoiceNewWizard.CurrentSupplierInvoiceableCostGroup.TheSupplierRequisitionLine.Name}" columns="1"></apex:pageblockSection>
+	 				<table cellpadding="0" cellspacing="2" border="0" width="100%">
+						<tr>
+							<td width="100%">
+								<div id="jsTreeContainer" style="height:100%;overflow-y:auto">
+									<div id="selectCostItems" ></div>
+								</div>
+							</td>
+						</tr>
+					</table>
+					<style>
+						.poContainer{float:left; margin-left:10px;}
+						.poAllocationContainer{height:258px;min-width: 102px;}
+						.poAllocationItemContainer{position: relative;height: 258px;display: inline-block;width: 102px;}
+						.poName {text-align: center; font-weight:bold; font-size:0.8em;margin-bottom: 4px;}
+						.allocationItem{position:absolute; bottom:0px; width:100px;text-align: center;margin-right:2px;}
+						.remainingAmount{position:relative; top:-16px; text-align: center; width:100%; font-weight:bold; font-size:0.8em;}
+						.Services{background-color:#729BC7}
+						.Expenses{background-color:#E68F1A}
+						.All {background-color:#028753}
+						.errorItem {background-image: url('{!URLFOR($Resource.JobImages, 'failed16.gif')}') !important;	background-repeat: no-repeat !important; background-position: center right !important;}
+					</style>
+					
+					<apex:inputText styleClass="TheAllocatableItemsJson" style="display:none" value="{!TheSupplierInvoiceNewWizard.TheSupplierInvoiceableCostGroupsToBeInvoicedMap[TheSupplierInvoiceNewWizard.CurrentSupplierInvoiceableCostGroup.TheFilterItem.Key].SupplierInvoiceableCostItemsJson}"/>
+
+					<script type="text/javascript">
+				
+						var theData;
+						var theCurrencyCode = '<apex:outputText value="{!TheSupplierInvoiceNewWizard.TheSupplierInvoice.CurrencyISOCode}"/>';
+						
+						$(function () {
+	
+							theData = jQuery.parseJSON($('.TheAllocatableItemsJson').val());
+	
+							jQuery.each(theData, function(i, obj){
+								updateFormattedAmount(obj);
+							});
+	
+							buildCostItemsTree();
+						});	
+					
+					</script>
+					
+					<style>
+						#jsonTree a:hover {text-decoration:none; color:black; cursor:default;}
+						.jstree-grid-wrapper{border: 1px solid #D4DADC;}
+						.jstree-grid-header-regular{background: white url('/img/alohaSkin/grid_headerbg.gif') 0 bottom repeat-x; color:black;font-weight: bold;font-size: 11px;}
+						.jstree-grid-container {border-bottom: 1px solid #CCC;}
+						.jstree-grid-separator{padding-top: 7px;}
+						.jstree-kimble-invoice.jstree-focused{background: #FFF;height: 275px;}
+					</style>
+					
+			</apex:outputPanel>
+           	
+           	<!-- ConfirmSupplierInvoiceStep -->
+			<apex:pageBlockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__confirmdetailsheading}"  columns="2" rendered="{!TheSupplierInvoiceNewWizard.CurrentStep.StepName == 'ConfirmSupplierInvoice'}">
+		    	
+		    	<apex:outputField value="{!TheSupplierInvoice.KimbleOne__SupplierAccount__c}" />
+		    	<apex:outputField value="{!TheSupplierInvoice.KimbleOne__NetAmount__c}" />
+
+		    	<apex:inputField value="{!TheSupplierInvoice.KimbleOne__SupplierContact__c}" rendered="{!TheSupplierInvoice.KimbleOne__IsSelfBill__c}"/>
+				<apex:outputText rendered="{!TheSupplierInvoice.KimbleOne__IsSelfBill__c}"/>
+
+				<apex:inputField value="{!TheSupplierInvoice.Name}" rendered="{!TheSupplierInvoiceNewWizard.TheSupplierInvoice.KimbleOne__IsManualReference__c}" required="true"/>
+		    	<apex:pageBlockSectionItem rendered="{!!TheSupplierInvoiceNewWizard.TheSupplierInvoice.KimbleOne__IsManualReference__c}">
+					<apex:outputText value="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.Name.Label}" />
+					<apex:outputText value="{!$Label.kimbleone__autogeneratedlabel}" />
+				</apex:pageBlockSectionItem>
+
+		    	<apex:inputField value="{!TheSupplierInvoice.KimbleOne__InvoiceDate__c}" styleClass="kimbleDatePicker" />
+		    	<apex:inputField value="{!TheSupplierInvoice.KimbleOne__InvoicePaymentTermDays__c}" />
+		    	
+		    	<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.KimbleOne__BusinessUnitTradingEntity__c.Label}" />
+					<apex:inputText id="businessUnitTradingEntitySelect" value="{!TheSupplierInvoice.KimbleOne__BusinessUnitTradingEntity__c}" styleclass="kimblecustomlookup GetTradingEntityList null true false" required="true"/>
+				</apex:pageBlockSectionItem>
+		    	
+		    	<apex:inputField value="{!TheSupplierInvoice.KimbleOne__Notes__c}" />
+
+		    </apex:pageBlockSection>
+		    
+			<apex:pageBlockSection columns="1" title="{!$Label.kimbleone__presentationdetailsheading}" rendered="{!TheSupplierInvoiceNewWizard.CurrentStep.StepName == 'ConfirmSupplierInvoice'}">
+				
+				<apex:pageBlockSectionItem >
+						<apex:outputText value="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.KimbleOne__SupplierInvoiceTemplate__c.Label}" />
+						<apex:inputText value="{!TheSupplierInvoice.KimbleOne__SupplierInvoiceTemplate__c}" styleclass="kimblecustomlookup GetCommercialDocumentTemplateList SupplierInvoice true false"/> 
+				</apex:pageBlockSectionItem>
+				
+			</apex:pageblockSection>
+			
+		</apex:pageBlock>
+		
+		</apex:form>
+
+		<script>
+			jQuery(window).load(function(){
+				initialiseItems();
+			});
+			function initialiseItems()
+			{
+			    SetupDatePicker();
+	        }
+			function SetupDatePicker()
+			{
+				//dateFormat: 'yy-mm-dd',
+				jQuery('.kimbleDatePicker').datepicker({
+						dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+						showOtherMonths: true,
+						selectOtherMonths: true,
+						changeMonth: true,
+						changeYear: true});
+			}
+		</script>
+
+	</apex:define>
+</apex:composition>
+
+</apex:page>

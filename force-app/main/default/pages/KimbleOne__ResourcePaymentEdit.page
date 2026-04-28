@@ -1,0 +1,132 @@
+<apex:page standardController="KimbleOne__ResourcePayment__c" extensions="KimbleOne.ResourcePaymentEditController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__ResourcePayment__c">
+
+	<apex:Composition template="KimbleOne__SiteMaster">
+	
+	<apex:define name="Menu">
+		<c:Menu MenuContextName="{!KimbleOne__ResourcePayment__c.Name}"/>
+<!-- 		<c:Menu rendered="{!ResourcePayment__c.Id != null}" MenuContextType="ResourcePayment" MenuContextId="{!ResourcePayment__c.Id}" MenuContextName="{!KimbleOne__ResourcePayment__c.Name}"/> --> 
+	</apex:define>
+		
+	<apex:define name="Content">
+<apex:form id="TheForm">
+
+    
+      	<apex:outputPanel id="pageErrors">
+    		<apex:pageMessages escape="False" />
+    		
+		</apex:outputPanel>
+		<apex:inputText value="{!selectedExpenseClaims}" styleclass="HideControl SelectedExpenseClaims"/>
+		<apex:pageBlock title="{!$ObjectType.KimbleOne__ResourcePayment__c.Label}" mode="edit" >
+			<apex:pageBlockSection collapsible="false" showheader="false" columns="2">
+				
+			
+				<apex:pageBlockSectionItem >
+	           		<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Label}"/>
+	           		<apex:actionRegion >
+	           		<apex:inputField value="{!resourcePayment.KimbleOne__Resource__c}" required="true">
+	           			<apex:actionSupport event="onchange" action="{!referesh}" rerender="ExpenseClaimsPanel,PaymentAmountPanel"   oncomplete="configureAllExpenseClaimsCheckBox()"/>
+	           		</apex:inputField>
+	           		</apex:actionRegion>
+	           </apex:pageBlockSectionItem>
+			
+				<apex:inputField value="{!resourcePayment.Name}" required="true"/>
+				<apex:inputField value="{!resourcePayment.KimbleOne__PaymentDate__c}" styleClass="kimbleDatePicker" required="true"/>
+				<apex:pageBlockSectionItem >
+					<apex:outputText id="PaymentAmountPanel" value="{!$ObjectType.KimbleOne__ResourcePayment__c.Fields.KimbleOne__PaymentAmount__c.Label} {!resource.KimbleOne__ExpenseReimbursementCurrencyIsoCode__c}" />
+					<apex:outputpanel >
+						<apex:inputField value="{!resourcePayment.KimbleOne__PaymentAmount__c}" required="true" rendered="{!KimbleOne__ResourcePayment__c.Id==null}"/>
+						<apex:outputText value="{!resourcePayment.KimbleOne__PaymentAmount__c}" rendered="{!KimbleOne__ResourcePayment__c.Id!=null}"/>
+					</apex:outputpanel>
+				</apex:pageBlockSectionItem>
+			</apex:pageBlockSection>
+			
+			<apex:pageBlockButtons location="bottom">
+				<apex:commandButton action="{!SaveResourcePayment}"
+							value="{!$Label.kimbleone__save}"  rerender="TheForm" styleclass="DisableButtonWhileBusy" onclick="setSelectedExpenseClaims()" oncomplete="getSelectedExpenseClaims();configureAllExpenseClaimsCheckBox();initialiseItems();"/>
+				<apex:commandButton action="{!CancelPage}" rerender="TheForm"
+							value="{!$Label.kimbleone__cancel}" styleclass="DisableButtonWhileBusy" immediate="true"/>			
+			</apex:pageBlockButtons>
+        
+		</apex:pageBlock>
+		<apex:outputPanel id="ExpenseClaimsPanel">
+		 <apex:pageBlock title="{!$ObjectType.KimbleOne__ExpenseClaim__c.LabelPlural}" >
+        
+            <apex:pageBlockTable value="{!ExpenseClaims}" var="claim">
+            	<apex:column style="width:5%" rendered="{!KimbleOne__ResourcePayment__c.Id==null}">
+		 			<apex:facet name="header">
+		 				<apex:outputPanel layout="none" rendered="{!ExpenseClaims!=null || ExpenseClaims.size!=0}">
+		 					<input type="checkbox" name="ExpenseClaims" value="AllExpenseClaims" id="AllExpenseClaims" class="AllExpenseClaims" />
+		 				</apex:outputPanel>		
+		 			</apex:facet>
+		 			<input type="checkbox" name="ExpenseClaims" value="{!claim.Id}" class="ChildExpenseClaims"/>
+		 		</apex:column>
+	       		<apex:column value="{!claim.KimbleOne__Reference__c}" style="width:20%">
+	               	<apex:facet name="header">{!$ObjectType.KimbleOne__ExpenseClaim__c.Fields.KimbleOne__Reference__c.Label}</apex:facet>
+	           	</apex:column>
+				<apex:column value="{!claim.KimbleOne__ResourcedActivity__c}" style="width:30%">
+	               	<apex:facet name="header">{!$Label.kimbleone__activity}</apex:facet>
+	           	</apex:column>
+				<apex:column headerValue="{!$ObjectType.KimbleOne__ExpenseClaim__c.Fields.KimbleOne__ReimbursementCcyTotalReimbursementAmount__c.Label}" style="width:30%" >
+	               	<apex:outputText value="{!claim.KimbleOne__ReimbursementCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+	               	<apex:outputField value="{!claim.KimbleOne__ReimbursementCcyTotalReimbursementAmount__c}" />
+	           	</apex:column>
+	        </apex:pageBlockTable> 
+	    </apex:pageBlock>
+       </apex:outputPanel>        
+	</apex:form>
+<script>
+
+	function setSelectedExpenseClaims()
+	{
+		var selectedItems=''; 
+		jQuery("input:checkbox[name=ExpenseClaims]:checked").each(function()
+		{
+			selectedItems=selectedItems+','+jQuery(this).val();
+  		});
+		jQuery('.SelectedExpenseClaims').val(selectedItems);
+	}
+	function getSelectedExpenseClaims()
+	{
+		var selectedItems=jQuery('.SelectedExpenseClaims').val();
+		var arrItems=selectedItems.split(',');
+					
+		for(index in arrItems)
+		{
+			jQuery("input[value="+arrItems[index]+"]").attr('checked', true);
+		}
+	}					
+	
+	jQuery(window).load(function()
+	{
+		configureAllExpenseClaimsCheckBox();
+		initialiseItems();
+			
+	});
+	function configureAllExpenseClaimsCheckBox()
+	{
+		jQuery('#AllExpenseClaims').unbind('change');
+		jQuery('#AllExpenseClaims').change(function(){
+			UncheckOrCheckGroup(jQuery(this),'ExpenseClaims');
+		});
+	}
+	function initialiseItems()
+	{
+		SetupDatePicker();
+	}
+	function SetupDatePicker()
+	{
+		//dateFormat: 'yy-mm-dd',
+		jQuery('.kimbleDatePicker').datepicker({
+				dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+				showOtherMonths: true,
+				selectOtherMonths: true,
+				changeMonth: true,
+				changeYear: true});
+	}
+		
+</script>
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

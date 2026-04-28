@@ -1,0 +1,137 @@
+<apex:page standardController="KimbleOne__Resource__c" extensions="KimbleOne.ResourceUsageAdjustmentsController" sidebar="false" >
+
+<apex:composition template="KimbleOne__SiteMaster">
+	 
+<apex:define name="Menu">
+	<c:Menu DefaultHelpPage="ManagingUsageAdjustments.html" MenuContextType="Resource" MenuContextId="{!KimbleOne__Resource__c.Id}" MenuContextName="{!KimbleOne__Resource__c.Name}"/> 
+</apex:define>
+	
+<apex:define name="Content">
+<apex:variable var="Suffix" value="{!activityAssignment.ResourcedActivity__r.ForecastUnitType__r.KimbleOne__Suffix__c}"/>
+<style>
+	.tdleft{
+		font-weight: bold;width:50%;border-bottom: 1px solid #ededed;text-align:right;
+	}
+	.tdright{
+		width:50%;border-bottom: 1px solid #ededed;
+	}
+</style>	
+	<apex:form id="TheForm">
+    <apex:actionFunction action="{!refresh}" name="refresh"  rerender="TheForm" >
+    	<apex:param name="asId" value="" />
+    </apex:actionFunction>
+    	<apex:outputPanel id="pageErrors">
+    		<apex:pageMessages escape="False" />
+		</apex:outputPanel>
+		 
+		<apex:pageBlock mode="edit" title="{!$ObjectType.KimbleOne__UsageAdjustment__c.Fields.KimbleOne__ActivityAssignment__c.Label}">
+			<table width="100%" style="white-space:nowrap;">
+				<tr>
+					<td style="width:20%;" valign="top" align="right">
+						<select id="ActivityAssignment" onchange="refresh(jQuery(this).val())">
+									<apex:repeat value="{!TheActivityAssignments}" var="ActivityAssignment">
+							 			<apex:outputPanel layout="none" rendered="{!ActivityAssignment.Id != activityAssignmentId}">
+							  				<option value="{!JSINHTMLENCODE(ActivityAssignment.Id)}"><apex:outputText value="{!ActivityAssignment.Name}" /></option>
+							  			</apex:outputPanel> 
+							  			<apex:outputPanel layout="none" rendered="{!ActivityAssignment.Id == activityAssignmentId}">
+							  				<option value="{!JSINHTMLENCODE(ActivityAssignment.Id)}" selected="selected"><apex:outputText value="{!ActivityAssignment.Name}" /></option>
+							  			</apex:outputPanel> 
+							 		</apex:repeat>
+								</select>
+						</td>
+						<td style="width:30%"  valign="top">
+						</td>
+						<td style="width:30%"  valign="top">
+						<table style="width:100px" >
+							<tr><td class="tdleft">{!$ObjectType.ActivityAssignment__c.Fields.BaselineUsage__c.Label}</td><td>&nbsp;</td><td  class="tdright"><apex:outputText value="{!baselineUsageFormatted}"/> {!JSINHTMLENCODE(Suffix)}</td></tr>
+							<tr><td class="tdleft">{!$label.AdjustmentUsageHeading}</td><td>&nbsp;</td><td class="tdright"><apex:outputText value="{!totalUsageAdjustmentsFormatted}"/> {!JSINHTMLENCODE(Suffix)}</td></tr>
+							<tr><td class="tdleft">{!$ObjectType.ActivityAssignment__c.Fields.TotalActualUsage__c.Label}</td><td>&nbsp;</td><td class="tdright"><apex:outputText value="{!actualUsageFormatted}"/>  {!JSINHTMLENCODE(Suffix)}</td></tr>
+							<tr><td class="tdleft">{!$label.ScheduledUsageHeading}</td><td>&nbsp;</td><td class="tdright"><apex:outputText value="{!scheduledUsageFormatted}"/> {!JSINHTMLENCODE(Suffix)}</td></tr>
+							<tr><td class="tdleft">{!$label.RemainingUsageHeading}</td><td>&nbsp;</td><td class="tdright" id="remainingUsage"><apex:outputText value="{!remainingUsageFormatted}"/> {!JSINHTMLENCODE(Suffix)}</td></tr>
+							<tr><td class="tdleft">{!$ObjectType.ActivityAssignment__c.Fields.UnforecastUsage__c.Label}</td><td>&nbsp;</td><td class="tdright"><apex:outputText value="{!unforecastUsageFormatted}"/> {!JSINHTMLENCODE(Suffix)}</td></tr>
+							
+						</table>
+
+							
+			 			</td>
+			 			</tr>
+			 			
+			 		</table>
+			
+		</apex:pageBlock>
+        
+        <apex:pageBlock title="{!$Label.kimbleone__adjustmentusageheading}">
+        
+        	<apex:pageBlockButtons location="top">
+					
+				<apex:outputPanel layout="none">
+						<apex:commandButton action="{!newUsageAdjustment}" value="{!$Label.kimbleone__new} {!$ObjectType.KimbleOne__UsageAdjustment__c.Label}" rendered="{!TheActivityAssignments.size > 0 && $ObjectType.KimbleOne__UsageAdjustment__c.createable}"/>
+				</apex:outputPanel>
+				
+			</apex:pageBlockButtons>
+        
+	        <apex:pageBlockTable value="{!UsageAdjustments}" var="adj">
+	       	
+	       		<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}" style="width:10%">
+	        
+			 		<apex:commandLink action="{!viewUsageAdjustment}" >{!$Label.kimbleone__view}
+						<apex:param name="uId" value="{!adj.Id}" />
+					</apex:commandLink>
+
+	       			<apex:outputPanel rendered="{!adj.Status__r.KimbleOne__Enum__c = 'Draft' && $ObjectType.KimbleOne__UsageAdjustment__c.createable}">&nbsp;|&nbsp;
+						<apex:commandLink action="{!editUsageAdjustment}" rendered="{!adj.Status__r.KimbleOne__Enum__c = 'Draft'}">{!$Label.kimbleone__edit}
+							<apex:param name="uId" value="{!adj.Id}" />
+						</apex:commandLink>
+					</apex:outputPanel> 
+		  			
+	        
+	        	</apex:column>
+	        
+	 			<apex:column value="{!adj.UsageAdjustmentReason__r.Name}" style="width:20%">
+	               	<apex:facet name="header">{!$ObjectType.KimbleOne__UsageAdjustment__c.Fields.KimbleOne__UsageAdjustmentReason__c.Label}</apex:facet>
+	           	</apex:column>
+				
+				<apex:column value="{!adj.KimbleOne__Description__c}" style="width:30%">
+	               	<apex:facet name="header">{!$ObjectType.KimbleOne__UsageAdjustment__c.Fields.KimbleOne__Description__c.Label}</apex:facet>
+	           	</apex:column>
+				
+				<apex:column style="width:20%">
+	               	<apex:facet name="header">{!$ObjectType.KimbleOne__UsageAdjustment__c.Fields.KimbleOne__AdjustmentUsage__c.Label} ({!JSINHTMLENCODE(Suffix)})</apex:facet>
+	               	<apex:outputText value="{0, number, #.######}">
+      					 <apex:param value="{!adj.KimbleOne__AdjustmentUsage__c}" />
+ 					</apex:outputText>
+	           	</apex:column>
+				
+				<apex:column value="{!adj.Status__r.Name}" style="width:20%">
+                	<apex:facet name="header">{!$ObjectType.KimbleOne__UsageAdjustment__c.Fields.KimbleOne__Status__c.Label}</apex:facet>
+	            </apex:column>
+	            
+	        </apex:pageBlockTable>
+	         
+	    </apex:pageBlock>
+        
+	</apex:form>
+	
+<script>
+
+	
+	
+	jQuery(document).ready(function() {
+		
+		if (kimble.user.isAdmin)
+		{
+			jQuery('#remainingUsage').click(function(e){
+				var theURL = '{!$Page.ActivityAssignmentRates}?id=<apex:outputText value="{!ActivityAssignment.Id}"/>';
+				safeNavigateToSForceURL(theURL);
+			});
+		
+		}		
+						
+	});
+	
+</script>
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

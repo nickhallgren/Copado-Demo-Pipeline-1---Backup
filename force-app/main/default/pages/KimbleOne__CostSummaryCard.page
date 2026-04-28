@@ -1,0 +1,136 @@
+<apex:page controller="KimbleOne.CostSummaryCardController" showHeader="false" sidebar="false" contentType="text/css" tabStyle="KimbleOne__ReferenceData__c">    
+
+	<style>
+		.cost-summary-card {
+			position: relative;
+		}
+		
+		.cost-summary-info-icon {
+			position: absolute;
+			font-size: 16px;
+			right: 6px;
+			color: #428BCA;
+		}
+		
+		.currency-mode-toggle-container
+		{
+			float: right;
+  			font-size: 15px;
+  		}
+  		.undecorated-link
+  		{
+  			cursor:pointer;
+  		}
+	</style>
+	<div class="card inverted min-horizontal-padding cost-summary-card">
+		<div class="cardHeading inverted">
+			<h3 id="costSummaryCardHeading" class="cardTitle"><apex:outputText value="{!$Label.kimbleone__costsummarylabel} ({!TheDisplayCurrencyIsoCode})"/></h3>
+			<apex:outputPanel layout="block" styleclass="currency-mode-toggle-container" rendered="{!CanToggleCurrencyIsoCode}">
+				<apex:outputPanel layout="inline" styleclass="undecorated-link" onclick="toggleCostCurrencyMode('base', '{!JSENCODE(BaseCurrencyIsoCode)}')" rendered="{!TheDisplayCurrencyIsoCode != BaseCurrencyIsoCode}"><apex:outputText value="{!BaseCurrencyIsoCode}"/></apex:outputPanel>
+				<apex:outputText value="{!BaseCurrencyIsoCode}" rendered="{!TheDisplayCurrencyIsoCode = BaseCurrencyIsoCode}"/>
+				
+				<apex:outputPanel layout="inline" styleclass="k-tgl fa fa-toggle-on" style="margin:0px 4px 0px 4px;" onclick="toggleCostCurrencyMode('base', '{!JSENCODE(BaseCurrencyIsoCode)}')" rendered="{!TheDisplayCurrencyIsoCode = SupplierInvoicingCurrencyIsoCode}"></apex:outputPanel>
+				<apex:outputPanel layout="inline" styleclass="k-tgl fa fa-toggle-off" style="margin:0px 4px 0px 4px;" onclick="toggleCostCurrencyMode('invoicing', '{!JSENCODE(SupplierInvoicingCurrencyIsoCode)}')" rendered="{!TheDisplayCurrencyIsoCode = BaseCurrencyIsoCode}"></apex:outputPanel>
+				
+				<apex:outputPanel layout="inline" styleclass="undecorated-link" onclick="toggleCostCurrencyMode('invoicing', '{!JSENCODE(SupplierInvoicingCurrencyIsoCode)}')" rendered="{!TheDisplayCurrencyIsoCode != SupplierInvoicingCurrencyIsoCode}"><apex:outputText value="{!SupplierInvoicingCurrencyIsoCode}"/></apex:outputPanel>
+				<apex:outputText value="{!SupplierInvoicingCurrencyISOCode}" rendered="{!TheDisplayCurrencyIsoCode = SupplierInvoicingCurrencyISOCode}"/>
+			</apex:outputPanel>
+		</div>
+	
+		<div class="cardBody">
+			<apex:outputPanel layout="none" rendered="{!(ProgramMode || MixedProbabilityMode) && !ISBLANK(TheDisplayStatus) && TheDisplayStatus != ''}">
+				<span class="fa fa-info-circle cost-summary-info-icon">
+					<div class="tooltiptext"><apex:outputText value="{!TheDisplayStatus}"/></div>
+				</span>
+			</apex:outputPanel>
+		    <div id="divForCostSummaryGraph">
+		    </div>
+			<apex:outputPanel layout="none" rendered="{!ShowFilter}">
+			<i class="fa fa-filter card-filter-icon filter-cst-sum-icon" title="{!$Label.TargetFiltersHeader}"></i>
+			</apex:outputPanel>
+		</div>
+	</div>
+    
+    <script>
+
+    var costDomainFilter = '<apex:outputText value="{!CostDomainFilter}"/>';
+	
+	function toggleCostCurrencyMode( mode, currencyCode)
+	{
+		var container =	jQuery('.cost-summary-card').closest('[pagesource]');
+		
+		container.attr('display-currency', currencyCode);
+		
+		loadDashboardComponent(container);
+	}
+
+	function costSummaryDomainFilterChange(domainFilter)
+	{
+		var container =	jQuery('.cost-summary-card').closest('[pagesource]');
+		
+		container.attr('domain', domainFilter);
+			
+		loadDashboardComponent(container);
+	}
+		
+	function initialiseSummaryGraphs()
+    {
+		var summaryData = jQuery.parseJSON('<apex:outputText value="{!JSENCODE(TheChartSummary)}"/>');
+		var theCurrencyCode = '';
+		 
+		var costData;
+		 
+		if (summaryData.SupplierPurchaseOrderRequired)
+		{
+			costData = new Array(
+		   		 [summaryData.BaselineCost,'{!JSENCODE($Label.BaselineLabel)}','#BBB'],
+		   	 	 [summaryData.SupplierPurchaseOrderCover,'{!JSENCODE($Label.POCoverLabel)}','#E68F1A'],
+		   	 	 [summaryData.ProjectedCost,'{!JSENCODE($Label.ProjectedLabel)}','#729BC7'],
+		   	 	 [summaryData.ActualCost,'{!JSENCODE($Label.ActualLabel)}','#008752'],
+		   	 	 [summaryData.SupplierInvoicedAmount,'{!JSENCODE($Label.InvoicedLabel)}','#000000']
+		 	);
+		}
+		else
+		{
+		 	costData = new Array(
+		   		 [summaryData.BaselineCost,'{!JSENCODE($Label.BaselineLabel)}','#BBB'],
+		   	 	 [summaryData.ProjectedCost,'{!JSENCODE($Label.ProjectedLabel)}','#729BC7'],
+		   	 	 [summaryData.ActualCost,'{!JSENCODE($Label.ActualLabel)}','#008752'],
+		   	 	 [summaryData.SupplierInvoicedAmount,'{!JSENCODE($Label.InvoicedLabel)}','#000000']
+			);
+		}
+
+		jQuery('#divForCostSummaryGraph').jqBarGraph({ data: costData, height:150, width:400, animate: true, speed: 0.5, barSpace: 6}); 
+		 
+		jQuery.each($('div.graphValuedivForCostSummaryGraph'),function(i,obj){
+		 	$(obj).text($.formatNumber($(obj).text(), {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+		});
+		
+		<apex:outputPanel layout="none" rendered="{!(ProgramMode || MixedProbabilityMode) && !ISBLANK(TheDisplayStatus) && TheDisplayStatus != ''}">
+			initialiseInfoIndicator();
+		</apex:outputPanel>
+		
+		initialiseFilterIndicator();
+    }
+
+    function initialiseFilterIndicator()
+    {
+    	jQuery('.filter-cst-sum-icon').toggleClass('f-active', costDomainFilter != 'All');
+    }
+        
+    function initialiseInfoIndicator()
+    {
+    		jQuery('.cost-summary-info-icon').qtip({content:{text:jQuery('.cost-summary-info-icon').children('.tooltiptext')},
+			position: {
+				adjust: {
+					method: 'flip flip'
+				},
+				viewport: $(window)
+			},
+			style: {classes: 'qtip-light qtip-shadow qtip-rounded'}})
+    }
+    
+    initialiseSummaryGraphs();
+    
+    </script>
+</apex:page>

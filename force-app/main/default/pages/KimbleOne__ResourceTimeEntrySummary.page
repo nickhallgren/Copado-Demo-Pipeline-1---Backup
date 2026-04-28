@@ -1,0 +1,95 @@
+<apex:page standardcontroller="KimbleOne__Resource__c" extensions="KimbleOne.ResourceTimeEntrySummaryController" tabStyle="KimbleOne__ReferenceData__c" sidebar="false" >
+    <apex:composition template="KimbleOne__SiteMaster">
+
+		<apex:define name="Menu" >
+			<c:Menu id="resourceTESummaryMenu" DefaultHelpPage="TimeExpenseEntryCalendarView.html" MenuContextName="{!$Label.kimbleone__resourcetimeentrysummarytitle}"/> 
+		</apex:define>
+
+        <apex:define name="Content">
+            <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'TimeEntryPeriodSummary.css')}"/>
+            <apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleJS, 'TimeEntryPeriodSummary.js')}"/>
+
+			<style>
+	            .period-summary-container {
+	                display: block;
+	                max-width: 367px;
+	            }
+	            .forecasting-period-header-btn.collapse {display:none;}
+	            .title {
+	            	font-size: 22px;
+				    font-weight: bold;
+				    display: block;
+				    color: #222;
+				    text-align: center;
+				    width: 387px;
+			    }
+				.forecasting-period-container.for-lightning {
+					padding: 0px !important;
+				}
+				.tracking-period.for-lightning {
+				    white-space: nowrap;
+				}
+			</style>
+            <div class="period-summary-container"></div>
+
+            <apex:form id="TheForm">
+                <apex:actionFunction name="getPeriodSummary" action="{!GetPeriodSummary}" onComplete="renderPeriodSummary()" reRender="PeriodSummaryPanel">
+                    <apex:param name="relativeToDate" value="" />
+                </apex:actionFunction>
+            </apex:form>
+
+            <apex:outputPanel id="PeriodSummaryPanel">
+                <script>
+                    var periodSummary = <apex:outputText value="{!PeriodSummaryJson}" />
+                </script>
+
+            </apex:outputPanel>
+
+            <script>
+
+            var currentPeriodId = '{!JSENCODE(TheResourceTrackingPeriod.Id)}';
+            var timesheetPageUrl = '{!$Page.TimesheetRedirect}?periodId=';
+            
+            var summaryLabel = [];
+			summaryLabel['active-timer'] = '<apex:outputText value="{!$Label.kimbleone__timermessage02}"/>';
+			
+            function renderPeriodSummary()
+            {
+                if(periodSummary.ForecastingPeriodIds.length && periodSummary.ForecastingPeriodMap[periodSummary.ForecastingPeriodIds[0]].TrackingPeriodIds.length)
+                {
+                    refreshPeriodSummary();
+                    showPeriodSummary({popup:false});
+
+					if(isSFLightning())
+					{
+						// specific styling for lightning home component
+						jQuery('.tracking-period').addClass('for-lightning');
+						jQuery('.forecasting-period-container').addClass('for-lightning');
+					}                     
+                }
+            }
+
+            function jumpToTimesheetPage(periodId)
+            {
+                safeRedirectParentToSForceURL(timesheetPageUrl + periodId);
+            }
+
+            jQuery(window).load(function(){
+                var dte = '{!YEAR(TheResourceTrackingPeriod.StartDate__c)}-{!MONTH(TheResourceTrackingPeriod.StartDate__c)}-{!DAY(TheResourceTrackingPeriod.StartDate__c)}';
+
+                getPeriodSummary(dte);
+                
+				// hide the banner if in lightning as Lighting renders it's own header
+				if(isSFLightning())
+				{
+					jQuery('span[id$="resourceTESummaryMenu"]').hide();
+					jQuery('#content-pane').css('overflow', 'hidden');
+				}                
+             });
+
+            </script>
+
+        </apex:define>
+    </apex:composition>
+
+</apex:page>

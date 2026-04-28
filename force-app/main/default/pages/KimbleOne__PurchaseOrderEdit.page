@@ -1,0 +1,90 @@
+<apex:page standardController="KimbleOne__PurchaseOrder__c" extensions="KimbleOne.PurchaseOrderEditController,KimbleOne.FilesAndAttachmentsController" showHeader="true" sidebar="false" standardStylesheets="true" >
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+      	<c:Menu DefaultHelpPage="BudgetsPOs.html" MenuContextType="PurchaseOrder" MenuContextId="{!KimbleOne__PurchaseOrder__c.Id}" MenuContextName="{!KimbleOne__PurchaseOrder__c.Name}"/>
+    </apex:define>
+    
+    <apex:define name="Content">
+    <apex:form >
+    	<div id="PurchaseOrderErrors">
+			<apex:pageMessages id="errormessages" escape="false"/>
+		</div>
+    	<apex:pageBlock mode="edit" title="{!$ObjectType.KimbleOne__PurchaseOrder__c.Label}">
+			<apex:pageBlockButtons styleclass="" location="bottom">
+			 	<apex:commandButton id="Save"  action="{!Save}" value="{!$Label.kimbleone__save}"/>
+			</apex:pageBlockButtons>
+			<apex:pageblockSection collapsible="false" showheader="false" columns="2">						
+				
+				<apex:inputField value="{!KimbleOne__PurchaseOrder__c.Name}"/>
+				
+				<apex:inputField value="{!KimbleOne__PurchaseOrder__c.KimbleOne__Account__c}" required="true" rendered="{!ISBLANK(KimbleOne__PurchaseOrder__c.id)}"/>
+				<apex:outputField value="{!KimbleOne__PurchaseOrder__c.KimbleOne__Account__c}" rendered="{!!ISBLANK(KimbleOne__PurchaseOrder__c.id)}"/>
+				
+				<!-- Currency (read only if Allocated) and Order Value  -->
+				<apex:pageBlockSectionItem rendered="{!(ISBLANK(KimbleOne__PurchaseOrder__c.KimbleOne__AllocatedValue__c) || KimbleOne__PurchaseOrder__c.KimbleOne__AllocatedValue__c = 0)}">
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__PurchaseOrder__c.Fields.CurrencyISOCode.Label}"/>
+	                <apex:inputText value="{!KimbleOne__PurchaseOrder__c.CurrencyISOCode}" styleclass="kimblecustomlookup GetActiveCurrencyTypes null true true" required="true"/>
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem rendered="{!(!ISBLANK(KimbleOne__PurchaseOrder__c.KimbleOne__AllocatedValue__c) && KimbleOne__PurchaseOrder__c.KimbleOne__AllocatedValue__c > 0)}">
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__PurchaseOrder__c.Fields.CurrencyISOCode.Label}"/>
+	                <apex:outputField value="{!KimbleOne__PurchaseOrder__c.CurrencyISOCode}"/>
+				</apex:pageBlockSectionItem>
+				<apex:inputField value="{!KimbleOne__PurchaseOrder__c.KimbleOne__OrderValue__c}" />
+				
+				<apex:inputField value="{!KimbleOne__PurchaseOrder__c.KimbleOne__OrderDate__c}" styleClass="kimbleDatePicker" required="true"/>
+				<apex:inputField value="{!KimbleOne__PurchaseOrder__c.KimbleOne__ExpiryDate__c}" styleClass="kimbleDatePicker" />
+				
+				<apex:inputField value="{!KimbleOne__PurchaseOrder__c.KimbleOne__EarliestInvoiceItemDate__c}" styleClass="kimbleDatePicker" />
+				<apex:inputField value="{!KimbleOne__PurchaseOrder__c.KimbleOne__LatestInvoiceItemDate__c}" styleClass="kimbleDatePicker" />
+				
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__PurchaseOrder__c.Fields.KimbleOne__Status__c.Label}"/>
+	                <apex:inputText value="{!KimbleOne__PurchaseOrder__c.KimbleOne__Status__c}" styleclass="kimbledropdown PurchaseOrderStatus" required="true"/>
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem />
+				
+				<apex:repeat value="{!$ObjectType.KimbleOne__PurchaseOrder__c.FieldSets.KimbleOne__PurchaseOrderDetails}" var="f">
+     				<apex:inputField value="{!KimbleOne__PurchaseOrder__c[f]}" rendered="{!!CONTAINS(f.FieldPath,'.')}" required="{!f.Required}" styleClass="{!IF(AND($ObjectType.KimbleOne__PurchaseOrder__c.Fields[f].type == 'date',$ObjectType.KimbleOne__PurchaseOrder__c.Fields[f].updateable),'kimbleDatePicker','')}"/>
+					<apex:outputField value="{!KimbleOne__PurchaseOrder__c[f]}" rendered="{!CONTAINS(f.FieldPath,'.')}"/>
+   				</apex:repeat>
+				
+			</apex:pageblockSection>
+		</apex:pageBlock>
+    </apex:form>
+	<apex:relatedList list="CombinedAttachments" rendered="{!AttachmentsEnabled}"/>
+	<apex:relatedList subject="{!KimbleOne__PurchaseOrder__c}" list="AttachedContentDocuments" rendered="{!FilesEnabled}"/>
+		
+    <script>
+    	$(document).ready(function(){
+    	getReferenceData();
+    	});
+    	
+		jQuery(document).ready(function() {
+			if(isSFLightning()) jQuery('input[name="newNote"],input[name="attachFile"]').hide();
+		});
+
+		jQuery(window).load(function()
+		{
+			initialiseItems();
+		});
+		function initialiseItems()
+		{
+		    SetupDatePicker();
+  		}
+		function SetupDatePicker()
+		{
+			//dateFormat: 'yy-mm-dd',
+			jQuery('.kimbleDatePicker').datepicker({
+					dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true,
+					selectOtherMonths: true,
+					changeMonth: true,
+					changeYear: true});
+		}
+
+    </script>
+    </apex:define>
+</apex:composition>
+
+</apex:page>

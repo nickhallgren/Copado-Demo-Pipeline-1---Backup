@@ -1,0 +1,282 @@
+<apex:page standardController="KimbleOne__ApplicationRole__c" extensions="KimbleOne.ApplicationRolePermissionsController" sidebar="false">
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu"> 
+	<c:Menu MenuContextType="ApplicationRole" MenuContextId="{!KimbleOne__ApplicationRole__c.Id}" MenuContextName="{!KimbleOne__ApplicationRole__c.Name}"/>
+</apex:define>
+    
+<apex:define name="Content">
+
+ 
+<script>
+
+   	function toggleCheckboxes(parent) 
+	{
+		var p = jQuery(parent);
+		
+		jQuery.each(jQuery('[parent-id="' + p.attr('id') + '"]'), function(i, obj)
+		{
+			jQuery(obj).find('input').prop('checked', p.prop('checked'));
+		});
+	}	
+	
+	jQuery(document).ready(function() {
+		refreshSlide();
+		
+		//Check permission group where all children checked
+		
+		jQuery.each(jQuery('.permission-group'), function(i, permGroup){
+		
+			var allChecked = true;
+			var p = jQuery(permGroup);
+			
+			jQuery.each(jQuery('[parent-id="' + p.attr('id') + '"]'), function(i, obj)
+			{
+				if (jQuery(obj).find('input').prop('checked') == false) allChecked = false;				
+			});
+			
+			p.prop('checked', allChecked);
+		
+		});
+			
+	});
+
+	function refreshSlide()
+   	{
+   		 jQuery("tr.head>td>span.slide").click(function () { 
+   			if(jQuery(this).is('.expanded'))
+   				jQuery(this).addClass('collapsed').removeClass('expanded');
+   			else
+   				jQuery(this).addClass('expanded').removeClass('collapsed');
+   			
+   			jQuery("tr.body[parentid=" + jQuery(this).parent().parent().attr('id')+"]").slideToggle("fast");
+   		});
+   		
+   		defaultViewLayout();
+   	} 
+
+	function expandAll()
+   	{
+		jQuery("tr.head>td>span.slide.collapsed").each(function () { 
+			jQuery(this).toggleClass('expanded').toggleClass('collapsed');
+   			jQuery("tr.body[parentid=" + jQuery(this).parent().parent().attr('id')+"]").slideToggle("fast");
+   		});
+
+   		createCookie('kimble.applicationrolepermstate', 'expanded');
+   	}
+   	
+	function collapseAll()
+   	{
+		jQuery("tr.head>td>span.slide.expanded").each(function () { 
+			jQuery(this).toggleClass('expanded').toggleClass('collapsed');
+   			jQuery("tr.body[parentid=" + jQuery(this).parent().parent().attr('id')+"]").slideToggle("fast");
+   		});
+   		
+   		createCookie('kimble.applicationrolepermstate', 'collapsed');
+   	}
+   	
+    function defaultViewLayout() 
+    {
+    	if (readCookie('kimble.applicationrolepermstate') == 'expanded')
+    	{
+    		expandAll();
+    		
+    		// page defaults to expanded
+    	}
+    	else if (readCookie('kimble.applicationrolepermstate') == 'collapsed')
+    	{
+    		collapseAll();
+
+			// radio buttons need to be reset if switching to collapsed
+			jQuery("input[value='expand-all']").prop("checked","checked");
+			jQuery("input[value='collapse-all']").prop("checked","");
+    	}
+
+    	if(readCookie('kimble.applicationroleappliedfilter') == 'true')
+    	{
+    		jQuery('#assigned-filter').prop('checked',true);
+    		handleAssignedFilter();
+    	}
+    	else
+    	{
+    		jQuery('#assigned-filter').prop('checked',false);
+     	}
+    }
+
+    function handleAssignedFilter()
+    {
+        var filterApplied = jQuery('#assigned-filter').prop('checked');
+
+        if(filterApplied)
+        {
+			createCookie('kimble.applicationroleappliedfilter','true');
+			jQuery('.permission-row').each(function(index, item)
+			{
+				if(!jQuery(item).find('.permission-row-input').prop('checked'))
+				{
+				    jQuery(item).addClass('hidden');
+    			}
+   			});
+
+			jQuery.each(jQuery('.permission-group'), function(i, permGroup){
+
+				var anyChecked = false;
+				var p = jQuery(permGroup);
+
+				jQuery.each(jQuery('[parent-id="' + p.attr('id') + '"]'), function(i, obj)
+				{
+					if (jQuery(obj).find('input').prop('checked') == true) anyChecked = true;
+				});
+
+				if(!anyChecked)
+				{
+				    jQuery(permGroup).parent().parent().parent().addClass('hidden');
+    			}
+
+			});
+        }
+        else
+        {
+			createCookie('kimble.applicationroleappliedfilter','false');
+        	jQuery('.permission-row').filter('.hidden').removeClass('hidden');
+        	jQuery('.headerRow').filter('.hidden').removeClass('hidden');
+        }
+
+    }
+   	
+</script>
+ 
+ <style>
+	tr.head>td 
+{
+	background-color:#1797C0;
+	color:white;
+	text-align:left;
+	font-weight: bold;
+	padding:4px 4px 4px 4px;
+	
+}
+
+
+.slide
+{
+cursor:pointer
+}
+.expanded
+{
+	background-image: url("{!URLFOR($Resource.TimesheetGrid, 'expanded.gif')}");
+	background-repeat:no-repeat;
+}
+.collapsed
+{
+	background-image: url("{!URLFOR($Resource.TimesheetGrid, 'collapsed.gif')}");
+	background-repeat:no-repeat;
+}
+.invalid-permission-ind, .permission-info-ind
+{
+    font-size: 16px;
+    margin-left: 2px;
+}
+.permission-info-ind
+{
+    color: #626262;
+}
+.invalid-permission-ind
+{
+    color: red;
+}
+.invalid-permission
+{
+    background-color: #FFB8B8;
+}
+.view-preferences
+{
+	float:right;
+}
+
+</style>
+
+<apex:outputPanel id="mainPanel">
+
+	<apex:pageMessages id="Errors" escape="false"/>
+	
+	<apex:form >
+    
+       	<apex:pageBlock > 
+			<apex:pageBlockButtons location="top">
+				<apex:commandButton id="SaveButton" action="{!Save}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__save}"  reRender="SaveButton, Errors"/>
+			</apex:pageBlockButtons>
+			<div class="view-preferences">
+				<label><input type="checkbox" id="assigned-filter" onchange="handleAssignedFilter();"/>Display Assigned Permissions Only</label>
+				<label><input type="radio" name="view-mode" value="expand-all" onclick="collapseAll();"/>Collapse All</label>
+				<label><input type="radio" name="view-mode" checked="checked" value="collapse-all" onclick="expandAll();"/>Expand All</label>
+	  		</div>
+			<table style="width:800px">
+
+				<apex:repeat value="{!FunctionalAreasAndPermissionGroups}" var="functionalArea" >
+
+					<tr class="head" id="{!functionalArea.Id}">
+						<td>
+							<span class="slide expanded">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+							{!JSENCODE(functionalArea.Name)}</td>
+					</tr>
+
+					<tr class="body" parentid="{!functionalArea.Id}">
+						<td>
+							<table border="0" style="width:700px" cellpadding="0" cellspacing="0" class="list" >
+	 	
+	 							<apex:repeat value="{!functionalArea.PermissionGroups__r}" var="group" >	
+		 							<tr class="headerRow">
+										<td class="headerRow"><h2>{!group.Name}</h2>
+											<apex:outputPanel layout="none" rendered="{!!ISBLANK(group.KimbleOne__Description__c)}">
+												<i class="fa fa-info-circle permission-info-ind" style="margin-left:5px;" title="{!group.Description__c}"></i>
+											</apex:outputPanel>
+										</td>
+										<td class="headerRow"> 
+											<h2><input id="{!JSENCODE(group.Id)}" type="checkbox" onclick="toggleCheckboxes(this)" class="permission-group"/></h2>
+										</td>
+									</tr>
+									
+									<apex:repeat value="{!PermissionGroupMap[group.Id]}" var="perm" >
+										<apex:variable value="{!perm.PermisionSetIsValid}" var="isValid"/>
+											<tr parent-id="{!group.Id}" class="{!IF(!isValid,'invalid-permission','')} permission-row">
+												<td style="width:500px;">
+													<apex:outputText value="{!perm.Name}"/>
+													<apex:outputPanel layout="none" rendered="{!!ISNULL(perm.Description)}">
+														<i class="fa fa-info-circle permission-info-ind" title="{!JSENCODE(perm.Description)}"></i>
+													</apex:outputPanel>
+													<apex:outputPanel layout="none" rendered="{!!isValid}">
+														<i class="fa fa-exclamation-circle invalid-permission-ind" title="Permission Set {!JSENCODE(perm.PermissionSetAPIName)} does not exist"></i>
+													</apex:outputPanel>
+												</td>
+												<td>
+													<apex:outputpanel >
+														<apex:inputField styleClass="permission-row-input" value="{!SelectedPermissionsMap[perm.Id].InputCheckbox__c}"/>
+													</apex:outputpanel>
+												</td>
+											</tr>
+					 				</apex:repeat>							
+
+								</apex:repeat>
+									
+	 						</table>
+	 					</td>
+	 				</tr>
+
+				</apex:repeat>
+
+			</table> 
+			 
+		</apex:pageBlock>
+
+	</apex:form>
+				
+</apex:outputPanel>						
+
+</apex:define>
+
+</apex:composition>
+
+
+
+</apex:page>

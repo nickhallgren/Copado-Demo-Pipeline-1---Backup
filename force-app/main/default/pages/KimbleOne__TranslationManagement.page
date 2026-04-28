@@ -1,0 +1,170 @@
+<apex:page controller="KimbleOne.TranslationManagementController" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">    
+
+<apex:define name="Content">
+
+	<apex:form id="TheForm">
+	
+	<style>
+		.translation-override {
+			height: 14px;
+		}
+		
+		.translations-action-buttons {
+			
+		}
+
+		.translation-language-select {
+			margin-right: 5px !important;
+		}
+		
+		.new-translations-button {
+			
+		}
+				
+		.save-translations-button {
+			margin-left: 10px !important;
+		}
+		
+		.delete-language-btn {
+			right: 1px;
+			position: absolute;
+			bottom: 2px;
+		}
+		
+		.import-language-btn {
+			right: 30px;
+			position: absolute;
+			bottom: 2px;
+		}
+		
+		.default-value-link {
+			text-decoration: none;
+		}
+		
+		.invalid-translation {
+			border: solid 3px #F00;
+		}
+		
+		.invalid-translation-icon {
+			color: #F00;
+			font-size: 16px;
+			position: relative;
+			right: 21px;
+			bottom: 6px;
+		}
+	</style>
+            
+	<apex:outputPanel id="theTranslations" styleClass="mainContainer">
+	
+		<script>
+			function translationChanged(translationSelector)
+			{
+				// track the data has changed and bind an event to the window to ensure that if the user
+				// navigates away they are prompted changes will be lost
+				jQuery(window).off('.has-changes').on('beforeunload.has-changes', function(){
+			        return "{!$Label.UnsavedChangesHeading}" + "\n\n" + "{!$Label.UnsavedChangesMessage}"; 
+			    });
+			    
+			    // validate that the change contains variables ({0}, {1} etc.) if the default value contains them
+			    var theChangedTranslationValue = jQuery("[translation-value-selector='" + translationSelector + "']").val();
+			    var theDefaultValue = jQuery("[default-value-selector='" + jQuery("[translation-value-selector='" + translationSelector + "']").attr('translation-default-selector') + "']").text();
+			    
+			    validateTranslation(translationSelector, theDefaultValue, theChangedTranslationValue);
+			}
+			
+			jQuery(window).off('.has-changes');
+			
+			function validateTranslation(translationSelector, theDefaultValue, theTranslationValue)
+			{
+			   	if(theTranslationValue !=null && theTranslationValue !='' && countVariablesInString(theDefaultValue) > countVariablesInString(theTranslationValue))
+				{
+			    	if(!jQuery("[translation-value-selector='" + translationSelector + "']").hasClass('invalid-translation'))
+			    	{
+				    	jQuery("[translation-value-selector='" + translationSelector + "']").addClass('invalid-translation');
+				    	jQuery("[translation-value-selector='" + translationSelector + "']").after("<span class='fa fa-exclamation-triangle invalid-translation-icon' title='{!JSENCODE($Label.TranslationMustIncludeVariablesMessage)}'></span>");
+			    	}
+			    }
+			    else
+			    {
+			    	if(jQuery("[translation-value-selector='" + translationSelector + "']").hasClass('invalid-translation'))
+			    	{
+			    		jQuery("[translation-value-selector='" + translationSelector + "']").removeClass('invalid-translation');
+			    		jQuery("[translation-value-selector='" + translationSelector + "']").next('.invalid-translation-icon').remove();
+		    		}
+			    }
+			}
+			
+			function countVariablesInString(theString)
+			{
+				return (theString.match(/{[0-9]*}/g) || []).length;
+			}
+			
+			function validateTranslations()
+			{
+				jQuery("[translation-value-selector]").each(function() {
+				    // validate that the change contains variables ({0}, {1} etc.) if the default value contains them
+				    var theTranslationValue = jQuery(this).val();
+				    var theDefaultValue = jQuery("[default-value-selector='" + jQuery(this).attr('translation-default-selector') + "']").text();
+				    
+				    validateTranslation(jQuery(this).attr('translation-value-selector'), theDefaultValue, theTranslationValue);
+				});
+			}
+			
+			jQuery(document).ready(function(){
+				validateTranslations();
+			});
+		</script>
+		
+		<div class="translations-action-buttons">
+			<apex:selectList styleClass="translation-language-select" value="{!ChosenLanguage}" size="1">
+            	<apex:selectOptions value="{!AvailableLanguages}"/>
+        	</apex:selectList>
+
+			<apex:commandButton styleClass="new-translations-button DisableButtonWhileBusy" value="{!$Label.kimbleone__new}" action="{!AddLanguage}" rerender="theTranslations"/>
+        	
+			<apex:commandButton styleClass="save-translations-button DisableButtonWhileBusy" value="{!$Label.kimbleone__save}" action="{!SaveTranslations}" rerender="theTranslations" rendered="{!$ObjectType.KimbleOne__Translation__c.createable && $ObjectType.KimbleOne__Translation__c.updateable && $ObjectType.KimbleOne__Translation__c.deletable}"/>
+		</div>
+		
+		<div class="translations-table">
+		<table class="list">
+			<th><apex:outputText value="{!$Label.kimbleone__objectnameheading}"/></th>
+			<th><apex:outputText value="{!$Label.kimbleone__fieldnameheading}"/></th>
+			<th><apex:outputText value="{!$Label.kimbleone__defaultvalueheading}"/></th>
+			
+			<apex:repeat value="{!TheLanguageMap}" var="languageCode">
+			<th style="position: relative;">
+				<apex:outputText styleClass="translated-language" html-language-code="{!languageCode}" value="{!AvailableLanguagesMap[languageCode]}"/>
+				
+				<apex:commandButton styleClass="delete-language-btn" onclick="var d = confirmDelete();if(!d) return false;else jQuery(this).addClass('DisableButtonWhileBusy');" value="{!$Label.kimbleone__delete}" action="{!DeleteLanguage}" rerender="theTranslations">
+					<apex:param value="{!languageCode}" name="languageCodeToDelete"/>
+				</apex:commandButton>
+
+				<apex:commandButton styleClass="import-language-btn" onclick="var d = confirmDelete();if(!d) return false;else jQuery(this).addClass('DisableButtonWhileBusy');" value="{!$Label.kimbleone__importlabel}" action="{!ImportTranslations}" rerender="theTranslations">
+					<apex:param value="{!languageCode}" name="languageCodeToImport"/>
+				</apex:commandButton>
+			</th>
+			</apex:repeat>
+			
+			<apex:repeat value="{!TheOriginalValues}" var="translatableItem">
+			<tr>
+				<td><apex:outputLink target="_blank" styleClass="default-value-link" value="/{!translatableItem.objectId}"><apex:outputText value="{!translatableItem.objectType} ({!translatableItem.name})"/></apex:outputLink></td>
+				<td><apex:outputText value="{!translatableItem.fieldName}"/></td>
+				<td><apex:outputText html-default-value-selector="{!translatableItem.objectId + ':' + translatableItem.fieldName}" styleClass="default-value" value="{!translatableItem.defaultValue}"/></td>
+				<apex:repeat value="{!TheLanguageMap}" var="languageCode">
+				<td><apex:inputField onchange="translationChanged('{!translatableItem.objectId + ':' + translatableItem.fieldName + ':' + languageCode}')" html-translation-default-selector="{!translatableItem.objectId + ':' + translatableItem.fieldName}" html-translation-value-selector="{!translatableItem.objectId + ':' + translatableItem.fieldName + ':' + languageCode}" styleClass="translation-override" value="{!TheTranslationsMap[translatableItem.objectId + ':' + translatableItem.fieldName + ':' + languageCode].Value__c}"/></td>
+				</apex:repeat>
+			</tr>
+			</apex:repeat>
+		</table>
+		</div>
+	</apex:outputPanel>
+	
+	
+
+	</apex:form>
+
+</apex:define>
+</apex:composition>
+</apex:page>

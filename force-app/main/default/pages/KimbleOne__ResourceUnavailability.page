@@ -1,0 +1,118 @@
+<apex:page standardController="KimbleOne__Resource__c" extensions="KimbleOne.ResourceUnavailabilityController" showHeader="true" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+    <c:Menu rendered="{!!ISBLANK(KimbleOne__Resource__c.Id)}" DefaultHelpPage="MaintainResource.html" MenuContextType="Resource" MenuContextId="{!KimbleOne__Resource__c.Id}" MenuContextName="{!KimbleOne__Resource__c.Name}"/>
+</apex:define>
+
+    <apex:define name="Content">
+        <apex:form id="TheForm">
+            <apex:pageBlock >
+                <apex:pageMessages escape="false"/>
+
+                <apex:pageBlockTable value="{!transferOptions}" var="item">
+
+                    <apex:column >
+                        <apex:facet name="header">
+                            <apex:inputCheckbox styleClass="select-all" onChange="selectAllCheckboxes(); checkForSelected();"/>
+                        </apex:facet>
+                        <apex:inputCheckbox value="{!item.forTransfer}" onChange="checkForSelected();" styleClass="row-selector"/>
+                    </apex:column>
+
+                    <apex:column headerValue="{!$Label.kimbleone__object}">
+                        <apex:outputText value="{!item.objectLabel}"/>
+                    </apex:column>
+
+                    <apex:column headerValue="{!$Label.kimbleone__total}">
+                        <a href="javascript:void(0);" onclick="safeNavigateToSForceURL('{!$Page.KimbleOne__UserObjectAccess}?Id={!JSENCODE(KimbleOne__Resource__c.KimbleOne__User__c)}&objectKey={!item.objectKey}');">
+                        <apex:outputText value="{!item.recordCount}"/>
+                        </a>
+                    </apex:column>
+
+                    <apex:column headerValue="{!$Label.kimbleone__ownerlabel}">
+                        <apex:outputPanel layout="none">
+                            <apex:outputPanel layout="block">
+                                <span id="UserId{!item.index}">
+                                    <apex:inputText id="UserId" styleClass="readonly"/>
+                                    <apex:inputHidden id="UserId_lkid" value="{!item.newOwnerId}">
+                                    </apex:inputHidden>
+                                </span>
+
+                                <a href="javascript: var lookupWindow = openLookup(KimbleLookupPage + '?lkfm=' + jQuery('[id$=\'TheForm\']').attr('id') + '&lknm=' + jQuery('#UserId{!item.index}').find('[id$=\'UserId\']').attr('id') + '&lktp={!$ObjectType.User.KeyPrefix}&typename=ActiveLicensedUserSearch',670,'1','&lksrch=');" class="kimbleSearch" onclick="setLastMousePosition(event);" ><img src="/s.gif" class="lookupIcon" onblur="this.className = 'lookupIcon';" onfocus="this.className = 'lookupIconOn';" onmouseout="this.className = 'lookupIcon';this.className = 'lookupIcon';" onmouseover="this.className = 'lookupIconOn';this.className = 'lookupIconOn';" /></a>
+                                <a href="javascript:applyToAll({!item.index})">{!$Label.GenericLabel15}</a>
+                                &nbsp;
+                                <apex:outputText id="validationMessage" value="{!item.validationMessage}" styleClass="errorMsg" rendered="{!!ISBLANK(item.validationMessage)}"/>
+                            </apex:outputPanel>
+                        </apex:outputPanel>
+                    </apex:column>
+
+                </apex:pageBlockTable>
+
+                    <apex:pageBlockButtons location="bottom">
+                        <apex:commandButton id="startButton" value="{!$Label.kimbleone__ok}" action="{!beginTransfer}" styleClass="DisableButtonWhileBusy" reRender="validationMessage,startButton"/>
+                    </apex:pageBlockButtons>
+            </apex:pageBlock>
+            <script>
+
+                jQuery(window).load(function()
+                {
+                    initialiseItems();
+                    resetPage();
+                });
+
+                function resetPage()
+                {
+                    jQuery("input.row-selector:visible").each(function(){jQuery(this).prop('checked', false);});
+                    jQuery('[id$=\'UserId\']').each(function(){jQuery(this).val('')});
+                    jQuery('[id$=\'UserId_lkid\']').each(function(){jQuery(this).val('')});
+                }
+
+                function initialiseItems()
+                {
+                    jQuery('.readonly').prop('readonly',true);
+                    jQuery('[id$=\'startButton\']').prop('disabled',true);
+                }
+
+				function selectAllCheckboxes()
+		  		{
+		  			if(jQuery("input.select-all:visible")[0].checked)
+		  			{
+		            	jQuery("input.row-selector:visible").each(function(){jQuery(this).prop('checked', true);});
+		           	}
+		           	else
+		           	{
+		           		jQuery("input.row-selector:visible").each(function(){jQuery(this).prop('checked', false);});
+					}
+		        }
+
+		        function applyToAll(index)
+		        {
+                    var userText = jQuery('#UserId'+index).find('[id$=\'UserId\']').val();
+                    var userId = jQuery('#UserId'+index).find('[id$=\'UserId_lkid\']').val();
+
+                    jQuery('[id$=\'UserId\']').each(function(){jQuery(this).val(userText);});
+                    jQuery('[id$=\'UserId_lkid\']').each(function(){jQuery(this).val(userId);});
+                }
+
+                function checkForSelected()
+                {
+                    if(jQuery("input.row-selector:checked").length>0)
+                    {
+                        jQuery('[id$=\'startButton\']').prop('disabled',false);
+                    }
+                    else
+                    {
+                        jQuery('[id$=\'startButton\']').prop('disabled',true);
+                    }
+                }
+
+            </script>
+
+        </apex:form>
+    </apex:define>
+    </apex:composition>
+
+    <!--Hidden field for use in controller-->
+    <apex:outputField value="{!KimbleOne__Resource__c.KimbleOne__User__c}" rendered="false"/>
+</apex:page>

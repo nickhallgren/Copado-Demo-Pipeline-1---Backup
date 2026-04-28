@@ -1,0 +1,135 @@
+<apex:page controller="KimbleOne.MarginSummaryCardController" showHeader="false" sidebar="false" contentType="text/css" >    
+    <apex:outputPanel layout="none" rendered="{!ShowCosts}">
+	   	<style>
+			.margin-summary-info-icon {
+				position: absolute;
+				font-size: 16px;
+				right: 6px;
+				color: #428BCA;
+			}
+			.margin-summary-card {
+				position: relative;
+				min-width: unset;
+			}
+		    .currency-cell {
+		    	width: 110px;
+		    }
+		    .percentage-cell {
+		    	width: 90px;
+		    }
+		    .summary-level-cell {
+		    	padding-left: 20px !important;
+		    }
+		    .cardBodyTable {
+		    	width: 100%;
+		    }
+		    .margin-level-total {
+		    	font-weight: bold;
+		    }
+			.rightAlignDataCell {
+			    text-align: right;
+			}
+			.centerAlignDataCell {
+				text-align: center;
+			}	
+		</style>
+
+		<div class="card inverted min-horizontal-padding margin-summary-card">
+			<div id="marginSummaryCardHeading" class="cardHeading inverted">
+				<h3 class="cardTitle"><apex:outputText value="{!$Label.kimbleone__marginsummarylabel}"/></h3>
+			</div>
+		
+			<div class="cardBody">
+				<apex:outputPanel layout="none" rendered="{!(ProgramMode || MixedProbabilityMode) && !ISBLANK(TheDisplayStatus) && TheDisplayStatus != ''}">
+					<span class="fa fa-info-circle margin-summary-info-icon">
+						<div class="tooltiptext"><apex:outputText value="{!TheDisplayStatus}"/></div>
+					</span>
+				</apex:outputPanel>
+				<apex:outputPanel layout="none" rendered="{!!HasAdditionalMarginLevels || ProgramMode}">
+					<div id="divForBaselineMargin" class="graphText" style="text-align: center;padding-top: 20px;font-size: 30px;"><span id="spanForBaselineMargin"></span></div>
+					<div class="graphText" style="text-align:center;">{!$Label.BaselineLabel}</div>
+																					
+					<div id="divForProjectedMargin" class="graphText" style="text-align: center;padding-top: 27px;font-size: 30px;"><span id="spanForProjectedMargin"></span></div>	
+					<div class="graphText" style="text-align:center;padding-bottom: 7px;">{!$Label.ProjectedLabel}</div>	
+				</apex:outputPanel>
+				<apex:outputPanel layout="none" rendered="{!HasAdditionalMarginLevels && !ProgramMode}">
+					<table class="list" border="0" cellpadding="0" cellspacing="0">
+						<thead>
+							<tr class="headerRow">
+								<th class="dataCell"><h2></h2></th>
+								<th class="headerRow centerAlignDataCell"><h2>&nbsp;</h2></th>
+							</tr>
+						</thead>
+						<tbody>
+							<apex:repeat value="{!TheMargins}" var="marginLevel">
+								<tr class="dataRow">
+									<td class="currency-cell"><apex:outputText styleclass="margin-level-total" value="{!marginLevel.Name}"/></td>
+									<td class="rightAlignDataCell percentage-cell"><apex:outputText value="{!marginLevel.Percent}%"/></td>
+								</tr>
+							</apex:repeat>
+						</tbody>
+					</table>
+				</apex:outputPanel>
+				<apex:outputPanel layout="none" rendered="{!ShowFilter}">
+				<i class="fa fa-filter card-filter-icon filter-mar-sum-icon" title="{!$Label.TargetFiltersHeader}"></i>
+				</apex:outputPanel>
+			</div>
+		</div>
+
+	    <script>
+
+	    var marginDomainFilter = '<apex:outputText value="{!MarginDomainFilter}"/>';
+
+		function marginSummaryDomainFilterChange(domainFilter)
+		{
+			var container =	jQuery('.margin-summary-card').closest('[pagesource]');
+			
+			container.attr('domain', domainFilter);
+				
+			loadDashboardComponent(container);
+		}
+	
+		function initialiseMarginSummary()
+	    {
+			var summaryData = jQuery.parseJSON('<apex:outputText value="{!JSENCODE(TheChartSummary)}"/>');
+			var showCosts = {!IF(ShowCosts,'true','false')};
+			
+			if (showCosts)
+			{ 		  
+			 	jQuery("#spanForBaselineMargin").text($.formatNumber(summaryData.BaselineMarginPercent, {format: "#,##0", locale:kimble.locale, isFullLocale:false}) + '%');
+				jQuery("#spanForProjectedMargin").text($.formatNumber(summaryData.ProjectedMarginPercent, {format: "#,##0", locale:kimble.locale, isFullLocale:false}) + '%');
+			 	
+			 	if (summaryData.BaselineMarginPercent < 0) jQuery('#spanForBaselineMargin').attr('style', 'color:red'); 
+			 	if (summaryData.ProjectedMarginPercent < 0) jQuery('#spanForProjectedMargin').attr('style', 'color:red');
+	   		}
+
+	   		if(hasEllipsis(jQuery('#marginSummaryCardHeading')[0])) jQuery('#marginSummaryCardHeading').prop('title', jQuery('#marginSummaryCardHeading h3').text());
+	   		
+   			initialiseInfoIndicator();
+   			
+   			initialiseFilterIndicator();
+	    }
+
+	    function initialiseFilterIndicator()
+	    {
+	    	jQuery('.filter-mar-sum-icon').toggleClass('f-active', marginDomainFilter != 'All');
+	    }
+    	    
+	    function initialiseInfoIndicator()
+	    {
+	    		jQuery('.margin-summary-info-icon').qtip({content:{text:jQuery('.margin-summary-info-icon').children('.tooltiptext')},
+				position: {
+					adjust: {
+						method: 'flip flip'
+					},
+					viewport: $(window)
+				},
+				style: {classes: 'qtip-light qtip-shadow qtip-rounded'}})
+	    }
+	
+		initialiseMarginSummary();
+	
+	    </script>
+
+	</apex:outputPanel>
+</apex:page>

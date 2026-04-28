@@ -1,0 +1,555 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.ActivityExpenseCategoryProfilesCntrllr,KimbleOne.TooltipsController"  showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__DeliveryGroup__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+     	<c:Menu MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryGroup__c.Id}" MenuContextName="{!KimbleOne__DeliveryGroup__c.Name}" />
+    </apex:define>
+    
+    <apex:define name="Content">
+		<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+		<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+		<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'InsightStyle.css')}"/>
+
+		<!-- Kimble Guidance -->
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+		<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+		<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/ActivityExpenseCategoryProfilesNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+			<apex:outputPanel layout="none" rendered="{!ActivityExpenseCategoryProfilesTipOverrideEnabled}">
+				<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+			</apex:outputPanel>
+		</apex:outputPanel>
+		
+		<style>
+			.right-align-cell {
+			    text-align: right;
+			}		
+			.inner-card-table>tbody>tr, .inner-card-table>tfoot>tr {
+				height: 28px;
+			}
+			.description-cell {
+				width: 200px;
+				text-align: left !important;			
+			}
+			.currency-value-cell {
+				width:110px;
+			}
+			.card {
+				margin-bottom: 10px;
+			}
+			.cardBody {
+				padding-bottom: 15px;
+			}
+			.totals-row {
+				font-weight: bold;
+			}
+			.action-icon {
+				cursor: pointer;
+			}
+			.no-wrap-label {
+		    	white-space: nowrap;
+			}
+			tr.headerRow th {
+			    padding-bottom: 5px;
+			}
+			.action-cell {
+				min-width: 30px;
+			}
+			.baseline-cell {
+				background-color: #EEE;
+			}
+			.centred-header {
+				text-align: center;
+			}	
+		</style>
+		<script>			
+	    	jQuery(window).load(function()
+			{
+				initialiseCurrencyValues();
+			});
+			
+			jQuery(document).ready(function()
+			{
+				initialiseInsights();	
+				initialisePageTips();
+			});
+			
+			function reInitialiseAll()
+			{
+				initialiseCurrencyValues();
+				initialiseInsights();
+				initialisePageTips();
+			}
+
+			function initialiseCurrencyValues()
+			{
+				jQuery('.currency-cell').each(function(){
+					jQuery(this).text(formatCurrencyValue(jQuery(this).text()));
+				});
+			}
+						
+			function newExpense(resourcedActivityId)
+			{
+				initialiseModalBoxy('#ExpenseEditPopup', '{!JSENCODE($Label.New)} {!$Label.kimbleone__expenseslabel}', jQuery('form[id$=\'ExpenseEditForm\']'));
+				newExpenseCategoryProfile(resourcedActivityId);
+			}
+
+			function editExpense(expenseCategoryProfileId)
+			{
+				initialiseModalBoxy('#ExpenseEditPopup', '{!JSENCODE($Label.Edit)} {!$Label.kimbleone__expenseslabel}', jQuery('form[id$=\'ExpenseEditForm\']'));
+				editExpenseCategoryProfile(expenseCategoryProfileId);
+			}
+			
+			
+			/* Insight */
+			var insightHeaderLabel = '<apex:outputText value="{!$Label.kimbleone__expenseaveragecostheading}"/>';
+			var categoryLabel = '<apex:outputText value="{!$ObjectType.KimbleOne__ActivityExpenseCategoryProfile__c.Fields.KimbleOne__ExpenseCategory__c.Label}"/>';
+			var numberOfInstanceLabel = '<apex:outputText value="{!$Label.kimbleone__totalnumberofexpenseitems}"/>';
+			var averageCostLabel = '<apex:outputText value="{!$Label.kimbleone__averagecost}"/>';
+			var inlineExpenseCostInsightLabel = '<apex:outputText value="{!$Label.kimbleone__expenseinsightnarrative}"/>';
+			
+			function formatCurrencyValue(theValue)
+			{
+				theValue = (theValue == undefined || theValue == null || theValue == '' ? '0' : theValue);
+				
+				return kimble.formatNumber(theValue, '#,##0.00');
+			}
+
+			function formatNumericValue(theValue)
+			{
+				theValue = (theValue == undefined || theValue == null || theValue == '' ? '0' : theValue);
+				
+				return kimble.formatNumber(theValue, '#,##0');
+			}
+						
+			var expenseInsight = {};
+			var baseCurrency;
+			
+			function initialiseInsights()
+			{
+				if(jQuery('.insight-container').length)
+				{
+					baseCurrency = jQuery(jQuery('.insight-container')[0]).attr('display-currency');
+					 
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityExpenseCategoryProfilesCntrllr.GetExpenseInsights}',
+							'<apex:outputText value="{!KimbleOne__DeliveryGroup__c.KimbleOne__Account__c}"/>', baseCurrency, 
+							function(result, event){		  
+								if (event.status) 
+								{
+									expenseInsight = result;
+									
+									if(expenseInsight.OrderedExpenseCategoryIds.length)
+									{
+										initialiseInsightActions();
+									}
+								} 
+								else if (event.type === 'exception') 
+								{
+									alert(event.message);
+								} 
+								else 
+								{
+									alert(event.message);
+								}
+						}, 
+						{escape: true, timeout: 60000}
+					);
+				}
+			}
+			
+			function initialiseInsightActions()
+			{
+				jQuery('.insight-container').removeClass('insight-hidden');
+
+				jQuery('div.insight-item').qtip('destroy', true);
+				jQuery('div.insight-item').qtip({
+						content: {
+							text: function(event, api) {		           
+								return generateInsightTipHtml();
+							}, 
+							title: insightHeaderLabel
+	 					},
+			            position: { 
+							my: 'middle right',
+							at: 'middle left',
+							adjust: { method: 'flip flip'},
+							viewport: $(window)
+						},
+						style: {
+							classes: 'qtip-light qtip-shadow qtip-rounded insight-tool-tip'
+						}
+					});
+								
+				jQuery(document).off('click', '.insight-item').on('click', '.insight-item', dockInsight);
+				jQuery(document).off('click', '.collapse-docked-insight').on('click', '.collapse-docked-insight', collapseInsight);
+				
+				jQuery(document).off('click', '.expense-cost-new-insight-ind, .expense-cost-edit-insight-ind').on('click', '.expense-cost-new-insight-ind, .expense-cost-edit-insight-ind', populateExpenseRemainingCostFromInsight);
+			}
+						
+			function generateInsightTipHtml()
+			{
+				var tipHtml = '<div class="expense-insight-tooltip">';
+
+				tipHtml += '<table border="0" cellpadding="0" cellspacing="0" class="list insight-entries">';
+				tipHtml += '<thead class="headerRow">';
+				tipHtml += '<th>' + categoryLabel + '</th>';
+				tipHtml += '<th class="instances-header">' + numberOfInstanceLabel + '</th>';
+				tipHtml += '<th class="average-cost-header">' + averageCostLabel + ' (' + baseCurrency + ')</th>';
+				tipHtml += '</thead>';
+				tipHtml += '<tbody>';
+								
+				for(var counter=0; counter < expenseInsight.OrderedExpenseCategoryIds.length; counter++)
+				{						
+					var expenseCategoryDetails = expenseInsight.TheExpenseCategoryAverageInsightMap[expenseInsight.OrderedExpenseCategoryIds[counter]];
+					
+					tipHtml += '<tr>';
+					tipHtml += '<td class="category-field">' + expenseCategoryDetails.ExpenseCategoryName + '</td>';
+					tipHtml += '<td class="instances-field">' + expenseCategoryDetails.InstanceCount + '</td>';
+					tipHtml += '<td class="average-cost-field">' + formatCurrencyValue(expenseCategoryDetails.ExpenseAverage) + '</td>';
+					tipHtml += '</tr>';
+				}
+				
+				tipHtml += '</tbody>';
+				tipHtml += '</table>';
+				tipHtml += '</div>';
+				
+				return tipHtml;
+			}
+						
+			function dockInsight(event)
+			{
+				var insightHtml = '<div class="insight-header">' + insightHeaderLabel + '</div><div class="collapse-docked-insight"><span class="cardIconInfo fa fa-lightbulb-o"></span><span class="cardIconInfo fa fa-angle-double-right"></span></div>';
+				
+				insightHtml += generateInsightTipHtml();
+																		
+				jQuery(this).hide();
+				jQuery(this).closest('div.insight-container').removeClass('insight-collapsed');
+				jQuery(this).closest('div.insight-container').find('.docked-insight').html(insightHtml);
+				jQuery(this).closest('div.insight-container').find('.docked-insight').show('fade');
+			}
+			
+			function collapseInsight(event)
+			{
+				jQuery(this).parent('.docked-insight').hide();
+				jQuery(this).closest('div.insight-container').addClass('insight-collapsed');
+				jQuery(this).closest('div.insight-container').find('.insight-item').show();				
+			}
+			
+			function refreshExpenseCostInsight(obj)
+			{
+				if(expenseInsight != undefined && expenseInsight.OrderedExpenseCategoryIds != undefined && expenseInsight.OrderedExpenseCategoryIds.length && expenseInsight.TheExpenseCategoryAverageInsightMap[obj.val()] != undefined)
+				{
+					var instanceCountDisplay = formatNumericValue(expenseInsight.TheExpenseCategoryAverageInsightMap[obj.val()].InstanceCount);
+					var expenseAverageDisplay = formatCurrencyValue(expenseInsight.TheExpenseCategoryAverageInsightMap[obj.val()].ExpenseAverage) + ' (' + baseCurrency + ')';
+
+					var theTooltip = inlineExpenseCostInsightLabel.format(instanceCountDisplay, expenseAverageDisplay);
+					obj.parent().find('.expense-cost-new-insight-ind').remove();
+					obj.parent().append('<span class="expense-cost-new-insight-ind fa fa-lightbulb-o" avg-amt="' + formatCurrencyValue(expenseInsight.TheExpenseCategoryAverageInsightMap[obj.val()].ExpenseAverage) + '" title="' + theTooltip + '"/>');
+					obj.parent().find('.expense-cost-new-insight-ind').qtip({
+			            position: { 
+							adjust: { method: 'flip flip'},
+							viewport: $(window)
+						},
+						style: {
+							classes: 'qtip-light qtip-shadow qtip-rounded'
+						}
+					});
+					
+					obj.parent().find('.expense-cost-new-insight-ind').fadeOut(500).fadeIn(500);
+				}
+				else
+				{
+					obj.parent().find('.expense-cost-new-insight-ind').remove();
+				}
+			}
+			
+			function showInlineExpenseInsight()
+			{
+				var expenseCategoryId = jQuery('.expense-category-name:visible').attr('expense-category-id');
+				
+				if(expenseInsight != undefined && expenseInsight.OrderedExpenseCategoryIds != undefined && expenseInsight.OrderedExpenseCategoryIds.length && expenseCategoryId != undefined && expenseInsight.TheExpenseCategoryAverageInsightMap[expenseCategoryId] != undefined)
+				{
+					var instanceCountDisplay = formatNumericValue(expenseInsight.TheExpenseCategoryAverageInsightMap[expenseCategoryId].InstanceCount);
+					var expenseAverageDisplay = formatCurrencyValue(expenseInsight.TheExpenseCategoryAverageInsightMap[expenseCategoryId].ExpenseAverage) + ' (' + baseCurrency + ')';
+
+					var theTooltip = inlineExpenseCostInsightLabel.format(instanceCountDisplay, expenseAverageDisplay);
+					jQuery('.expense-category-name:visible').find('.expense-cost-edit-insight-ind').remove();
+					jQuery('.expense-category-name:visible').append('<span class="expense-cost-edit-insight-ind fa fa-lightbulb-o" avg-amt="' + formatCurrencyValue(expenseInsight.TheExpenseCategoryAverageInsightMap[expenseCategoryId].ExpenseAverage) + '" title="' + theTooltip + '"/>');
+					jQuery('.expense-category-name:visible').find('.expense-cost-edit-insight-ind').qtip({
+			            position: { 
+							adjust: { method: 'flip flip'},
+							viewport: $(window)
+						},
+						style: {
+							classes: 'qtip-light qtip-shadow qtip-rounded'
+						}
+					});
+				}
+				else
+				{
+					jQuery('.expense-category-name:visible').find('.expense-cost-edit-insight-ind').remove();
+				}
+			}
+			
+			function populateExpenseRemainingCostFromInsight()
+			{
+				var insightTip = jQuery(this);
+				var averageAmt = insightTip.attr('avg-amt');
+				
+				insightTip.closest('#ExpenseEditPopup').find('.remaining-cost').val(averageAmt).change();
+			}
+			
+			/* Tooltips */
+			var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+			var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+			var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+			var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+			var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+			var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+		
+			function initialisePageTips()
+			{
+				ApplyTipAttributes();
+				initialiseTips();
+			}
+
+			// add tip attributes to elements
+			function ApplyTipAttributes()
+			{
+				if(enableTips)
+				{
+				    // table fields
+					jQuery('[id$="expenseCategoryHeader"]').attr('kimble-tip','ExpenseCategory').attr('kimble-tip-extended-text','ExpenseCategoryExtendedText');
+					jQuery('[id$="businessUnitHeader"]').attr('kimble-tip','BusinessUnit').attr('kimble-tip-help-link','ExpenseForecastingHelpLink');
+					jQuery('[id$="baselineCostHeader"]').attr('kimble-tip','BaselineCost').attr('kimble-tip-help-link','ExpenseForecastingHelpLink');
+					jQuery('[id$="baselineRevenueHeader"]').attr('kimble-tip','BaselineRevenue').attr('kimble-tip-help-link','ExpenseForecastingHelpLink');
+					jQuery('[id$="projectedCostHeader"]').attr('kimble-tip','ProjectedCost').attr('kimble-tip-help-link','ExpenseForecastingHelpLink');
+					jQuery('[id$="projectedRevenueHeader"]').attr('kimble-tip','ProjectedRevenue').attr('kimble-tip-help-link','ExpenseForecastingHelpLink');
+					jQuery('[id$="actualCostHeader"]').attr('kimble-tip','ActualCost').attr('kimble-tip-help-link','ExpenseForecastingHelpLink');
+					jQuery('[id$="actualRevenueHeader"]').attr('kimble-tip','ActualRevenue').attr('kimble-tip-help-link','ExpenseForecastingHelpLink');
+					jQuery('[id$="remainingCostHeader"]').attr('kimble-tip','RemainingCost').attr('kimble-tip-help-link','ExpenseForecastingHelpLink');
+					jQuery('[id$="remainingRevenueHeader"]').attr('kimble-tip','RemainingRevenue').attr('kimble-tip-help-link','ExpenseForecastingHelpLink');
+					
+					// add expense pop-up
+					jQuery('[id$="expense-category-id"]').attr('kimble-tip','Add_ExpenseCategory').attr('kimble-tip-extended-text','Add_ExpenseCategoryExtendedText').attr('kimble-tip-help-link','ExpenseForecastingHelpLink').addClass('tip-right');
+					jQuery('[id$="business-unit-id"]').attr('kimble-tip','Add_BusinessUnit').attr('kimble-tip-help-link','ExpenseForecastingHelpLink').addClass('tip-right');
+					jQuery('[id$="forecastRemainingCostInput"]').attr('kimble-tip','Add_RemainingCost').attr('kimble-tip-help-link','ExpenseForecastingHelpLink').addClass('tip-right');
+					jQuery('[id$="forecastRemainingRevenueInput"]').attr('kimble-tip','Add_RemainingRevenue').attr('kimble-tip-help-link','ExpenseForecastingHelpLink').addClass('tip-right');
+				}
+			}
+			
+			function updateTipsConfigSetting(newTipSetting)
+			{
+				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+					newTipSetting,
+						function(result, event){
+							if (event.status)
+							{
+								var data = {};
+								data.results = result;
+								loadGuidance();
+							}
+							else
+							{
+								alert(event.message);
+							}
+					},
+					{escape: false, timeout: 60000}
+				);
+			}
+		</script>
+		
+		<apex:outputPanel layout="none" rendered="{!ShowExpenseInsight && TheResourcedActivities.size > 0}">
+		<div class="insight-container insight-collapsed insight-hidden" display-currency="{!TheResourcedActivities[0].CurrencyISOCode}">
+			<div class="docked-insight-container">
+				<div class="docked-insight"></div>
+			</div>
+			<div class="insight-item">
+				<span class="miniCardIcon cardIconInfo fa fa-lightbulb-o"></span>
+			</div>
+		</div>
+		</apex:outputPanel>
+
+		<apex:form id="TheExpenseForm">
+		<apex:outputPanel id="ElementExpensesContainer">
+		
+		<apex:repeat value="{!TheResourcedActivities}" var="TheResourcedActivity">
+			<div class="card variable-width min-horizontal-padding">
+				<div class="cardHeading">
+					<h3 class="cardTitle"><apex:outputText value="{!TheResourcedActivity.Name}"/></h3>
+				</div>
+				<div class="cardBody">
+					<div class="inner-card resourced-activity-card" resourced-activity-id="{!TheResourcedActivity.Id}" resourced-activity-currency="{!TheResourcedActivity.CurrencyISOCode}">
+						<div class="inner-card-header">
+							<div class="inner-card-title"><apex:outputText value="{!$Label.kimbleone__expenseslabel}"/></div>
+
+						</div>
+						<div class="inner-card-body">
+							<apex:variable value="{!0}" var="rowNum"/>
+							<table cellpadding="0" cellspacing="0" border="0" class="list">
+								<thead>
+									<tr class="headerRow">
+										<th colspan="3"></th>
+										<th colspan="2" class="currency-value-cell centred-header">{!$Label.BaselineLabel} ({!TheResourcedActivity.CurrencyISOCode})</th>
+										<th colspan="2" class="currency-value-cell centred-header">{!$Label.ProjectedLabel} ({!TheResourcedActivity.CurrencyISOCode})</th>
+										<th colspan="2" class="currency-value-cell centred-header">{!$Label.ActualLabel} ({!TheResourcedActivity.CurrencyISOCode})</th>
+										<th colspan="2" class="currency-value-cell centred-header">{!$Label.DeliveryGroupHomeRemaining} ({!TheResourcedActivity.CurrencyISOCode})</th>
+									</tr>
+									<tr class="headerRow">
+										<th></th>
+										<th id="expenseCategoryHeader" class="description-cell">{!$ObjectType.KimbleOne__ActivityExpenseCategoryProfile__c.Fields.KimbleOne__ExpenseCategory__c.Label}</th>
+										<th id="businessUnitHeader" class="description-cell">{!$ObjectType.KimbleOne__ActivityExpenseCategoryProfile__c.Fields.KimbleOne__BusinessUnit__c.Label}</th>
+										<th id="baselineCostHeader" class="currency-value-cell centred-header">{!$Label.CostLabel}</th>
+										<th id="baselineRevenueHeader" class="currency-value-cell centred-header">{!$Label.RevenueLabel}</th>
+										<th id="projectedCostHeader" class="currency-value-cell centred-header">{!$Label.CostLabel}</th>
+										<th id="projectedRevenueHeader" class="currency-value-cell centred-header">{!$Label.RevenueLabel}</th>
+										<th id="actualCostHeader" class="currency-value-cell centred-header">{!$Label.CostLabel}</th>
+										<th id="actualRevenueHeader" class="currency-value-cell centred-header">{!$Label.RevenueLabel}</th>
+										<th id="remainingCostHeader" class="currency-value-cell centred-header">{!$Label.CostLabel}</th>
+										<th id="remainingRevenueHeader" class="currency-value-cell centred-header">{!$Label.RevenueLabel}</th>
+									</tr>
+								</thead> 
+								<tbody>
+									<apex:repeat value="{!TheResourcedActivityExpenseCategoryProfilesMap[TheResourcedActivity]}" var="TheResourcedActivityExpenseCategoryProfile">
+										<tr>
+											<td class="action-cell">
+												<apex:outputpanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityExpenseCategoryProfile__c.updateable}">
+													<span class="fa fa-pencil action-icon" style="padding-right: 4px;padding-left: 2px;" onclick="editExpense('{!JSENCODE(TheResourcedActivityExpenseCategoryProfile.Id)}')"></span>
+												</apex:outputpanel>
+												<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityExpenseCategoryProfile__c.deletable && IF((!ISNULL(TheResourcedActivityExpenseCategoryProfile.ActualCost__c) && TheResourcedActivityExpenseCategoryProfile.ActualCost__c > 0) || (!ISNULL(TheResourcedActivityExpenseCategoryProfile.ActualRevenue__c) && TheResourcedActivityExpenseCategoryProfile.ActualRevenue__c > 0), false, true)}">
+													<span class="fa fa-trash-o action-icon" onclick="var d = confirmDelete();if(!d) return;removeExpense('{!JSENCODE(TheResourcedActivityExpenseCategoryProfile.Id)}');"></span>
+												</apex:outputPanel>
+											</td>
+											<td><apex:outputText value="{!TheResourcedActivityExpenseCategoryProfile.ExpenseCategory__r.Name}" /></td>
+											<td><apex:outputText value="{!TheResourcedActivityExpenseCategoryProfile.BusinessUnit__r.Name}" /></td>
+											<td class="right-align-cell currency-cell baseline-cell"><apex:outputText value="{!TheResourcedActivityExpenseCategoryProfile.BaselineCost__c}" /></td>
+											<td class="right-align-cell currency-cell baseline-cell"><apex:outputText value="{!TheResourcedActivityExpenseCategoryProfile.BaselineRevenue__c}"/></td>
+											<td class="right-align-cell currency-cell"><apex:outputText value="{!TheResourcedActivityExpenseCategoryProfile.ForecastCost__c}"/></td>
+											<td class="right-align-cell currency-cell"><apex:outputText value="{!TheResourcedActivityExpenseCategoryProfile.ForecastRevenue__c}"/></td>
+											<td class="right-align-cell currency-cell"><apex:outputText value="{!TheResourcedActivityExpenseCategoryProfile.ActualCost__c}"/></td>
+											<td class="right-align-cell currency-cell"><apex:outputText value="{!TheResourcedActivityExpenseCategoryProfile.ActualRevenue__c}"/></td>
+											<td class="right-align-cell currency-cell"><apex:outputText value="{!TheResourcedActivityExpenseCategoryProfile.ForecastRemainingCost__c}"/></td>
+											<td class="right-align-cell currency-cell"><apex:outputText value="{!TheResourcedActivityExpenseCategoryProfile.ForecastRemainingRevenue__c}"/></td>
+										</tr>											
+									</apex:repeat>
+								</tbody>
+								<tfoot>
+									<apex:variable value="{!TheResourcedActivityExpenseCategoryProfilesTotalsMap[TheResourcedActivity]}" var="TheResourcedActivityExpenseCategoryProfileTotals"/>
+									<tr class="totals-row">
+										<td colspan="3">
+											<apex:outputpanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityExpenseCategoryProfile__c.createable}">
+												<a href="#" onClick="newExpense('{!JSENCODE(TheResourcedActivity.Id)}');return false;" style="font-weight: normal;"><span class="fa fa-plus-square" style="padding-right: 4px;"></span>{!$Label.AddExpenseButton}</a>
+											</apex:outputpanel>
+										</td>
+										<td class="right-align-cell currency-cell baseline-cell"><apex:outputText value="{!TheResourcedActivityExpenseCategoryProfileTotals.BaselineCost.InputDecimal__c}"/></td>
+										<td class="right-align-cell currency-cell baseline-cell"><apex:outputText value="{!TheResourcedActivityExpenseCategoryProfileTotals.BaselineRevenue.InputDecimal__c}"/></td>
+										<td class="right-align-cell currency-cell"><apex:outputText value="{!TheResourcedActivityExpenseCategoryProfileTotals.ForecastCost.InputDecimal__c}"/></td>
+										<td class="right-align-cell currency-cell"><apex:outputText value="{!TheResourcedActivityExpenseCategoryProfileTotals.ForecastRevenue.InputDecimal__c}"/></td>
+										<td class="right-align-cell currency-cell"><apex:outputText value="{!TheResourcedActivityExpenseCategoryProfileTotals.ActualCost.InputDecimal__c}"/></td>
+										<td class="right-align-cell currency-cell"><apex:outputText value="{!TheResourcedActivityExpenseCategoryProfileTotals.ActualRevenue.InputDecimal__c}"/></td>
+										<td class="right-align-cell currency-cell"><apex:outputText value="{!TheResourcedActivityExpenseCategoryProfileTotals.ForecastRemainingCost.InputDecimal__c}"/></td>
+										<td class="right-align-cell currency-cell"><apex:outputText value="{!TheResourcedActivityExpenseCategoryProfileTotals.ForecastRemainingRevenue.InputDecimal__c}"/></td>
+									</tr>
+								</tfoot>
+							</table>
+						</div>
+					</div>
+				</div>
+			</div>
+		</apex:repeat>
+		</apex:outputPanel>
+     	
+     	<apex:actionFunction action="{!RemoveExpense}" name="removeExpense" rerender="TheExpenseForm" oncomplete="reInitialiseAll();">
+     		<apex:param name="aecprofileId" value=""/>
+     	</apex:actionFunction>
+     	     	
+       	<apex:actionFunction action="{!LoadExpenseCategoryProfile}" name="editExpenseCategoryProfile" rerender="ExpenseEditPopupPanel" oncomplete="showModalBoxy();showInlineExpenseInsight();initialisePageTips()">
+       		<apex:param name="expenseCategoryProfileId" value="" />
+       	</apex:actionFunction>
+ 
+       	<apex:actionFunction action="{!NewExpenseCategoryProfile}" name="newExpenseCategoryProfile" rerender="ExpenseEditPopupPanel" oncomplete="showModalBoxy();initialisePageTips();">
+       		<apex:param name="resourcedActivityId" value="" />
+       	</apex:actionFunction>
+
+		<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+		<div style="display:none;" kimble-tip="null"></div>	
+		</apex:form>
+		
+		<apex:form id="ExpenseEditForm">
+		<div id="ExpenseEditPopup" style="display:none">
+			<apex:outputPanel id="ExpenseEditPopupPanel">
+	   	     	
+	   	     	<div id="ExpenseEditErrors">
+	           		<apex:pageMessages id="ExpenseEditMessages" escape="false"/>
+	           	</div>
+	   			
+	   			<apex:pageBlock id="ExpenseEditPageBlock">
+	            
+	           	<apex:pageBlockButtons location="bottom">
+	           		<apex:commandButton id="saveExpense" styleclass="DisableButtonWhileBusy" action="{!UpsertExpense}" value="{!$Label.kimbleone__save}" oncomplete="reInitialiseAll();hideModalBoxyWithErrorCheck('#ExpenseEditErrors');" reRender="ExpenseEditPopupPanel, TheExpenseForm"/>
+	            	<input id="cancelEdit" class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+	  			</apex:pageBlockButtons>
+	            
+	            <apex:variable value="{!ISNULL(TheExpenseCategoryProfileForEdit.Id)}" var="IsNew"/>
+	            <apex:variable value="{!IF((!ISNULL(TheExpenseCategoryProfileForEdit.KimbleOne__ActualCost__c) && TheExpenseCategoryProfileForEdit.KimbleOne__ActualCost__c > 0) || (!ISNULL(TheExpenseCategoryProfileForEdit.KimbleOne__ActualRevenue__c) && TheExpenseCategoryProfileForEdit.KimbleOne__ActualRevenue__c > 0), false, true)}" var="allowEdit"/>
+	            <apex:variable value="{!TheResourcedActivityMap[TheResourcedActivityIdForEdit]}" var="TheResourcedActivity"/>
+	            <apex:pageblockSection collapsible="false" showheader="false" columns="1">
+	               
+					<apex:pageBlockSectionItem >
+						<apex:outputText styleClass="no-wrap-label" value="{!$ObjectType.KimbleOne__ActivityExpenseCategoryProfile__c.Fields.KimbleOne__ExpenseCategory__c.Label}"/>
+						<apex:outputPanel layout="none">
+							<apex:selectList id="expense-category-id" value="{!TheExpenseCategoryProfileForEdit.KimbleOne__ExpenseCategory__c}" size="1" required="false" rendered="{!IsNew}" onchange="refreshExpenseCostInsight(jQuery(this));">
+								<apex:selectOptions value="{!TheExpenseCategoriesMap[TheResourcedActivityIdForEdit]}"/>
+							</apex:selectList>
+
+							<apex:outputPanel layout="none" rendered="{!!IsNew}">
+	                   			<div class="expense-category-name" expense-category-id="{!JSENCODE(TheExpenseCategoryProfileForEdit.KimbleOne__ExpenseCategory__c)}">
+		                   			<apex:outputText value="{!TheExpenseCategoryProfileForEdit.ExpenseCategory__r.Name}"/>
+		                   			<span class="expense-cost-edit-insight-ind fa fa-lightbulb-o"/>
+	                   			</div>
+	                   		</apex:outputPanel>
+						</apex:outputPanel>
+                   	</apex:pageBlockSectionItem>
+                   	
+					<apex:pageBlockSectionItem >
+						<apex:outputText styleClass="no-wrap-label" value="{!$ObjectType.KimbleOne__ActivityExpenseCategoryProfile__c.Fields.KimbleOne__BusinessUnit__c.Label}"/>
+						<apex:outputPanel layout="none">
+							<apex:selectList id="business-unit-id" value="{!TheExpenseCategoryProfileForEdit.KimbleOne__BusinessUnit__c}" size="1" required="false" rendered="{!allowEdit}">
+								<apex:selectOptions value="{!TheBusinessUnits}"/>
+							</apex:selectList>
+							<apex:outputText value="{!TheExpenseCategoryProfileForEdit.BusinessUnit__r.Name}" rendered="{!!allowEdit}"/>
+                   		</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+					
+					<apex:pageBlockSectionItem rendered="{!!IsNew}">
+						<apex:outputText styleClass="no-wrap-label" value="{!$ObjectType.KimbleOne__ActivityExpenseCategoryProfile__c.Fields.KimbleOne__ActualCost__c.Label} ({!TheExpenseCategoryProfileForEdit.CurrencyISOCode})"/>
+						<apex:outputText value="{!TheExpenseCategoryProfileForEdit.KimbleOne__ActualCost__c}"/>
+					</apex:pageBlockSectionItem>
+					
+					<apex:pageBlockSectionItem rendered="{!!IsNew && TheResourcedActivity.DeliveryElement__r.Product__r.ProductDomain__r.RevenueGenerationModel__r.IsExpenseGenerated__c}">
+						<apex:outputText styleClass="no-wrap-label" value="{!$ObjectType.KimbleOne__ActivityExpenseCategoryProfile__c.Fields.KimbleOne__ActualRevenue__c.Label} ({!TheResourcedActivity.DeliveryElement__r.InvoicingCurrencyIsoCode__c})"/>
+						<apex:outputText value="{!TheExpenseCategoryProfileForEdit.KimbleOne__ActualRevenue__c}"/>
+					</apex:pageBlockSectionItem>
+					
+					<apex:pageBlockSectionItem >
+						<apex:outputText styleClass="no-wrap-label" value="{!$ObjectType.KimbleOne__ActivityExpenseCategoryProfile__c.Fields.KimbleOne__ForecastRemainingCost__c.Label} ({!TheExpenseCategoryProfileForEdit.CurrencyISOCode})"/>
+						<apex:inputField id="forecastRemainingCostInput" value="{!TheExpenseCategoryProfileForEdit.KimbleOne__ForecastRemainingCost__c}" styleClass="remaining-cost" required="true" />
+					</apex:pageBlockSectionItem>
+
+					<apex:pageBlockSectionItem rendered="{!TheResourcedActivity.DeliveryElement__r.Product__r.ProductDomain__r.RevenueGenerationModel__r.IsExpenseGenerated__c}">
+						<apex:outputText styleClass="no-wrap-label" value="{!$ObjectType.KimbleOne__ActivityExpenseCategoryProfile__c.Fields.KimbleOne__InvoicingCcyForecastRemainingRevenue__c.Label} ({!TheResourcedActivity.DeliveryElement__r.InvoicingCurrencyIsoCode__c})"/>
+						<apex:inputField id="forecastRemainingRevenueInput" value="{!TheExpenseCategoryProfileForEdit.KimbleOne__InvoicingCcyForecastRemainingRevenue__c}" required="true" />				
+					</apex:pageBlockSectionItem>
+	            </apex:pageBlockSection>
+	            
+				</apex:pageBlock>
+				
+					
+	        </apex:outputPanel> <!-- end newDeliveryElement -->
+		</div>
+		</apex:form>
+    </apex:define>
+</apex:composition>
+
+</apex:page>

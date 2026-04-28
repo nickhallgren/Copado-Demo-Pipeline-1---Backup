@@ -1,0 +1,165 @@
+<apex:page controller="KimbleOne.RevenueSummaryCardController" showHeader="false" sidebar="false" contentType="text/css" tabStyle="KimbleOne__ReferenceData__c">    
+
+	<style>
+		.revenue-summary-card {
+			position: relative;
+			min-width: unset;
+		}
+		
+		.revenue-summary-info-icon {
+			position: absolute;
+			font-size: 16px;
+			right: 6px;
+			color: #428BCA;
+		}
+		
+		.revenue-adjustments-info-icon {
+			position: absolute;
+			font-size: 16px;
+		    right: 2px;
+		    color: #808080;
+		}
+		
+		.currency-mode-toggle-container
+		{
+			float: right;
+  			font-size: 15px;
+  		}
+  		.undecorated-link
+  		{
+  			cursor:pointer;
+  		}
+	</style>
+	<div class="card inverted min-horizontal-padding revenue-summary-card">
+		<div class="cardHeading inverted">
+			<h3 class="cardTitle"><apex:outputText id="revenueSummaryCard" value="{!$Label.kimbleone__revenuesummarylabel} ({!TheDisplayCurrencyIsoCode})"/></h3>
+			<apex:outputPanel layout="block" styleclass="currency-mode-toggle-container" rendered="{!CanToggleCurrencyIsoCode}">
+				<apex:outputPanel layout="inline" styleclass="undecorated-link" onclick="toggleCurrencyMode('base', '{!JSENCODE(BaseCurrencyIsoCode)}')" rendered="{!TheDisplayCurrencyIsoCode != BaseCurrencyIsoCode}"><apex:outputText value="{!BaseCurrencyIsoCode}"/></apex:outputPanel>
+				<apex:outputText value="{!BaseCurrencyIsoCode}" rendered="{!TheDisplayCurrencyIsoCode = BaseCurrencyIsoCode}"/>
+				
+				<apex:outputPanel layout="inline" styleclass="k-tgl fa fa-toggle-on" style="margin:0px 4px 0px 4px;" onclick="toggleCurrencyMode('base', '{!JSENCODE(BaseCurrencyIsoCode)}')" rendered="{!TheDisplayCurrencyIsoCode = InvoicingCurrencyIsoCode}"></apex:outputPanel>
+				<apex:outputPanel layout="inline" styleclass="k-tgl fa fa-toggle-off" style="margin:0px 4px 0px 4px;" onclick="toggleCurrencyMode('invoicing', '{!JSENCODE(InvoicingCurrencyIsoCode)}')" rendered="{!TheDisplayCurrencyIsoCode = BaseCurrencyIsoCode}"></apex:outputPanel>
+				
+				<apex:outputPanel layout="inline" styleclass="undecorated-link" onclick="toggleCurrencyMode('invoicing', '{!JSENCODE(InvoicingCurrencyIsoCode)}')" rendered="{!TheDisplayCurrencyIsoCode != InvoicingCurrencyIsoCode}"><apex:outputText value="{!InvoicingCurrencyIsoCode}"/></apex:outputPanel>
+				<apex:outputText value="{!InvoicingCurrencyISOCode}" rendered="{!TheDisplayCurrencyIsoCode = InvoicingCurrencyISOCode}"/>
+			</apex:outputPanel>
+		</div>
+	
+		<div class="cardBody">
+			<apex:outputPanel layout="none" rendered="{!(ProgramMode || MixedProbabilityMode) && !ISBLANK(TheDisplayStatus) && TheDisplayStatus != ''}">
+				<span class="fa fa-info-circle info-indicator revenue-summary-info-icon">
+					<div class="tooltiptext"><apex:outputText value="{!TheDisplayStatus}"/></div>
+				</span>
+			</apex:outputPanel>
+			<apex:outputPanel layout="none" rendered="{!ApprovedRevenueAdjustmentsExistInd}">
+				<i class="fa fa-info-circle info-indicator revenue-adjustments-info-icon" title="{!$Label.RevenueAdjustmentsIncludedLabel}"></i>
+			</apex:outputPanel>			
+		    <div id="divForRevenueSummaryGraph">
+		    </div>
+			<apex:outputPanel layout="none" rendered="{!ShowFilter}">
+			<i class="fa fa-filter card-filter-icon filter-rev-sum-icon" title="{!$Label.TargetFiltersHeader}"></i>
+			</apex:outputPanel>
+		</div>
+	</div>
+    
+    <script>
+	var revenueFilterLabels = {};
+	revenueFilterLabels['services'] = '<apex:outputText value="{!$Label.kimbleone__serviceslabel}"/>';
+	revenueFilterLabels['expenses'] = '<apex:outputText value="{!$Label.kimbleone__expenseslabel}"/>';
+	revenueFilterLabels['all'] = '<apex:outputText value="{!$Label.kimbleone__all}"/>';
+	    
+    var revenueDomainFilter = '<apex:outputText value="{!RevenueDomainFilter}"/>';
+	
+	function toggleCurrencyMode( mode, currencyCode)
+	{
+		var container =	jQuery('.revenue-summary-card').closest('[pagesource]');
+		
+		container.attr('display-currency', currencyCode);
+		
+		loadDashboardComponent(container);
+	}
+
+	function revenueSummaryDomainFilterChange(domainFilter)
+	{
+		var container =	jQuery('.revenue-summary-card').closest('[pagesource]');
+		
+		container.attr('domain', domainFilter);
+			
+		loadDashboardComponent(container);
+	}
+	
+	function initialiseSummaryGraphs()
+    {
+		var summaryData = jQuery.parseJSON('<apex:outputText value="{!JSENCODE(TheChartSummary)}"/>');
+		var theCurrencyCode = '';
+		 
+		var revenueData = new Array();
+        revenueData.push([summaryData.BaselineRevenue,'{!JSENCODE($Label.BaselineLabel)}','#BBB']);
+        if (summaryData.PurchaseOrderRequired) revenueData.push([summaryData.PurchaseOrderCover,'{!JSENCODE($Label.POCoverLabel)}','#E68F1A']);
+        revenueData.push([summaryData.ProjectedRevenue,'{!JSENCODE($Label.ProjectedLabel)}','#729BC7']);
+        revenueData.push([summaryData.ActualRevenue,'{!JSENCODE($Label.ActualLabel)}','#008752']);
+        
+        var creditLabel = '{!JSENCODE($Label.CreditLabel)}';
+        if (summaryData.CreditUnits > 0) creditLabel = summaryData.CreditUnits + ' {!JSENCODE($Label.CreditsLabel)}';
+        if (summaryData.HasCreditAllocation) revenueData.push([summaryData.CreditValue,creditLabel,'#B42B33']);
+
+        revenueData.push([summaryData.InvoicedAmount,'{!JSENCODE($Label.InvoicedLabel)}','#000000']);
+        
+		jQuery('#divForRevenueSummaryGraph').jqBarGraph({ data: revenueData, height:150, width:400, animate: true, speed: 0.5, barSpace: 6}); 
+		 
+		jQuery.each($('div.graphValuedivForRevenueSummaryGraph'),function(i,obj){
+		 	$(obj).text($.formatNumber($(obj).text(), {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+		});
+		
+		<apex:outputPanel layout="none" rendered="{!(ProgramMode || MixedProbabilityMode) && !ISBLANK(TheDisplayStatus) && TheDisplayStatus != ''}">
+			initialiseInfoIndicator();
+		</apex:outputPanel>
+		
+		<apex:outputPanel layout="none" rendered="{!ApprovedRevenueAdjustmentsExistInd}">
+			initialiseRevenueAdjustmentIndicator(summaryData.HasActual);
+		</apex:outputPanel>
+
+		initialiseFilterIndicator();
+    }
+    
+    function initialiseFilterIndicator()
+    {
+    	jQuery('.filter-rev-sum-icon').toggleClass('f-active', revenueDomainFilter != 'All');
+    }
+    
+    function initialiseInfoIndicator()
+    {
+   		jQuery('.revenue-summary-info-icon').qtip({content:{text:jQuery('.revenue-summary-info-icon').children('.tooltiptext')},
+		position: {
+			adjust: {
+				method: 'flip flip'
+			},
+			viewport: $(window)
+		},
+		style: {classes: 'qtip-light qtip-shadow qtip-rounded'}});
+    }
+    
+    function initialiseRevenueAdjustmentIndicator(hasActual)
+    {
+		var revAdjustmentInd = jQuery('.revenue-adjustments-info-icon').detach();
+		jQuery(".graphLabeldivForRevenueSummaryGraph:contains('{!JSENCODE($Label.ProjectedLabel)}')").append(revAdjustmentInd);
+
+		if(hasActual)
+		{
+			var revAdjustmentIndClone = jQuery(revAdjustmentInd).clone();		
+			jQuery(".graphLabeldivForRevenueSummaryGraph:contains('{!JSENCODE($Label.ActualLabel)}')").append(revAdjustmentIndClone);
+		}
+		
+   		jQuery('.revenue-adjustments-info-icon').qtip({position: {
+			adjust: {
+				method: 'flip flip'
+			},
+			viewport: $(window)
+		},
+		style: {classes: 'qtip-light qtip-shadow qtip-rounded'}});
+    }
+    
+    initialiseSummaryGraphs();
+    
+    </script>
+</apex:page>

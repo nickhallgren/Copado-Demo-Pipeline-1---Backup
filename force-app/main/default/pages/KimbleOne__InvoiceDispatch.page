@@ -1,0 +1,248 @@
+<apex:page controller="KimbleOne.InvoiceDispatchController" showHeader="true" sidebar="false" >
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+</apex:define>
+     
+<apex:define name="Content">
+
+	<style>
+		.overall-status
+		{
+			width: 90% !important;
+		}
+		span.progress-counter div {
+			white-space: nowrap;
+		}
+		.invoice-counter
+		{
+			width: 10%;
+			text-align: right;
+		}
+		.Pending 
+		{
+			background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'pending16.gif')}');
+		}
+		.Processing 
+		{
+			background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'running16.gif')}');
+		}
+		.Completed 
+		{
+			background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'completed16.gif')}');
+		}
+		.Failed 
+		{
+			background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'failed16.gif')}');
+		}
+		.status-cell
+		{
+			width: 16px;
+			height: 16px;
+			display: block;
+		}
+        .status-col
+        {
+        	width: 16px;
+        }
+	</style>
+
+ 
+	<apex:pageMessages escape="false"/>
+
+	<apex:pageBlock >
+	
+		<div class="pbHeader">
+			<table border="0" cellpadding="0" cellspacing="0">
+				<tbody>
+					<tr>
+						<td class="pbTitle overall-status"><h2 id="jobStatus" class="mainTitle">{!JSENCODE($Label.DispatchingInvoicesMessage)}...</h2></td>
+						<td class="invoice-counter"><span class="progress-counter"><div>{!JSENCODE($Label.DispatchPending)}:<span id="pending-count">0</span></div><div>{!JSENCODE($Label.DispatchComplete)}:<span id="completed-count">0</span></div><div>Failed:<span id="failed-count">0</span></div></span></td>
+					</tr>
+				</tbody>
+			</table>	
+		</div>                                
+								
+		<apex:pageBlockTable styleClass="approval-item-list" value="{!TheApprovedInvoices}" var="item">
+			<apex:column styleClass="status-col" headervalue="{!$Label.kimbleone__statuslabel}">
+				<span id="{!JSENCODE(item.id)}" class="invoice-row status-cell Pending"></span>
+			</apex:column>
+			<apex:column headerValue="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__Reference__c.Label}">
+				<apex:outputField value="{!item.KimbleOne__ReferenceLink__c}"/>
+			</apex:column>
+			<apex:column headerValue="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__Account__c.Label}">
+				<apex:outputField value="{!item.Account__r.Name}"/>
+			</apex:column>
+			<apex:column headervalue="{!$Label.kimbleone__notes}">
+				<span class="status-text">{!JSENCODE($Label.kimbleone__dispatchpending)}</span>
+			</apex:column>
+		</apex:pageBlockTable>
+	
+	</apex:pageBlock>
+	<apex:include pageName="{!$Page.ExpenseExport}"/>
+	<script>
+    
+    	jQuery(document).ready(function(){
+            dispatchInvoices()
+        });
+    
+    	function dispatchInvoices()
+    	{
+            updateTotals();
+            
+            if(jQuery('.invoice-row.Pending').length)
+            {
+                startDispatchInvoice(jQuery(jQuery('.invoice-row.Pending')[0]).prop('id'));
+            }
+        }
+    
+    	function setStatusText(invoiceId, statusTxt)
+    	{
+            jQuery('.invoice-row[id="' + invoiceId + '"]').parent().parent().find('.status-text').text(statusTxt);
+        }
+
+		function GetInvoiceDetails(invoiceId){
+		    Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InvoiceDispatchController.GetInvoiceLogoAndDetails}',
+	       		invoiceId,
+	      			function(result, event){
+	      			     if (event.status)
+			             {
+                            if(event.result)
+                            {
+                                var theInvoice = event.result;
+
+                                var ongenerateComplete = function() {
+									//Validate pdf to email size - thePdfToDownload.output().length / 1024 / 1024 - 26214400 (25 MB)
+									if (thePdfToDownload == null) {
+										dispatchInvoice(invoiceId, null);
+										return;
+         							}
+
+									if (thePdfToDownload.output().length > 26214400) {
+										var maxSizeLabel = '{!JSENCODE($Label.EmailAttachmentsExceedLimit)}';
+										jQuery('.invoice-row[id="' + invoiceId + '"]').removeClass('Processing').addClass('Failed').prop('title', '{!JSENCODE($Label.DispatchFailed)}');
+                                		setStatusText(invoiceId, maxSizeLabel.format('25MB'));
+										return;
+									}
+
+									var attachment = new sforce.SObject("Attachment");
+									attachment.Name = 'tmp.pdf';
+									attachment.ContentType = 'application/pdf';
+									attachment.Body = btoa(thePdfToDownload.output())
+									attachment.ParentId = theInvoice.CombinedAttachmentsParentId;
+
+									sforce.connection.create([attachment],
+									{
+										 onSuccess : function(result, source)
+										 {
+											 if(result[0].getBoolean("success")) {
+
+												 console.log('file added successfully:' + result[0].id);
+												 var attachmentId = result[0].id;
+
+												 dispatchInvoice(invoiceId, attachmentId);
+											 }
+										 },
+										 onFailure : function(error, source)
+										 {
+												console.log(error);
+
+												jQuery('.invoice-row[id="' + invoiceId + '"]').removeClass('Processing').addClass('Failed').prop('title', '{!JSENCODE($Label.DispatchFailed)}');
+                                				setStatusText(invoiceId, '{!JSENCODE($Label.DispatchFailed)}: ' + error);
+
+										 }
+
+									});
+								}
+
+                                generateAttachments(invoiceId, theInvoice.Reference,{showLogo:theInvoice.ShowLogo, showFooter:theInvoice.ShowFooter, showPageNumbers:theInvoice.ShowPageNumbers,
+                                						footerText:theInvoice.InvoiceFooter, logoWidth:{!JSENCODE($Label.INVOICEPRINTT1ImageWidth)}, logoHeight:{!JSENCODE($Label.INVOICEPRINTT1ImageHeight)}, logoData:theInvoice.LogoData, logoContentType:theInvoice.LogoContentType}
+                                						,ongenerateComplete);
+
+                          	}
+                         }
+                    },
+	         	{escape: true, timeout: 60000}
+	     	);
+  		}
+
+		function startDispatchInvoice(invoiceId)
+		{
+		    jQuery('.invoice-row[id="' + invoiceId + '"]').removeClass('Pending').addClass('Processing');
+
+		    if ({!AttachmentConversionEnabled})
+			    GetInvoiceDetails(invoiceId);
+			else
+   				dispatchInvoice(invoiceId, null);
+   		}
+
+    	function dispatchInvoice(invoiceId, combinedExpenseAttachmentsB64 )
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InvoiceDispatchController.DispatchInvoice}',
+	       		invoiceId,
+	       		combinedExpenseAttachmentsB64,
+	       		{!JSENCODE($CurrentPage.parameters.IncTE) == 'true'},
+	       		"{!JSENCODE($CurrentPage.parameters.IncTEType)}",
+	       		{!JSENCODE($CurrentPage.parameters.IncEI) == 'true'},
+	       		"{!JSENCODE($CurrentPage.parameters.IncEIType)}",
+	       		{!JSENCODE($CurrentPage.parameters.IncRC) == 'true'},
+	      			function(result, event){
+	             		 if (event.status) 
+			             {
+                            if(event.result)
+                            {
+                                jQuery('.invoice-row[id="' + invoiceId + '"]').removeClass('Processing').addClass('Completed').prop('title', '{!JSENCODE($Label.DispatchComplete)}');
+                                setStatusText(invoiceId, '{!JSENCODE($Label.DispatchComplete)}');
+                            }
+							else
+                            {
+                                jQuery('.invoice-row[id="' + invoiceId + '"]').removeClass('Processing').addClass('Failed').prop('title', '{!JSENCODE($Label.DispatchFailed)}');
+                                setStatusText(invoiceId, '{!JSENCODE($Label.DispatchFailed)}');
+                            }
+			         	 } 
+			         	 else 
+			         	 {
+			             	jQuery('.invoice-row[id="' + invoiceId + '"]').removeClass('Processing').addClass('Failed').prop('title', '{!JSENCODE($Label.DispatchFailed)}: ' + event.message);
+                            setStatusText(invoiceId, '{!JSENCODE($Label.DispatchFailed)}: ' + event.message);
+			         	 }
+
+                        updateTotals();
+                        
+                        if(jQuery('.invoice-row.Pending').length > 0)
+                        {
+                            startDispatchInvoice(jQuery(jQuery('.invoice-row.Pending')[0]).prop('id'));
+						}
+						else
+						{
+						    // reload the page if we have a 1000 rows as quite likely there are more pages - only do this if we have no errors on display
+							if(jQuery('.invoice-row').length == {!PAGELIMIT} && jQuery('.invoice-row.Failed').length == 0)
+							{
+								jQuery('#jobStatus').text('Refreshing');
+								window.location.reload();
+							}
+							else if(jQuery('.invoice-row.Failed').length > 0)
+							{
+							    jQuery('#jobStatus').text('{!JSENCODE($Label.ProcessingErrorMessage)}');
+       						}
+						}
+                    },
+	         	{escape: true, timeout: 60000}
+	     	);
+		}
+
+        function updateTotals()
+        {
+            jQuery("span[id='completed-count']").text(jQuery('.invoice-row.Completed').length);
+            jQuery("span[id='pending-count']").text(jQuery('.invoice-row.Pending').length);
+            jQuery("span[id='failed-count']").text(jQuery('.invoice-row.Failed').length);
+            
+            if(jQuery('.invoice-row.Pending').length == 0) jQuery('#jobStatus').text('{!JSENCODE($Label.DispatchComplete)}');
+        }
+    
+	</script>	
+
+</apex:define>
+
+</apex:composition>
+</apex:page>

@@ -1,0 +1,848 @@
+<apex:page controller="guar.GuestAccessReportController" showheader="false" sidebar="false" lightningStyleSheets="true">
+    <apex:slds />
+<style>
+.red {
+    background-color: red;
+    color: white;
+}
+.green {
+    background-color: green;
+    color: white;
+}  
+.yellow {
+    background-color: yellow;
+    color: black;
+}   
+.hide {
+    visibility: hidden;
+}
+.green-highlight {
+    background: #00ff00;
+}
+.highlight-values {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+.disclaimer {
+    font-size: 1.5em;
+    font-weight: bold;
+    text-align: center;
+}
+.important {
+    font-size: 2em;
+    color: red;
+    font-weight: bold;
+    text-align: center;
+}
+h1 {
+    font-size: 2em;
+}
+.wrapper {
+    padding: 2rem;
+}
+
+.wrapper th {
+    white-space: normal;
+}
+
+.wrapper td {
+    padding: 0px 10px 0px 10px;
+}
+
+.wrapper table {
+    border-color: black;
+}
+
+.wrapper .flowLink {
+    color: white;
+    text-decoration: underline;
+    font-size: smaller;
+}
+
+.wrapper .yellow a {
+    color: black;
+}
+
+.wrapper .securityUpdatesTable li {
+    margin-left: 1.5em;
+    list-style-type: square;
+}
+
+.wrapper .greenLight {
+    margin-top: 50px;
+    margin-bottom: 20px;
+    font-size: medium;
+    text-align: center;
+}
+
+.wrapper .greenLight button,
+.wrapper .greenLight button:active,
+.wrapper .greenLight button:hover,
+.wrapper .greenLight button:focus,
+.wrapper .greenLight button:visited {
+    background-color: green;
+    border-color: green;
+    box-shadow: 1px 1px 20px 5px #9aff00;
+    padding: 10px;
+    color: white;
+    margin-top: 10px;
+}
+
+.wrapper .greenLight a,
+.wrapper .greenLight a:hover,
+.wrapper .greenLight a:focus,
+.wrapper .greenLight a:visited,
+.wrapper .greenLight a:active {
+    color: white;
+}
+
+.wrapper .version {
+    width: 100%;
+    text-align: right;
+}
+
+.wrapper .loadingStatus {
+    transform: translate(0%, 230%) rotate(0deg);
+    width: 100vw;
+    text-align: center;
+    font-weight: bolder;
+    background-color: white;
+    height: 32vh;
+    border: 1px solid #1589ee;
+}
+
+.wrapper .loadingStatus .loadingStatusChild {
+    display: inline-block;
+    text-align:left;
+}
+
+.wrapper .slds-spinner_container {
+    top: -30vh;
+}
+
+.wrapper .custom-close-container {
+    vertical-align: top;
+    margin-top: 10px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.wrapper .slds-icon-custom-close {
+    background-color: #b59a9a;
+    border-radius: 20px;
+    padding: 5px;
+    width: 30px;
+}
+.wrapper .custom-close-container .custom-close-text {
+    font-size: smaller;
+}
+
+@media print {
+  a[href]:after {
+    content: none !important;
+  }
+}
+
+</style>
+
+<apex:outputPanel rendered="{!userType != 'Guest'}">
+    <p class="slds-m-around_x-large">
+        You are attempting to run this report as <b>{!userName}</b>. This report should run as a Guest user of a specific force.com site or community. 
+        Please copy the link and open a different or incognito / private browsing session and paste / navigate to the link there.
+    </p>
+</apex:outputPanel>
+
+<apex:outputPanel rendered="{!userType == 'Guest'}">
+
+<div class="slds-scope wrapper">
+    
+<div id="spinner" style="height:6rem">
+    <div class="slds-spinner_container slds-is-fixed">
+        <div role="status" class="slds-spinner slds-spinner_large slds-spinner_brand">
+            <span class="slds-assistive-text">Loading</span>
+            <div class="slds-spinner__dot-a"></div>
+            <div class="slds-spinner__dot-b"></div>
+        </div>
+        <div class="loadingStatus">
+            <div id="loadingStatusDiv" class="loadingStatusChild">
+
+                <div class="custom-close-container slds-hide">
+                    <span class="slds-icon_container slds-icon-custom-close" title="Close" onclick="closeLoadingStatus();">
+                        <img src="/apexpages/slds/latest/assets/icons/action/close_60.png"/>
+                        <span class="slds-assistive-text">Close</span>
+                    </span>
+                    <div class="custom-close-text">Close</div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<p class="important">
+    IMPORTANT: Remember to immediately revoke public access to this page for all your communities' Guest User profiles once you finish running the reports.
+</p>
+<br/>
+<p class="disclaimer">
+    Note: Use this tool to check your security settings after you’ve read the security updates and recommendations by Salesforce. 
+    Ensure you have a good understanding of any upcoming changes and their potential impact. 
+    Do not use this tool as your only security check - it is meant to offer some guidance / insights throughout your assessment of your org, 
+    but it is NOT a definitive assessment of your org.
+</p>
+<br/>
+<p class="disclaimer">
+    It is recommended to run this report before and after activating security updates and making any security modifications in your org, so you can compare impact.
+</p>
+<br/>
+<p class="disclaimer">
+    A separate report should be run for each Community Guest user.
+</p>
+<br/>
+<p class="disclaimer">
+    For help in using this report or securing your org, please post to the trailblazer community group 
+    <a href="https://success.salesforce.com/_ui/core/chatter/groups/GroupProfilePage?g=0F93A0000004mDI" target="_blank">Securing Community Cloud</a> 
+    using the topic <a href="https://success.salesforce.com/_ui/core/chatter/topics/TopicPage?name=SecureMyGuestUser" target="_blank">#SecureMyGuestUser</a>
+</p>
+<br/>
+<p class="disclaimer">
+    Upon clicking the 'help me secure this' link, your Org's configuration metadata regarding Guest User Access will be passed to a Salesforce-managed Org in a U.S. hosted 
+    Salesforce instance to identify the next suggested steps. This metadata is temporarily processed only and not stored / persisted in the environment. If you do not want 
+    this to occur, do not click the 'help me secure this" link and instead use the report findings to inform any configuration updates.
+</p>
+<br/>
+<br/>
+<p class="version">
+    Guest User Access Report {!version}
+</p>
+
+<span class="" id="loadingSpan">Loading...</span>
+
+<p>&nbsp;</p>
+<h1>Legend:</h1>
+<table border="1px" >
+        <tr>
+            <th class="slds-p-vertical_small">Indicator</th>
+            <th class="slds-p-vertical_small">Explanation</th>
+        </tr>
+        <tr>
+            <td class="red slds-p-vertical_small">Potential Risk</td>
+            <td class="slds-p-vertical_small">Potential Risk detected due to not adhering to best practices. These items should be remediated. (Some exceptions with profile permissions)</td>
+        </tr>
+        <tr>
+            <td class="yellow slds-p-vertical_small">Potential Risk</td>
+            <td class="slds-p-vertical_small">Potential Risk flagged. Must be further reviewed / assessed to determine risk with higher confidence.
+                <br/><br/> <ul>
+                <li><b>Security Updates:</b> The report may not be able to make an accurate determination. 
+                                Review release notes and best practices against your org configuration to determine risks with higher confidence. </li>
+                <li><br/></li>
+                <li><b>Record Data:</b> Review and determine best practices are being followed, and any data being exposed is being done so intentionally.</li>
+                <li><br/></li>
+                <li><b>Permissions:</b> Review and determine whether to grant or revoke.</li>
+                <li><br/></li>
+                <li><b>AuraEnabled Apex classes:</b> The report will highlight any class with potential risks that is:<br/> 
+                    1) AuraEnabled or maybe AuraEnabled (if part of a managed package and the report cannot read the code within the class)<br/>
+                    2) If the Guest User profile does not have access to the class</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td class="green slds-p-vertical_small">no Risk</td>
+            <td class="slds-p-vertical_small">No Risk detected by the report</td>
+        </tr>
+</table>
+
+
+<p>&nbsp;</p>
+<h1>Org Community Information:</h1>
+<table border="1px" >
+    <tr>
+        <th>Report for this Community?</th>
+        <th>Site Name</th>
+        <th>Guest User Name</th>
+        <th>Guest User Profile Name</th>
+        <th>Run Guest Access Report</th>
+    </tr>  
+    <apex:repeat value="{!siteInfoList}" var="siteObj" id="siteInfo">
+        <tr class="{!IF(siteObj.selectedCommunity,'green-highlight','')}">
+            <td>
+                <apex:outputText rendered="{!siteObj.selectedCommunity}">
+                    <input type="checkbox" checked="checked" disabled="disabled" />
+                </apex:outputText>
+                <apex:outputText rendered="{!!siteObj.selectedCommunity}">
+                    <input type="checkbox" disabled="disabled" />
+                </apex:outputText>
+            </td>
+            <td>{!siteObj.siteName}</td>
+            <td><a href="{!siteObj.internalDomain + '/' + siteObj.siteGuestUserId}">{!siteObj.siteGuestUserName}</a></td>
+            <td><a href="{!siteObj.internalDomain + '/' + siteObj.siteGuestUserProfileId}">{!siteObj.siteGuestUserProfileName}</a></td>
+            <td><a href="{!siteObj.siteDomain + '/' + siteObj.sitePrefix + '/apex/' + IF(isInNamespace,'guar__guestaccessreport','guestaccessreport')}">Run Report</a></td>
+
+        </tr>
+    </apex:repeat>
+</table>
+
+<p>&nbsp;</p><p>&nbsp;</p>
+
+<h1>Report for Community (<span class="green-highlight highlight-values">{!currentCommunityName}</span>) with Guest User (<span class="green-highlight highlight-values">{!currentUserName}</span>). Ran on [<span class="green-highlight highlight-values"><apex:outputText value="{!NOW()}"/></span>]:</h1>
+
+<p>&nbsp;</p>
+<h1>Potential Impact of Security Updates on your org:</h1>
+<apex:outputPanel id="securityUpdatesPanel">
+
+<apex:outputPanel rendered="{!!readyToDisplaySecurityUpdatesTable}"><p>Assessing...</p></apex:outputPanel>
+<apex:outputPanel rendered="{!readyToDisplaySecurityUpdatesTable}">
+<table class="securityUpdatesTable" border="1px" >
+    <tr>
+        <th>Learn More</th>
+        <th>Security Update</th>
+        <th>Impact</th>
+        <th>Details</th>
+    </tr>
+    <tr>
+        <td>
+            <ul>
+            <li>
+                <a href="https://releasenotes.docs.salesforce.com/en-us/winter20/release-notes/rn_networks_guest_users_owds.htm" target="_blank">Release Notes</a> <br/>
+            </li>
+            <li>
+                <a href="https://success.salesforce.com/_ui/core/chatter/topics/TopicPage?name=DefaultRecordOwner-Mar%2720" target="_blank">#Guest-DefaultOWD-Mar’20</a>
+            </li>
+            </ul>
+        </td>
+        <td>Guest Default OWD Settings (Secure Guest User Record Access setting)</td>
+        <td class="{!IF(!securityUpdatesInfoObject.GuestDefaultVisibility,'green','yellow')}">{!IF(!securityUpdatesInfoObject.GuestDefaultVisibility,'no risk','potential risk')}</td>
+        <td>The report will attempt to detect one or more objects' records being exposed to the guest user. Review your External OWD sharing settings and avoid Public Read Only and Public Read/Write configuration.</td>
+    </tr>
+    <tr>
+            <td>
+                <ul>
+                <li>
+                    <a href="https://releasenotes.docs.salesforce.com/en-us/winter20/release-notes/rn_networks_guest_user_sharing_rule.htm" target="_blank">Release Notes</a> <br/>
+                </li>
+                <li>
+                    <a href="https://success.salesforce.com/_ui/core/chatter/topics/TopicPage?name=GuestUserSharingRules-Mar%2720" target="_blank">#GuestUserSharingRules-Mar’20</a>
+                </li>
+                </ul>
+            </td>
+            <td>Guest User Sharing Rules</td>
+            <td class="{!IF(!securityUpdatesInfoObject.GuestUserSharing,'green','yellow')}">{!IF(!securityUpdatesInfoObject.GuestUserSharing,'no risk','potential risk')}</td>
+            <td>The report will attempt to detect if the guest user profile has access to one or more objects.</td>
+        </tr>
+    <tr>
+        <td>
+            <ul>
+            <li>
+                <a href="https://releasenotes.docs.salesforce.com/en-us/winter20/release-notes/rn_networks_guest_user_visibility.htm" target="_blank">Release Notes</a> <br/>
+            </li>
+            <li>
+                <a href="https://success.salesforce.com/_ui/core/chatter/topics/TopicPage?name=GuestUserVisibility-Winter%2720" target="_blank">#GuestUserVisibility-Winter’20</a>
+            </li>
+            </ul>
+        </td>
+        <td>Guest User Visibility</td>
+        <td class="{!IF(!securityUpdatesInfoObject.GuestUserVisibility,'green','yellow')}">{!IF(!securityUpdatesInfoObject.GuestUserVisibility,'no risk','potential risk')}</td>
+        <td>The report will attempt to detect one or more User records being exposed to the guest user.</td>
+    </tr>
+    <tr>
+        <td>
+            <ul>
+            <li>
+                <a href="https://releasenotes.docs.salesforce.com/en-us/winter20/release-notes/rn_networks_guest_perms_removed.htm" target="_blank">Release Notes</a> <br/>
+            </li>
+            <li>
+                <a href="https://success.salesforce.com/_ui/core/chatter/topics/TopicPage?name=GuestPermsRetirement-Spring%2720" target="_blank">#GuestPermsRetirement-Spring’20</a>
+            </li>
+            </ul>
+        </td>
+        <td>Guest Profile Changes</td>
+        <td class="{!IF(!securityUpdatesInfoObject.GuestProfileChanges,'green','red')}">{!IF(!securityUpdatesInfoObject.GuestProfileChanges,'no risk','potential risk')}</td>
+        <td>The report will attempt to detect one or more enabled permissions on the Guest user profile that are either being retired or defaulting to false / unchecked.</td>
+    </tr>
+    <tr>
+        <td>
+            <ul>
+            <li>
+                <a href="https://releasenotes.docs.salesforce.com/en-us/winter20/release-notes/rn_networks_guest_perms_removed.htm" target="_blank">Release Notes</a> <br/>
+            </li>
+            <li>
+                <a href="https://success.salesforce.com/_ui/core/chatter/topics/TopicPage?name=ViewAllUsers-Mar%2720" target="_blank">#ViewAllUsers-Mar’20</a>
+            </li>
+            </ul>
+        </td>
+        <td>View All Users</td>
+        <td class="{!IF(!securityUpdatesInfoObject.ViewAllUsers,'green','red')}">{!IF(!securityUpdatesInfoObject.ViewAllUsers,'no risk','potential risk')}</td>
+        <td>The report will attempt to detect if the "View All Users" permission on the Guest user profile is enabled and exposing User records to the Guest user. Changes to this permission may impact this configuration.</td>
+    </tr>
+    <tr>
+        <td>
+            <ul>
+            <li>
+                <a href="https://releasenotes.docs.salesforce.com/en-us/winter20/release-notes/rn_networks_reassign_guest_records.htm" target="_blank">Release Notes</a> <br/>
+            </li>
+            <li>
+                <a href="https://success.salesforce.com/_ui/core/chatter/topics/TopicPage?name=DefaultRecordOwner-Mar%2720" target="_blank">#DefaultRecordOwner-Mar’20</a>
+            </li>
+            </ul>
+        </td>
+        <td>Guest Cannot Own Records</td>
+        <td class="{!IF(!securityUpdatesInfoObject.GuestCannotOwnRecords,'green','red')}">{!IF(!securityUpdatesInfoObject.GuestCannotOwnRecords,'no risk','potential risk')}</td>
+        <td>The report will attempt to detect one or more objects' records that are owned by the Guest user.</td>
+    </tr>
+    <tr>
+        <td>
+            <ul>
+            <li>
+                <a href="https://releasenotes.docs.salesforce.com/en-us/winter20/release-notes/rn_lc_apex_with_sharing_cruc.htm" target="_blank">Release Notes</a> <br/>
+            </li>
+            <li>
+                <a href="https://success.salesforce.com/_ui/core/chatter/topics/TopicPage?name=AuraEnabledApex-Spring%2720" target="_blank">#AuraEnabledApex-Spring’20</a>
+            </li>
+            </ul>
+        </td>
+        <td>AuraEnabled Apex</td>
+        <td class="{!IF(!securityUpdatesInfoObject.AuraEnabledControllers,'green','red')}">{!IF(!securityUpdatesInfoObject.AuraEnabledControllers,'no risk','potential risk')}</td>
+        <td>The report will attempt to detect if there are some AuraEnabled methods in Apex controllers which the Guest User profile does not have access to. If an apex class is part of a managed package, it will be flagged as a risk for review.</td>
+    </tr>
+    <tr>
+        <td>
+            <ul>
+            <li>
+                <a href="https://releasenotes.docs.salesforce.com/en-us/winter20/release-notes/rn_networks_standard_external_profile_restrictions.htm" target="_blank">Release Notes</a> <br/>
+            </li>
+            <li>
+                <a href="https://success.salesforce.com/_ui/core/chatter/topics/TopicPage?name=SelfRegOnStandardProfiles-Dec%2719" target="_blank">#SelfRegOnStandardProfiles-Dec’19</a>
+            </li>
+            </ul>
+        </td>
+        <td>Standard Profiles for Self Registration</td>
+        <td class="{!IF(!securityUpdatesInfoObject.SelfRegStandardProfiles,'green','red')}">{!IF(!securityUpdatesInfoObject.SelfRegStandardProfiles,'no risk','potential risk')}</td>
+        <td>The report will attempt to detect if there are any external users assigned a standard (non-custom) profile.</td>
+    </tr>
+    
+</table>
+</apex:outputPanel>
+
+</apex:outputPanel>
+
+
+<p>&nbsp;</p><p>&nbsp;</p>
+<apex:outputPanel id="objectInfoTitlePanel">
+<h1>Object Access Information ({!mapObjectKeysLength}):</h1>
+</apex:outputPanel>
+<span class="" id="objectTableLoadingSpan">Calculating...</span>
+<span class="hide" id="objectTableSpan">
+<apex:outputPanel id="objectInfoPanel">
+<table class="objectTable" border="1px" >
+        <tr class="slds-p-around_small">
+            <th>#</th>
+            <th>Object Name</th>
+            <th>Is Custom?</th>
+            <th>Is Exposing Data?</th>
+            <th>Total Number of Records with Access To</th>
+            <th>Total Number of Records Owned</th>
+            <th>Total Number of Records due to Owner Sharing</th>
+            <th>Total Number of Records due to Manual and/or Apex Sharing</th>
+            <th>Total Number of Records due to Non-Guest Sharing Rules</th>
+            <th>Total Number of Records due to Guest Sharing Rules</th>
+            <th>Profile Read Access?</th>
+            <th>Profile Create Access?</th>
+            <th>Profile Edit Access?</th>
+            <th>Profile Delete Access?</th>
+            <th>Profile View All Access?</th>
+            <th>Profile Modify All Access?</th>
+            
+            <!-- commenting these out as they are irrelevant
+            <th>Query Access?</th>
+            <th>Read Access?</th>
+            <th>Create Access?</th>
+            <th>Update Access?</th>
+            <th>Delete Access?</th>
+            -->
+        </tr>                    
+    <apex:variable value="{!1}" var="objectInfoCounter"/>
+    <apex:repeat value="{!mapObjectKeys}" var="objName" id="objectInfo">
+        <tr class="slds-p-around_small">
+            <td>{!objectInfoCounter}</td>
+            <td>{!mapObjectInfo[objName].objectName}</td>
+            <td>{!mapObjectInfo[objName].isCustom}</td>
+            <td class="{!mapObjectInfo[objName].isExposingDataColor}">{!IF(mapObjectInfo[objName].isExposingData,'potential risk','no risk')} <apex:outputPanel rendered="{!mapObjectInfo[objName].isExposingData}"> - <a href="{!mapObjectInfo[objName].flowUrl}" class="flowLink" target="_blank">Help me secure this</a></apex:outputPanel></td>
+            <td class="{!IF(AND(NOT(ISBLANK(mapObjectInfo[objName].totalRecordsWithAccessTo)),mapObjectInfo[objName].totalRecordsWithAccessTo > 0,objName == 'eventrelation' || AND(mapObjectInfo[objName].totalRecordsOwned > 0, (objName == 'event' || objName == 'task'))),'red',IF(AND(NOT(ISBLANK(mapObjectInfo[objName].totalRecordsWithAccessTo)),mapObjectInfo[objName].totalRecordsWithAccessTo > 0),'yellow','green'))}"><span id="totalRecordsSpan-{!objName}">{!IF(ISBLANK(mapObjectInfo[objName].totalRecordsWithAccessTo),'Loading values...',mapObjectInfo[objName].totalRecordsWithAccessToLabel)}</span><input class="totalRecords" value="{!objName}" id="totalRecords-{!objName}" type="hidden"/></td>
+            <td class="{!IF(AND(NOT(ISBLANK(mapObjectInfo[objName].totalRecordsOwned)),mapObjectInfo[objName].totalRecordsOwned > 0, objName == 'event' || objName == 'task'),'red',IF(AND(NOT(ISBLANK(mapObjectInfo[objName].totalRecordsOwned)),mapObjectInfo[objName].totalRecordsOwned > 0),'yellow','green'))}"><span id="totalRecordsOwnedSpan-{!objName}">{!IF(ISBLANK(mapObjectInfo[objName].totalRecordsOwned),'Loading values...',mapObjectInfo[objName].totalRecordsOwnedLabel)}</span><input class="totalRecordsOwned" value="{!objName}" id="totalRecordsOwned-{!objName}" type="hidden"/></td>
+            <td class="{!IF(AND(NOT(ISBLANK(mapObjectInfo[objName].totalRecordsWithOwnerShare)),mapObjectInfo[objName].totalRecordsWithOwnerShare > 0),'red','green')}"><span id="totalRecordsOwnerShareSpan-{!objName}">{!IF(ISBLANK(mapObjectInfo[objName].totalRecordsWithOwnerShare),'Loading values...',mapObjectInfo[objName].totalRecordsWithOwnerShareLabel)}</span><input class="totalRecordsOwnerShare" value="{!objName}" id="totalRecordsOwnerShare-{!objName}" type="hidden"/></td>
+            <td class="{!IF(AND(NOT(ISBLANK(mapObjectInfo[objName].totalRecordsWithManualShare)),mapObjectInfo[objName].totalRecordsWithManualShare > 0),'red','green')}"><span id="totalRecordsManualShareSpan-{!objName}">{!IF(ISBLANK(mapObjectInfo[objName].totalRecordsWithManualShare),'Loading values...',mapObjectInfo[objName].totalRecordsWithManualShareLabel)}</span><input class="totalRecordsManualShare" value="{!objName}" id="totalRecordsManualShare-{!objName}" type="hidden"/></td>
+            <td class="{!IF(AND(NOT(ISBLANK(mapObjectInfo[objName].totalRecordsWithRuleShare)),mapObjectInfo[objName].totalRecordsWithRuleShare > 0),'red','green')}"><span id="totalRecordsRuleShareSpan-{!objName}">{!IF(ISBLANK(mapObjectInfo[objName].totalRecordsWithRuleShare),'Loading values...',mapObjectInfo[objName].totalRecordsWithRuleShareLabel)}</span><input class="totalRecordsRuleShare" value="{!objName}" id="totalRecordsRuleShare-{!objName}" type="hidden"/></td>
+            <td class="{!IF(AND(NOT(ISBLANK(mapObjectInfo[objName].totalRecordsWithGuestRuleShare)),mapObjectInfo[objName].totalRecordsWithGuestRuleShare > 0),'yellow','green')}"><span id="totalRecordsGuestRuleShareSpan-{!objName}">{!IF(ISBLANK(mapObjectInfo[objName].totalRecordsWithGuestRuleShare),'Loading values...',mapObjectInfo[objName].totalRecordsWithGuestRuleShareLabel)}</span><input class="totalRecordsRuleGuestShare" value="{!objName}" id="totalRecordsGuestRuleShare-{!objName}" type="hidden"/></td>
+            <td class="{!IF(mapObjectInfo[objName].hasProfileReadAccess,'yellow','green')}">{!IF(mapObjectInfo[objName].hasProfileReadAccess,'potential risk','no risk')}</td>
+            <td class="{!IF(mapObjectInfo[objName].hasProfileCreateAccess,'yellow','green')}">{!IF(mapObjectInfo[objName].hasProfileCreateAccess,'potential risk','no risk')}</td>
+            <td class="{!IF(mapObjectInfo[objName].hasProfileEditAccess,'red','green')}">{!IF(mapObjectInfo[objName].hasProfileEditAccess,'potential risk','no risk')}</td>
+            <td class="{!IF(mapObjectInfo[objName].hasProfileDeleteAccess,'red','green')}">{!IF(mapObjectInfo[objName].hasProfileDeleteAccess,'potential risk','no risk')}</td>
+            <td class="{!IF(mapObjectInfo[objName].hasProfileViewAllAccess,'red','green')}">{!IF(mapObjectInfo[objName].hasProfileViewAllAccess,'potential risk','no risk')}</td>
+            <td class="{!IF(mapObjectInfo[objName].hasProfileModifyAllAccess,'red','green')}">{!IF(mapObjectInfo[objName].hasProfileModifyAllAccess,'potential risk','no risk')}</td>
+            
+            <!-- commenting these out as they are irrelevant
+            <td class="{!IF(mapObjectInfo[objName].hasQueryAccess,'yellow','green')}">{!IF(mapObjectInfo[objName].hasQueryAccess,'potential risk','no risk')}</td>
+            <td class="{!IF(mapObjectInfo[objName].hasReadAccess,'yellow','green')}">{!IF(mapObjectInfo[objName].hasReadAccess,'potential risk','no risk')}</td>
+            <td class="{!IF(mapObjectInfo[objName].hasCreateAccess,'yellow','green')}">{!IF(mapObjectInfo[objName].hasCreateAccess,'potential risk','no risk')}</td>
+            <td class="{!IF(mapObjectInfo[objName].hasUpdateAccess,'red','green')}">{!IF(mapObjectInfo[objName].hasUpdateAccess,'potential risk','no risk')}</td>
+            <td class="{!IF(mapObjectInfo[objName].hasDeleteAccess,'red','green')}">{!IF(mapObjectInfo[objName].hasDeleteAccess,'potential risk','no risk')}</td>          
+            -->
+        </tr>
+        <apex:variable var="objectInfoCounter" value="{!objectInfoCounter + 1}"/>
+    </apex:repeat>
+
+</table>
+</apex:outputPanel>
+</span>
+<p>&nbsp;</p><p>&nbsp;</p><p>&nbsp;</p>
+
+
+<p>&nbsp;</p><p>&nbsp;</p>
+<h1>Permission Set / Permission Set Group Membership Information (<span class="{!IF(permissionSetMembershipList.size > 0,'yellow','green')}">{!permissionSetMembershipList.size} - {!IF(permissionSetMembershipList.size > 0,'potential risk','no risk')}</span>):</h1>
+<br/>
+<h1><b>Note: </b> This report does not reflect access from Permission Sets or Permission Set Groups. 
+    Impact from Permission Sets and/or Permission Set Groups should be reviewed manually by an admin. 
+    This <a href="https://appexchange.salesforce.com/appxListingDetail?listingId=a0N3A00000FYkDDUA1" target="_blank">User Access Report</a> tool might also help with assessing the impact from permisson sets and permission set groups, as it does include those calculations. 
+</h1>
+<table border="1px" >
+    <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Type</th>
+    </tr>
+    <apex:variable value="{!1}" var="permissionSetMembershipInfoCounter"/>
+    <apex:repeat value="{!permissionSetMembershipList}" var="permissionSetObj" id="permissionSetMembershipInfo">
+        <tr>
+            <td>{!permissionSetMembershipInfoCounter}</td>
+            <td><a href="{!permissionSetObj.value}">{!permissionSetObj.name}</a></td>
+            <td>{!permissionSetObj.type}</td>
+        </tr>
+        <apex:variable var="permissionSetMembershipInfoCounter" value="{!permissionSetMembershipInfoCounter + 1}"/>
+    </apex:repeat>
+
+</table>
+
+
+<p>&nbsp;</p><p>&nbsp;</p>
+<h1>Queue / Public Group Membership Information (<span class="{!IF(publicGroupMembershipList.size > 0,'red','green')}">{!publicGroupMembershipList.size} - {!IF(publicGroupMembershipList.size > 0,'potential risk','no risk')}</span>):</h1>
+<table border="1px" >
+    <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Type</th>
+    </tr>
+    <apex:variable value="{!1}" var="publicGroupMembershipInfoCounter"/>
+    <apex:repeat value="{!publicGroupMembershipList}" var="publicGroupObj" id="publicGroupMembershipInfo">
+        <tr>
+            <td>{!publicGroupMembershipInfoCounter}</td>
+            <td><a href="{!publicGroupObj.value}">{!publicGroupObj.name}</a></td>
+            <td>{!publicGroupObj.type}</td>
+        </tr>
+        <apex:variable var="publicGroupMembershipInfoCounter" value="{!publicGroupMembershipInfoCounter + 1}"/>
+    </apex:repeat>
+
+</table>
+
+<p>&nbsp;</p><p>&nbsp;</p>
+<h1>Profile Permission Information:</h1>
+<p class="slds-m-top_medium">This table displays the permission API names, which do not match the labels on the profile UI. 
+    The recommended way to update these permissions is by using a tool like data loader or 
+    <a href="https://workbench.developerforce.com/update.php?sourceType=singleRecord&id={!currentUserProfileId}" target="_blank">workbench (copy link and open as admin)</a>. 
+    Query the guest user profile and set as many of these permissions to false as possible.</p>
+    <p class="slds-m-bottom_medium"><b>Note 1:</b> You may not be able to set all of the permissions to false, some will error when setting to false - you can ignore those and leave them set to true.</p>
+    <p class="slds-m-bottom_medium"><b>Note 2:</b> This report cannot differentiate between high risk permissions and low risk permissions, so any permission set to true is flagged as red potential risk. Admin/manual assessment is best suited to classify the risk level for enabled/flagged permissions.</p>
+
+<table border="1px" >
+    <tr>
+        <th>#</th>
+        <th>Permission Name</th>
+        <th>Permission Value</th>
+    </tr>
+    <apex:variable value="{!1}" var="profilePermissionInfoCounter"/>
+    <apex:repeat value="{!profilePermissionInfoList}" var="profilePermissionObjTmp" id="profilePermissionInfoTmp">
+            <apex:repeat value="{!profilePermissionObjTmp}" var="profilePermissionObj" id="profilePermissionInfoTmp">
+                <tr>
+                    <td>{!profilePermissionInfoCounter}</td>
+                    <td>{!profilePermissionObj.name}</td>
+                    <td class="{!IF(profilePermissionObj.value == 'false','green','red')}">{!IF(profilePermissionObj.value == 'false','no risk','potential risk')}</td>
+                </tr>
+                <apex:variable var="profilePermissionInfoCounter" value="{!profilePermissionInfoCounter + 1}"/>
+            </apex:repeat>
+    </apex:repeat>
+</table>
+
+
+
+<p>&nbsp;</p><p>&nbsp;</p>
+<apex:outputPanel id="apexClassInfo" rendered="{!!bypassApexInfo}">
+    <h1>AuraEnabled Apex Profile Permission Information ({!apexClassInfoTotals}{!IF(apexClassInfoTotals > 10000,'+','')}):</h1>
+    <apex:outputPanel rendered="{!!apexClassInfoComplete}">
+        <p>Loading...</p>
+    </apex:outputPanel>
+<table border="1px" >
+    <tr>
+        <th>#</th>
+        <th>Apex Class Name</th>
+        <th>Apex Class Namespace Prefix</th>
+        <th>Has AuraEnabled Methods?</th>
+        <th>Is Accessible by Guest Profile?</th>
+    </tr>
+    <apex:variable value="{!1}" var="apexClassInfoCounter"/>
+    <apex:repeat value="{!apexClassInfoList}" var="apexClassInfoObjTmp" id="profileApexPermissionInfoTmp">
+        <apex:repeat value="{!apexClassInfoObjTmp}" var="apexClassInfoObj" id="profileApexPermissionInfo">
+            <tr>
+                <td>{!apexClassInfoCounter}</td>
+                <td>{!apexClassInfoObj.name}</td>
+                <td>{!apexClassInfoObj.namespacePrefix}</td>
+                <td>{!apexClassInfoObj.hasAuraEnabled}</td>
+                <td class="{!IF(apexClassInfoObj.isAccessibleByGuestProfile == 'false','yellow','green')}">{!IF(apexClassInfoObj.isAccessibleByGuestProfile == 'false','potential risk','no risk')}</td>
+            </tr>
+            <apex:variable var="apexClassInfoCounter" value="{!apexClassInfoCounter + 1}"/>
+        </apex:repeat>
+    </apex:repeat>
+</table>
+</apex:outputPanel>
+
+</div>
+
+
+<apex:outputPanel id="apexClassInfoComplete">
+    <script>
+        var apexClassInfoComplete = '{!apexClassInfoComplete}';
+    </script>
+</apex:outputPanel>
+
+<apex:outputPanel id="objectInfoComplete">
+    <script>
+        var objectInfoComplete = '{!objectInfoComplete}';
+    </script>
+</apex:outputPanel>
+
+
+<apex:form >
+
+<apex:actionFunction action="{!rerenderTables}" 
+                    name="rerenderTables" 
+                    rerender="securityUpdatesPanel,apexClassInfo"
+                    oncomplete="removeSpinner()">
+</apex:actionFunction>
+
+
+<apex:actionFunction action="{!buildApexClassInfoList}" 
+                    name="buildApexClassInfoList" 
+                    rerender="apexClassInfoComplete" 
+                    oncomplete="checkApexClassInfoCompletion()">
+</apex:actionFunction>
+
+<apex:actionFunction action="{!updateTotalCounts}" 
+                    name="updateTotalCounts" 
+                    rerender="objectInfoPanel" 
+                    oncomplete="doBuildApexClassInfoList()">
+    <apex:param name="firstParam" assignTo="{!totalCountsMap}" value="" />
+</apex:actionFunction>
+
+<apex:actionFunction action="{!buildProfileObjectInfoMap}" 
+                    name="buildProfileObjectInfoMap" 
+                    rerender="objectInfoPanel,objectInfoComplete,objectInfoTitlePanel" 
+                    oncomplete="checkBuildProfileObjectInfoMapComplete()">
+</apex:actionFunction>
+
+</apex:form>
+
+<script>
+    var totalRecordsMap = {};
+    function getTotalRecords(objInfo) {
+        
+
+            Visualforce.remoting.Manager.invokeAction(
+                '{!$RemoteAction.GuestAccessReportController.getTotalRecordCount}',
+                objInfo.objName, 
+                function(result, event){
+                    var tmpOI = {};
+                    
+                    try{ 
+
+                        if (event.status) {
+                            // Get DOM IDs for HTML and Visualforce elements like this
+                            var outputResultTotalRecords = (result.totalRecordsWithAccessTo === -1) ? 'N/A' : result.totalRecordsWithAccessTo;
+                            var outputResultTotalRecordsOwned = (result.totalRecordsOwned === -1) ? 'N/A' : result.totalRecordsOwned;
+                            var outputResultTotalRecordsManualShare = (result.totalRecordsWithManualShare === -1) ? 'N/A' : result.totalRecordsWithManualShare;
+                            var outputResultTotalRecordsRuleShare = (result.totalRecordsWithRuleShare === -1) ? 'N/A' : result.totalRecordsWithRuleShare;
+                            var outputResultTotalRecordsGuestRuleShare = (result.totalRecordsWithGuestRuleShare === -1) ? 'N/A' : result.totalRecordsWithGuestRuleShare;
+                            var outputResultTotalRecordsOwnerShare = (result.totalRecordsWithOwnerShare === -1) ? 'N/A' : result.totalRecordsWithOwnerShare;
+                            
+                            /*document.getElementById('totalRecordsSpan-'+result.objectName).innerHTML = outputResultTotalRecords + '<a href="' + result.flowPageUrl + '" target="_blank"> Help me secure this</a>';
+                            document.getElementById('totalRecordsOwnedSpan-'+result.objectName).innerHTML = outputResultTotalRecordsOwned;
+                            document.getElementById('totalRecordsManualShareSpan-'+result.objectName).innerHTML = outputResultTotalRecordsManualShare;
+                            document.getElementById('totalRecordsRuleShareSpan-'+result.objectName).innerHTML = outputResultTotalRecordsRuleShare;
+                            */
+
+                            tmpOI.objectName = result.objectName;
+                            tmpOI.totalRecordsWithAccessTo = result.totalRecordsWithAccessTo;
+                            tmpOI.totalRecordsOwned = result.totalRecordsOwned;
+                            tmpOI.totalRecordsWithManualShare = result.totalRecordsWithManualShare;
+                            tmpOI.totalRecordsWithRuleShare = result.totalRecordsWithRuleShare;
+                            tmpOI.totalRecordsWithGuestRuleShare = result.totalRecordsWithGuestRuleShare;
+                            tmpOI.totalRecordsWithOwnerShare = result.totalRecordsWithOwnerShare;
+
+                            tmpOI.totalRecordsWithAccessToLabel = (result.totalRecordsWithAccessToLabel !== null && result.totalRecordsWithAccessToLabel !== undefined) ? result.totalRecordsWithAccessToLabel : 'N/A';
+                            tmpOI.totalRecordsOwnedLabel = (result.totalRecordsOwnedLabel !== null && result.totalRecordsOwnedLabel !== undefined) ? result.totalRecordsOwnedLabel : 'N/A';
+                            tmpOI.totalRecordsWithManualShareLabel = (result.totalRecordsWithManualShareLabel != null && result.totalRecordsWithManualShareLabel != undefined) ? result.totalRecordsWithManualShareLabel : 'N/A';
+                            tmpOI.totalRecordsWithRuleShareLabel = (result.totalRecordsWithRuleShareLabel !== null && result.totalRecordsWithRuleShareLabel !== undefined) ? result.totalRecordsWithRuleShareLabel : 'N/A';
+                            tmpOI.totalRecordsWithGuestRuleShareLabel = (result.totalRecordsWithGuestRuleShareLabel !== null && result.totalRecordsWithGuestRuleShareLabel !== undefined) ? result.totalRecordsWithGuestRuleShareLabel : 'N/A';
+                            tmpOI.totalRecordsWithOwnerShareLabel = (result.totalRecordsWithOwnerShareLabel !== null && result.totalRecordsWithOwnerShareLabel !== undefined) ? result.totalRecordsWithOwnerShareLabel : 'N/A';
+
+                        } else if (event.type === 'exception') {
+                            var objNameTmp = (event.data !== undefined && event.data !== null && event.data[0] !== undefined && event.data[0] !== null) ? event.data[0] : undefined;
+                            objNameTmp = (objNameTmp === undefined && event.transaction !== undefined && event.transaction.data !== undefined && 
+                                            event.transaction !== null && event.transaction.data !== null && event.transaction.data.length > 0
+                                        ) ? event.transaction.data[0] : objNameTmp;
+
+                            document.getElementById('totalRecordsSpan-'+objNameTmp).innerHTML = event.message;
+                            
+                            tmpOI.objectName = objNameTmp;
+                            tmpOI.totalRecordsWithAccessTo = -1;
+                            tmpOI.totalRecordsOwned = -1;
+                            tmpOI.totalRecordsWithManualShare = -1;
+                            tmpOI.totalRecordsWithRuleShare = -1;
+                            tmpOI.totalRecordsWithGuestRuleShare = -1;
+                            tmpOI.totalRecordsWithOwnerShare = -1;
+
+                            tmpOI.totalRecordsWithAccessToLabel = 'N/A';
+                            tmpOI.totalRecordsOwnedLabel = 'N/A';
+                            tmpOI.totalRecordsWithManualShareLabel = 'N/A';
+                            tmpOI.totalRecordsWithRuleShareLabel = 'N/A';
+                            tmpOI.totalRecordsWithGuestRuleShareLabel = 'N/A';
+                            tmpOI.totalRecordsWithOwnerShareLabel = 'N/A';
+                        } else {
+                            var objNameTmp = (event.data !== undefined && event.data !== null && event.data[0] !== undefined && event.data[0] !== null) ? event.data[0] : undefined;
+                            objNameTmp = (objNameTmp === undefined && event.transaction !== undefined && event.transaction.data !== undefined && 
+                                            event.transaction !== null && event.transaction.data !== null && event.transaction.data[0] !== undefined && 
+                                            event.transaction.data[0] !== null) ? event.transaction.data[0] : objNameTmp;
+
+                            document.getElementById('totalRecordsSpan-'+objNameTmp).innerHTML = event.message;
+                            tmpOI.objectName = objNameTmp;
+                            tmpOI.totalRecordsWithAccessTo = -1;
+                            tmpOI.totalRecordsOwned = -1;
+                            tmpOI.totalRecordsWithManualShare = -1;
+                            tmpOI.totalRecordsWithRuleShare = -1;
+                            tmpOI.totalRecordsWithGuestRuleShare = -1;
+                            tmpOI.totalRecordsWithOwnerShare = -1;
+
+                            tmpOI.totalRecordsWithAccessToLabel = 'N/A';
+                            tmpOI.totalRecordsOwnedLabel = 'N/A';
+                            tmpOI.totalRecordsWithManualShareLabel = 'N/A';
+                            tmpOI.totalRecordsWithRuleShareLabel = 'N/A';
+                            tmpOI.totalRecordsWithGuestRuleShareLabel = 'N/A';
+                            tmpOI.totalRecordsWithOwnerShareLabel = 'N/A';
+                        }
+
+                        totalRecordsMap[tmpOI.objectName] = tmpOI;
+                        
+                    } catch(err) {
+
+                    }
+
+                    checkTotalCountCompletion();
+                }, 
+                {escape: true, buffer: false,timeout: 120000}
+            );
+
+    }
+
+    function checkTotalCountCompletion() 
+    {
+        var objectNameElementList = document.getElementsByClassName('totalRecords');
+        if(objectNameElementList.length === Object.keys(totalRecordsMap).length)
+        {
+            updateTotalCounts(JSON.stringify(totalRecordsMap));
+            document.getElementById('loadingSpan').classList.add('hide');
+            document.getElementById('objectTableLoadingSpan').classList.add('hide');
+            document.getElementById('objectTableSpan').classList.remove('hide');
+        }
+    }
+
+    function checkApexClassInfoCompletion()
+    {
+        if(apexClassInfoComplete !== 'true')
+        {
+            buildApexClassInfoList();
+        }
+        else
+        {
+            doRerenderTables();
+        }
+    }
+
+    function doRerenderTables()
+    {
+        rerenderTables();
+    }
+
+    function doBuildApexClassInfoList()
+    {
+        updateLoadingStatus('Retrieving AuraEnabled ApexClass Information ...');
+        checkApexClassInfoCompletion();
+    }
+
+
+    function doGetTotalRecords() 
+    {
+        updateLoadingStatus('Retrieving Object Totals ...');
+        var objectNameElementList = document.getElementsByClassName('totalRecords');
+
+        if(objectNameElementList.length && objectNameElementList.length > 0)
+        {
+            for(var i=0;i<objectNameElementList.length;i++)
+            {
+                var tmpObjInfo = {};
+                tmpObjInfo.objName = objectNameElementList[i].value;
+                var objInfo = JSON.parse(JSON.stringify(tmpObjInfo));
+                getTotalRecords( objInfo );
+            }
+        }
+        else
+        {
+            checkTotalCountCompletion();
+        }
+    }
+
+    function checkBuildProfileObjectInfoMapComplete()
+    {
+        if(objectInfoComplete !== 'true')
+        {
+            buildProfileObjectInfoMap();
+        }
+        else
+        {
+            doGetTotalRecords();
+        }
+    }
+
+    function removeSpinner()
+    {
+        updateLoadingStatus('Completed.');
+        closeLoadingStatus();
+    }
+
+    function updateLoadingStatus(statusText) 
+    {
+        var d = new Date();
+        var n = d.toString() + ': ' + statusText;
+        document.getElementById('loadingStatusDiv').innerHTML += '<br/>' + n + '<br/>';
+    }
+
+    function closeLoadingStatus()
+    {
+        document.getElementById("spinner").classList.add('slds-hide');
+    }
+
+    updateLoadingStatus('Initializing ...');
+    buildProfileObjectInfoMap();
+    updateLoadingStatus('Retrieving Object Information ...');
+    
+
+</script>
+
+</apex:outputPanel>
+
+</apex:page>

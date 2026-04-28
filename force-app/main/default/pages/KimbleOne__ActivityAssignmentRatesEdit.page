@@ -1,0 +1,283 @@
+<apex:page Controller="KimbleOne.ActivityAssignmentRemoteActions" showHeader="false" sidebar="false">
+	
+	<div id="assignmentRatesEditPanel">
+	<apex:outputPanel id="Error-panel" layout="none">
+	<div id="errors"><apex:pageMessages id="MessagesPanel" escape="false" /></div>
+	<div id="assignment-warning" style="display:none"><span><div class="message warningM3"><table border="0" cellpadding="0" cellspacing="0" class="messageTable" style="padding:0px;margin:0px;"><tbody><tr valign="top"><td><img alt="warning" class="msgIcon" src="/s.gif" title="{!$Label.WarningHeading}"/></td><td class="messageCell"><div class="messageText" id="assignment-rates-warning-text"><br/></div></td></tr><tr><td></td><td></td></tr></tbody></table></div></span></div>
+	<div id="assignment-error" style="display:none"><span><div class="message errorM3"><table border="0" cellpadding="0" cellspacing="0" class="messageTable" style="padding:0px;margin:0px;"><tbody><tr valign="top"><td><img alt="error" class="msgIcon" src="/s.gif" title="{!$Label.Error}"/></td><td class="messageCell"><div class="messageText" id="assignment-rates-error-text"><br/></div></td></tr><tr><td></td><td></td></tr></tbody></table></div></span></div>
+	</apex:outputPanel>
+	<apex:form >
+	<apex:pageBlock id="ActivityAssignmentRates" mode="edit">				
+		<apex:pageBlockButtons location="bottom" id="ButtonsBlock" styleclass="ButtonsBlock">
+			<apex:outputPanel id="ButtonsPanel">
+				<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.updateable && $ObjectType.KimbleOne__ActivityAssignmentRate__c.updateable}">
+					<input type="button" id="SaveActivityAssignmentRatesButton" onclick="ActivityAssignmentRates.saveAssignmentRates()" class="btn" value="{!$Label.Save}" />
+				</apex:outputPanel>	
+				<input type="button" id="CancelActivityAssignmentRatesButton" onclick="hideModalBoxy()" class="btn" value="{!$Label.Cancel}" />
+			</apex:outputPanel>
+		</apex:pageBlockButtons>
+		
+		<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+			
+			<apex:pageBlockSectionItem >
+				<apex:outputLabel >
+					<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__Resource__c.Label}" />
+				</apex:outputLabel>
+				<span id="output-resource"></span>
+			
+			</apex:pageBlockSectionItem>
+			
+			<apex:pageBlockSectionItem >
+				<apex:outputLabel >
+					<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ActivityRole__c.Label}" />
+				</apex:outputLabel>
+				<span id="output-role"></span>
+			</apex:pageBlockSectionItem>
+						
+			<apex:pageBlockSectionItem >
+				<apex:outputLabel >{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__RevenueRate__c.Label}</apex:outputLabel>
+				<span id="output-revneue-rate"></span><span id="revenue-rate-suffix"></span>
+			</apex:pageBlockSectionItem>
+			
+			<apex:pageBlockSectionItem rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__CostRate__c.Accessible}">
+				<apex:outputLabel >{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__CostRate__c.Label}</apex:outputLabel>
+				<span id="output-cost-rate"></span><span id="cost-rate-suffix"></span>
+			</apex:pageBlockSectionItem>
+			
+			</apex:pageblockSection>
+			
+				<div style="margin:12px;">
+				<table id="assignment-rates" cellpadding="0" cellspacing="0" border="0" class="list">
+					<thead>
+						<tr class="headerRow">
+							<th id="rate-name">{!$ObjectType.ActivityAssignmentRate__c.Fields.ActivityPeriodRateBand__c.Label}</th>
+							<th id="rate-overridden">{!$ObjectType.ActivityAssignmentRate__c.Fields.IsOverridden__c.Label}</th>
+							<th class="revenue-col" id="revenue-rate-header">{!$ObjectType.ActivityAssignmentRate__c.Fields.RevenueRate__c.Label}<br/><span class="suffix"></span></th>
+							<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__CostRate__c.Accessible}">
+							<th id="cost-rate-header">{!$ObjectType.ActivityAssignmentRate__c.Fields.CostRate__c.Label}<br/><span class="suffix"></span></th>
+							</apex:outputPanel>
+						</tr>
+					</thead>
+					<tbody>
+					
+					</tbody>
+				</table>
+				</div>
+	</apex:pageBlock>
+	
+	</apex:form>
+	</div>
+<script>
+	
+	var ActivityAssignmentRates = new ActivityAssignmentRatesController();
+	
+	var ratePageLabels = {};
+	ratePageLabels['NewCostEffectiveFromMessage'] = '{!JSENCODE($Label.NewCostEffectiveFromMessage)}';
+	
+	function ActivityAssignmentRatesController()
+	{
+		this.theAssignmentRatesToEdit = null;
+		
+		jQuery(document).off('click', '.future-cost-rate-change');
+		
+		jQuery(document).on('mouseover', '.future-cost-rate-change', function (event) {
+				var j = jQuery(this); 
+				
+				var costs = ActivityAssignmentRates.theAssignmentRatesToEdit.TheRates[j.attr('rate-band-id')];
+						
+				var tipHtml = '';
+				var $row = j.closest('tr');
+				
+				//may be a cost rate change or a rateband restriction / addition
+				
+				for(var i=1; i<costs.length;i++)
+				{
+					if (i == 1 || (i > 1 && costs[i].CostRate != costs[i-1].CostRate))
+					{
+						var formattedMesage = ratePageLabels['NewCostEffectiveFromMessage'].format(kimble.formatNumber(costs[i].CostRate, '#,##0.00'), kimble.formatDate(costs[i].EffectiveDate));
+						tipHtml += '<div class="cost-change-message">' + formattedMesage + '</div>';
+					}
+				}
+				
+				if (costs[costs.length-1].EffectiveToDate != null) //rateband no longer applicable
+				{
+					tipHtml += '<div class="cost-change-message">{!JSENCODE($Label.RatebandRestrictedFromMessage)} ' + kimble.formatDate(costs[costs.length-1].EffectiveToDate) + '</div>';
+				}
+				
+				//tooltips
+				j.qtip('destroy', true);
+			 
+				j.qtip({
+					overwrite: true,
+					show: {
+						solo:true,
+						ready: true // Show immediately - important!
+					},
+					style: {
+						classes: 'qtip-light qtip-shadow qtip-rounded'
+					},
+					content: { 
+						text: tipHtml,
+						title: 'Changes'
+					},
+					position: { adjust: { method: 'flip flip'
+						},
+						viewport: $(window)
+					}
+				});
+		});
+		
+		this.initialiseAssignment = function (data){
+			var context = ActivityAssignmentRates;
+			var restrictedLabel = '{!JSENCODE($Label.RestrictedLabel)}';
+			context.theAssignmentRatesToEdit = data;
+			
+			jQuery('#output-resource').text(data.Resource);
+			jQuery('#output-role').text(data.ActivityRole);
+			
+			if (data.HasRevenue)
+			{
+				jQuery('#output-revneue-rate').closest('tr').show();
+				jQuery('#output-revneue-rate').text(kimble.formatNumber(data.RevenueRate, data.InvoicingCurrency + ' #,###.00'));
+				jQuery('#revenue-rate-suffix').text(' / ' + data.InvoicingUnits);
+			}
+			else
+			{
+				jQuery('#output-revneue-rate').closest('tr').hide();
+			}
+			
+			jQuery('#output-cost-rate').text(kimble.formatNumber(data.CostRate, data.BaseCurrency + ' #,###.00'));
+			jQuery('#cost-rate-suffix').text(' / ' + data.InvoicingUnits);
+			
+			jQuery('#revenue-rate-header>span.suffix').text(data.InvoicingCurrency + ' / ' + data.InvoicingUnits);
+			jQuery('#cost-rate-header>span.suffix').text(data.BaseCurrency + ' / ' + data.InvoicingUnits);
+			
+			jQuery('#assignment-rates>tbody').empty();
+			
+			var ratesHtml = '';
+			
+			jQuery.each(data.TheActivityPeriodRateBands, function(i, rateBand) {
+				
+				var rateArray = data.TheRates[rateBand.id];
+				var rate = null; 
+				
+				if (rateArray != null && rateArray.length > 0 ) rate = rateArray[0];
+				
+				if(rate != undefined)
+				{
+					ratesHtml += '<tr class="dataRow rate-row" rate-band-id="' + rateBand.id + '"><td>' + rateBand.text + '</td>';
+					
+					ratesHtml += '<td class="overridden-col"><input type="checkbox" ' + (rate.IsOverridden?'checked':'') + ' /></td>';
+					
+					ratesHtml += '<td class="revenue-col"><input rate-type="revenue" type="text" value="' + kimble.formatNumber(rate.RevenueRate, '#,###.00') + '" ' + (!rate.CanEditRevenue?'readonly':'') + '/></td>';
+					
+					<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__CostRate__c.Accessible}">
+						ratesHtml += '<td><input rate-type="cost" type="text" value="' + kimble.formatNumber(rate.CostRate, '#,###.00') + '" ' + (!rate.CanEditCost || {!!$ObjectType.ActivityAssignment__c.Fields.CostRate__c.updateable} ?'readonly':'') + '/>';
+					
+						if (rateArray.length > 1 || (rateArray.length == 1 && rateArray[0].EffectiveToDate != null))
+            			{
+		                	ratesHtml += '<span rate-band-id="' + rateBand.id + '" class="fa fa-info-circle future-cost-rate-change"/>';		             		      
+		            	}
+					</apex:outputPanel>
+					
+					ratesHtml += '</td>';
+					
+				}
+				else
+				{
+					ratesHtml += '<tr class="dataRow "><td>' + rateBand.text + '</td>';
+					
+					// no AssignmentRates for this TheActivityPeriodRateBand
+					ratesHtml += '<td class="revenue-col"><span class="restricted-rate">' + restrictedLabel + '</span></td>';					
+				}
+				ratesHtml += '</tr>';
+			});
+			
+			jQuery(ratesHtml).appendTo(jQuery('#assignment-rates>tbody'));
+			
+			if (data.HasRevenue)
+			{
+				jQuery('.revenue-col').show();
+			}
+			else
+			{
+				jQuery('.revenue-col').hide();
+			}
+		}
+		
+		this.getAssignmentRates = function(assignmentId){	
+			var context = ActivityAssignmentRates;
+			
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.GetActivityAssignmentRatesToEdit}',
+       			assignmentId,
+      			function(result, event){          
+             		 if (event.status) 
+		             {
+		             	context.initialiseAssignment(result);
+		             	
+		             	showModalBoxy();
+		             	if(typeof initialisePageTips === "function") initialisePageTips();
+		         	} 
+		         	else if (event.type === 'exception') 
+		         	{
+		             	alert(event.message);
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		         	}
+	         }, 
+	         {escape: false, timeout: 60000});
+		}
+		
+		this.saveAssignmentRates = function() {
+			
+			var context = ActivityAssignmentRates;
+			
+			//Copy Rate changes to object.
+			var theRatesToSave = new Array();
+			
+			jQuery.each(jQuery('.rate-row'), function (i, row) {
+			
+				var j = jQuery(row);
+				theRatesToSave.push({ActivityPeriodRateBandId:j.attr('rate-band-id'), IsOverridden:j.find('input[type="checkbox"]').prop('checked'), RevenueRate:kimble.parseNumber(j.find('input[rate-type="revenue"]').val(), '#,##0.00'), CostRate:kimble.parseNumber(j.find('input[rate-type="cost"]').val(), '#,##0.00')});
+			});
+						
+			jQuery('[id$="SaveActivityAssignmentRatesButton"], [id$="CancelActivityAssignmentRatesButton"]').prop('disabled', true).addClass('btnDisabled');
+			
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.SaveActivityAssignmentRates}',
+       		context.theAssignmentRatesToEdit.Id, theRatesToSave,
+      			function(result, event){          
+             		if (event.status) 
+		            {
+		             	hideModalBoxy();	             	
+		         	} 
+		         	else if (event.type === 'exception') 
+		         	{
+		             	alert(event.message);
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		         	}
+		         	jQuery('[id$="SaveActivityAssignmentRatesButton"], [id$="CancelActivityAssignmentRatesButton"]').prop('disabled', false).removeClass('btnDisabled');
+		         }, 
+		         {escape: true, timeout: 60000});
+			}
+	}
+	
+</script>	
+
+<style>
+		table#assignment-rates Input {width: 100px;}
+		.restricted-rate
+		{
+			font-style: italic;
+    		font-weight: bold;
+    	}
+    	.future-cost-rate-change
+    	{
+    		position: relative !important;
+    	}
+</style>
+</apex:page>

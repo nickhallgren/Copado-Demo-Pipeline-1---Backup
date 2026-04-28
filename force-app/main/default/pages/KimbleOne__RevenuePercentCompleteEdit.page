@@ -1,0 +1,509 @@
+<apex:page controller="KimbleOne.RevenuePercentCompleteEditController" sidebar="false">
+    <apex:composition template="KimbleOne__SiteMaster">
+
+        <apex:define name="Menu">
+
+            <c:Menu MenuContextType="{!MenuContextType}" MenuContextId="{!MenuId}" MenuContextName="{!MenuName}" />
+
+        </apex:define>
+
+        <apex:define name="Content">
+
+            <apex:includeScript value="{!URLFOR($Resource.KimbleOne__jQueryBarGraph, 'jqBarGraph.1.1.min.js')}"/>
+            <script>
+
+               jQuery(window).load(function(){
+                    checkJobs();
+                });
+
+                function checkJobs()
+                {
+                    loadSpecificJobsInline(jQuery('#PendingJobs'), '{!JSINHTMLENCODE(MenuId)}','JobCalcDelElementRevenueAndCostForecast','{!JSENCODE($Label.Initialising)}', pendingJobsComplete);
+                }
+
+                function pendingJobsComplete(ranJobs)
+		        {
+		            loadElements();
+		            jQuery('#PendingJobs').hide();
+		        }
+
+                function initialise()
+                {
+                    jQuery('.currency-val, .pct-val').each(function(i, obj)
+                    {
+                        var o = jQuery(obj);
+                        o.text(kimble.formatNumber(o.text(), '#,##0.##'));
+                        o.show();
+                    });
+
+                    jQuery('.currency-inp, .pct-inp').each(function(i, obj)
+                    {
+                        var o = jQuery(obj);
+                        o.val(kimble.formatNumber(o.val(), '#,##0.##'));
+                        o.show();
+                    });
+
+                    jQuery('.readonly').each(function(i, obj)
+                    {
+                       jQuery(obj).prop('readonly', true);
+                    });
+
+                    jQuery(document).off('change', '.element-pct input');
+	                jQuery(document).on('change', '.element-pct input', function() {
+		                var tr = jQuery(this).closest('tr');
+
+                        tr.find('.element-amt input').val(kimble.formatNumber(kimble.parseNumber(jQuery(this).val()) / 100 * tr.data('contractValue'), '#,##0.##'));
+
+		                calculateDerivedFields();
+
+		                if (tr.find('.fa-comment').length == 0)
+		                {
+		                    tr.find('.element-amt input').before('<i class="fa fa-comment adjustment-comments"></i>');
+                        }
+
+                    });
+
+                    jQuery(document).off('change', '.element-amt input');
+	                jQuery(document).on('change', '.element-amt input', function() {
+
+                        var tr = jQuery(this).closest('tr');
+
+                        tr.find('.element-pct input').val(kimble.formatNumber(kimble.parseNumber(jQuery(this).val()) / tr.data('contractValue') * 100, '#,##0.##'));
+
+		                calculateDerivedFields();
+
+		                if (tr.find('.fa-comment').length == 0)
+		                {
+		                    jQuery(this).before('<i class="fa fa-comment adjustment-comments"></i>');
+                        }
+
+                    });
+
+                    jQuery(document).off('change', 'textarea.comments');
+		            jQuery(document).on('change', 'textarea.comments', function (event) {
+		                jQuery(this).parent().parent().parent().qtip('api').target.closest('tr').find('.adjustment-description').val(jQuery(this).val());
+		            });
+
+                    jQuery(document).off('mouseover', '.adjustment-comments');
+		            jQuery(document).on('mouseover', '.adjustment-comments', function (event) {
+                            var j = jQuery(this);
+
+                            var $row = j.closest('tr');
+
+                            var tipHtml = '<div><textarea class="comments">' + $row.find('.adjustment-description').val() + '</textarea></div>';
+
+                            //tooltips
+                            j.qtip('destroy', true);
+
+                            j.qtip({
+                                overwrite: true,
+                                hide: {
+                                    event: 'unfocus'
+                                },
+                                show: {
+                                    solo:true,
+                                    ready: true // Show immediately - important!
+                                },
+                                style: {
+                                    classes: 'qtip-light qtip-shadow qtip-rounded'
+                                },
+                                content: {
+                                    text: tipHtml,
+                                    title: '{!$ObjectType.RevenueAdjustment__c.Fields.Description__c.Label}'
+                                },
+                                position: { adjust: { method: 'flip flip'
+                                    },
+                                    viewport: $(window)
+                                }
+                            });
+                    });
+
+                    jQuery(document).off('mouseover', '.approved-adjustments, .pending-adjustments');
+		            jQuery(document).on('mouseover', '.approved-adjustments, .pending-adjustments', function (event) {
+                            var j = jQuery(this);
+
+                            var approvedLabel = '<apex:outputText value="{!$Label.kimbleone__approvedadjustmentsforelement}"/>';
+                            var pendingLabel = '<apex:outputText value="{!$Label.kimbleone__pendingadjustmentsforelement}"/>';
+
+                            var tipHtml = '<div>';
+
+                            if (j.hasClass('approved-adjustments'))
+                                tipHtml += approvedLabel;
+                            else
+                                tipHtml += pendingLabel;
+
+                            tipHtml += '</div>';
+
+                            var $row = j.closest('tr');
+
+                            //tooltips
+                            j.qtip('destroy', true);
+
+                            j.qtip({
+                                overwrite: true,
+                                show: {
+                                    solo:true,
+                                    ready: true // Show immediately - important!
+                                },
+                                style: {
+                                    classes: 'qtip-light qtip-shadow qtip-rounded'
+                                },
+                                content: {
+                                    text: tipHtml,
+                                    title: '{!$ObjectType.RevenueAdjustment__c.Label}'
+                                },
+                                position: { adjust: { method: 'flip flip'
+                                    },
+                                    viewport: $(window)
+                                }
+                            });
+                    });
+
+                    calculateDerivedFields();
+                }
+
+                function calculateDerivedFields()
+                {
+                    jQuery.each(jQuery('.contingency-row'), function(i, r){
+
+                        var tr = jQuery(r);
+                        var mgmtRow = tr.prev();
+                        var calcRow = mgmtRow.prev();
+
+                        var actualRev = kimble.parseNumber(calcRow.find('.open-actual-rev').text());
+                        var mgmtRev = kimble.parseNumber(mgmtRow.find('.element-amt input').val());
+
+                        tr.find('.element-contingency-amt').text(kimble.formatNumber(actualRev-mgmtRev, '#,##0.##'));
+                        tr.find('.adjustment-input').val(kimble.formatNumber(actualRev-mgmtRev, '#,##0.##'));
+
+                        var actualPct = kimble.parseNumber(calcRow.find('.open-pct').text());
+                        var mgmtPct = kimble.parseNumber(mgmtRow.find('.element-pct input').val());
+
+                        tr.find('.element-contingency-pct').text(kimble.formatNumber(actualPct-mgmtPct, '#,##0.##'));
+
+                        var nextRev = kimble.parseNumber(calcRow.find('.forecast-rev').text());
+                        mgmtRow.find('.next-amt').text(kimble.formatNumber(nextRev + actualRev - mgmtRev, '#,##0.##'));
+
+                    });
+
+                    var totalClosedRev = sumValues('.closed-actual-rev');
+                    jQuery('#total-closed-rev').text(kimble.formatNumber(totalClosedRev, '#,##0.##'));
+
+                    var totalActualRev = sumValues('.open-actual-rev');
+                    var totalContRev = sumValues('.element-contingency-amt')
+
+                    jQuery('#total-open-rev').text(kimble.formatNumber(totalActualRev, '#,##0.##'));
+                    jQuery('#total-mgmt-rev-this').text(kimble.formatNumber(totalActualRev-totalContRev, '#,##0.##'));
+
+                    jQuery('#total-contingency-rev-this').text(kimble.formatNumber(totalContRev, '#,##0.##'));
+
+                    jQuery('#total-cont-pct').text(kimble.formatNumber(totalContRev / totalActualRev * 100, '#,##0.##'));
+
+                    var totalForecastRev = sumValues('.forecast-rev');
+                    jQuery('#total-forecast-rev').text(kimble.formatNumber(totalForecastRev, '#,##0.##'));
+
+                    var totalMgtRev = sumValues('.next-amt');
+                    jQuery('#total-mgmt-rev-next').text(kimble.formatNumber(totalMgtRev, '#,##0.##'));
+
+                    //show graph
+                      var grpArray = new Array(
+                        [[0,totalClosedRev],''],
+                        [[totalActualRev,totalActualRev-totalContRev],''],
+                        [[totalForecastRev,totalMgtRev],'']
+                    );
+
+                    jQuery('#summary-chart').empty().jqBarGraph({
+                        data: grpArray, height:120, width:740, barSpace:50, animate: false, colors: ['#008752','#E58E1A'],  type: 'multi'});
+
+                    jQuery.each(jQuery('.subBarssummary-chart'), function (i, obj){
+
+                        var o = jQuery(obj);
+                        o.text(kimble.formatNumber(o.text(), '#,###.##'));
+
+                    });
+                }
+
+                function sumValues(selector)
+                {
+                    var val = 0;
+                    jQuery.each(jQuery(selector), function(i,o){
+                        var obj = jQuery(o);
+
+                        val += kimble.parseNumber(obj.text());
+                    });
+
+                    return val;
+                }
+
+            </script>
+
+            <div id="PendingJobs"></div>
+
+
+            <apex:form id="theForm">
+                <apex:actionFunction name="loadElements" action="{!GetTheElements}" rerender="theForm" oncomplete="initialise();"/>
+
+                <div id="loadingIndicatorOuterContainer" class="loadingIndicator" style="display:none">
+                    <div id="loadingIndicatorInnerContainer">
+                        <img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+                    </div>
+                </div>
+            <apex:pageMessages />
+
+            <apex:pageBlock rendered="{!CurrencyIsoCodeOptions.size > 1}">
+
+                <apex:pageBlockSection columns="1" showHeader="false">
+                    <apex:pageBlockSectionItem >
+                        <apex:outputLabel value="{!$Label.kimbleone__costpctcompletemulticurrencylabel}"/>
+                        <apex:selectList value="{!TheSelectedCurrencyISOCode}" size="1">
+                            <apex:selectOptions value="{!CurrencyIsoCodeOptions}"/>
+                        </apex:selectList>
+                    </apex:pageBlockSectionItem>
+
+                    <apex:pageBlockSectionItem >
+                        &nbsp;
+                        <apex:commandButton styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__gobutton}" action="{!GetTheElements}" rerender="theForm" oncomplete="initialise();"/>
+                    </apex:pageBlockSectionItem>
+                </apex:pageBlockSection>
+
+            </apex:pageBlock>
+
+            <apex:pageBlock rendered="{!!ISBLANK(TheElements)}">
+                <apex:pageBlockButtons location="top">
+                    <apex:commandButton id="save" styleclass="DisableButtonWhileBusy" action="{!save}" value="{!$Label.kimbleone__save}" reRender="theForm"/>
+                </apex:pageBlockButtons>
+                <!--position this based on grid below-->
+                <div id="summary-chart-container" style="position:relative;height:136px;background-color: white;padding-top: 8px;">
+                    <div id="summary-chart"/>
+                </div>
+
+                <div id="elements-container">
+                    <table id="elements-table" cellspacing="0" cellpadding="4" border="0" width="100%">
+                        <thead>
+                            <tr>
+                                <th colspan="3"></th>
+                                <th colspan="2" id="lastPeriodHeader"  style="text-align: center;"><apex:outputText value="{!$Label.kimbleone__lastperiod}"/></th>
+                                <th class="period-gap"></th>
+                                <th colspan="3" id="currentPeriodHeader"  style="text-align: center;"><apex:outputText value="{!$Label.kimbleone__currentperiod}"/></th>
+                                <th class="period-gap"></th>
+                                <th colspan="3" id="nextPeriodHeader"  style="text-align: center;"><apex:outputText value="{!$Label.kimbleone__nextperiod}"/></th>
+                            </tr>
+                            <tr>
+                                <th colspan="3"></th>
+                                <th colspan="2" id="lastPeriodName" style="text-align: center;" class="closed-period"><apex:outputText value="{!PreviousPeriod.Name}" rendered="{!!ISBLANK(PreviousPeriod)}"/></th>
+                                <th></th>
+                                <th colspan="3" id="currentPeriodName" style="text-align: center;"><apex:outputText value="{!ThisPeriod.Name}"/></th>
+                                <th></th>
+                                <th colspan="3" id="nextPeriodName" style="text-align: center;"><apex:outputText value="{!NextPeriod.Name}"/></th>
+                            </tr>
+                            <tr>
+                                <th><apex:outputText value="{!$ObjectType.KimbleOne__DeliveryGroup__c.Label}"/></th>
+                                <th><apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Label}"/></th>
+                                <th><apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ServicesContractRevenue__c.Label}"/></th>
+                                <th style="width:78px" class="closed-period"><apex:outputText value="{!$Label.kimbleone__pctcomplete}"/></th>
+                                <th style="width:62px" class="closed-period"><apex:outputText value="{!$Label.kimbleone__actualrev}"/></th>
+                                <th style="width:16px"></th>
+                                <th style="width:68px"></th>
+                                <th style="width:58px"><apex:outputText value="{!$Label.kimbleone__pctcomplete}"/></th>
+                                <th style="width:66px"><apex:outputText value="{!$Label.kimbleone__actualrev}"/></th>
+                                <th style="width:16px"></th>
+                                <th style="width:58px"></th>
+                                <th style="width:58px"><apex:outputText value="{!$Label.kimbleone__pctcomplete}"/></th>
+                                <th style="width:66px"><apex:outputText value="{!$Label.kimbleone__forecastrev}"/></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <apex:repeat value="{!TheElements}" var="element">
+                                <tr data-element-id="{!element.TheElement.Id}">
+                                    <td><apex:outputField value="{!element.TheElement.KimbleOne__DeliveryGroup__c}"/></td>
+                                    <td><apex:outputField value="{!element.TheElement.Name}"/></td>
+                                    <td class="align-right"><apex:outputField value="{!element.TheElement.KimbleOne__ServicesContractRevenue__c}"/></td>
+                                    <td class="align-right closed-period"><apex:outputText styleclass="pct-val" value="{!element.ClosedPctComplete}"/></td>
+                                    <td class="align-right closed-period"><apex:outputText styleclass="currency-val closed-actual-rev" value="{!element.ClosedActualRev}"/></td>
+                                    <td></td>
+                                    <td><apex:outputText value="{!$Label.kimbleone__costadjustmentcalculated}"/></td>
+                                    <td class="align-right"><apex:outputText styleclass="pct-val open-pct" value="{!element.OpenPctComplete}"/></td>
+                                    <td class="align-right"><div style="position:relative"><apex:outputPanel layout="none" rendered="{!element.HasAdjustments}"><a class="{!IF(element.ApprovedAdjustments.size>0,'approved-adjustments fa-info-circle','pending-adjustments fa-warning')} fa" href="{!$Page.DeliveryElementRevenueAdjustments}?id={!element.TheElement.Id}"></a></apex:outputPanel><apex:outputText styleclass="currency-val open-actual-rev" value="{!element.OpenActualRev}"/></div></td>
+                                    <td></td>
+                                    <td><apex:outputText value="{!$Label.kimbleone__costadjustmentcalculated}"/></td>
+                                    <td class="align-right"><apex:outputText styleclass="pct-val" value="{!element.NextPctComplete}"/></td>
+                                    <td class="align-right"><apex:outputText styleclass="currency-val forecast-rev" value="{!element.NextForecastRev}"/></td>
+                                </tr>
+                                <tr data-contract-value="{!element.TheElement.KimbleOne__ServicesContractRevenue__c}" data-element-id="{!element.TheElement.Id}">
+                                    <td colspan="3"><apex:inputText styleclass="adjustment-description" value="{!element.AdjustmentDescription}"/></td>
+                                    <td class="closed-period"></td>
+                                    <td class="closed-period"></td>
+                                    <td></td>
+                                    <td><apex:outputText value="{!$Label.kimbleone__costadjustmentoverride}"/></td>
+                                    <td class="element-pct align-right"><div style="position:relative"><input class="pct-inp {!IF(element.DraftOrPendingAdjustments.size>0,'readonly','')}" type="text" value="{!element.OpenPctComplete}"></input></div></td>
+                                    <td class="element-amt align-right"><div style="position:relative"><input class="currency-inp {!IF(element.DraftOrPendingAdjustments.size>0,'readonly','')}" type="text" value="{!element.OpenActualRev}"></input></div></td>
+                                    <td></td>
+                                    <td><apex:outputText value="{!$Label.kimbleone__costadjustmentoverride}"/></td>
+                                    <td></td>
+                                    <td class="next-amt align-right"></td>
+                                </tr>
+                                <tr class="contingency-row">
+                                    <td colspan="3"><apex:inputField styleclass="adjustment-input" value="{!element.AdjustmentRevenue.KimbleOne__InputDecimal__c}"/></td>
+                                    <td class="closed-period"></td>
+                                    <td class="closed-period"></td>
+                                    <td></td>
+                                    <td><apex:outputText value="{!$Label.kimbleone__costadjustmentcontingency}"/></td>
+                                    <td class="element-contingency-pct align-right"></td>
+                                    <td class="element-contingency-amt align-right"></td>
+                                    <td></td>
+                                    <td></td>
+                                    <td></td>
+                                    <td colspan="3"></td>
+                                </tr>
+                                <tr class="blank-row">
+                                    <td colspan="3"></td>
+                                    <td class="closed-period"></td>
+                                    <td class="closed-period"></td>
+                                    <td colspan="8"></td>
+                                </tr>
+                            </apex:repeat>
+                            <tr class="final-row">
+                                <td colspan="13"></td>
+                            </tr>
+                        </tbody>
+                        <tfoot class="element-totals">
+                            <tr>
+                                <td></td>
+                                <td></td>
+                                <td class="align-right"><apex:outputText value="{!$Label.kimbleone__total}"/></td>
+                                <td></td>
+                                <td id="total-closed-rev" class="align-right"></td>
+                                <td></td>
+                                <td><apex:outputText value="{!$Label.kimbleone__costadjustmentcalculated}"/></td>
+                                <td></td>
+                                <td id="total-open-rev" class="align-right"></td>
+                                <td></td>
+                                <td><apex:outputText value="{!$Label.kimbleone__costadjustmentcalculated}"/></td>
+                                <td></td>
+                                <td id="total-forecast-rev" class="align-right"></td>
+                            </tr>
+                            <tr>
+                                <td colspan="5"></td>
+                                <td></td>
+                                <td><apex:outputText value="{!$Label.kimbleone__costadjustmentoverride}"/></td>
+                                <td></td>
+                                <td id="total-mgmt-rev-this" class="align-right"></td>
+                                <td></td>
+                                <td><apex:outputText value="{!$Label.kimbleone__costadjustmentoverride}"/></td>
+                                <td></td>
+                                <td id="total-mgmt-rev-next" class="align-right"></td>
+                            </tr>
+                            <tr>
+                                <td colspan="5"></td>
+                                <td></td>
+                                <td><apex:outputText value="{!$Label.kimbleone__costadjustmentcontingency}"/></td>
+                                <td id="total-cont-pct" class="align-right"></td>
+                                <td id="total-contingency-rev-this" class="align-right"></td>
+                                <td colspan="4"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+            </apex:pageBlock>
+            </apex:form>
+
+            <style>
+            /* loading panel */
+		.loadingIndicator {
+		   top:0;
+		   right:0;
+		   width:100%;
+		   height:100%;
+		   font-weight: bold;
+		   position:absolute;
+		   text-align:center;
+		   /* IE filter */
+		   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+		   -moz-opacity:0.7;	/* Mozilla extension */
+		   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+		   opacity:0.7; /* CSS3 */
+		   z-index:1000;
+		   background-color:white;
+		   display:none;
+		}
+		.loadingIndicator img {
+			margin-right:9px;
+		}
+		#loadingIndicatorInnerContainer {
+			position:absolute;
+			top:50%;
+			height:10em;
+			margin-top:-2em;
+			width:100%;
+		}
+        .pct-val, .pct-inp, .currency-val, .currency-inp {display:none;}
+        input.pct-inp {width: 42px;text-align:right;}
+        input.currency-inp {width: 62px;text-align:right;}
+        .align-right {text-align:right;}
+        th.period-gap {width: 25px;}
+        .adjustment-input, .adjustment-description {display:none;}
+        #elements-container{background-color:white;padding-right: 8px;}
+        .closed-period{background-color: #bbb;}
+        tfoot.element-totals {background-color: #eee;}
+        .graphFieldsummary-chart {background-color: white;padding: 12px;bottom: -16px !important;}
+        .approved-adjustments{font-size: 16px;
+            color: #428BCA !important;
+            margin-left: 2px;
+            position: absolute;
+            margin-top: 1px;
+            cursor: pointer;
+            top: -3px;
+            right: -18px;
+            text-decoration: none;
+        }
+        .pending-adjustments{
+            font-size: 16px;
+            color: #E58E1A !important;
+            margin-left: 2px;
+            position: absolute;
+            margin-top: 1px;
+            cursor: pointer;
+            top: -3px;
+            right: -18px;
+            text-decoration: none;
+        }
+        .adjustment-comments{
+            font-size: 16px;
+            color: #428BCA !important;
+            margin-left: 2px;
+            position: absolute;
+            margin-top: 1px;
+            cursor: pointer;
+            top: -3px;
+            right: -18px;
+            text-decoration: none;
+        }
+        div#summary-chart {
+            position:absolute !important;
+            right:0px;
+            padding-right: 24px;
+        }
+
+        .graphFieldsummary-chart {
+            background-color: white;
+            padding: 12px;
+            bottom: -16px !important;
+        }
+        .subBarssummary-chart::before {
+            content: "";
+            display: block;
+            height: 3px;
+        }
+        #graphField0summary-chart .subBarssummary-chart {
+            background-color: #729bc7 !important;
+            left: 87px !important;
+        }
+        textarea.comments {
+            width: 200px;
+            height: 60px;
+        }
+</style>
+        </apex:define>
+    </apex:composition>
+</apex:page>

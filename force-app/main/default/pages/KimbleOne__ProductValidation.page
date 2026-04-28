@@ -1,0 +1,523 @@
+<apex:page standardController="KimbleOne__ResourcedActivityType__c" extensions="KimbleOne.ProductValidationController" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+	<apex:define name="Menu"> 
+		<c:Menu HelpSource="CfgGuide" DefaultHelpPage="WhatcanIdoinKimble.html" MenuContextType="ResourcedActivityType" MenuContextId="{!KimbleOne__ResourcedActivityType__c.Id}" MenuContextName="{!KimbleOne__ResourcedActivityType__c.Name}" /> 
+ 	</apex:define>   
+
+<apex:define name="Content">
+
+	<apex:form id="TheForm">
+	
+		<style>		
+			.mainContainer
+			{display:block}	
+			.keyContainer
+			{display:inline-block; width: 197px; text-align: center;vertical-align: top}
+			.valueContainer
+			{display:inline-block;white-space: normal;vertical-align: top; padding-left: 10px;}
+			.kimbleObjectGridContainer 
+			{overflow:auto; display:inline-block;}	
+			.tabContainer
+			{background-color: #FFF !important}
+							
+			.objectTypeContainer
+			{border-bottom: 1px #6D5B5B dashed;padding-top: 10px;padding-bottom: 10px;white-space: nowrap;}		
+			.kimbleObjectContainer
+			{display: inline-block; text-align: center; vertical-align: middle;vertical-align: top;white-space: normal;}
+			.kimbleObject
+			{border: #DFDFDF 1px solid; margin: 5px; display:inline-block; text-align: center; padding: 5px; vertical-align: top}
+			.Proposition
+ 			{background-color: #ededed; white-space: nowrap} 
+			.ProductGroup
+			{background-color: lightblue; white-space: nowrap}
+			.Product
+			{background-color: lightgreen;}
+			.productNavigatorContainer .Product
+			{min-height: 97px;}
+			.ProductDomain
+			{background-color: lightyellow;}
+			.productNavigatorContainer .ProductDomain
+			{min-height: 133px;}
+			.lastChildObject
+			{height: 25px}
+ 
+			.productDomainRow
+			{height: 30px}
+			.statusCol
+			{width: 70px}
+			.validationCol
+			{width:480px}
+			
+			.actionLink
+			{cursor: pointer; text-decoration: underline}
+			.validationFailed
+			{color: red}
+			.validationPassed
+			{color: green}
+			.validationFailedRow
+			{background-color: #FFBEBE}
+			.validationPassedRow
+			{background-color: #C2FFC2}
+
+			.loadingImage
+			{vertical-align: bottom; padding-left: 10px;}
+			.show
+			{display: block}				
+			.hidden
+			{display: none}	
+			
+			.selectedObject
+			{border: 1px blue dashed; background-color: yellow}
+			
+			.truncatedItem
+			{color: red; font-style: italic;}	
+		</style>
+		
+		
+ 	
+ 	<apex:pageblock title="">
+            <apex:pageBlockSection columns="2">
+                <apex:outputField value="{!KimbleOne__ResourcedActivityType__c.Name}"/>
+                &nbsp;
+                <apex:outputField value="{!KimbleOne__ResourcedActivityType__c.KimbleOne__UsageAllocationModel__c}"/>
+                <apex:outputField value="{!KimbleOne__ResourcedActivityType__c.KimbleOne__CostAllocationModel__c}"/>
+            </apex:pageBlockSection>
+ 	</apex:pageblock>
+ 	
+ 	<apex:outputPanel layout="none" rendered="{!KimbleOne__ResourcedActivityType__c.KimbleOne__Enum__c == 'DeliveryElement'}">
+ 	
+ 	<script>
+			jQuery(function() {
+			    jQuery( "#tabs" ).tabs({
+				  activate: function( event, ui ) {
+				    // work through the displayed product domains and make them all the same height and width (based on max of each)
+				    // in order to present a more readable grid format
+					// do this in two sets as we need them to be differently sized on the two navigator screens
+					if(ui.newPanel.attr('id') == 'proposition-tab')
+					{
+						setPropHeightsOnTabActivate(".propositionNavigatorContainer");
+	 				}
+				  }
+				});
+				
+			    // setup the hovers - select anything that is the same
+			    jQuery(".kimbleObject").mouseover(
+			        function(e) {
+			            e.stopPropagation();
+			            selectObject(jQuery(this));
+			        }).mouseout(
+			        function() {
+			            unSelectObject(jQuery(this));
+			        });
+        
+			    setContainerWidth();
+			  });
+
+			function setPropHeightsOnTabActivate(parentSelector)
+			{
+			    jQuery(parentSelector + " .Proposition").height(getMaxHeight(parentSelector + " .Proposition"));
+			    jQuery(parentSelector + " .ProductGroup").height(getMaxHeight(parentSelector + " .ProductGroup"));
+			    jQuery(parentSelector + " .Product").height(getMaxHeight(parentSelector + " .Product"));
+			    jQuery(parentSelector + " .ProductDomain").height(getMaxHeight(parentSelector + " .ProductDomain"));			
+			}
+						
+			function selectObject(selectedParent)
+			{
+	            selectedParent.addClass("selectedObject");
+			            
+	            // highlight all other elements with the same sf-id attribute value
+	            jQuery("div[sf-id='" + selectedParent.attr("sf-id") + "']").addClass("selectedObject");
+			}
+			
+			function unSelectObject(selectedParent)
+			{
+				selectedParent.removeClass("selectedObject");
+			            
+	            // remove highlight from everything else
+	            jQuery("div[sf-id='" + selectedParent.attr("sf-id") + "']").removeClass("selectedObject");
+			}
+			
+			function setContainerWidth() {
+			    jQuery(".valueContainer").width(parseInt(jQuery(window).width()) - parseInt(jQuery(".keyContainer").width()) - parseInt(360));
+			};
+			
+			var resizeTimer;
+			$(window).resize(function() {
+			    clearTimeout(resizeTimer);
+			    resizeTimer = setTimeout(setContainerWidth, 100);
+			});
+			
+			function getMaxHeight(selector) {
+			    max = 0;
+			    jQuery(selector).each(function(){
+			        c_height = parseInt($(this).height());
+			        if (c_height > max) {
+			            max = c_height;
+			        }
+			    });
+			    return max;
+			}
+			
+			function setCloning(productDomainId)
+			{
+				jQuery('#' + productDomainId + '-cloning').removeClass('hidden');
+			}
+						
+			function validateAllProductDomains()
+			{
+				// push the validate button for all domains
+				jQuery("span[onclick^='validateProductDomain']").click();
+			}
+						  
+			function validateProductDomain(productDomainId)
+			{
+				jQuery('#' + productDomainId + '-working').removeClass('hidden');
+				
+				validateViaRemoting(productDomainId, function(validateResult) {
+						if(validateResult.length > 0)
+						{
+							var formattedResult = formatValidationResult(validateResult);
+							
+							// error messages have been returned
+							jQuery('#' + productDomainId + '-state').html('<b>Invalid</b>');
+							jQuery('#' + productDomainId + '-state').addClass('validationFailed');
+							jQuery('#' + productDomainId + '-state').removeClass('validationPassed');
+							jQuery('#' + productDomainId + '-row').addClass('validationFailedRow');
+							jQuery('#' + productDomainId + '-row').removeClass('validationPassedRow');
+							jQuery('#' + productDomainId + '-validation').html(formattedResult);
+						}
+						else
+						{
+							jQuery('#' + productDomainId + '-state').html('Valid');
+							jQuery('#' + productDomainId + '-state').removeClass('validationFailed');
+							jQuery('#' + productDomainId + '-state').addClass('validationPassed');
+							jQuery('#' + productDomainId + '-row').removeClass('validationFailedRow');
+							jQuery('#' + productDomainId + '-row').addClass('validationPassedRow');
+							jQuery('#' + productDomainId + '-validation').html('');
+						}
+						
+						jQuery('#' + productDomainId + '-working').addClass('hidden');
+					});
+			}
+			
+			function formatValidationResult(validationResult)
+			{
+				// join the array to produce a string with carriage returns at the end of each
+				// individual message
+				var fullResultHTMLString = validationResult.sort().join("<br/>");
+								
+				return fullResultHTMLString;
+			}
+			  
+			function validateViaRemoting(productDomainId, callback)
+			{ 
+				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ProductValidationController.ValidateProductDomain}',
+			       		productDomainId,
+			      			function(result, event)
+			      			{          
+			             		if (event.status) 
+					            {
+					             	callback(result);		             								
+					         	} 
+					         	else if (event.type === 'exception') 
+					         	{
+					             	alert(event.message);
+					         	} 
+					         	else 
+					         	{
+					             	alert(event.message);
+					         	}
+				         	}, 
+				         	{escape: true, buffer: false, timeout: 60000});
+		    }
+		</script>
+ 	
+	<div id="tabs">
+	  <ul>
+	    <li><a href="#productvalidator-tab">Product Domain Validator</a></li>
+	    <li><a href="#product-tab">Product Domain Navigator</a></li>
+	    <li><a href="#proposition-tab">Proposition Navigator</a></li>
+	  </ul>
+	  
+<!-- 	  Proposition Navigator -->
+	  <div id="proposition-tab" class="tabContainer">
+		<apex:outputPanel id="propositionDomainNavigator" >
+			<div class="propositionNavigatorContainer">
+				<div class="objectTypeContainer">
+					<div class="keyContainer">
+					    <div class="kimbleObjectContainer">
+						    <div class="kimbleObject Proposition" style="font-weight: bold">
+						    	<div><apex:outputLink value="/{!URLFOR($ObjectType.KimbleOne__Proposition__c.keyPrefix)}" target="_blank">{!$ObjectType.KimbleOne__Proposition__c.Label}</apex:outputLink></div>
+								<div class="kimbleObject ProductGroup" style="font-weight: bold">
+									<div>
+										<div><apex:outputLink value="/{!URLFOR($ObjectType.KimbleOne__ProductGroup__c.keyPrefix)}" target="_blank">{!$ObjectType.KimbleOne__ProductGroup__c.Label}</apex:outputLink></div>
+										<div class="kimbleObject Product" style="font-weight: bold">
+											<div>
+												<div><apex:outputLink value="/{!URLFOR($ObjectType.KimbleOne__Product__c.keyPrefix)}" target="_blank">{!$ObjectType.KimbleOne__Product__c.Label}</apex:outputLink></div>
+												<div class="kimbleObject ProductDomain lastChildObject" style="font-weight: bold">
+													<div><apex:outputLink value="/{!URLFOR($ObjectType.KimbleOne__ProductDomain__c.keyPrefix)}" target="_blank">{!$ObjectType.KimbleOne__ProductDomain__c.Label}</apex:outputLink></div>
+												</div>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+				    	</div>
+					</div>
+					<div class="valueContainer">
+						<apex:repeat value="{!Propositions}" var="theProposition">
+					    	<div class="kimbleObjectContainer">
+								<div sf-id="{!theProposition.sObjectId}" class="kimbleObject Proposition">
+									<div>
+										<apex:outputLink value="/{!URLFOR(theProposition.sObjectId)}" target="_blank">{!theProposition.name}</apex:outputLink>
+									</div>
+				
+									<apex:repeat value="{!theProposition.productGroups}" var="theProductGroup">
+										<div sf-id="{!theProductGroup.sObjectId}" class="kimbleObject ProductGroup">
+											<div>
+												<apex:outputLink value="/{!URLFOR(theProductGroup.sObjectId)}" target="_blank">{!theProductGroup.name}</apex:outputLink>
+											</div>
+											<apex:outputPanel rendered="{!theProductGroup.numOfProducts > 1000}">
+												<span class="truncatedItem">Note: Product display limited to 1000 entries for this Group</span><br/>
+											</apex:outputPanel>				
+											<apex:repeat value="{!theProductGroup.products}" var="theProduct">
+												<div sf-id="{!theProduct.sObjectId}" class="kimbleObject Product">
+													<div>
+														<apex:outputLink value="/{!URLFOR(theProduct.sObjectId)}" target="_blank">{!theProduct.name}</apex:outputLink>
+													</div>
+													
+													<apex:variable value="{!theProduct.productDomain}" var="theProductDomain"/>
+													<div sf-id="{!theProductDomain.sObjectId}" class="kimbleObject ProductDomain lastChildObject">
+														<div>
+															<apex:outputLink value="/{!URLFOR(theProductDomain.sObjectId)}" target="_blank" rendered="{!!ISBLANK(theProductDomain.sObjectId)}">{!theProductDomain.name}</apex:outputLink>
+															<apex:outputText value="{!theProductDomain.name}"/>
+														</div>
+													</div>
+												</div>
+											</apex:repeat>
+										</div>
+									</apex:repeat>
+								</div>
+							</div>
+						</apex:repeat>
+					</div>
+				</div>
+				<div class="objectTypeContainer">
+					<div class="keyContainer">
+					    <div class="kimbleObjectContainer">
+							<div class="kimbleObject ProductGroup" style="font-weight: bold">
+								<div>
+									<div><apex:outputLink value="/{!URLFOR($ObjectType.KimbleOne__ProductGroup__c.keyPrefix)}" target="_blank">{!$ObjectType.KimbleOne__ProductGroup__c.Label}</apex:outputLink></div>
+									<div class="kimbleObject Product" style="font-weight: bold">
+										<div>
+											<div><apex:outputLink value="/{!URLFOR($ObjectType.KimbleOne__Product__c.keyPrefix)}" target="_blank">{!$ObjectType.KimbleOne__Product__c.Label}</apex:outputLink></div>
+											<div class="kimbleObject ProductDomain lastChildObject" style="font-weight: bold">
+												<div><apex:outputLink value="/{!URLFOR($ObjectType.KimbleOne__ProductDomain__c.keyPrefix)}" target="_blank">{!$ObjectType.KimbleOne__ProductDomain__c.Label}</apex:outputLink></div>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+				    	</div>
+					</div>
+					<div class="valueContainer">
+						<apex:repeat value="{!UnusedProductGroups}" var="theProductGroup">
+				    		<div class="kimbleObjectContainer">
+								<div sf-id="{!theProductGroup.sObjectId}" class="kimbleObject ProductGroup">
+									<div>
+										<apex:outputLink value="/{!URLFOR(theProductGroup.sObjectId)}" target="_blank">{!theProductGroup.name}</apex:outputLink>
+									</div>
+									<apex:outputPanel rendered="{!theProductGroup.numOfProducts >= 1000}">
+										<span class="truncatedItem">Note: Product list display to 1000 entries for this Group</span><br/>
+									</apex:outputPanel>	
+									<apex:repeat value="{!theProductGroup.products}" var="theProduct">
+										<div sf-id="{!theProduct.sObjectId}" class="kimbleObject Product">
+											<div>
+												<apex:outputLink value="/{!URLFOR(theProduct.sObjectId)}" target="_blank">{!theProduct.name}</apex:outputLink>
+											</div>
+											
+											<apex:variable value="{!theProduct.productDomain}" var="theProductDomain"/>
+											<div sf-id="{!theProductDomain.sObjectId}" class="kimbleObject ProductDomain lastChildObject">
+												<div>
+													<apex:outputLink value="/{!URLFOR(theProductDomain.sObjectId)}" target="_blank" rendered="{!!ISBLANK(theProductDomain.sObjectId)}">{!theProductDomain.name}</apex:outputLink>
+													<apex:outputText value="{!theProductDomain.name}"/>
+												</div>
+											</div>
+										</div>
+									</apex:repeat>
+								</div>
+							</div>
+						</apex:repeat>
+					</div>
+				</div>
+				<div class="objectTypeContainer">
+					<div class="keyContainer">
+					    <div class="kimbleObjectContainer">
+							<div class="kimbleObject Product" style="font-weight: bold">
+								<div>
+									<div><apex:outputLink value="/{!URLFOR($ObjectType.KimbleOne__Product__c.keyPrefix)}" target="_blank">{!$ObjectType.KimbleOne__Product__c.Label}</apex:outputLink></div>
+									<div class="kimbleObject ProductDomain lastChildObject" style="font-weight: bold">
+										<div><apex:outputLink value="/{!URLFOR($ObjectType.KimbleOne__ProductDomain__c.keyPrefix)}" target="_blank">{!$ObjectType.KimbleOne__ProductDomain__c.Label}</apex:outputLink></div>
+									</div>
+								</div>
+							</div>
+				    	</div>
+					</div>
+					<div class="valueContainer">
+						<apex:outputPanel rendered="{!UnusedProductsNum > 1000}">
+							<span class="truncatedItem">Note: There are more than 1000 products configured, displaying 1000 of <apex:outputText value=" {!UnusedProductsNum}"></apex:outputText></span><br/>
+						</apex:outputPanel>
+
+						<apex:repeat value="{!UnusedProducts}" var="theProduct">
+					    	<div class="kimbleObjectContainer">
+								<div sf-id="{!theProduct.sObjectId}" class="kimbleObject Product">
+								 	<div>
+										<apex:outputLink value="/{!URLFOR(theProduct.sObjectId)}" target="_blank">{!theProduct.name}</apex:outputLink>
+									</div>
+									
+									<apex:variable value="{!theProduct.productDomain}" var="theProductDomain"/>
+									<div sf-id="{!theProductDomain.sObjectId}" class="kimbleObject ProductDomain lastChildObject">
+										<div>
+											<apex:outputLink value="/{!URLFOR(theProductDomain.sObjectId)}" target="_blank" rendered="{!!ISBLANK(theProductDomain.sObjectId)}">{!theProductDomain.name}</apex:outputLink>
+											<apex:outputText value="{!theProductDomain.name}"/>
+										</div>
+									</div>
+								</div>
+							</div>	
+						</apex:repeat>
+					</div>
+				</div>
+				<div class="objectTypeContainer">
+					<div class="keyContainer">
+					    <div class="kimbleObjectContainer">
+							<div class="kimbleObject ProductDomain lastChildObject" style="font-weight: bold">
+								<div><apex:outputLink value="/{!URLFOR($ObjectType.KimbleOne__ProductDomain__c.keyPrefix)}" target="_blank">{!$ObjectType.KimbleOne__ProductDomain__c.Label}</apex:outputLink></div>
+							</div>
+				    	</div>
+					</div>
+					<div class="valueContainer">
+						<apex:repeat value="{!UnusedProductDomains}" var="theProductDomain">
+					    	<div class="kimbleObjectContainer">
+								<div class="kimbleObject ProductDomain lastChildObject">
+									<div>
+										<apex:outputLink value="/{!URLFOR(theProductDomain.sObjectId)}" target="_blank" rendered="{!!ISBLANK(theProductDomain.sObjectId)}">{!theProductDomain.name}</apex:outputLink>
+										<apex:outputText value="{!theProductDomain.name}"/>
+									</div>
+								</div>
+							</div>
+						</apex:repeat>
+					</div>
+				</div>								
+			</div>
+			</apex:outputPanel>
+	  </div>
+
+<!-- 	  Product Domain Navigator -->
+	  <div id="product-tab" class="tabContainer">
+		<apex:outputPanel id="productDomainNavigator" >
+			<div class="productNavigatorContainer">
+				<div class="objectTypeContainer">
+					<div class="keyContainer">
+					    <div class="kimbleObjectContainer">	   	
+							<div class="kimbleObject ProductDomain Key" style="font-weight: bold">
+								<div><apex:outputLink value="/{!URLFOR($ObjectType.KimbleOne__ProductDomain__c.keyPrefix)}" target="_blank">{!$ObjectType.KimbleOne__ProductDomain__c.Label}</apex:outputLink></div>
+								<div class="kimbleObject Product Key" style="font-weight: bold">
+									<div><apex:outputLink value="/{!URLFOR($ObjectType.KimbleOne__Product__c.keyPrefix)}" target="_blank">{!$ObjectType.KimbleOne__Product__c.Label}</apex:outputLink></div>
+									<div class="kimbleObject ProductGroup Key" style="font-weight: bold">
+										<div><apex:outputLink value="/{!URLFOR($ObjectType.KimbleOne__ProductGroup__c.keyPrefix)}" target="_blank">{!$ObjectType.KimbleOne__ProductGroup__c.Label}</apex:outputLink></div>
+										<div class="kimbleObject Proposition Key lastChildObject" style="font-weight: bold">
+						    				<div><apex:outputLink value="/{!URLFOR($ObjectType.KimbleOne__Proposition__c.keyPrefix)}" target="_blank">{!$ObjectType.KimbleOne__Proposition__c.Label}</apex:outputLink></div>
+			    						</div>
+									</div>
+								</div>
+							</div>
+				    	</div>
+					</div>
+					<div class="valueContainer">
+						<apex:repeat value="{!ProductDomains}" var="theProductDomain">
+					    	<div class="kimbleObjectContainer">
+								<div class="kimbleObject ProductDomain">
+									<div>
+										<apex:outputLink value="/{!URLFOR(theProductDomain.sObjectId)}" target="_blank">{!theProductDomain.name}</apex:outputLink>
+									</div>
+									<apex:outputPanel rendered="{!theProductDomain.productCount >= 1000}">
+										<span class="truncatedItem">Note: Product display limited to 1000 entries for this domain</span><br/>
+									</apex:outputPanel>
+									<apex:repeat value="{!ProductDomainMap[theProductDomain.sObjectId]}" var="theProduct">
+										<div sf-id="{!theProduct.sObjectId}" class="kimbleObject Product">
+								 			<div>
+												<apex:outputLink value="/{!URLFOR(theProduct.sObjectId)}" target="_blank">{!theProduct.name}</apex:outputLink>
+											</div>
+											<apex:repeat value="{!ProductGroupMap[theProduct.sObjectId]}" var="theProductGroup">
+												<div sf-id="{!theProductGroup.sObjectId}" class="kimbleObject ProductGroup">
+													<div>
+														<apex:outputLink value="/{!URLFOR(theProductGroup.sObjectId)}" target="_blank">{!theProductGroup.name}</apex:outputLink>
+													</div>
+													<apex:repeat value="{!PropositionMap[theProductGroup.sObjectId]}" var="theProposition">
+														<div sf-id="{!theProposition.sObjectId}" class="kimbleObject Proposition lastChildObject">
+															<div>
+																<apex:outputLink value="/{!URLFOR(theProposition.sObjectId)}" target="_blank">{!theProposition.name}</apex:outputLink>
+															</div>
+														</div>
+													</apex:repeat>
+												</div>
+											</apex:repeat>
+										</div>
+									</apex:repeat>
+								</div>
+							</div>
+						</apex:repeat>
+					</div>
+				</div>								
+			</div>
+			</apex:outputPanel>
+	  </div>
+	  	  
+<!-- 	  Product Domain Validator -->
+	  <div id="productvalidator-tab" class="tabContainer">
+	  	<div style="display: inline-block; text-align: right;">
+		  	<input type="button" class="btn" value="Validate All" onclick="validateAllProductDomains();"/>
+			
+			<div style="text-align: left;"> 
+			<apex:outputPanel id="productDomainList" >
+			<table class="list">
+				<tr class="headerRow">
+					<th>Product Domain</th>
+					<th>Number Of Products</th>		
+					<th>Status</th>
+					<th>Validation</th>
+					<th>Actions</th>
+				</tr>
+				<apex:repeat value="{!ProductDomains}" var="theProductDomain">
+				<tr id="{!theProductDomain.sObjectId}-row" class="productDomainRow">
+					<td><apex:outputLink value="/{!URLFOR(theProductDomain.sObjectId)}" target="_blank"><apex:outputText value="{!theProductDomain.name}"/></apex:outputLink></td>
+					<td style="text-align: center;"><apex:outputText value="{!theProductDomain.productCount}"/></td>
+					<td class="statusCol"><span id="{!JSINHTMLENCODE(theProductDomain.sObjectId)}-state" class="actionLink" onclick="validateProductDomain('{!JSENCODE(theProductDomain.sObjectId)}')">{!$Label.Validate}</span><span id="{!JSINHTMLENCODE(theProductDomain.sObjectId)}-working" class="hidden"><img src="{!URLFOR($Resource.LoadingImage)}" class="loadingImage"/></span></td>
+					<td class="validationCol" id="{!JSINHTMLENCODE(theProductDomain.sObjectId)}-validation"><span id="{!JSINHTMLENCODE(theProductDomain.sObjectId)}-validation"></span></td>
+					<td class="actionsCol">
+						<apex:outputLink value="/{!URLFOR(theProductDomain.sObjectId)}" target="_blank">{!$Label.kimbleone__edit}</apex:outputLink>
+	   						&nbsp;|&nbsp;
+	   					<span class="actionLink" onclick="validateProductDomain('{!JSINHTMLENCODE(theProductDomain.sObjectId)}')">{!$Label.Validate}</span>
+	   						&nbsp;|&nbsp;
+   						<apex:commandLink onclick="var d = confirmDelete();if(!d) return;setCloning('{!JSINHTMLENCODE(theProductDomain.sObjectId)}')" action="{!DeepCloneProductDomain}" oncomplete="setContainerWidth();" reRender="productDomainList, productDomainNavigator">Clone
+   							<apex:param name="productDomainId" value="{!theProductDomain.sObjectId}" />
+   						</apex:commandLink>
+   						<span id="{!JSINHTMLENCODE(theProductDomain.sObjectId)}-cloning" class="hidden"><img src="{!URLFOR($Resource.LoadingImage)}" class="loadingImage"/></span>
+					</td>
+				</tr>
+				</apex:repeat>
+			</table>
+					</apex:outputPanel> 
+			</div>	
+		</div>
+	  </div>
+	</div>
+	
+	</apex:outputPanel>
+	</apex:form>
+
+</apex:define>
+</apex:composition>
+</apex:page>

@@ -1,0 +1,177 @@
+<apex:page controller="KimbleOne.ObjectSharesController" showHeader="true" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+	<c:Menu DefaultHelpPage="ObjectOwnership.html" MenuContextType="{!menuType}" MenuContextId="{!menuId}" MenuContextName="{!objectName}"/>
+
+</apex:define>  
+   
+<apex:define name="Content">
+
+	<apex:pageMessages escape="false"/>
+	
+	<apex:form id="TheForm">     
+         <apex:pageBlock title="{!ObjectTypeName}" id="PendingShareActions" rendered="{!HasPendingShareActions}">
+         	<span class="fa fa-circle-o-notch fa-spin" style="margin-right: 8px;font-size: 16px; margin-top: 10px; margin-bottom: 14px;"></span><label style="color: #333; font-weight: bold;">Recalculating Object Shares</label>
+         	<script>
+				var delay = 3000;
+				setTimeout(function(){ window.location.reload(true);}, delay);
+			</script>
+         </apex:pageBlock>
+         
+         <apex:pageBlock title="{!ObjectTypeName}" id="TheShares" rendered="{!!HasPendingShareActions}">
+            <apex:pageBlockButtons location="top" rendered="{!HasEditAccess || HasTransferAccess}">
+				<apex:outputPanel layout="none" rendered="{!HasEditAccess}">
+					<input id="addShareButton" type="button" class="btn" value="{!$Label.New}" onclick="initialiseModalBoxy('#SharePopup', '{!JSENCODE($Label.New)}', jQuery('form[id$=\'TheForm\']'));newShare('Share')"></input>
+				</apex:outputPanel>
+				<apex:outputPanel layout="none" rendered="{!!ISBLANK(OwnerSharingReasonId) && HasTransferAccess}">
+					<input id="transferButton" type="button" class="btn" value="{!$Label.ChangeOwner}" onclick="initialiseModalBoxy('#SharePopup', '{!JSENCODE($Label.ChangeOwner)}', jQuery('form[id$=\'TheForm\']'));newShare('Transfer')"></input>
+				</apex:outputPanel>
+            </apex:pageBlockButtons>
+			
+			<div style="position: absolute; right: 24px; top: 64px;">            
+	            <span style="font-size: 11px;font-weight: bold;display: inline-block;height: 25px;vertical-align: middle;line-height: 25px;"><apex:outputLabel value="{!$Label.kimbleone__filter}"/>&nbsp;</span>
+	            
+	            <apex:selectList value="{!ReasonCode}" size="1">
+					<apex:actionSupport event="onchange" action="{!ReasonCodeFilterChange}" />
+					<apex:selectOptions value="{!TheFilterSharingReasons}" />
+				</apex:selectList>
+            </div>
+            <apex:variable var="UserOrGroupIdFieldName" value="{!$ObjectType.DeliveryGroup__Share.Fields.UserOrGroupId.Name}"/>
+            <apex:variable var="AccessLevelFieldName" value="{!$ObjectType.DeliveryGroup__Share.Fields.AccessLevel.Name}"/>
+            <apex:variable var="RowCauseFieldName" value="{!$ObjectType.DeliveryGroup__Share.Fields.RowCause.Name}"/>
+            
+            <apex:pageBlockTable value="{!ObjectShares}" var="shareObject">
+              <apex:column headerValue="{!$ObjectType.DeliveryGroup__Share.Fields.UserOrGroupId.Label}">
+                  <apex:outputField value="{!shareObject.TheShareObject[UserOrGroupIdFieldName]}" />
+              </apex:column>	
+               
+              <apex:column headerValue="{!$ObjectType.DeliveryGroup__Share.Fields.AccessLevel.Label}">
+                 <apex:outputLink value="/{!shareObject.ObjectShareId}" style="text-decoration:none;cursor:default">
+                  <apex:outputField value="{!shareObject.TheShareObject[AccessLevelFieldName]}" />
+                 </apex:outputLink>
+                 
+              </apex:column>
+              
+             <apex:column headerValue="{!$ObjectType.DeliveryGroup__Share.Fields.RowCause.Label}">
+                  <apex:repeat value="{!shareObject.Reasons}" var="reason">
+                  		<div style="padding-bottom: 4px;">
+                  		<apex:commandLink styleclass="fa fa-remove remove-share" onclick="var d = confirmDelete();if(!d) return; jQuery(this).addClass('fa fa-circle-o-notch fa-spin');" rendered="{!HasEditAccess && reason.CanDelete}" action="{!removeShare}" reRender="TheShares" title="{!$Label.kimbleone__delete}" oncomplete="initialise();">
+							<apex:param name="shareReasonId" value="{!reason.ReasonId}" />
+							<apex:param name="userOrGroupId" value="{!shareObject.TheShareObject[UserOrGroupIdFieldName]}" />
+						</apex:commandLink>
+						<apex:outputText value="{!reason.Reason}"/>&nbsp;<apex:outputPanel layout="none" rendered="{!!ISBLANK(reason.ContextId)}">[ <span><apex:outputText styleclass="kimble-objectid-lookup" html-data-type="{!reason.ObjectType}" value="{!reason.ContextId}" /></span> ]</apex:outputPanel></div>
+                  </apex:repeat>               
+              </apex:column>	
+            
+            </apex:pageBlockTable> 
+			<br/>
+			
+			<div style="position: relative;">
+				<apex:outputText value="{!$Label.kimbleone__pdfpage}"/>: <apex:outputText value="{!PageNumber}"/>
+					<div style="position:absolute;top:0px; right:8px">
+					<apex:outputLink value="{!PreviousLink}" rendered="{!Offset != 0}">
+                  	<apex:outputText value="{!$Label.kimbleone__previous}" />
+		             </apex:outputLink>
+		             &nbsp;&nbsp;&nbsp;
+		             <apex:outputLink value="{!NextLink}" rendered="{!ObjectShares.size = PageSize}">
+		                  <apex:outputText value="{!$Label.kimbleone__next}" />
+		             </apex:outputLink>
+				</div>
+			</div>
+        </apex:pageBlock> 
+          
+        <apex:actionFunction action="{!NewShare}" name="newShare" rerender="SharePanel" oncomplete="initialiseSharePopup();showModalBoxy()">
+        	<apex:param name="mode" value=""/>
+		</apex:actionFunction>
+		
+		<div id="SharePopup" style="display:none">
+			<apex:outputPanel id="SharePanel">
+					
+	       			<div id="ShareErrors">
+	           			<apex:pageMessages id="ShareMessages" escape="false" />
+	           		</div>
+	           		<apex:pageBlock >
+	           		 
+	            		<apex:pageBlockButtons location="bottom">
+							<apex:commandButton id="save" styleclass="DisableButtonWhileBusy" action="{!SaveShare}" value="{!$Label.kimbleone__save}" oncomplete="initialiseSharePopup();hideModalBoxyWithErrorCheck('#ShareErrors'); initialise();" rerender="SharePanel, TheShares"/>
+							<input id="cancel" class="btn"  type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+						</apex:pageBlockButtons>
+						
+						<apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+                		  <apex:pageBlockSectionItem datastyle="white-space: nowrap;">
+			              	<apex:outputLabel value="{!$ObjectType.User.Name}"/>
+			              	<apex:outputPanel layout="none">
+			              		<apex:inputText id="SelectUserId" value="{!UserName}" required="false" styleclass="readonly"/>
+			              		<apex:inputHidden id="SelectUserId_lkid" value="{!UserId}"/>
+			              		<a href="javascript:openLookup(KimbleLookupPage + '?lkfm=' + jQuery('[id$=\'TheForm\']').attr('id') + '&lknm=' + jQuery('[id$=\'SelectUserId\']').attr('id') + '&lktp={!$ObjectType.User.KeyPrefix}&typename=ActiveLicensedUserSearch',670,'1','&lksrch=')" class="kimbleSearch " onclick="setLastMousePosition(event)" ><img src="/s.gif" class="lookupIcon" onblur="this.className = 'lookupIcon';" onfocus="this.className = 'lookupIconOn';" onmouseout="this.className = 'lookupIcon';this.className = 'lookupIcon';" onmouseover="this.className = 'lookupIconOn';this.className = 'lookupIconOn';" /></a>
+			              	</apex:outputPanel>			     
+			              </apex:pageBlockSectionItem>
+			              
+			              <apex:pageBlockSectionItem rendered="{!Mode = 'Share'}">
+			              	<apex:outputLabel value="{!$Label.kimbleone__or}"/>
+			              	&nbsp;
+			              </apex:pageBlockSectionItem>
+			              
+			              <apex:pageBlockSectionItem rendered="{!Mode = 'Share'}">
+			              	<apex:outputLabel value="{!$ObjectType.Group.Name}"/>
+			              	<apex:outputPanel layout="none">
+			              		<apex:inputText id="SelectGroupId" value="{!GroupName}" required="false" styleclass="readonly"/>
+			              		<apex:inputHidden id="SelectGroupId_lkid" value="{!GroupId}"/>
+			              		<a href="javascript:openLookup(KimbleLookupPage + '?lkfm=' + jQuery('[id$=\'TheForm\']').attr('id') + '&lknm=' + jQuery('[id$=\'SelectGroupId\']').attr('id') + '&lktp={!$ObjectType.Group.KeyPrefix}&typename=GroupSearch',670,'1','&lksrch=')" class="kimbleSearch " onclick="setLastMousePosition(event)" ><img src="/s.gif" class="lookupIcon" onblur="this.className = 'lookupIcon';" onfocus="this.className = 'lookupIconOn';" onmouseout="this.className = 'lookupIcon';this.className = 'lookupIcon';" onmouseover="this.className = 'lookupIconOn';this.className = 'lookupIconOn';" /></a>
+			              	</apex:outputPanel>			     
+			              </apex:pageBlockSectionItem>
+			              
+			              <apex:pageBlockSectionItem rendered="{!Mode = 'Share'}">
+			             		<apex:outputLabel value="{!$ObjectType.KimbleOne__ShareReason__c.Label}"/>
+			             	 
+			             		<apex:selectList value="{!TheSelectedSharingReasonId}" size="1">
+						  			<apex:selectOptions value="{!TheSharingReasons}" />
+						  		</apex:selectList>
+						  	</apex:pageBlockSectionItem>
+						  	
+			            </apex:pageBlockSection>
+			            
+					</apex:pageBlock>
+			</apex:outputPanel>
+		</div>
+   </apex:form>
+   <style>
+       .kimble-objectid-lookup{display:none;}
+       .remove-share{margin-right: 4px; cursor: pointer;font-size: 14px;text-decoration: none;}
+   </style>
+   <script>
+            
+          jQuery(window).load(function(){
+          	
+          	initialise();
+          
+          });
+          
+          function initialiseSharePopup()
+          {
+          	jQuery('.readonly').prop('readonly', true);
+          }
+          
+          function initialise()
+          {
+          	jQuery.each(jQuery('.kimble-objectid-lookup'), function (i, obj)
+			{
+				if (jQuery(obj).text() != '')
+				{
+					var sObject = sforce.connection.query("SELECT Id, Name FROM " + jQuery(obj).attr("data-type") + " WHERE Id = '" + jQuery(obj).text() + "'");
+				
+					jQuery(obj).parent().append('<a href="/' + jQuery(obj).text() + '">' + sObject.records.Name + '</a>');
+				}
+			
+			});
+          }
+            
+   </script>
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

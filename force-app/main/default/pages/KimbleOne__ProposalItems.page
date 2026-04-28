@@ -1,0 +1,1925 @@
+<apex:page standardcontroller="KimbleOne__Proposal__c" extensions="KimbleOne.ProposalItemsController,KimbleOne.DeliveryStageController,KimbleOne.TooltipsController" tabStyle="KimbleOne__ReferenceData__c" sidebar="false" >
+
+	<apex:composition template="KimbleOne__SiteMaster">
+
+		<apex:define name="Menu">
+			<c:Menu DefaultHelpPage="MaintainProposalDetails.html" MenuContextType="{!IF(KimbleOne__Proposal__c.AcceptanceType__r.KimbleOne__Enum__c = 'Approval', 'ChangeOrder', 'Proposal')}"  MenuContextId="{!IF(KimbleOne__Proposal__c.AcceptanceType__r.KimbleOne__Enum__c = 'Approval', TheChangeOrder.Id, TheProposal.Id)}" MenuContextName="{!TheProposal.Name}" />
+		</apex:define>
+
+		<apex:define name="Content">
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'InsightStyle.css')}"/>
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleJS, 'Charm.js')}"/>
+
+			<!-- Kimble Guidance -->
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+			<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+				<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/ProposalItemsNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+				<apex:outputPanel layout="none" rendered="{!ProposalItemsTipOverrideEnabled}">
+					<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+				</apex:outputPanel>
+			</apex:outputPanel>
+
+			<style>
+		.boxy-content {display:none;}
+		
+		/* Insight */
+		.dg-margin-insight-tooltip-content {
+		    width: 200px;
+		    padding: 10px;
+		}
+		.qtip-titlebar {
+		    text-align: center;
+		}
+		.dg-margin-narrative {
+		    font-size: 12px;
+		    white-space: normal;
+		    line-height: 14px;
+		    text-align: center;
+		}
+		.dg-margin {
+		    text-align: center;
+		    padding-top: 10px;
+		    font-size: 32px;
+		    padding-bottom: 20px;
+		}
+		.dg-margin-insight-tooltip {
+			margin-top: 6px;
+		}
+		.ele-tip-info {
+			color: #428BCA;
+		}
+
+		.ele-tip-inline-icon {
+			font-size: 15px;
+			display: inline-block;
+		    vertical-align: bottom;
+		    margin-left: 3px;
+		}
+		.extended-text {
+		 	display: none;
+		}
+		.tip-link-see-more {
+			color:rgb(0, 95, 178) !important;
+			cursor: pointer;
+			text-decoration: none;
+		}
+		.tip-link-kimble-help {
+			color:rgb(0, 95, 178) !important;
+			float:right;
+			text-decoration: none;
+		}
+		.hide-tip {
+		    display: none;
+		}
+		.show-tip {
+		    display: inline;
+		}
+		.qtip-content>ul , .extended-text>ul  {    
+			padding-inline-start: 0px;A
+			margin-block-start: 0px;
+			display: inline-block;
+			margin-block-end: 0px;
+		}
+
+		/* alt proposals */
+		#proposal-title {
+			position: relative;
+  		}
+  		#proposal-alternatives
+  		{
+			position: absolute;
+			right: 26px;
+			top: 60px;
+			width: 280px;
+			text-align: center;
+			background: lemonchiffon;
+			padding: 10px;
+			border: 2px dashed #bbbbbb;
+			display: table-row;
+			color: #4b4d4b !important;
+			cursor: pointer;
+		}
+    	i.alt-prop-ind {
+			font-size: 20px;
+			padding: 6px;
+			display: table-cell;
+			vertical-align: middle;
+		}
+		span.alt-prop-msg {
+			display: table-cell;
+			text-align: left;
+			padding-left: 5px;
+			vertical-align: middle;
+		}
+	</style>
+
+			<apex:outputPanel id="ProposalItems" layout="block">
+
+				<div id="proposal-container" style="display:none">
+
+					<apex:outputPanel layout="none" rendered="{!ShowDeliveryGroupMarginInsight}">
+						<div class="insight-container dg-average-margin insight-collapsed insight-hidden" display-currency="{!TheProposal.CurrencyISOCode}">
+							<div class="docked-insight-container">
+								<div class="docked-insight"></div>
+							</div>
+							<div class="insight-item">
+								<span class="miniCardIcon cardIconInfo fa fa-lightbulb-o"></span>
+							</div>
+						</div>
+					</apex:outputPanel>
+
+					<div id="proposal-title" kimble-tip="ProposalName" kimble-tip-help-link="ProposalNameLink">
+						<apex:outputPanel id="ProposalCard" layout="none">
+							<div id="ProposalItemsErrors">
+								<apex:pageMessages escape="false"/>
+							</div>
+							<div class="title-card-container">
+								<div class="title-card">
+									<div class="title-card-heading" >
+										<div class="title-card-heading-icon">
+											<div class="fa fa-square kimble-probability {!JSINHTMLENCODE(TheProposal.ForecastStatus__r.StyleClass__c)}" title="{!JSINHTMLENCODE(TheProposal.ForecastStatus__r.Name)}"></div>
+										</div>
+										<div class="title-card-heading-text">
+											<apex:outputText value="{!TheProposal.KimbleOne__ShortName__c}" title="{!TheProposal.KimbleOne__ShortName__c}"/>
+										</div>
+									</div>
+
+									<div class="title-card-body">
+										<apex:outputPanel layout="none" rendered="{!IsProposalInProgress && ISBLANK(TheChangeOrder)}">
+											<div class="title-card-body-field tip-bottom" kimble-tip="ForecastLevelToggle" kimble-tip-help-link="ForecastLevelToggleLink" kimble-tip-extended-text="ForecastLevelToggleExtendedText">
+
+												<apex:outputPanel layout="block" styleclass="toggle-forecast-level fixed-toggle fa fa-toggle-on fa-2 suppress-on fa-rotate-90" rendered="{!TheProposal.KimbleOne__ForecastAtDetailedLevel__c}" title="{!$Label.kimbleone__detailedlevelforecastheadinglabel}"></apex:outputPanel>
+												<span class="forecast-level-switch-container">
+			  				<apex:outputPanel layout="block" styleclass="toggle-forecast-level fa fa-toggle-on fa-2 suppress-on fa-rotate-270" rendered="{!!TheProposal.KimbleOne__ForecastAtDetailedLevel__c && $ObjectType.KimbleOne__Proposal__c.updateable}" title="{!$Label.kimbleone__detailedlevelforecastswitchheadinglabel}"></apex:outputPanel>
+
+			  				<apex:outputPanel styleClass="tool-tip-content" >
+
+								<apex:outputPanel styleClass="tool-tip-content-container" title="{!$Label.kimbleone__detailedlevelforecastswitchheadinglabel}" rendered="{!!TheProposal.KimbleOne__ForecastAtDetailedLevel__c}">
+									<apex:outputText styleClass="message-text" value="{!$Label.kimbleone__detailedlevelforecastswitchmessage}" />
+									
+									<apex:outputPanel rendered="{!ISBLANK(IncompleteElementsMessage)}">
+										<div>
+											<span class="tool-tip-inline-icon tool-tip-warn fa fa-exclamation-triangle" style="vertical-align: top;"></span>
+											<apex:outputText styleClass="message-text additional-details-text" value="{!$Label.kimbleone__detailedlevelforecastswitchwarningmessage}" />
+										</div>
+										
+										<div class="tool-tip-form-buttons">
+											<input id="switchToLowLevel" class="btn"  type="button" onclick="jQuery('.toggle-forecast-level').parent().parent().addClass('Loading').children().hide();jQuery('.forecast-level-switch-container').qtip('hide');toggleForecastLevel();" value="{!$Label.DetailedLevelForecastSwitchButtonLabel}"/>
+											<input id="cancelSwitchToLowLevel" class="btn"  type="button" onclick="cancelForecastLevelPopup();" value="{!$Label.kimbleone__cancel}"/>
+										</div>
+									</apex:outputPanel>
+									
+									<apex:outputPanel rendered="{!!ISBLANK(IncompleteElementsMessage)}">
+										<div>
+											<span class="tool-tip-inline-icon tool-tip-warn fa fa-exclamation-triangle" style="vertical-align: top;"></span>
+											<apex:outputText styleClass="message-text additional-details-text" value="{!IncompleteElementsMessage}" />
+										</div>
+										
+										<div class="tool-tip-form-buttons">
+											<input id="cancelSwitchToLowLevel" class="btn"  type="button" onclick="cancelForecastLevelPopup();" value="{!$Label.kimbleone__ok}"/>
+										</div>
+									</apex:outputPanel>
+									
+								</apex:outputPanel>
+
+							</apex:outputPanel>
+		  				</span>
+											</div>
+										</apex:outputPanel>
+
+										<div class="title-card-body-field tip-bottom" kimble-tip="ForecastStatus" kimble-tip-help-link="ForecastStatusHelpLink">
+											<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ForecastStatus__c.Label}" />
+											<span ><apex:outputField styleClass="center-aligned-block" value="{!TheProposal.ForecastStatus__r.Name}"/></span>
+										</div>
+										<div class="title-card-body-field tip-bottom" kimble-tip="AcceptanceDate" kimble-tip-extended-text="AcceptanceDateExtendedText">
+											<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__AcceptanceDate__c.Label}" />
+											<span ><apex:outputField styleClass="center-aligned-block" value="{!TheProposal.KimbleOne__AcceptanceDate__c}"/></span>
+										</div>
+										<div class="title-card-body-field tip-bottom" kimble-tip="ContractRevenue" kimble-tip-help-link="ContractRevenueHelpLink">
+											<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ContractRevenue__c.Label}" />
+											<span ><apex:outputField id="proposal-contract-revenue" styleClass="center-aligned-block" value="{!TheProposal.KimbleOne__ContractRevenue__c}"/></span>
+										</div>
+										<div class="title-card-body-field tip-bottom" kimble-tip="ContractCost" kimble-tip-help-link="ContractCostHelpLink">
+											<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ContractCost__c.Label}" />
+											<span ><apex:outputField styleClass="center-aligned-block" value="{!TheProposal.KimbleOne__ContractCost__c}"/></span>
+										</div>
+										<div class="title-card-body-field tip-bottom" kimble-tip="MarginPct" kimble-tip-help-link="MarginPctLink">
+											<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ContractMargin__c.Label}" />
+											<span ><apex:outputField styleClass="center-aligned-block" value="{!TheProposal.KimbleOne__ContractMargin__c}"/></span>
+										</div>
+
+										<div id="embeddedCharmsContainer" pageSource="ProposalCharmsCard" parentContext="{!$Page.ProposalItems}"></div>
+									</div>
+
+									<div class="title-card-menu tip-bottom" kimble-tip="ProposalBurgerMenu" kimble-tip-help-link="ProposalBurgerMenuLink" kimble-tip-extended-text="ProposalBurgerMenuExtendedText">
+										<apex:outputPanel layout="none" rendered="{!IsProposalInProgress}">
+											<div id="proposal-menu" data-floating-dropdown="#{!TheProposal.Id}-menu-data" class="title-card-menu fa fa-bars burger-menu"></div>
+										</apex:outputPanel>
+									</div>
+
+									<div id="{!TheProposal.Id}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+										<ul class="floating-dropdown-menu">
+											<apex:outputPanel layout="none" rendered="{!ISBLANK(TheChangeOrder) && $ObjectType.KimbleOne__DeliveryGroup__c.createable}">
+												<li><a href="javascript:addGroupWizard('NEW');"><i class="fa fa-plus-square dropdown-icon"></i>{!$Label.AddDeliveryEngagementLink}</a></li>
+											</apex:outputPanel>
+											<apex:outputPanel layout="none" rendered="{!ISBLANK(TheChangeOrder) && $ObjectType.KimbleOne__DeliveryGroup__c.updateable}">
+												<li><a href="javascript:addGroupWizard('EXISTING');"><i class="fa fa-plus-square-o dropdown-icon"></i>{!$Label.AddExistingGroupWizardLink}</a></li>
+											</apex:outputPanel>
+											<apex:outputPanel layout="none" rendered="{!ISBLANK(TheChangeOrder) && allowAlternatives && $ObjectType.KimbleOne__Proposal__c.createable}">
+												<li><a href="javascript:newProposalAlternativeClick();"><i class="fa fa-files-o dropdown-icon"></i>{!$Label.CreateAlternativeProposal}</a></li>
+											</apex:outputPanel>
+											<apex:outputPanel layout="none" rendered="{!ISBLANK(TheChangeOrder) && allowAlternatives && isAlternative && $ObjectType.KimbleOne__Proposal__c.createable}">
+												<li><a href="javascript:makeAltPreferred('{!TheProposal.Id}');"><i class="fa fa-star-o dropdown-icon"></i>{!$Label.ProposalAlternativeNarrative01}</a></li>
+											</apex:outputPanel>
+										</ul>
+									</div>
+
+								</div>
+							</div>
+							<apex:outputPanel layout="none" rendered="{!ISBLANK(TheChangeOrder) && allowAlternatives && (isAlternative || hasAlternatives)}">
+								<div id="proposal-alternatives" onclick="safeNavigateToSForceURL('{!$Page.ProposalAlternatives}?id={!IF(!ISBLANK(TheProposal.Proposal__c), TheProposal.Proposal__c, TheProposal.Id)}');" >
+								<apex:outputPanel layout="none" rendered="{!!isAlternative}">
+								<i class="fa fa-star alt-prop-ind is-pref-prop"></i>
+								</apex:outputPanel>
+								<apex:outputPanel layout="none" rendered="{!isAlternative}">
+								<i class="fa fa-files-o alt-prop-ind not-pref-prop"></i>
+								</apex:outputPanel>
+								<apex:outputText styleClass="alt-prop-msg" value="{!alternativeProposalNarrative}" />
+								</div>
+							</apex:outputPanel>
+						</apex:outputPanel>
+					</div>
+
+
+					<apex:outputPanel id="ProposalGroups">
+
+						<apex:outputPanel layout="none" rendered="{!ISBLANK(TheDeliveryGroupAndElementsWizard)}">
+							<div id="proposal-items" style="display:inline-block;vertical-align:top; min-height: 100px;">
+								<apex:actionStatus id="ProposalGroupsLoadingStatus">
+									<apex:facet name="start">
+										<div id="loadingIndicatorOuterContainerGroups" class="loadingIndicator">
+											<div id="loadingIndicatorInnerContainerGroups">
+												<img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.kimbleone__loading}
+											</div>
+										</div>
+									</apex:facet>
+								</apex:actionStatus>
+								<div id="delivery-groups-container">
+
+									<apex:repeat value="{!TheProposalGroupStructure.TheGroups}" var="group">
+										<apex:variable var="IsWAR" value="{!group.IsWar}"/>
+										<div id="{!group.Id}" class="delivery-group-container cardContainer" kimble-tip="EngagementName" kimble-tip-help-link="EngagementNameLink">
+
+											<div class="delivery-group card">
+												<div class="delivery-group-header cardHeading" probability-code="{!JSINHTMLENCODE(group.ProbabilityCode)}">
+													<div class="card-heading-icon kimble-probability {!if(ISBLANK(group.ForecastStyle), JSINHTMLENCODE(group.ProbabilityCode), JSINHTMLENCODE(group.ForecastStyle))} fa fa-square" title="{!JSINHTMLENCODE(group.ForecastStatus)}"></div>
+													<div class="card-title-container">
+														<h3 class="cardTitle"><a class="undecorated-link" href="/{!group.Id}"><apex:outputText value="{!group.Name}"/></a></h3>
+													</div>
+													<apex:outputPanel layout="none" rendered="{!IsProposalInProgress && group.IsInProgress}">
+														<div data-floating-dropdown="#{!group.Id}-menu-data" class="fa fa-bars delivery-group-menu burger-menu tip-right" kimble-tip="EngagementBurgermenu" kimble-tip-help-link="EngagementBurgermenuLink"></div>
+														<div class="deleting Loading" style="display:none"></div>
+														<div id="{!group.Id}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+															<ul class="floating-dropdown-menu">
+																<apex:outputPanel layout="none" rendered="{!IsProposalInProgress}">
+																	<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__DeliveryElement__c.createable && IsActionAllowed[group.Id]['AllowNewElements']}">
+																		<li><a href="javascript:addNewElement('{!JSINHTMLENCODE(group.Id)}');"><i class="fa fa-plus-square dropdown-icon"></i>{!$Label.AddElementLink}</a></li>
+																	</apex:outputPanel>
+                                                                    <apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__DeliveryElement__c.createable && IsActionAllowed[group.Id]['AllowNewElements'] && CloneEnabled}">
+                                                                        <li><a href="javascript:addNewElementFromExisting('{!JSINHTMLENCODE(group.Id)}', null);"><i class="fa fa-clone dropdown-icon"></i>{!$Label.CloneElementFromEngagement}</a></li>
+                                                                    </apex:outputPanel>
+																	<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__DeliveryGroup__c.updateable}">
+																		<li><a href="javascript:editGroup('{!JSINHTMLENCODE(group.Id)}');"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.EngagementEditLink}</a></li>
+																	</apex:outputPanel>
+																	<apex:outputPanel layout="none" rendered="{!!TheProposal.KimbleOne__ForecastAtDetailedLevel__c && $ObjectType.KimbleOne__ProposalItem__c.updateable}">
+																		<li><a href="javascript:editGroupForecast('{!JSINHTMLENCODE(group.Id)}');" ><i class="fa fa-toggle-on suppress-on fa-rotate-270 dropdown-icon"></i>{!$Label.kimbleone__highlevelforecastlabel}</a></li>
+																	</apex:outputPanel>
+																	<apex:outputPanel layout="none" rendered="{!TheProposalGroupStructure.NumberOfInProgressItems > 1 && $ObjectType.KimbleOne__ProposalItem__c.updateable}">
+																		<li><a href="javascript:loseGroup('{!JSINHTMLENCODE(group.Id)}');"><i class="fa fa-times dropdown-icon"></i>{!$Label.Lost}</a></li>
+																	</apex:outputPanel>
+
+																	<apex:outputPanel layout="none" rendered="{!group.CanDelete && $ObjectType.KimbleOne__DeliveryGroup__c.deletable}">
+																		<li><a href="javascript:deleteGroup('{!JSINHTMLENCODE(group.Id)}');"><i class="fa fa-trash dropdown-icon"></i>{!$Label.DeleteEngagementLink}</a></li>
+																	</apex:outputPanel>
+
+																</apex:outputPanel>
+
+															</ul>
+														</div>
+													</apex:outputPanel>
+												</div><!-- delivery-group-header -->
+
+												<div class="primary-elements-container">
+													<div class="card-body-header">
+										<span class="group-dates" kimble-tip="EngagementDates">
+										<apex:outputPanel layout="inline" styleclass="fa fa-exclamation-triangle group-start-date-warning" rendered="{!group.HighLevelStartDateOffset != 0}" title="{!$Label.kimbleone__highlevelstartdateoffset}">
+											<apex:outputPanel styleClass="tool-tip-content" >
+												<apex:outputPanel styleClass="tool-tip-content-container" title="{!$Label.kimbleone__highlevelstartdateoffset}" rendered="{!group.HighLevelStartDateOffset != 0}">
+													<span class="tool-tip-inline-icon tool-tip-warn fa fa-exclamation-triangle"></span><apex:outputText styleClass="message-text" value="{!$Label.kimbleone__highlevelstartdateoffsetwarning}" />
+													<div>
+														<span class="card-field-label"><apex:outputText value="{!$ObjectType.KimbleOne__ProposalItem__c.Fields.KimbleOne__DetailedLevelStartDate__c.Label}"/></span>
+														<span class="card-field-value"><apex:outputText styleclass="kimble-format-date" value="{!group.DetailedLevelStartDate}" /></span>
+													</div>
+													<div>
+														<a href="{!$Page.KimbleOne__DeliveryDatesBulkEdit}?Id={!JSENCODE(KimbleOne__Proposal__c.Id)}">{!$Label.kimbleone__bulkupdateassignmentslink}</a>
+													</div>
+												</apex:outputPanel>
+											</apex:outputPanel>
+										</apex:outputPanel>
+
+										<apex:outputText styleclass="kimble-format-date" value="{!group.StartDate}" />&nbsp;-&nbsp;<apex:outputText styleclass="kimble-format-date" value="{!group.EndDate}"/></span>
+														<span style="float:right" class="{!IF(TheProposal.ForecastAtDetailedLevel__c, 'elementLevelForecast', '')} tip-right" kimble-tip="EngagementRevenue"><apex:outputText rendered="{!$ObjectType.KimbleOne__DeliveryGroup__c.fields.KimbleOne__ContractRevenue__c.accessible}" styleclass="kimble-format-currency" html-data-currency="{!group.CurrencyISOCode}"  value="{!group.Revenue}"/></span>
+													</div>
+
+													<div class="inner-cards-container" kimble-tip="ElementName" kimble-tip-help-link="ElementNameLink">
+														<apex:repeat value="{!group.TheElements}" var="element">
+															<apex:outputPanel title="{!IF(!element.IsPartOfProposal,$Label.kimbleone__notpartofthisproposalmessage,'')}" layout="block" styleclass="{!IF(!element.IsPartOfProposal,'element-not-in-proposal','element-in-proposal')}">
+
+																<div id="{!element.Id}" class="inner-card">
+																	<div class="inner-card-header">
+																		<!-- if this is a WAR element then show a WAR icon, otherwise the normal probability square -->
+																		<div class="inner-card-header-icon kimble-probability fa {!IF(element.IsWAR,'fa-exclamation-triangle ' + IF(element.IsWARAlert,'war-icon-alert','war-icon-warn'),'fa-square ' + if(ISBLANK(element.ForecastStyle), JSENCODE(element.ProbabilityCode), JSENCODE(element.ForecastStyle)))}" title="{!JSENCODE(element.ForecastStatus)}{!IF(element.IsWAR,' (' + $Label.WorkingAtRiskHeading + ')','')}"></div>
+																		<div class="inner-card-title"><apex:outputText value="{!element.Name}"/></div>
+
+																		<apex:outputPanel layout="none" rendered="{!element.IsPartOfProposal && IsProposalInProgress && $ObjectType.KimbleOne__ProposalItem__c.updateable && IsActionAllowed[group.Id]['AllowNewElements']}">
+																			<div data-floating-dropdown="#{!element.Id}-menu-data" class="fa fa-bars delivery-element-menu burger-menu tip-right" kimble-tip="ElementBurgerMenu" kimble-tip-help-link="ElementBurgerMenuLink"></div>
+																			<div class="burger-menu updating" style="display:none"><i class="fa fa-circle-o-notch fa-spin"></i></div>
+																			<div id="{!element.Id}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+																				<ul class="floating-dropdown-menu">
+																					<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__DeliveryElement__c.fields.KimbleOne__ServicesContractCost__c.Accessible}" >
+																						<li><a href="javascript:editProposalElement('{!JSINHTMLENCODE(element.Id)}')"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.ConfigureElementLink}</a></li>
+																					</apex:outputPanel>
+																					<apex:outputPanel layout="none" rendered="{!CloneEnabled && $ObjectType.KimbleOne__DeliveryElement__c.createable && IsActionAllowed[group.Id]['AllowNewElements']}">
+																						<li><a href="javascript:addNewElementFromExisting('{!JSINHTMLENCODE(group.Id)}', '{!JSINHTMLENCODE(element.Id)}');"><i class="fa fa-clone dropdown-icon"></i>{!$Label.CloneElementLink}</a></li>
+																					</apex:outputPanel>																					
+																					<apex:outputPanel layout="none" rendered="{!ShowAlternatives}">
+																						<li class="load-alternatives" element-id="{!JSINHTMLENCODE(element.Id)}">
+																							<label><i class="fa fa-circle-o-notch fa-spin dropdown-icon"></i><apex:outputText value="{!$Label.kimbleone__loading}"/></label></li>
+																					</apex:outputPanel>
+																				</ul>
+																			</div>
+																		</apex:outputPanel>
+
+																		<apex:outputPanel layout="none" rendered="{!!element.IsPartOfProposal && IsProposalInProgress && element.RaisedAgainstElements.size == 0 && $ObjectType.KimbleOne__ProposalItem__c.updateable && IsActionAllowed[group.Id]['AllowNewElements']}">
+																			<div id="change-element-element.Id" title="Include this element in proposal" onclick="changeElement('{!JSINHTMLENCODE(group.Id)}', '{!JSINHTMLENCODE(element.Id)}')" class="fa fa-plus-square delivery-element-menu burger-menu configure-element"></div>
+																		</apex:outputPanel>
+																	</div><!-- delivery-element-header -->
+
+																	<!-- INNER CARD BODY -->
+																	<c:DeliveryElementCardBody TheElement="{!element}" ForecastAtDetailedLevel="{!TheProposal.KimbleOne__ForecastAtDetailedLevel__c}"/>
+
+																	<div class="inner-card-footer-primary-element">
+																		<div class="element-config tip-right" kimble-tip="ElementCode">
+																			<apex:outputPanel layout="block" styleClass="delivery-element-reference" rendered="{!!ISBLANK(element.Reference)}">
+																				<apex:outputText value="{!element.Reference}"/>
+																			</apex:outputPanel>
+																		</div>
+																	</div>
+
+																	<div class="scoped-with-elements-container" style="margin-left: 60px;"><!-- Secondary elements and audit change orders -->
+																		<apex:outputPanel layout="none" rendered="{!element.IsPartOfProposal}">
+																			<apex:repeat var="scopedChildElement" value="{!element.ScopedWithChildElements}" >
+																				<div id="{!scopedChildElement.Id}" class="inner-card card-in-card">
+																					<div class="inner-card-header">
+
+																						<div class="inner-card-title"><apex:outputText value="{!scopedChildElement.Name}"/></div>
+
+																						<apex:outputPanel layout="none" rendered="{!element.IsPartOfProposal && IsProposalInProgress && $ObjectType.KimbleOne__ProposalItem__c.updateable && IsActionAllowed[group.Id]['AllowNewElements']}">
+																							<div data-floating-dropdown="#{!scopedChildElement.Id}-menu-data" class="fa fa-bars delivery-element-menu burger-menu"></div>
+																							<div class="burger-menu updating" style="display:none"><i class="fa fa-circle-o-notch fa-spin"></i></div>
+																							<div id="{!scopedChildElement.Id}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+																								<ul class="floating-dropdown-menu">
+																									<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__DeliveryElement__c.fields.KimbleOne__ServicesContractCost__c.Accessible}" >
+																										<li><a href="javascript:editProposalElement('{!JSINHTMLENCODE(scopedChildElement.Id)}')"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.ConfigureElementLink}</a></li>
+																									</apex:outputPanel>
+																									<apex:outputPanel layout="none" rendered="{!ShowAlternatives}">
+																										<li class="load-alternatives" element-id="{!JSINHTMLENCODE(scopedChildElement.Id)}">
+																											<label><i class="fa fa-circle-o-notch fa-spin dropdown-icon"></i><apex:outputText value="{!$Label.kimbleone__loading}"/></label></li>
+																									</apex:outputPanel>
+																								</ul>
+																							</div>
+																						</apex:outputPanel>
+
+																					</div><!-- delivery-element-header -->
+
+																					<!-- INNER CARD BODY -->
+																					<c:DeliveryElementCardBody TheElement="{!scopedChildElement}" ForecastAtDetailedLevel="{!TheProposal.KimbleOne__ForecastAtDetailedLevel__c}"/>
+																				</div>
+
+																			</apex:repeat>
+
+																			<div id="optional-products-container">
+																				<apex:repeat var="optionalProduct" value="{!element.OptionalProducts}" rendered="{!IsProposalInProgress}">
+																					<div id="{!optionalProduct.ProductId}" class="inner-card optional-product">
+																						<div class="inner-card-header">
+
+																							<div class="inner-card-title"><apex:outputText value="{!optionalProduct.Name}"/></div>
+																							<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ProposalItem__c.createable && IsActionAllowed[group.Id]['AllowNewElements']}">
+																								<div id="configure-element-{!optionalProduct.ProductId}" onclick="includeProduct('{!JSINHTMLENCODE(group.Id)}', '{!optionalProduct.ProductId}', '{!JSINHTMLENCODE(element.Id)}', rerenderMainDetails)" class="fa fa-plus-square delivery-element-menu burger-menu configure-element"></div>
+																								<div class="burger-menu adding" style="display:none"><i class="fa fa-circle-o-notch fa-spin"></i></div>
+																							</apex:outputPanel>
+																						</div>
+
+																					</div>
+																				</apex:repeat>
+																			</div>
+																		</apex:outputPanel>
+																	</div>
+																</div><!-- delivery-element-card  -->
+
+
+
+															</apex:outputPanel>
+
+															<div class="secondary-elements-container"><!-- Secondary elements and audit change orders -->
+																<div class="secondary-elements-connector"></div>
+
+																<apex:repeat var="secondaryElement" value="{!element.RaisedAgainstElements}">
+
+																	<apex:outputPanel title="{!IF(!secondaryElement.IsPartOfProposal,$Label.kimbleone__notpartofthisproposalmessage,'')}" layout="block" styleclass="{!IF(!secondaryElement.IsPartOfProposal,'element-not-in-proposal','element-in-proposal')}">
+
+																		<div id="{!element.Id}" class="inner-card">
+
+																			<div class="inner-card-header">
+																				<!-- if this is a WAR element then show a WAR icon, otherwise the normal probability square -->
+																				<div class="inner-card-header-icon kimble-probability fa {!IF(secondaryElement.IsWAR,'fa-exclamation-triangle ' + IF(secondaryElement.IsWARAlert,'war-icon-alert','war-icon-warn'),'fa-square ' + if(ISBLANK(secondaryElement.ForecastStyle), JSINHTMLENCODE(secondaryElement.ProbabilityCode), JSINHTMLENCODE(secondaryElement.ForecastStyle)))}" title="{!JSINHTMLENCODE(secondaryElement.ForecastStatus)}{!IF(secondaryElement.IsWAR,' (' + $Label.WorkingAtRiskHeading + ')','')}"></div>
+																				<div class="inner-card-title"><apex:outputText value="{!secondaryElement.Name}"/></div>
+
+																				<apex:outputPanel layout="none" rendered="{!secondaryElement.IsPartOfProposal && IsProposalInProgress && $ObjectType.KimbleOne__ProposalItem__c.updateable && IsActionAllowed[group.Id]['AllowNewElements']}">
+																					<div data-floating-dropdown="#{!secondaryElement.Id}-menu-data" class="fa fa-bars delivery-element-menu burger-menu"></div>
+																					<div class="burger-menu updating" style="display:none"><i class="fa fa-circle-o-notch fa-spin"></i></div>
+																					<div id="{!secondaryElement.Id}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+																						<ul class="floating-dropdown-menu">
+																							<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__DeliveryElement__c.fields.KimbleOne__ServicesContractCost__c.Accessible}" >
+																								<li><a href="javascript:editProposalElement('{!JSINHTMLENCODE(secondaryElement.Id)}')"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.ConfigureElementLink}</a></li>
+																							</apex:outputPanel>
+																							<apex:outputPanel layout="none" rendered="{!ShowAlternatives && !secondaryElement.IsOperatedWithParent}">
+																								<li class="load-alternatives" element-id="{!JSINHTMLENCODE(secondaryElement.Id)}">
+																									<label><i class="fa fa-circle-o-notch fa-spin dropdown-icon"></i><apex:outputText value="{!$Label.kimbleone__loading}"/></label></li>
+																							</apex:outputPanel>
+																						</ul>
+																					</div>
+																				</apex:outputPanel>
+
+
+																			</div><!-- delivery-element-header -->
+
+																			<!-- INNER CARD BODY -->
+																			<c:DeliveryElementCardBody TheElement="{!secondaryElement}" ForecastAtDetailedLevel="{!TheProposal.KimbleOne__ForecastAtDetailedLevel__c}"/>
+
+																			<div class="inner-card-footer-secondary-element">
+																				<div class="secondary-element-connector"></div>
+																				<div class="element-config">
+																					<span title="{!IF(secondaryElement.IsOperatedWithParent, $Label.OperatedWithParentLabel, $Label.OperatedSeparatelyLabel)}"><i class="fa fa-user {!IF(secondaryElement.IsOperatedWithParent, 'with-primary', '')}"></i></span>
+
+																					<apex:outputPanel layout="inline" styleclass="change-order-label">
+																						<a href="/{!secondaryElement.ChangeOrderId}"><apex:outputText value="{!secondaryElement.ChangeOrderReference}"/></a>
+																					</apex:outputPanel>
+																					<apex:outputPanel layout="block" styleClass="secondary-element-reference" rendered="{!!ISBLANK(secondaryElement.Reference)}">
+																						<apex:outputText value="{!secondaryElement.Reference}"/>
+																					</apex:outputPanel>
+																				</div>
+
+																			</div>
+																			<div class="scoped-with-elements-container" style="margin-left: 60px;"><!-- Secondary elements and audit change orders -->
+
+																				<apex:repeat var="scopedChildElement" value="{!secondaryElement.ScopedWithChildElements}"  rendered="{!secondaryElement.IsPartOfProposal}">
+																					<div id="{!scopedChildElement.Id}" class="inner-card card-in-card">
+																						<div class="inner-card-header">
+
+																							<div class="inner-card-title"><apex:outputText value="{!scopedChildElement.Name}"/></div>
+
+																							<apex:outputPanel layout="none" rendered="{!secondaryElement.IsPartOfProposal && IsProposalInProgress && $ObjectType.KimbleOne__ProposalItem__c.updateable && IsActionAllowed[group.Id]['AllowNewElements']}">
+																								<div data-floating-dropdown="#{!scopedChildElement.Id}-menu-data" class="fa fa-bars delivery-element-menu burger-menu"></div>
+																								<div class="burger-menu updating" style="display:none"><i class="fa fa-circle-o-notch fa-spin"></i></div>
+																								<div id="{!scopedChildElement.Id}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+																									<ul class="floating-dropdown-menu">
+																										<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__DeliveryElement__c.fields.KimbleOne__ServicesContractCost__c.Accessible}" >
+																											<li><a href="javascript:editProposalElement('{!JSINHTMLENCODE(scopedChildElement.Id)}')"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.ConfigureElementLink}</a></li>
+																										</apex:outputPanel>
+																										<apex:outputPanel layout="none" rendered="{!ShowAlternatives && !secondaryElement.IsOperatedWithParent}">
+																											<li class="load-alternatives" element-id="{!JSINHTMLENCODE(scopedChildElement.Id)}">
+																												<label><i class="fa fa-circle-o-notch fa-spin dropdown-icon"></i><apex:outputText value="{!$Label.kimbleone__loading}"/></label></li>
+																										</apex:outputPanel>
+																									</ul>
+																								</div>
+
+																							</apex:outputPanel>
+
+																						</div><!-- delivery-element-header -->
+
+																						<!-- INNER CARD BODY -->
+																						<c:DeliveryElementCardBody TheElement="{!scopedChildElement}" ForecastAtDetailedLevel="{!TheProposal.KimbleOne__ForecastAtDetailedLevel__c}"/>
+																					</div>
+
+																				</apex:repeat>
+
+																				<div id="optional-products-container">
+																					<apex:repeat var="optionalProduct" value="{!secondaryElement.OptionalProducts}" rendered="{!IsProposalInProgress}">
+																						<div id="{!optionalProduct.ProductId}" class="inner-card optional-product">
+																							<div class="inner-card-header">
+
+																								<div class="inner-card-title"><apex:outputText value="{!optionalProduct.Name}"/></div>
+																								<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ProposalItem__c.createable && IsActionAllowed[group.Id]['AllowNewElements']}">
+																									<div id="configure-element-{!optionalProduct.ProductId}" onclick="includeProduct('{!JSINHTMLENCODE(group.Id)}', '{!optionalProduct.ProductId}', '{!JSINHTMLENCODE(secondaryElement.Id)}', rerenderMainDetails)" class="fa fa-plus-square delivery-element-menu burger-menu configure-element"></div>
+																									<div class="burger-menu adding" style="display:none"><i class="fa fa-circle-o-notch fa-spin"></i></div>
+																								</apex:outputPanel>
+																							</div>
+
+																						</div>
+																					</apex:repeat>
+																				</div>
+																			</div><!-- delivery-element-card  -->
+
+
+																		</div>
+																	</apex:outputPanel>
+																</apex:repeat>
+
+															</div> <!-- secondary-elements-container -->
+
+														</apex:repeat>
+
+														<div id="optional-products-container">
+															<apex:repeat var="optionalProduct" value="{!group.OptionalProducts}" rendered="{!IsProposalInProgress}">
+																<div id="{!optionalProduct.ProductId}" class="inner-card optional-product">
+																	<div class="inner-card-header">
+
+																		<div class="inner-card-title"><apex:outputText value="{!optionalProduct.Name}"/></div>
+																		<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ProposalItem__c.createable && IsActionAllowed[group.Id]['AllowNewElements']}">
+																			<div id="configure-element-{!optionalProduct.ProductId}" onclick="includeProduct('{!JSINHTMLENCODE(group.Id)}', '{!optionalProduct.ProductId}', null, rerenderMainDetails)" class="fa fa-plus-square delivery-element-menu burger-menu configure-element"></div>
+																			<div class="burger-menu adding" style="display:none"><i class="fa fa-circle-o-notch fa-spin"></i></div>
+																		</apex:outputPanel>
+																	</div>
+
+																</div>
+															</apex:repeat>
+														</div>
+													</div><!-- primary-element-container -->
+
+
+												</div> <!-- delivery-elements-container -->
+
+												<div class="cardFooter">
+													<span class="delivery-group-reference"><apex:outputText value="{!group.Reference}"/></span>
+												</div>
+											</div><!-- delivery group Card -->
+										</div><!-- delivery-group-container -->
+									</apex:repeat> <!-- delivery-group-repeat -->
+								</div><!-- delivery-groups-container -->
+							</div>
+						</apex:outputPanel>
+
+						<apex:form id="DeliveryGroupEditForm">
+							<div id="DeliveryGroupEditPopup" style="display:none">
+
+								<apex:outputPanel id="DeliveryGroupEdit">
+
+									<div id="DeliveryGroupEditErrors">
+										<apex:pageMessages id="DeliveryGroupEditMessages" escape="false" />
+									</div>
+									<apex:pageBlock >
+
+										<apex:pageBlockButtons location="bottom">
+											<apex:commandButton id="saveGroup" styleclass="DisableButtonWhileBusy" action="{!SaveDeliveryGroup}" value="{!$Label.kimbleone__save}" oncomplete="if(hideModalBoxyWithErrorCheck('#DeliveryGroupEditErrors')) rerenderMainDetails();" rerender="DeliveryGroupEdit"/>
+											<input id="cancelGroup" class="btn"  type="button" onclick="hideModalBoxy();" value="{!$Label.kimbleone__cancel}"/>
+										</apex:pageBlockButtons>
+
+										<apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+											<apex:inputfield id="deliveryGroupShortName" value="{!TheDeliveryGroup.KimbleOne__ShortName__c}" required="true" styleclass="DeliveryGroup_ShortName"/>
+											<apex:inputfield id="deliveryGroupReference" value="{!TheDeliveryGroup.KimbleOne__Reference__c}" rendered="{!EditDeliveryGroupReference}" />
+											<apex:outputField id="readDeliveryGroupReference" value="{!TheDeliveryGroup.KimbleOne__Reference__c}" rendered="{!!EditDeliveryGroupReference}" />
+
+											<apex:pageBlockSectionItem >
+												<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__ProductGroup__c.Label}"/>
+												<apex:inputField id="deliveryGroupProductGroup" required="true" styleclass="kimbleSearch GetActiveProductGroupListForDeliveryGroup" value="{!TheDeliverygroup.KimbleOne__ProductGroup__c}" html-data-typename="'LookupObjectDeliveryElement'" html-data-filter="{!('DeliveryGroupProductGroupFilter;ProductGroup__c:' + TheDeliveryGroup.ProductGroup__r.Id)}" onchange="{!If(DefaultGroupNameFromProductGroup,'defaultGroupName()','')}" />
+											</apex:pageBlockSectionItem>
+
+											<apex:pageBlockSectionItem rendered="{!TheDeliveryPrograms.size > 1}">
+												<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__DeliveryProgram__c.Label}"/>
+												<apex:selectList id="programInput" value="{!TheDeliverygroup.KimbleOne__DeliveryProgram__c}" size="1" >
+													<apex:selectOptions value="{!TheDeliveryPrograms}" />
+												</apex:selectList>
+											</apex:pageBlockSectionItem>
+										</apex:pageblockSection>
+
+										<apex:pageblockSection id="groupFieldsetFields" collapsible="false" showheader="false"  columns="1">
+											<apex:repeat var="f" value="{!$ObjectType.KimbleOne__DeliveryGroup__c.FieldSets.KimbleOne__DeliveryGroupDetails}">
+												<apex:inputField value="{!TheDeliveryGroup[f]}" rendered="{!!CONTAINS(f.FieldPath,'.')}" required="{!f.Required}" />
+												<apex:outputField value="{!TheDeliveryGroup[f]}" rendered="{!CONTAINS(f.FieldPath,'.')}"/>
+											</apex:repeat>
+										</apex:pageblockSection>
+
+									</apex:pageBlock>
+
+								</apex:outputPanel> <!-- end newDeliveryGroup -->
+
+							</div>
+						</apex:form>
+
+						<apex:include pageName="{!$Page.DeliveryElementProposalEdit}"/>
+
+						<apex:form id="DeliveryGroupForecastForm">
+							<div id="DeliveryGroupForecastPopup" style="display:none">
+
+								<apex:outputPanel id="DeliveryGroupForecast">
+
+									<div id="DeliveryGroupForecastErrors">
+										<apex:pageMessages id="DeliveryGroupForecastMessages" escape="false" />
+									</div>
+
+
+									<apex:pageBlock >
+
+										<apex:pageBlockButtons location="bottom">
+											<apex:commandButton id="saveGroupHL" styleclass="DisableButtonWhileBusy" action="{!SaveDeliveryGroup}" value="{!$Label.kimbleone__save}" oncomplete="SetupDatePicker(); if(hideModalBoxyWithErrorCheck('#DeliveryGroupForecastErrors')) rerenderMainDetails(); else refreshPageSources();" rerender="DeliveryGroupForecast"/>
+											<input id="cancelGroupHL" class="btn"  type="button" onclick="hideModalBoxy();" value="{!$Label.kimbleone__cancel}"/>
+										</apex:pageBlockButtons>
+
+										<apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+											<apex:outputfield value="{!TheDeliveryGroup.KimbleOne__ShortName__c}" />
+
+											<apex:pageBlockSectionItem >
+												<apex:outputLabel value="{!$ObjectType.KimbleOne__ProposalItem__c.Fields.KimbleOne__HighLevelCcyHighLevelContractRevenue__c.Label}" />
+												<apex:outputPanel id="editRevenue" >
+													<apex:inputfield value="{!TheDeliveryGroup.ProposalItems__r[0].HighLevelCurrencyIsoCode__c}" styleclass="kimblecustomlookup GetActiveCurrencyTypes null false false" />
+													<apex:inputfield id="contractRevenueHL" value="{!TheDeliveryGroup.ProposalItems__r[0].HighLevelCcyHighLevelContractRevenue__c}"  />
+												</apex:outputPanel>
+											</apex:pageBlockSectionItem>
+
+											<apex:pageBlockSectionItem >
+												<apex:outputLabel >{!$ObjectType.KimbleOne__ProposalItem__c.Fields.KimbleOne__HighLevelContractCost__c.Label} <span>({!TheDeliveryGroup.ProposalItems__r[0].CurrencyISOCode})</span></apex:outputLabel>
+												<apex:outputPanel id="editCost" >
+													<apex:inputfield id="contractCostHL" value="{!TheDeliveryGroup.ProposalItems__r[0].HighLevelContractCost__c}"  />
+												</apex:outputPanel>
+											</apex:pageBlockSectionItem>
+
+											<apex:inputField id="expectedHLStartDate" styleclass="kimbleDatePicker" value="{!TheDeliveryGroup.ProposalItems__r[0].HighLevelStartDate__c}"  />
+											<apex:inputField id="expectedHLEndDate" styleclass="kimbleDatePicker" value="{!TheDeliveryGroup.ProposalItems__r[0].HighLevelEndDate__c}" />
+
+										</apex:pageBlockSection>
+
+
+									</apex:pageBlock>
+
+								</apex:outputPanel> <!-- end newDeliveryGroup -->
+
+							</div>
+						</apex:form>
+
+						<apex:form id="DeliveryGroupLostForm">
+							<div id="DeliveryGroupPopupLost" style="display:none">
+
+								<apex:outputPanel id="DeliveryGroupPopupLost" >
+									<div id="DeliveryGroupErrorsLost">
+										<apex:pageMessages escape="false"/>
+									</div>
+									<apex:pageBlock >
+										<apex:pageBlockButtons location="bottom">
+											<apex:commandButton id="saveDeliveryGroupLostBtn" styleClass="DisableButtonWhileBusy" action="{!LoseDeliveryGroup}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#DeliveryGroupErrorsLost');rerenderMainDetails();" reRender="DeliveryGroupPopupLost"/>
+											<input class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.kimbleone__cancel}"/>
+										</apex:pageBlockButtons>
+
+										<apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+											<apex:inputfield id="deliveryGroupLostReasonSelect" required="true" value="{!TheDeliveryGroup.KimbleOne__LostReason__c}"/>
+											<apex:inputfield id="deliveryGroupLostNarrativeField" required="true" value="{!TheDeliveryGroup.KimbleOne__LostReasonNarrative__c}" style="overflow:scroll;width:300px;" />
+										</apex:pageblockSection>
+
+									</apex:pageBlock>
+
+								</apex:outputPanel> <!-- end newDeliveryGroup -->
+
+							</div>
+						</apex:form>
+						
+						<apex:form id="ProposalAlternativeForm">
+							<div id="CreateProposalAlternativePopup" style="display:none">
+								<apex:outputPanel id="CreateProposalAlternativePopupPanel" layout="block" style="min-height:80px;">
+
+									<div id="ProposalAlternativeErrors"><apex:pageMessages id="ProposalAlternativeMessages" escape="false"/></div>
+
+									<apex:pageBlock >
+										<apex:pageBlockButtons location="bottom">
+											<apex:commandButton id="saveProposalAlternativeNew" styleClass="DisableButtonWhileBusy" action="{!CreateAlternativeProposal}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#ProposalAlternativeErrors');" reRender="CreateProposalAlternativePopup"/>
+											<input class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.kimbleone__cancel}"/>
+										</apex:pageBlockButtons>
+										
+										<apex:pageBlockSection collapsible="false" showheader="false" columns="1">
+										
+											<apex:pageBlockSectionItem >
+												<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ShortName__c.Label}"/>
+												<apex:inputfield required="true" value="{!ProposalAlternative.KimbleOne__ShortName__c}"/>
+											</apex:pageBlockSectionItem>
+	
+											<apex:pageBlockSectionItem >
+												<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__Description__c.Label}"/>
+												<apex:inputfield value="{!ProposalAlternative.KimbleOne__Description__c}" style="width:300px;" />
+											</apex:pageBlockSectionItem>
+	
+											<apex:pageBlockSectionItem >
+												<apex:outputLabel value="{!$Label.kimbleone__label002}" />
+												<apex:outputPanel >
+													<div class="requiredInput">
+														<div class="requiredBlock"></div>
+														<apex:actionRegion >
+															<apex:selectRadio id="ProposalAlternativeModeSelect" required="true" value="{!ProposalAlternativesMode}">
+																<apex:selectOptions value="{!ProposalAlternativeModes}"/>
+																<apex:actionSupport event="onchange" action="{!ProposalAlternativesModeChanged}" rerender="alternativeProposalProposition"/>
+															</apex:selectRadio>
+														</apex:actionRegion>
+													</div>
+												</apex:outputPanel>
+											</apex:pageBlockSectionItem>
+										</apex:pageBlockSection>
+										
+										<apex:pageBlockSection id="alternativeProposalProposition" collapsible="false" showheader="false" columns="1">
+											<apex:pageBlockSectionItem rendered="{!ProposalAlternativesMode == 'PROPOSITION'}">
+												<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__Proposition__c.Label}"/>
+												<apex:outputPanel >
+													<div class="requiredInput">
+														<div class="requiredBlock"></div>
+														<apex:selectList required="true" label="{!$ObjectType.KimbleOne__Proposal__c.fields.KimbleOne__Proposition__c.label}" id="proposalProposition" value="{!ProposalAlternative.KimbleOne__Proposition__c}" size="1">
+															<apex:selectOptions value="{!ThePropositions}" />
+														</apex:selectList>
+													</div>
+												</apex:outputPanel>
+											</apex:pageBlockSectionItem>
+										</apex:pageBlockSection>
+									</apex:pageBlock>
+
+								</apex:outputPanel>
+							</div>
+						</apex:form>
+
+						<apex:form id="DeliveryElementForm">
+							<div id="DeliveryElementPopup" style="display:none">
+								<apex:outputPanel id="DeliveryElementPopupPanel" style="min-height:80px;">
+
+									<div id="DeliveryElementErrors">
+										<apex:pageMessages id="DeliveryElementMessages" escape="false"/>
+									</div>
+
+									<apex:pageBlock id="DeliveryElementPageBlock">
+
+										<apex:pageBlockButtons location="bottom">
+											<apex:commandButton id="saveDeliveryElement" styleclass="DisableButtonWhileBusy saveDeliveryElement" action="{!InsertDeliveryElement}" value="{!$Label.kimbleone__save}" oncomplete="DisableButton('NewElement');SetupDatePicker(); if($('#DeliveryElementErrors>span')[0].children.length == 0) loadJobsPopup(jQuery('[id$=\'DeliveryElementPopupPanel\']'), '{!JSINHTMLENCODE(TheDeliveryElement.Id)}', runJobsComplete);" reRender="DeliveryElementPopupPanel"/>
+											<input id="cancelElement" class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.kimbleone__cancel}"/>
+										</apex:pageBlockButtons>
+
+										<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+
+											<apex:outputfield value="{!TheDeliveryGroup.Name}" rendered="{!ISBLANK(TheDeliveryElement.KimbleOne__DeliveryElementRaisedAgainst__c)}"/>
+
+                                            <apex:pageblockSectionItem rendered="{!IsCloneFromOtherEngagement}">
+                                                <apex:outputLabel value="{!$Label.kimbleone__engagementclonefrom}"/>
+                                                <apex:actionRegion >
+                                                    <apex:inputField id="engagementEnhancedInput" required="true" styleclass="kimbleSearch" value="{!SelectedEngagementElement.KimbleOne__DeliveryGroup__c}" html-data-typename="'LookupObjectDeliveryGroup'" html-data-filter="{!('CloneElementFindDeliveryGroupFilter;Account__c:' + TheDeliveryGroup.KimbleOne__Account__c + ';Id:' + TheDeliveryGroup.Id)}">
+                                                        <apex:actionSupport event="onchange" action="{!CloneEngagementChanged}" rerender="elementEnhancedInput, productOutput, DeliveryElementPageBlock, DeliveryElementErrors, cloneElementInput, elementName" onsubmit="DisableButton('saveDeliveryElement');" oncomplete="EnableButton('saveDeliveryElement');"/>
+                                                    </apex:inputField>
+                                                </apex:actionRegion>
+                                            </apex:pageblockSectionItem>
+                                            
+											<apex:pageblockSectionItem id="elementEnhancedInput" rendered="{!IsCloneFromOtherEngagement && SelectedEngagementElement.KimbleOne__DeliveryGroup__c != null}">
+												<apex:outputLabel value="{!$Label.kimbleone__elementtoclone}"/>
+												<apex:actionRegion >
+													<apex:outputPanel rendered="{!(TheCloneElementOptions.size -1) < CloneElementLookupThreshold}">
+														<apex:selectList label="{!$Label.kimbleone__elementtoclone}" value="{!SelectedElementToClone.KimbleOne__DeliveryElementAnalysedWith__c}" size="1">
+															<apex:selectOptions value="{!TheCloneElementOptions}"/>
+														</apex:selectList>
+														<apex:actionSupport event="onchange" action="{!CloneElementChanged}" rerender="MainSection, DeliveryElementMessages, productOutput, elementName" onsubmit="DisableButton('saveDeliveryElement');" oncomplete="EnableButton('saveDeliveryElement');"/>
+													</apex:outputPanel>
+													<apex:outputPanel rendered="{!(TheCloneElementOptions.size -1) >= CloneElementLookupThreshold}">
+														<apex:inputField id="cloneElementInput" label="{!$Label.kimbleone__elementtoclone}" required="true" styleclass="kimbleSearch" value="{!SelectedElementToClone.KimbleOne__DeliveryElementAnalysedWith__c}" html-data-typename="'LookupObjectDeliveryElement'" html-data-filter="{!('CloneElementProposalFilter;DeliveryGroup__c:' + SelectedEngagementElement.KimbleOne__DeliveryGroup__c)}">
+															<apex:actionSupport event="onchange" action="{!CloneElementChanged}" rerender="MainSection, productOutput, DeliveryElementMessages, productOutput, elementName" onsubmit="DisableButton('saveDeliveryElement');" oncomplete="EnableButton('saveDeliveryElement');"/>
+														</apex:inputField>
+													</apex:outputPanel>
+												</apex:actionRegion>
+											</apex:pageblockSectionItem>
+											<apex:outputfield value="{!TheParentDeliveryElement.Name}" rendered="{!!ISBLANK(TheParentDeliveryElement)}"/>
+
+											<apex:pageblockSectionItem rendered="{!UseProductEnhancedLookup && !IsClone && !IsCloneFromOtherEngagement}">
+												<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__Product__c.Label}"/>
+												<apex:actionRegion >
+													<apex:inputField id="productInput" required="true" styleclass="kimbleSearch" value="{!TheDeliveryElement.KimbleOne__Product__c}" html-data-typename="ApplicableProduct" html-data-filter="{!IF(!ISBLANK(TheDeliveryGroup.KimbleOne__Proposal__c), 'BusinessUnitId:' + TheDeliveryGroup.Proposal__r.KimbleOne__BusinessUnit__c + ';ProductId:' + TheDeliveryElement.KimbleOne__Product__c, '')}">
+														<apex:actionSupport event="onchange" rerender="DeliveryElementMessages" onsubmit="DisableButton('saveDeliveryElement');" oncomplete="EnableButton('saveDeliveryElement');productChanged()"/>
+													</apex:inputField>
+												</apex:actionRegion>
+											</apex:pageblockSectionItem>
+
+											<apex:pageblockSectionItem rendered="{!!UseProductEnhancedLookup && !IsClone && !IsCloneFromOtherEngagement}">
+												<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__Product__c.Label}"/>
+												<apex:actionRegion >
+													<apex:selectList id="productInput" value="{!TheDeliveryElement.KimbleOne__Product__c}" required="true" size="1" >
+														<apex:selectOptions value="{!TheActiveProducts}" />
+														<apex:actionSupport event="onchange" rerender="DeliveryElementMessages, productInput" onsubmit="DisableButton('saveDeliveryElement');" oncomplete="EnableButton('saveDeliveryElement');productChanged()"/>
+													</apex:selectList>
+												</apex:actionRegion>
+											</apex:pageblockSectionItem>
+											
+											<apex:outputfield id="productOutput" value="{!TheDeliveryElement.KimbleOne__Product__c}" rendered="{!IsClone || IsCloneFromOtherEngagement}"/>
+
+											<apex:pageblockSectionItem >
+												<apex:outputPanel id="elementLabel">
+													<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.Name.Label}" rendered="{!ISBLANK(TheParentDeliveryElement)}"/>
+													<apex:outputLabel value="{!$Label.kimbleone__changeelementlabel}" rendered="{!!ISBLANK(TheParentDeliveryElement)}"/>
+												</apex:outputPanel>
+												<apex:inputfield id="elementName" required="true" value="{!TheDeliveryElement.KimbleOne__ShortName__c}" styleclass="DeliveryElement_Name" />
+											</apex:pageblockSectionItem>
+
+											<apex:pageblockSectionItem rendered="{!CanOperateWithParent && ISBLANK(TheDeliveryElement.Id) && !ISBLANK(TheParentDeliveryElement)}">
+												<apex:outputLabel value="{!$Label.kimbleone__operatedwithprimarylabel}" />
+												<apex:inputField id="OperatedWithPrimary" value="{!OperatedWithRaisedAgainstElement.KimbleOne__InputCheckbox__c}"/>
+											</apex:pageblockSectionItem>
+
+											<apex:repeat var="f" value="{!$ObjectType.KimbleOne__DeliveryElement__c.FieldSets.KimbleOne__DeliveryElementDetails}">
+												<apex:inputField value="{!TheDeliveryElement[f]}" rendered="{!!CONTAINS(f.FieldPath,'.')}" required="{!f.Required}" styleClass="{!IF(AND($ObjectType.KimbleOne__DeliveryElement__c.Fields[f].type == 'date',$ObjectType.KimbleOne__DeliveryElement__c.Fields[f].updateable),'kimbleDatePicker','')}" />
+												<apex:outputField value="{!TheDeliveryElement[f]}" rendered="{!CONTAINS(f.FieldPath,'.')}"/>
+											</apex:repeat>
+
+										</apex:pageblockSection>
+
+
+									</apex:pageBlock>
+
+
+								</apex:outputPanel> <!-- end newDeliveryElement -->
+							</div>
+						</apex:form>
+
+						<apex:form >
+							<apex:actionFunction action="{!NewDeliveryGroupWizard}" name="addGroupWizard" rerender="ProposalGroups" oncomplete="SetupDatePicker();">
+								<apex:param name="mode" value=""/>
+							</apex:actionFunction>
+							<apex:actionFunction action="{!CreateAlternativeProposal}" name="createAlternativeProposal" rerender="ProposalItems, ProposalGroups" oncomplete="SetupDatePicker();">
+								<apex:param name="pId" value="" />
+							</apex:actionFunction>
+							<apex:actionFunction action="{!MakeAlternativePreferred}" name="makeAlternativePreferred" rerender="ProposalItems, ProposalGroups">
+								<apex:param name="pId" value="" />
+							</apex:actionFunction>
+							<apex:actionFunction action="{!ReadDeliveryGroup}" name="editDeliveryGroup" rerender="DeliveryGroupEdit, DeliveryGroupForecast, DeliveryGroupPopupLost, DeliveryGroupForecastStatus" oncomplete="SetupDatePicker();showModalBoxy()">
+								<apex:param name="deliveryGroupId" value="" />
+							</apex:actionFunction>
+
+							<apex:actionFunction action="{!NewDeliveryElement}" name="newDeliveryElement" rerender="DeliveryElementPopupPanel" oncomplete="SetupDatePicker();showModalBoxy()">
+								<apex:param name="deliveryGroupId" value="" />
+							</apex:actionFunction>
+
+							<apex:actionFunction action="{!NewChangeElement}" name="newChangeElement" rerender="DeliveryElementPopupPanel" oncomplete="SetupDatePicker();showModalBoxy()">
+								<apex:param name="deliveryGroupId" value="" />
+								<apex:param name="deliveryElementId" value="" />
+							</apex:actionFunction>
+
+							<apex:actionFunction action="{!ToggleForecastLevel}" name="toggleForecastLevel" rerender="ProposalItems" oncomplete="initialisePage()"></apex:actionFunction>
+
+							<apex:actionFunction action="{!ReloadAll}" name="rerenderMainDetails" rerender="ProposalItems" oncomplete="initialisePage();refreshPageSources();"/>
+
+							<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialiseTips();"/>
+
+							<apex:actionFunction action="{!NewDeliveryElementCloneExisting}" name="newDeliveryElementCloneExisting" rerender="DeliveryElementPopupPanel" oncomplete="SetupDatePicker();showModalBoxy()">
+						  		<apex:param name="deliveryGroupId" value="" />
+						  		<apex:param name="sourceElementId" value="" />
+						  	</apex:actionFunction>
+
+							<apex:actionFunction action="{!NewProposalAlternative}" name="newProposalAlternative" rerender="CreateProposalAlternativePopupPanel" oncomplete="SetupDatePicker();showModalBoxy()"/>
+							
+						</apex:form>
+
+						<apex:outputPanel rendered="{!!ISBLANK(TheDeliveryGroupAndElementsWizard)}">
+							<apex:form id="GroupsAndElementsWizardForm">
+								<div id="pageErrors">
+									<apex:pageMessages escape="False" />
+								</div>
+								<apex:pageBlock >
+									<apex:pageBlockButtons location="bottom">
+										<apex:commandButton action="{!Cancel}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__cancel}" rendered="{!TheDeliveryGroupAndElementsWizard.CanCancel && !TheDeliveryGroupAndElementsWizard.HasFinished}" oncomplete="rerenderMainDetails();"/>
+										<apex:commandButton action="{!TheDeliveryGroupAndElementsWizard.GoPrevious}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__previous}" reRender="GroupsAndElementsWizardForm" rendered="{!TheDeliveryGroupAndElementsWizard.CanGoPrevious}"/>
+										<apex:commandButton action="{!TheDeliveryGroupAndElementsWizard.GoNext}" styleclass="DisableButtonWhileBusy" value="{!TheDeliveryGroupAndElementsWizard.NextLabel}" reRender="GroupsAndElementsWizardForm" rendered="{!TheDeliveryGroupAndElementsWizard.CanGoNext}" onComplete="SetupDatePicker()"/>
+									</apex:pageBlockButtons>
+
+									<div id="wizard-pages">
+										<!-- SELECT NEW OR EXISTING GROUP -->
+										<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheDeliveryGroupAndElementsWizard.SelectDeliveryGroupStep)}">
+
+											<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__addtoexistingengagement}"  columns="1">
+												<apex:pageBlockSectionItem rendered="{!TheDeliveryGroupAndElementsWizard.SelectDeliveryGroupStep.ShowEnhancedLookup}">
+													<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryGroup__c.Label}"/>
+													<apex:inputField required="true" value="{!TheDeliveryGroupAndElementsWizard.SelectDeliveryGroupStep.DeliveryGroupLookup.KimbleOne__DeliveryGroup__c}" styleclass="kimbleSearch" html-data-filter="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__Account__c.Name}:{!TheDeliveryGroupAndElementsWizard.TheProposal.KimbleOne__Account__c}"/>
+												</apex:pageBlockSectionItem>
+
+											</apex:pageBlockSection>
+
+											<div style="maxHeight:300px;overflow-y:auto;">
+												<apex:inputText value="{!TheDeliveryGroupAndElementsWizard.SelectDeliveryGroupStep.SelectedGroupId}" style="display:none" styleclass="selectedGroupId"/>
+												<apex:pageBlockTable rendered="{!!TheDeliveryGroupAndElementsWizard.SelectDeliveryGroupStep.ShowEnhancedLookup}" value="{!TheDeliveryGroupAndElementsWizard.SelectDeliveryGroupStep.ExistingGroups}" var="grp">
+													<apex:column headerValue="{!$Label.kimbleone__selectlabel}">
+														<input id="{!grp.Id}" type="radio" name="selectGroup" onclick="if(this.checked) jQuery('.selectedGroupId').val('{!JSINHTMLENCODE(grp.Id)}');" />
+													</apex:column>
+													<apex:column value="{!grp.Name}" />
+
+												</apex:pageBlockTable>
+
+											</div>
+											<script>
+							jQuery(function () {
+				                	jQuery('#' + jQuery('.selectedGroupId').val()).attr('checked', true);
+				            });
+				        </script>
+
+										</apex:outputPanel>
+
+										<!-- CREATE NEW GROUP -->
+										<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheDeliveryGroupAndElementsWizard.ConfigureNewDeliveryGroupStep)}">
+
+											<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__createlabel} {!$ObjectType.KimbleOne__DeliveryGroup__c.Label}"  columns="1">
+
+												<apex:inputfield id="newDeliveryGroupShortName" value="{!TheDeliveryGroupAndElementsWizard.TheDeliveryGroup.KimbleOne__ShortName__c}" required="true" styleclass="DeliveryGroup_ShortName"/>
+												<apex:inputfield id="deliveryGroupReference" value="{!TheDeliveryGroupAndElementsWizard.TheDeliveryGroup.KimbleOne__Reference__c}" rendered="{!EditDeliveryGroupReference}" />
+												<apex:outputField id="readDeliveryGroupReference" value="{!TheDeliveryGroupAndElementsWizard.TheDeliveryGroup.KimbleOne__Reference__c}" rendered="{!AND(!EditDeliveryGroupReference, NOT(ISBLANK(TheDeliveryGroupAndElementsWizard.TheDeliveryGroup.Reference__c))) }" />
+
+												<apex:pageBlockSectionItem >
+													<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__ProductGroup__c.Label}"/>
+													<apex:outputPanel layout="block" styleclass="requiredInput">
+														<div class="requiredBlock"></div>
+														<apex:selectList id="newDeliveryGroupProductGroup" value="{!TheDeliveryGroupAndElementsWizard.TheDeliveryGroup.KimbleOne__ProductGroup__c}" size="1" required="true" onchange="{!If(DefaultGroupNameFromProductGroup,'newDeliveryGroupDefaultGroupNameToProductGroupName()','')}">
+															<apex:selectOptions value="{!TheProductGroups}" />
+														</apex:selectList>
+													</apex:outputPanel>
+
+												</apex:pageBlockSectionItem>
+
+												<apex:pageBlockSectionItem rendered="{!TheDeliveryPrograms.size > 1}">
+													<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__DeliveryProgram__c.Label}"/>
+													<apex:selectList id="programInput" value="{!TheDeliveryGroupAndElementsWizard.TheDeliverygroup.KimbleOne__DeliveryProgram__c}" size="1" >
+														<apex:selectOptions value="{!TheDeliveryPrograms}" />
+													</apex:selectList>
+												</apex:pageBlockSectionItem>
+
+
+											</apex:pageblockSection>
+											<script>
+
+					function newDeliveryGroupDefaultGroupNameToProductGroupName()
+			 		{
+			 			if(jQuery('[id$="newDeliveryGroupShortName"]').val() == '')
+			   				jQuery('[id$="newDeliveryGroupShortName"]').val(jQuery('[id$="newDeliveryGroupProductGroup"]').find('option:selected').text());
+			   		}
+
+					</script>
+										</apex:outputPanel>
+
+										<!-- GROUP HIGHLEVEL FORECAST -->
+										<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheDeliveryGroupAndElementsWizard.DeliveryGroupHighLevelForecastStep)}">
+
+											<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__highlevelforecastlabel}"  columns="1">
+
+												<apex:outputfield value="{!TheDeliveryGroupAndElementsWizard.TheDeliveryGroup.KimbleOne__ShortName__c}"/>
+												<apex:pageBlockSectionItem >
+													<apex:outputLabel value="{!$ObjectType.KimbleOne__ProposalItem__c.Fields.KimbleOne__HighLevelCcyHighLevelContractRevenue__c.Label}" />
+													<apex:outputPanel id="editRevenue" >
+
+														<apex:selectList value="{!TheDeliveryGroupAndElementsWizard.TheProposalItem.KimbleOne__HighLevelCurrencyIsoCode__c}" size="1" >
+															<apex:selectOptions value="{!TheActiveCurrencies}" />
+														</apex:selectList>
+														<apex:inputfield id="contractRevenue" value="{!TheDeliveryGroupAndElementsWizard.TheProposalItem.KimbleOne__HighLevelCcyHighLevelContractRevenue__c}"  />
+													</apex:outputPanel>
+												</apex:pageBlockSectionItem>
+
+												<apex:pageBlockSectionItem >
+													<apex:outputLabel >{!$ObjectType.KimbleOne__ProposalItem__c.Fields.KimbleOne__HighLevelContractCost__c.Label} <span>({!TheDeliveryGroupAndElementsWizard.TheProposalItem.CurrencyISOCode})</span></apex:outputLabel>
+													<apex:outputPanel id="editCost" >
+														<apex:inputfield id="contractCost" value="{!TheDeliveryGroupAndElementsWizard.TheProposalItem.KimbleOne__HighLevelContractCost__c}"  />
+													</apex:outputPanel>
+												</apex:pageBlockSectionItem>
+
+												<apex:inputField id="expectedStartDate" styleclass="kimbleDatePicker" value="{!TheDeliveryGroupAndElementsWizard.TheProposalItem.KimbleOne__HighLevelStartDate__c}"  />
+												<apex:inputField id="expectedEndDate" styleclass="kimbleDatePicker" value="{!TheDeliveryGroupAndElementsWizard.TheProposalItem.KimbleOne__HighLevelEndDate__c}" />
+
+											</apex:pageblockSection>
+										</apex:outputPanel>
+
+										<!-- ADD REMOVE ELEMENTS -->
+										<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheDeliveryGroupAndElementsWizard.AddRemoveDeliveryElementsStep)}">
+											<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__deliverygroupexistingelements}"  columns="1" rendered="{!TheDeliveryGroupAndElementsWizard.AddRemoveDeliveryElementsStep.TheExistingElements.size > 0}"/>
+
+											<apex:pageBlockTable value="{!TheDeliveryGroupAndElementsWizard.AddRemoveDeliveryElementsStep.TheExistingElements}" var="element" rendered="{!TheDeliveryGroupAndElementsWizard.AddRemoveDeliveryElementsStep.TheExistingElements.size > 0}">
+												<apex:column value="{!element.Name}" />
+												<apex:column value="{!element.KimbleOne__Product__c}" />
+												<apex:column value="{!element.KimbleOne__ContractRevenue__c}" />
+												<apex:column value="{!element.KimbleOne__ContractCost__c}" />
+												<apex:column value="{!element.KimbleOne__StartDate__c}" />
+												<apex:column value="{!element.KimbleOne__EndDate__c}" />
+												<apex:column value="{!element.KimbleOne__ForecastStatus__c}" />
+											</apex:pageBlockTable>
+
+											<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__deliverygroupnewelements}"  columns="1"></apex:pageblockSection>
+											<apex:variable value="{!0}" var="rowNum"/>
+
+											<table class="list" border="0" cellpadding="0" cellspacing="0">
+												<thead>
+												<tr class="headerRow">
+													<th class="headerRow" style="width: 60px;text-align: center;"><span style="cursor:pointer;" onclick="addNewElementToGroup()"><i class="fa fa-plus-square fa-2x"></i></span></th>
+													<th class="headerRow"><div>{!$ObjectType.DeliveryElement__c.Label}</div></th>
+													<th class="headerRow"><div>{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__Product__c.Label}</div></th>
+												</tr>
+												</thead>
+												<tbody>
+												<apex:repeat value="{!TheDeliveryGroupAndElementsWizard.TheDeliveryElementsToCreate}" var="element">
+
+													<tr class="dataRow even first">
+														<td class="dataCell" style="text-align: center;">
+															<span style="font-size:16px;cursor:pointer;padding-right: 4px;" onclick="editNewElement({!ABS(rowNum)}, this)"><i class="fa fa-edit"></i></span>
+															<span style="font-size:16px;cursor:pointer;padding-right: 4px;" onclick="removeDeliveryElement({!ABS(rowNum)}, this)"><i class="fa fa-trash-o"></i></span>
+														</td>
+														<td class="dataCell"><apex:outputField value="{!element.KimbleOne__ShortName__c}"/></td>
+														<td class="dataCell"><apex:outputField value="{!element.KimbleOne__Product__c}"/></td>
+													</tr>
+													<apex:variable value="{!rowNum+1}" var="rowNum"/>
+												</apex:repeat>
+												</tbody>
+											</table>
+
+											<div id="NewDeliveryElementPopup" style="display:none">
+												<apex:outputPanel id="NewDeliveryElementPopupPanel" layout="block" style="min-height:80px;">
+
+													<div id="DeliveryElementErrors"><apex:pageMessages id="DeliveryElementMessages" escape="false"/></div>
+
+													<apex:pageBlock id="DeliveryElementPageBlock" rendered="{!!ISBLANK(TheDeliveryGroupAndElementsWizard.AddRemoveDeliveryElementsStep.TheDeliveryElement)}">
+
+														<apex:pageBlockButtons location="bottom">
+															<apex:commandButton id="saveDeliveryElement" styleclass="DisableButtonWhileBusy saveDeliveryElement" action="{!TheDeliveryGroupAndElementsWizard.AddRemoveDeliveryElementsStep.AddDeliveryElement}" value="{!$Label.kimbleone__ok}" oncomplete="DisableButton('NewElement');SetupDatePicker();if($('#DeliveryElementErrors>span')[0].children.length == 0) hideModalBoxy()" reRender="GroupsAndElementsWizardForm"/>
+															<input id="cancelElement" class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.kimbleone__cancel}"/>
+														</apex:pageBlockButtons>
+
+														<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+
+															<apex:pageblockSectionItem rendered="{!!UseProductEnhancedLookup}">
+																<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__Product__c.Label}"/>
+																<apex:selectList id="newDeliveryElementProductSelect" value="{!TheDeliveryGroupAndElementsWizard.AddRemoveDeliveryElementsStep.TheDeliveryElement.KimbleOne__Product__c}" required="true" size="1" onchange="{!If(DefaultElementNameFromProduct,'newDeliveryElementDefaultElementNameToProductName()','')}">
+																	<apex:selectOptions value="{!TheActiveProducts}"/>
+																</apex:selectList>
+
+															</apex:pageblockSectionItem>
+
+															<apex:pageblockSectionItem rendered="{!UseProductEnhancedLookup}">
+																<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__Product__c.Label}"/>
+																<apex:inputField id="newDeliveryElementProductInput" required="true" styleclass="kimbleSearch" value="{!TheDeliveryGroupAndElementsWizard.AddRemoveDeliveryElementsStep.TheDeliveryElement.KimbleOne__Product__c}" />
+
+															</apex:pageblockSectionItem>
+
+															<apex:inputField id="newDeliveryElementName" value="{!TheDeliveryGroupAndElementsWizard.AddRemoveDeliveryElementsStep.TheDeliveryElement.KimbleOne__ShortName__c}" required="true"/>
+
+															<apex:repeat var="f" value="{!$ObjectType.KimbleOne__DeliveryElement__c.FieldSets.KimbleOne__DeliveryElementDetails}">
+																<apex:inputField value="{!TheDeliveryGroupAndElementsWizard.AddRemoveDeliveryElementsStep.TheDeliveryElement[f]}" rendered="{!!CONTAINS(f.FieldPath,'.')}" required="{!f.Required}" styleClass="{!IF(AND($ObjectType.KimbleOne__DeliveryElement__c.Fields[f].type == 'date',$ObjectType.KimbleOne__DeliveryElement__c.Fields[f].updateable),'kimbleDatePicker','')}" />
+																<apex:outputField value="{!TheDeliveryGroupAndElementsWizard.AddRemoveDeliveryElementsStep.TheDeliveryElement[f]}"  rendered="{!CONTAINS(f.FieldPath,'.')}"/>
+															</apex:repeat>
+
+														</apex:pageblockSection>
+
+													</apex:pageBlock>
+
+												</apex:outputPanel> <!-- end newDeliveryElement -->
+											</div>
+
+											<apex:actionRegion >
+												<apex:actionFunction action="{!TheDeliveryGroupAndElementsWizard.AddRemoveDeliveryElementsStep.NewDeliveryElement}" name="newDeliveryElementWizard" rerender="NewDeliveryElementPopupPanel" oncomplete="SetupDatePicker();showModalBoxy()">
+												</apex:actionFunction>
+
+												<apex:actionFunction action="{!TheDeliveryGroupAndElementsWizard.AddRemoveDeliveryElementsStep.EditDeliveryElement}" name="editNewDeliveryElementWizard" rerender="NewDeliveryElementPopupPanel" oncomplete="SetupDatePicker();showModalBoxy()">
+													<apex:param name="pos" value="" />
+												</apex:actionFunction>
+
+												<apex:actionFunction action="{!TheDeliveryGroupAndElementsWizard.AddRemoveDeliveryElementsStep.RemoveDeliveryElement}" name="removeDeliveryElementWizard" rerender="GroupsAndElementsWizardForm">
+													<apex:param name="pos" value="" />
+												</apex:actionFunction>
+											</apex:actionRegion>
+											<script>
+
+            		function addNewElementToGroup()
+					{
+						initialiseModalBoxy('#NewDeliveryElementPopup', '{!JSENCODE($Label.New)}  {!$ObjectType.DeliveryElement__c.label}', jQuery('form[id$=\'GroupsAndElementsWizardForm\']'));
+						newDeliveryElementWizard();
+					}
+
+					function editNewElement(pos)
+					{
+						initialiseModalBoxy('#NewDeliveryElementPopup', '{!JSENCODE($Label.Edit)}  {!$ObjectType.DeliveryElement__c.label}', jQuery('form[id$=\'GroupsAndElementsWizardForm\']'));
+						editNewDeliveryElementWizard(pos);
+					}
+
+            		function removeDeliveryElement(pos, obj)
+            		{
+            			jQuery(obj).parent().addClass('Loading');
+            			removeDeliveryElementWizard(pos);
+
+            		}
+
+            		function newDeliveryElementDefaultElementNameToProductName()
+			 		{
+			 			//may be lookup rather than dropdown
+			 			if(jQuery('[id$="newDeliveryElementName"]').val() == '')
+			   			{
+			   				if (jQuery('[id$="newDeliveryElementProductSelect"]').length == 1)
+			   					jQuery('[id$="newDeliveryElementName"]').val(jQuery('[id$="newDeliveryElementProductSelect"]').find('option:selected').text());
+			   				else
+			   					jQuery('[id$="newDeliveryElementName"]').val(jQuery('[id$="newDeliveryElementProductInput"]').val());
+			   			}
+			   		}
+
+					</script>
+
+										</apex:outputPanel>
+
+										<apex:outputPanel rendered="{!TheDeliveryGroupAndElementsWizard.HasFinished}">
+											<script>
+
+			                wizardFinished();
+
+			          </script>
+
+										</apex:outputPanel>
+									</div>
+
+								</apex:pageBlock>
+							</apex:form>
+
+							<script>
+
+		function wizardFinished()
+		{
+			 window.location = window.location;
+		}
+
+		</script>
+
+						</apex:outputPanel>
+
+					</apex:outputPanel>
+
+				</div>
+
+				<apex:outputPanel layout="none">
+
+					<div id="ProposalJobs">
+
+					</div>
+					<script>
+				jQuery(function () {
+	                	loadJobsInline(jQuery('#ProposalJobs'), '{!JSINHTMLENCODE(Proposal__c.Id)}','Initialising proposal data', reloadPage);
+	            });
+
+	            function reloadPage(jobsProcessed)
+	            {
+	            	jQuery('#ProposalJobs').hide();
+
+	            	if (jobsProcessed)
+	            	{
+	            		window.location.href = window.location.href.replace(/firstLoad=1/g,'firstLoad=0');
+            		}
+	            	else
+	            	{
+	            		jQuery('#proposal-container').show();
+	            		adjustLayout();
+						initialiseKTips();
+
+	            		setTimeout(function(){ loadAlternativeProductMenus(); }, 1000);
+
+	            		// if this is the first load of the page and
+	            		// 1) we have a group
+						// 2) there are placeholder elements
+						// 3) there are no default elements
+						// then do a speculative reload in order to attempt
+						// to catch jobs which were pending before the refresh started (ticket #6264)
+						if(window.location.href.indexOf('firstLoad=1') > -1
+							&& jQuery('.fa-bars.delivery-element-menu').length == 0
+							&& jQuery('.fa-plus-square.delivery-element-menu').length > 0
+							&& jQuery('.fa-bars.delivery-group-menu').length > 0)
+						{
+							// turn on-screen burger menus into spinners to signify the page is reloading
+							jQuery('.fa-bars.title-card-menu').removeClass('fa-bars').addClass('fa-circle-o-notch fa-spin').attr('data-floating-dropdown','');
+							jQuery('.fa-bars.delivery-group-menu').removeClass('fa-bars').addClass('fa-circle-o-notch fa-spin').attr('data-floating-dropdown','');
+							jQuery('.fa-plus-square.delivery-element-menu').removeClass('fa-plus-square').addClass('fa-circle-o-notch fa-spin').attr('onclick','');
+							// is two seconds enough?
+							var delay = 2000;
+							setTimeout(function(){ window.location.href = window.location.href.replace(/firstLoad=1/g,'firstLoad=0'); }, delay);
+						}
+            		}
+	            }
+
+	        </script>
+
+				</apex:outputPanel>
+
+
+
+			</apex:outputPanel>
+
+			<style>
+		.element-revenue {
+			padding-top: 4px;
+			text-align: right;
+		}
+		.element-cost {
+			padding-top: 4px;
+			text-align: right;
+		}
+		.delivery-group-reference
+		{
+    		font-style: italic;
+		}
+		.groupLevelForecast, .groupLevelForecast a, .elementLevelForecast
+		{
+			font-style: italic;
+			color: #ABABAB;
+		}
+		.services-heading {
+			padding-left: 10px;
+			padding-top: 9px;
+			font-size: 15px;
+			font-weight: bold;
+		}
+
+		.value-heading {
+			font-size: 16px;
+			padding-left: 10px;
+			padding-right: 10px;
+		}
+
+		.body-value-block {
+			padding: 0px 1px;
+			text-align: center;
+			display: inline-block;
+		}
+
+		.Loading
+		{
+			background-image: url('{!URLFOR($Resource.JobImages, 'running16.gif')}') !important;
+			background-repeat:no-repeat !important;
+			background-position: 50%, 50%;
+		}
+		.Loading>span
+		{
+			display:none;
+		}
+		.secondary-elements-container
+		{
+			position: relative;
+			padding-left:40px;
+		}
+
+		.secondary-elements-connector
+		{
+			position: absolute;
+			top: 1px;
+			bottom: 23px;
+			width: 2px;
+			left: 21px;
+			border-left: 2px #808080 dotted;
+			display:none;
+		}
+		.delivery-element-reference {
+		    font-style: italic;
+		    text-align: right;
+		    display: block;
+		    padding-top: 8px;
+		}
+		.secondary-element-reference {
+		    font-style: italic;
+		    text-align: right;
+		    display: inline;
+		    position: absolute;
+		    right: 15px;
+		    bottom: 15px;
+		}
+
+		.secondary-element-container
+		{
+			position: relative;
+		}
+
+		.secondary-element-connector
+		{
+			width: 11px;
+			position: absolute;
+			border-bottom: 2px #808080 dotted;
+			left: -30px;
+			top: 11px;
+			display:none;
+
+		}
+		.element-config>span
+		{
+			padding-right: 5px;
+			font-size: 18px;
+			color: #424242;
+		}
+		span.change-order-label {
+	    	font-size: 12px !important;
+	    	font-weight: bold;
+		}
+		.with-primary
+		{
+			color:#dedede;
+		}
+		.element-not-in-proposal div {
+			background-color: #EFEFEF;
+		}
+
+		.element-in-proposal {
+
+		}
+		.deleting {
+	    	margin-left: 10px;
+			vertical-align: top;
+			float: right;
+			width: 18px;
+			height: 18px;
+		}
+		.additional-details-text {
+		    width: 210px;
+		}
+		.fixed-toggle {
+			cursor: default;
+		}
+		.inner-card {
+			min-width:280px;
+		}
+		.element-product
+		{
+			margin-bottom: 6px;
+		}
+		.optional-product {
+		    background-color: #ddd;
+		}
+		.card-in-card
+		{
+			box-shadow: rgba(31, 31, 31, 0.16) 1px 2px 5px 2px;
+			min-width: 256px;
+		}
+		div[id$="groupFieldsetFields"] {
+		    max-height: 260px;
+    		overflow-y: auto;
+		}
+		div[id*='DeliveryGroupEditForm'] .detailList .labelCol,
+		div[id$='groupFieldsetFields'] .detailList .labelCol {
+		    white-space: normal !important;
+		}
+		.DeliveryElement_Name {
+		    width: 350px;
+		}
+		.p-tip-qtip {
+			background-color: lemonchiffon;
+			padding: 2px;
+			font-size: 12px;
+		}
+	</style>
+
+			<script>
+		var confirmProductChange = false;
+
+		//{!ShowProductChangeWarning}
+		<apex:outputPanel layout="none" rendered="{!ShowProductChangeWarning}">
+			confirmProductChange = true;
+		</apex:outputPanel>
+
+		jQuery(window).load(function()
+		{
+			initialisePage();
+		});
+
+		function cancelForecastLevelPopup()
+		{
+			jQuery('.forecast-level-switch-container').qtip("hide");
+		}
+
+		function loadAlternativeProductMenus() {
+			jQuery.each(jQuery('.load-alternatives'), function(i, obj) {
+			   //console.log(jQuery(obj).attr('element-id'));
+			   loadElementAlternatives(jQuery(obj).attr('element-id'));
+			});
+        }
+
+		function loadElementAlternatives(elementId)
+		{
+		    Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ProposalItemsController.GetAlternativeProducts}',
+	       		elementId,
+	      			function(result, event){
+	             		if (event.status)
+			            {
+			             	var li = jQuery('.load-alternatives[element-id="' + elementId + '"]');
+			             	var ul = li.parent();
+			             	li.hide();
+			             	
+							$(ul).find('.product-alternative').remove();
+							
+			             	for (var i=0;i<result.length;i++)
+			             	{
+			             	 	//ul.append(jQuery('<li>' + result[i].Name + '</li>'));
+
+			             	 	var o = ('<li class="product-alternative"><a href="javascript:changeProduct(\'' + elementId + '\',\'' + result[i].Id + '\', rerenderMainDetails,' + result[i].RevenueChange + ',' + result[i].CostChange + ')">');
+
+			             	 	o += ('<i class="fa fa-random dropdown-icon"></i>' + result[i].Name);
+
+			             	 	o += '</a></li>';
+
+
+			             	 	ul.append(jQuery(o));
+                 			}
+			         	}
+			         	else if (event.type === 'exception')
+			         	{
+			             	alert(event.message);
+			         	}
+			         	else
+			         	{
+			             	alert(event.message);
+			         	}
+	         },
+	         {buffer:false, escape: false, timeout: 60000});
+  		}
+
+		function initialiseHighLevelForecastSwitch()
+		{
+			jQuery('.forecast-level-switch-container').each(function() {
+				jQuery(this).qtip({
+					content:{
+						text:jQuery(this).children('.tool-tip-content'),
+						title:jQuery(this).children('.tool-tip-content').children('.tool-tip-content-container').attr('title'),
+						button: 'Close'
+					},
+					position: {
+			            adjust: {
+			                method: 'flip flip'
+			            },
+			            viewport: $(window)
+			        },
+			        show: {
+      					event: 'click',
+      					solo: true
+   					},
+   					hide: false,
+					style: {classes: 'qtip-light qtip-shadow qtip-rounded'}})
+			});
+		}
+
+		function initialisePage()
+		{
+			initialiseDatesAndCurrencies();
+			initialiseHighLevelForecastSwitch();
+			initialiseDeliveryGroupMarginInsight();
+			jQuery('#loadingIndicatorOuterContainerGroups').parent().hide();
+			initialiseTips();
+		}
+
+		function initialiseDatesAndCurrencies()
+		{
+			kimble.formatDates();
+			kimble.formatCurrencies();
+
+			jQuery('.group-start-date-warning').each(function() {
+				jQuery(this).qtip({
+					content:{
+						text:jQuery(this).children('.tool-tip-content'),
+						title:jQuery(this).children('.tool-tip-content').children('.tool-tip-content-container').attr('title'),
+						button: 'Close'
+					},
+					position: {
+			            adjust: {
+			                method: 'flip flip'
+			            },
+			            viewport: $(window)
+			        },
+			        show: {
+      					event: 'click',
+      					solo: true
+   					},
+   					hide: false,
+					style: {classes: 'qtip-light qtip-shadow qtip-rounded'}})
+			});
+
+			jQuery.subscribe('kimble.proposalElementUpdated', function(){
+           		rerenderMainDetails();
+         	});
+		}
+
+		function SetupDatePicker()
+		{
+			jQuery('.kimbleDatePicker').datepicker({
+					dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true,
+					selectOtherMonths: true});
+		}
+
+		function changeProduct(elementId, newProductId, oncomplete, revChange, costChange)
+		{
+
+			if (!confirmProductChange || (!revChange && !costChange))
+			{
+				if (!confirmDelete()) return;
+			}
+			else //rev change or cost change
+			{
+				var message = '';
+
+				if (revChange)
+					message += ('{!JSENCODE($Label.ProductChangeDifferentRevenueModel)}' + '\r\n');
+
+				if (costChange)
+					message += ('{!JSENCODE($Label.ProductChangeDifferentCostModel)}' + '\r\n');
+
+				message += '{!JSENCODE($Label.AreYouSure)}';
+
+				if (!confirm(message)) return;
+			}
+
+
+			jQuery('#' + elementId + ' .burger-menu').hide();
+			jQuery('#' + elementId + ' .updating').show();
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ProposalItemsController.ChangeProduct}',
+	       		elementId, '{!JSENCODE(Proposal__c.Id)}', newProductId,
+	      			function(result, event){
+	             		if (event.status)
+			            {
+			             	oncomplete();
+			         	}
+			         	else if (event.type === 'exception')
+			         	{
+			             	alert(event.message);
+			             	jQuery('#' + elementId + ' .burger-menu').show();
+							jQuery('#' + elementId + ' .updating').hide();
+			         	}
+			         	else
+			         	{
+			             	alert(event.message);
+			             	jQuery('#' + elementId + ' .burger-menu').show();
+							jQuery('#' + elementId + ' .updating').hide();
+			         	}
+	         },
+	         {escape: true, timeout: 60000});
+		}
+
+		function includeProduct(groupId, productId, elementId, oncomplete)
+   		{
+   			jQuery('#' + productId + ' .burger-menu').hide();
+			jQuery('#' + productId + ' .adding').show();
+
+   			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ProposalItemsController.CreateDeliveryElement}',
+	       		groupId, '{!JSENCODE(Proposal__c.Id)}', productId, elementId,
+	      			function(result, event){
+	             		if (event.status)
+			            {
+			             	//remove group from screen
+			             	oncomplete();
+			         	}
+			         	else if (event.type === 'exception')
+			         	{
+			             	alert(event.message);
+			             	jQuery('#' + productId + ' .burger-menu').show();
+							jQuery('#' + productId + ' .adding').hide();
+			         	}
+			         	else
+			         	{
+			             	alert(event.message);
+			             	jQuery('#' + productId + ' .burger-menu').show();
+							jQuery('#' + productId + ' .adding').hide();
+			         	}
+	         },
+	         {escape: true, timeout: 60000});
+   		}
+
+        function deleteElement(elementId, withConfirmation, oncomplete)
+		{
+			if(withConfirmation)
+			{
+				if (!confirmDelete()) return;
+			}
+
+			jQuery('#' + elementId + ' .burger-menu').hide();
+			jQuery('#' + elementId + ' .deleting').show();
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ProposalItemsController.DeleteDeliveryElement}',
+	       		elementId,
+	      			function(result, event){
+	             		if (event.status)
+			            {
+			             	//remove group from screen
+			             	oncomplete();
+			         	}
+			         	else if (event.type === 'exception')
+			         	{
+			             	alert(event.message);
+			             	jQuery('#' + elementId + ' .burger-menu').show();
+							jQuery('#' + elementId + ' .deleting').hide();
+			         	}
+			         	else
+			         	{
+			             	alert(event.message);
+			             	jQuery('#' + elementId + ' .burger-menu').show();
+							jQuery('#' + elementId + ' .deleting').hide();
+			         	}
+	         },
+	         {escape: true, timeout: 60000});
+		}
+
+		function editGroup(groupId)
+		{
+			initialiseModalBoxy('#DeliveryGroupEditPopup', '{!JSENCODE($Label.Edit)}  {!$ObjectType.DeliveryGroup__c.label}', jQuery('form[id$=\'DeliveryGroupEditForm\']'));
+			editDeliveryGroup(groupId);
+		}
+
+		function editGroupForecast(groupId)
+		{
+			initialiseModalBoxy('#DeliveryGroupForecastPopup', '{!JSENCODE($Label.Edit)}  {!$ObjectType.DeliveryGroup__c.label}', jQuery('form[id$=\'DeliveryGroupForecastForm\']'));
+			editDeliveryGroup(groupId);
+		}
+
+		function loseGroup(groupId)
+		{
+			initialiseModalBoxy('#DeliveryGroupPopupLost', '{!$ObjectType.DeliveryGroup__c.label}', jQuery('form[id$=\'DeliveryGroupLostForm\']'));
+			editDeliveryGroup(groupId);
+		}
+
+		function addNewElement(groupId)
+		{
+			initialiseModalBoxy('#DeliveryElementPopup', '{!JSENCODE($Label.New)}  {!$ObjectType.DeliveryElement__c.label}', jQuery('form[id$=\'DeliveryElementForm\']'));
+			newDeliveryElement(groupId);
+		}
+		
+		function newProposalAlternativeClick()
+		{
+			initialiseModalBoxy('#CreateProposalAlternativePopup', '{!JSENCODE($Label.CreateAlternativeProposal)}', jQuery('form[id$=\'ProposalAlternativeForm\']'));
+			newProposalAlternative();
+		}
+
+		function cloneDeliveryElement(elementId)
+		{
+			if (!confirm('{!JSENCODE($Label.AreYouSure)}')) return;
+			jQuery('#loadingIndicatorOuterContainerGroups').parent().show();
+			cloneElement(elementId);
+		}
+
+		function runJobsComplete()
+		{
+			hideModalBoxy();
+			rerenderMainDetails();
+		}
+		
+		function productChanged()
+		{
+			if ({!IF(!DefaultElementNameFromProduct, 'true','false')}) return;
+			
+			var elementName = jQuery('[id$="elementName"]');
+			
+			if (elementName.val() == '')
+			{
+				if (jQuery('SELECT[id$="productInput"]').length == 1)
+			   		elementName.val(jQuery('SELECT[id$="productInput"]').find('option:selected').text());
+			   	else
+			   		elementName.val(jQuery('INPUT[id$="productInput"]').val());				
+			}
+		}
+		
+		var elementsToDelete = new Array();
+		var groupToDelete;
+		
+		function deleteGroup(groupId)
+		{
+			if (!confirmDelete()) return;
+			
+			// queue elements to delete then delete group
+			
+			jQuery('#' + groupId + ' .burger-menu').hide();
+			jQuery('#' + groupId + ' .Loading').show();
+			
+			jQuery.each(jQuery('#' + groupId + '.delivery-group-container .inner-card'), function (i, ele) {
+				elementsToDelete.push(jQuery(ele).prop('id'));
+			});
+			
+			groupToDelete = groupId;
+			
+			deleteAllGroupElements();
+		}
+		
+		function deleteAllGroupElements()
+		{
+			if (elementsToDelete.length > 0)
+			{
+				var elementId = elementsToDelete.shift();
+				deleteElement(elementId, false, deleteAllGroupElements);
+			}
+			else // now delete the group
+			{
+				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ProposalItemsController.DeleteDeliveryGroup}',
+		       		groupToDelete,
+		      			function(result, event){          
+		             		if (event.status) 
+				            {
+				             	groupToDelete = null;
+				             	//remove group from screen
+				             	rerenderMainDetails();
+				         	} 
+				         	else if (event.type === 'exception') 
+				         	{
+				             	alert(event.message);
+				             	jQuery('#' + groupId + ' .burger-menu').show();
+								jQuery('#' + groupId + ' .deleting').hide();
+				         	} 
+				         	else 
+				         	{
+				             	alert(event.message);
+				             	jQuery('#' + groupId + ' .burger-menu').show();
+								jQuery('#' + groupId + ' .deleting').hide();
+				         	}
+		         }, 
+		         {escape: true, timeout: 60000});
+			}
+		}
+		
+		function addNewElementFromExisting(groupId, sourceElementId)
+		{
+			initialiseModalBoxy('#DeliveryElementPopup', '{!JSENCODE($Label.CloneElementLink)}', jQuery('form[id$=\'DeliveryElementForm\']'));
+			newDeliveryElementCloneExisting(groupId, sourceElementId);
+		}
+		
+		function changeElement(deliveryGroupId, raisedAgainstElementId)
+		{
+			initialiseModalBoxy('#DeliveryElementPopup', 'Change  {!$ObjectType.DeliveryElement__c.label}', jQuery('form[id$=\'DeliveryElementForm\']'));
+			newChangeElement(deliveryGroupId, raisedAgainstElementId);
+		}
+		
+		function adjustLayout()
+		{
+			// when parent and child elements are displayed the divs can end up different sizes (as the parent
+			// is made wide enough to contain a normal sized change order element)
+			// iterate the parent elements and set them to the max width of those present
+			var maxDivWidth = Math.max.apply(Math, jQuery(".delivery-element-card").not(".level2").map(function(){ return jQuery(this).width(); }).get());
+			
+			if(maxDivWidth > 0)
+			{
+				jQuery(".delivery-element-card").not(".level2").width(maxDivWidth);
+			}
+		}
+
+		jQuery(document).ready(function()
+		{					
+			refreshPageSources();
+		});
+		
+		function refreshPageSources(){
+			var ProposalId = '<apex:outputText value="{!KimbleOne__Proposal__c.Id}"/>';
+			
+			jQuery('div[pageSource]').each(function() {
+	   		var theComponent = jQuery( this );
+	   		var pageSourceName = theComponent.attr('pageSource');
+	   		var parentContextParam = (theComponent.attr('parentContext') != undefined && theComponent.attr('parentContext') != null ? '&parentContext=' + theComponent.attr('parentContext') : '');
+	   		
+	   		// kick off the population of the page with an ajax call
+			jQuery.ajax({ url: kimble.pages[pageSourceName] + ProposalId + parentContextParam})
+				.done(function(html) {
+					jQuery(html).appendTo("#" + theComponent.attr('id'));
+				})
+				.fail(function(xhr, status, error) {
+					if(error !=null && error !="") alert(error);								
+				})				
+			});
+		}
+		
+		/* Insight */
+		var dgMarginInsightHeaderLabel = '<apex:outputText value="{!$Label.kimbleone__proposaldeliverygroupaveragemarginheading}"/>';
+		var dgMarginInsightNarrativeLabel = '<apex:outputText value="{!$Label.kimbleone__proposaldeliverygroupaveragemarginnarrative}"/>';
+
+		var deliveryGroupMarginInsight;
+		var baseCurrency;
+
+		function initialiseDeliveryGroupMarginInsight()
+		{
+			if(jQuery('.insight-container.dg-average-margin').length)
+			{
+				baseCurrency = jQuery(jQuery('.insight-container.dg-average-margin')[0]).attr('display-currency');
+				 
+				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ProposalItemsController.GetDeliveryGroupAverageMarginInsight}',
+						'<apex:outputText value="{!KimbleOne__Proposal__c.KimbleOne__Account__c}"/>', '<apex:outputText value="{!KimbleOne__Proposal__c}"/>', baseCurrency, 
+						function(result, event){		  
+							if (event.status) 
+							{
+								deliveryGroupMarginInsight = result;
+								initialiseDeliveryGroupMarginInsightActions();
+							} 
+							else if (event.type === 'exception') 
+							{
+								alert(event.message);
+							} 
+							else 
+							{
+								alert(event.message);
+							}
+					}, 
+					{escape: true, timeout: 60000}
+				);
+			}
+		}
+		
+		function initialiseDeliveryGroupMarginInsightActions()
+		{
+			jQuery('.insight-container.dg-average-margin').removeClass('insight-hidden');
+			
+			jQuery('div.dg-average-margin .insight-item').qtip('destroy', true);
+			jQuery('div.dg-average-margin .insight-item').qtip({
+					content: {
+						text: function(event, api) {		           
+							return generateDeliveryGroupMarginInsightTipHtml();
+						}, 
+						title: dgMarginInsightHeaderLabel
+ 					},
+		            position: { 
+						my: 'middle right',
+						at: 'middle left',
+						adjust: { method: 'flip flip'},
+						viewport: $(window)
+					},
+					style: {
+						classes: 'qtip-light qtip-shadow qtip-rounded insight-tool-tip dg-margin-insight-tooltip'
+					}
+				});
+		}
+					
+		function generateDeliveryGroupMarginInsightTipHtml()
+		{
+			var tipHtml = '<div class="dg-margin-insight-tooltip-content">';
+
+			tipHtml += '<div class="dg-margin">' + deliveryGroupMarginInsight + '%</div>';
+			tipHtml += '<div class="dg-margin-narrative">' + dgMarginInsightNarrativeLabel + '</div>';
+
+			tipHtml += '</div>';
+			
+			return tipHtml;
+		}
+
+		/* Proposal Tooltips */
+		var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+		var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+		var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+		var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+		var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+		var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+		
+		// add tip attributes to elements in components
+		jQuery('.element-product').attr('kimble-tip','Product').addClass('tip-right');
+		jQuery('.element-product').attr('kimble-tip-help-link','ProductLink');
+		jQuery('.element-product').attr('kimble-tip-extended-text','ProductExtendedText');
+		jQuery('.element-service-contract-revenue').attr('kimble-tip','ServicesContractRevenue').addClass('tip-right');
+		jQuery('.element-service-contract-revenue').attr('kimble-tip-extended-text','ServicesContractRevenueExtendedText');
+		jQuery('.element-service-contract-cost').attr('kimble-tip','ServicesContractCost').addClass('tip-right');
+		jQuery('.element-service-contract-cost').attr('kimble-tip-extended-text','ServicesContractCostExtendedText');
+		jQuery('.element-expense-contract-revenue').attr('kimble-tip','ExpensesContractRevenue').addClass('tip-right');
+		jQuery('.element-expense-contract-cost').attr('kimble-tip','ExpensesContractCost').addClass('tip-right');
+        
+		function updateTipsConfigSetting(newTipSetting)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+				newTipSetting,
+					function(result, event){
+						if (event.status)
+						{
+							var data = {};
+							data.results = result;
+							loadGuidance();
+						}
+						else
+						{
+							alert(event.message);
+						}
+				},
+				{escape: false, timeout: 60000}
+			);
+		}
+
+		function createAltProposal(pId)
+		{
+			var d = confirmDelete();
+			if(!d) return;
+
+			jQuery('#loadingIndicatorOuterContainerGroups').parent().show();
+
+			createAlternativeProposal(pId);
+		}
+
+		function makeAltPreferred(pId)
+		{
+		    var d = confirmDelete();
+		    if(!d) return;
+
+		    jQuery('#loadingIndicatorOuterContainerGroups').parent().show();
+
+		    makeAlternativePreferred(pId);
+  		}
+
+	</script>
+		</apex:define>
+
+	</apex:composition>
+
+</apex:page>

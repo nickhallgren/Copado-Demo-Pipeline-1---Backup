@@ -1,0 +1,388 @@
+<apex:page standardController="Account" extensions="KimbleOne.AccountEditController" lightningStylesheets="true" sidebar="false" >
+ 
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+
+</apex:define>
+    
+<apex:define name="Content">
+
+    <!-- Kimble Guidance -->
+    <apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+    <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+    <apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+        <apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/AccountEditNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+        <apex:outputPanel layout="none" rendered="{!AccountEditTipOverrideEnabled}">
+            <apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+        </apex:outputPanel>
+    </apex:outputPanel>
+
+    <apex:form id="TheForm">
+
+        <apex:outputPanel id="AccountEditErrorMessages">
+            <apex:pageMessages escape="false"/>
+        </apex:outputPanel>
+    
+        <apex:outputPanel layout="none" rendered="{!Account.Id == null}">
+            <apex:sectionHeader title="{!$ObjectType.Account.label}" subtitle="{!$Label.kimbleone__new} {!$ObjectType.Account.label}"/>
+        </apex:outputPanel>
+      
+        <apex:pageBlock >
+            <apex:pageBlockButtons location="Bottom">
+                <apex:commandButton id="edit" action="{!EditAccount}" value="{!$Label.kimbleone__edit}" rendered="{!CanEdit && !CanEditMode}" />
+                <apex:commandButton id="save" action="{!SaveAccount}" value="{!$Label.kimbleone__save}" rendered="{!CanEdit && CanEditMode}" />
+                <apex:commandButton id="cancel" action="{!cancelEdit}" value="{!$Label.kimbleone__cancel}" rendered="{!CanEdit && CanEditMode}"/>
+            </apex:pageBlockButtons>
+        </apex:pageBlock>
+        
+        <apex:pageBlock id="InputPageBlock" mode="edit" >
+
+            <apex:pageBlockSection title="{!$Label.kimbleone__label006} {!$ObjectType.Account.Name} {!$Label.kimbleone__detailsheading}" columns="1" >
+
+                <apex:inputField id="accountName" value="{!Account.Name}" required="true" rendered="{!!EmbeddedMode && CanEditMode}"/>
+                <apex:outputField id="accountNameOutput" value="{!Account.Name}" rendered="{!!EmbeddedMode || !CanEditMode}"/>
+
+                <apex:inputField id="accountCode" value="{!Account.KimbleOne__Code__c}" rendered="{!CanEditMode}"/>
+                <apex:outputField id="accountCodeOutput" value="{!Account.KimbleOne__Code__c}" rendered="{!!CanEditMode}"/>
+
+                <apex:inputField id="businessUnitInput" value="{!Account.KimbleOne__BusinessUnit__c}" rendered="{!CanEditMode}"/>
+                <apex:outputField id="businessUnitOutput" value="{!Account.KimbleOne__BusinessUnit__c}" rendered="{!!CanEditMode}"/>
+
+                <apex:inputField id="tradingEntityInput" value="{!Account.KimbleOne__BusinessUnitTradingEntity__c}" rendered="{!CanEditMode}"/>
+                <apex:outputField id="tradingEntityOutput" value="{!Account.KimbleOne__BusinessUnitTradingEntity__c}" rendered="{!!CanEditMode}"/>
+
+            </apex:pageBlockSection>
+
+            <apex:pageBlockSection id="InputSection" title="{!$Label.kimbleone__customerdetailsheading}" columns="1">
+
+                <apex:outputField id="accountIsCustomerOutput" value="{!Account.KimbleOne__IsCustomer__c}" rendered="{!!CanEditMode}"/>
+                <apex:pageblockSectionItem rendered="{!CanEditMode}">
+                    <apex:outputLabel value="{!$ObjectType.Account.fields.KimbleOne__IsCustomer__c.Label}"/>
+    
+                    <apex:actionRegion >
+                        <apex:inputField id="accountIsCustomer" value="{!Account.KimbleOne__IsCustomer__c}">
+                            <apex:actionSupport event="onchange" rerender="ExtendedDetailsPageBlock" onComplete="initialisePageTips();"/>
+                        </apex:inputField>
+                    </apex:actionRegion>
+                </apex:pageblockSectionItem>
+
+                <apex:outputField id="accountIsInternalOutput" value="{!Account.KimbleOne__IsInternal__c}" rendered="{!!CanEditMode}"/>
+                <apex:pageblockSectionItem rendered="{!CanEditMode}">
+                    <apex:outputLabel value="{!$ObjectType.Account.fields.KimbleOne__IsInternal__c.Label}"/>
+
+                    <apex:actionRegion >
+                        <apex:inputField id="accountIsInternal" value="{!Account.KimbleOne__IsInternal__c}">
+                            <apex:actionSupport event="onchange" rerender="ExtendedDetailsPageBlock" onComplete="initialisePageTips();"/>
+                        </apex:inputField>
+                    </apex:actionRegion>
+                </apex:pageblockSectionItem>
+                
+            </apex:pageBlockSection>
+
+            <apex:pageBlockSection title="{!$Label.kimbleone__supplierdetailsheading}" columns="1">
+
+                <apex:outputField id="accountIsSupplierOutput" value="{!Account.KimbleOne__IsSupplier__c}" rendered="{!!CanEditMode}"/>
+                <apex:pageblockSectionItem rendered="{!CanEditMode}">
+                    <apex:outputLabel value="{!$ObjectType.Account.fields.KimbleOne__IsSupplier__c.Label}"/>
+
+                    <apex:actionRegion >
+                        <apex:inputField id="accountIsSupplier" value="{!Account.KimbleOne__IsSupplier__c}">
+                            <apex:actionSupport event="onchange" rerender="ExtendedDetailsPageBlock" onComplete="initialisePageTips();"/>
+                        </apex:inputField>
+                    </apex:actionRegion>
+                </apex:pageblockSectionItem>
+
+            </apex:pageBlockSection>
+
+        </apex:pageBlock>
+        
+        <apex:pageBlock id="ExtendedDetailsPageBlock" mode="edit">
+
+            <apex:pageBlockSection id="SupplierApprovalRuleSection" title="{!$Label.kimbleone__supplier} {!$ObjectType.KimbleOne__ApprovalRule__c.Label}" rendered="{!Account.KimbleOne__IsSupplier__c}" columns="1">
+
+                <apex:pageBlockSectionItem rendered="{!$ObjectType.KimbleOne__ApprovalRule__c.createable && !EditRuleMode && CanEditMode}">
+                    <apex:outputLink styleClass="actionLink" value="javascript:void(0)" onclick="editSupplierApprovalRule();" >{!$Label.kimbleone__edit} {!$ObjectType.KimbleOne__ApprovalRule__c.Label}</apex:outputLink>
+                </apex:pageBlockSectionItem>
+
+                <apex:outputField value="{!SupplierApprovalRule.KimbleOne__ApprovalType__c}"/>
+                <apex:outputField value="{!SupplierApprovalRule.KimbleOne__Approver1Type__c}" rendered="{!!EditRuleMode || !CanEditMode}"/>
+                <apex:outputField value="{!SupplierApprovalRule.KimbleOne__Approver1User__c}" rendered="{!!EditRuleMode || !CanEditMode}"/>
+                <apex:outputField value="{!SupplierApprovalRule.KimbleOne__Approver2Type__c}" rendered="{!!EditRuleMode || !CanEditMode}"/>
+                <apex:outputField value="{!SupplierApprovalRule.KimbleOne__Approver2User__c}" rendered="{!!EditRuleMode || !CanEditMode}"/>
+                
+                <apex:pageblockSectionItem rendered="{!EditRuleMode && CanEditMode}">
+                    <apex:outputLabel value="{!$ObjectType.KimbleOne__ApprovalRule__c.fields.KimbleOne__Approver1Type__c.Label}"/>
+
+                    <apex:actionRegion >
+                        <apex:inputField value="{!SupplierApprovalRule.KimbleOne__Approver1Type__c}">
+                            <apex:actionSupport event="onchange" rerender="SupplierApprovalRuleSection" />
+                        </apex:inputField>
+                    </apex:actionRegion>
+                </apex:pageblockSectionItem>
+                
+                <apex:inputField id="Approver1UserInput" value="{!SupplierApprovalRule.KimbleOne__Approver1User__c}" rendered="{!EditRuleMode && CanEditMode && !ISBLANK(SupplierApprovalRule.KimbleOne__Approver1Type__c) && CONTAINS(SupplierApprovalRule.KimbleOne__Approver1Type__c, ApprovalRuleUser)}"/>
+
+                <apex:pageblockSectionItem rendered="{!EditRuleMode && CanEditMode}">
+                    <apex:outputLabel value="{!$ObjectType.KimbleOne__ApprovalRule__c.fields.KimbleOne__Approver2Type__c.Label}"/>
+
+                    <apex:actionRegion >
+                        <apex:inputField value="{!SupplierApprovalRule.KimbleOne__Approver2Type__c}">
+                            <apex:actionSupport event="onchange" rerender="SupplierApprovalRuleSection" />
+                        </apex:inputField>
+                    </apex:actionRegion>
+                </apex:pageblockSectionItem>
+
+                <apex:inputField id="Approver2UserInput" value="{!SupplierApprovalRule.KimbleOne__Approver2User__c}" rendered="{!EditRuleMode && CanEditMode && !ISBLANK(SupplierApprovalRule.KimbleOne__Approver2Type__c) && CONTAINS(SupplierApprovalRule.KimbleOne__Approver2Type__c, ApprovalRuleUser)}"/>
+                
+                <apex:pageblockSectionItem rendered="{!EditRuleMode && CanEditMode}">
+                    <apex:commandButton id="save" action="{!SaveSupplierApprovalRule}" value="{!$Label.kimbleone__save} {!$ObjectType.KimbleOne__ApprovalRule__c.label}" reRender="SupplierApprovalRuleSection,AccountEditErrorMessages"/>
+                    <apex:commandButton id="cancel" action="{!CancelEditSupplierApprovalRule}" value="{!$Label.kimbleone__cancel}" reRender="SupplierApprovalRuleSection"/>
+                </apex:pageblockSectionItem>
+                
+            </apex:pageBlockSection>
+
+            <apex:pageBlockSection id="SupplierProductSection" title="{!$ObjectType.KimbleOne__SupplierProduct__c.Labelplural}" rendered="{!Account.KimbleOne__IsSupplier__c}" columns="1">
+
+                <apex:pageBlockSectionItem rendered="{!$ObjectType.KimbleOne__SupplierProduct__c.createable && CanEditMode}">
+                    <apex:outputLink styleClass="actionLink" value="javascript:void(0)" onclick="addSupplierProduct();" >{!$Label.kimbleone__addbutton} {!$ObjectType.KimbleOne__SupplierProduct__c.Label}</apex:outputLink>
+                </apex:pageBlockSectionItem>
+                
+                <apex:pageBlockSectionItem id="SupplierProductsList">
+
+                    <apex:outputPanel >
+                        <div class="table-wrapper">
+                            <apex:pageBlockTable styleClass="product-table" value="{!SupplierProducts}" var="product">
+                                
+                                <apex:column id="actionColumn" headerValue="{!$Label.kimbleone__actionlinksheader}" width="5%" rendered="{!CanEditMode}">
+                                    <apex:outputLink styleClass="actionLink" value="javascript:void(0)" onclick="editSupplierProduct('{!JSINHTMLENCODE(product.id)}');" title="{!$Label.kimbleone__edit}" rendered="{!$ObjectType.KimbleOne__SupplierProduct__c.updateable}"><span class="fa fa-pencil"></span></apex:outputLink>
+                                    <apex:outputLink styleClass="actionLink" value="javascript:void(0)" onclick="var d = confirmDelete();if(!d) return;deleteSupplierProduct('{!JSINHTMLENCODE(product.id)}');" title="{!$Label.kimbleone__delete}" rendered="{!$ObjectType.KimbleOne__SupplierProduct__c.deletable}"><span class="fa fa-trash second-action-link"></span></apex:outputLink>
+                                </apex:column>
+                                
+                                <apex:column width="10%">
+                                    <apex:facet name="header">
+                                        <apex:outputText value="{!$ObjectType.KimbleOne__SupplierProduct__c.fields.Name.Label}"/>
+                                    </apex:facet>
+                                    <apex:outputField value="{!product.Name}"/>
+                                </apex:column>
+
+                                <apex:column width="10%">
+                                    <apex:facet name="header">
+                                        <apex:outputText value="{!$ObjectType.KimbleOne__SupplierProduct__c.fields.KimbleOne__IsSupplierRequisitioned__c.Label}"/>
+                                    </apex:facet>
+                                    <apex:outputField value="{!product.KimbleOne__IsSupplierRequisitioned__c}"/>
+                                </apex:column>
+
+                                <apex:column width="10%">
+                                    <apex:facet name="header">
+                                        <apex:outputText value="{!$ObjectType.KimbleOne__SupplierProduct__c.fields.KimbleOne__Resource__c.Label}"/>
+                                    </apex:facet>
+                                    <apex:outputField value="{!product.KimbleOne__Resource__c}"/>
+                                </apex:column>
+
+                                <apex:column width="10%">
+                                    <apex:facet name="header">
+                                        <apex:outputText value="{!$ObjectType.KimbleOne__SupplierProduct__c.fields.KimbleOne__TravelCategory__c.Label}"/>
+                                    </apex:facet>
+                                    <apex:outputField value="{!product.KimbleOne__TravelCategory__c}"/>
+                                </apex:column>
+
+                                <apex:column width="10%">
+                                </apex:column>
+                            </apex:pageBlockTable>
+                        </div>
+                    </apex:outputPanel>
+
+                </apex:pageBlockSectionItem>
+
+                <apex:pageBlockSectionItem rendered="{!!ISBLANK(SelectedSupplierProduct)}"/>
+
+                <apex:outputField value="{!SelectedSupplierProduct.Name}" rendered="{!!ISBLANK(SelectedSupplierProduct) && !CanEditMode}"/>
+                <apex:pageblockSectionItem rendered="{!!ISBLANK(SelectedSupplierProduct) && CanEditMode}">
+                    <apex:outputLabel value="{!$ObjectType.KimbleOne__SupplierProduct__c.fields.Name.Label}"/>
+                    <apex:inputField value="{!SelectedSupplierProduct.Name}"/>
+                </apex:pageblockSectionItem>
+
+                <apex:outputField value="{!SelectedSupplierProduct.KimbleOne__IsSupplierRequisitioned__c}" rendered="{!!ISBLANK(SelectedSupplierProduct) && !CanEditMode}"/>
+                <apex:pageblockSectionItem rendered="{!!ISBLANK(SelectedSupplierProduct) && CanEditMode}">
+                    <apex:outputLabel value="{!$ObjectType.KimbleOne__SupplierProduct__c.fields.KimbleOne__IsSupplierRequisitioned__c.Label}"/>
+                    <apex:inputField value="{!SelectedSupplierProduct.KimbleOne__IsSupplierRequisitioned__c}"/>
+                </apex:pageblockSectionItem>
+
+                <apex:outputField value="{!SelectedSupplierProduct.KimbleOne__TravelCategory__c}" rendered="{!!ISBLANK(SelectedSupplierProduct) && !CanEditMode}"/>
+                <apex:pageblockSectionItem rendered="{!!ISBLANK(SelectedSupplierProduct) && CanEditMode}">
+                    <apex:outputLabel value="{!$ObjectType.KimbleOne__SupplierProduct__c.fields.KimbleOne__TravelCategory__c.Label}"/>
+                    <apex:inputField value="{!SelectedSupplierProduct.KimbleOne__TravelCategory__c}"/>
+                </apex:pageblockSectionItem>
+
+                <apex:outputField value="{!SelectedSupplierProduct.KimbleOne__Resource__c}" rendered="{!!ISBLANK(SelectedSupplierProduct) && !CanEditMode}"/>
+                <apex:pageblockSectionItem rendered="{!!ISBLANK(SelectedSupplierProduct) && CanEditMode}">
+                    <apex:outputLabel value="{!$ObjectType.KimbleOne__SupplierProduct__c.fields.KimbleOne__Resource__c.Label}"/>
+                    <apex:inputField value="{!SelectedSupplierProduct.KimbleOne__Resource__c}"/>
+                </apex:pageblockSectionItem>
+
+                <apex:outputField value="{!SelectedSupplierProduct.Name}" rendered="{!!ISBLANK(SelectedSupplierProduct) && !CanEditMode}"/>
+                <apex:pageblockSectionItem rendered="{!!ISBLANK(SelectedSupplierProduct) && CanEditMode}">
+                    <apex:commandButton id="save" action="{!SaveSupplierProduct}" value="{!$Label.kimbleone__save} {!$ObjectType.KimbleOne__SupplierProduct__c.label}" reRender="SupplierProductSection,AccountEditErrorMessages"/>
+                    <apex:commandButton id="cancel" action="{!CancelEditSupplierProduct}" value="{!$Label.kimbleone__cancel}" reRender="SupplierProductSection"/>
+                </apex:pageblockSectionItem>
+                
+            </apex:pageBlockSection>
+
+            <apex:pageBlockSection id="InvoiceDetailsSection" title="{!$Label.kimbleone__invoicedetailsheading}" rendered="{!CanEditMode && $ObjectType.KimbleOne__AccountInvoicingModel__c.updateable && (Account.KimbleOne__IsCustomer__c || Account.KimbleOne__IsInternal__c || Account.KimbleOne__IsSupplier__c)}" columns="1">
+
+                <apex:pageblockSectionItem >
+                    <apex:outputLabel value="{!$ObjectType.KimbleOne__AccountInvoicingModel__c.fields.KimbleOne__PurchaseOrderRule__c.Label}"/>
+                    <apex:inputField id="poRuleInput" value="{!InvoicingModel.KimbleOne__PurchaseOrderRule__c}"/>
+                </apex:pageblockSectionItem>
+
+                <apex:pageblockSectionItem >
+                    <apex:outputLabel value="{!$ObjectType.KimbleOne__AccountInvoicingModel__c.fields.KimbleOne__InvoicingCurrencyIsoCode__c.Label}"/>
+                    <apex:inputField id="incCcyInput" value="{!InvoicingModel.KimbleOne__InvoicingCurrencyIsoCode__c}"/>
+                </apex:pageblockSectionItem>
+                
+                <apex:pageBlockSectionItem >
+                    <apex:outputLabel value="{!$ObjectType.KimbleOne__AccountInvoicingModel__c.fields.KimbleOne__InvoiceFormat__c.Label}"/>
+                    <apex:outputPanel layout="none">
+                        <apex:outputPanel layout="block">
+                            <apex:inputField id="InvFormSupplier" styleclass="kimbleSearch" value="{!InvoicingModel.KimbleOne__InvoiceFormat__c}" html-data-typename="LookupObjectInvoiceFormat" html-data-filter="{!'InvoiceFormatFilter;IsSupplier__c:' + IF(Account.KimbleOne__IsSupplier__c == true,'true','false') + ';IsInternal__c:' + IF(Account.KimbleOne__IsInternal__c == true,'true','false')}">
+                            </apex:inputField>
+                        </apex:outputPanel>
+                    </apex:outputPanel>
+                </apex:pageBlockSectionItem>
+                
+                <apex:pageblockSectionItem >
+                    <apex:outputLabel value="{!$ObjectType.KimbleOne__AccountInvoicingModel__c.fields.KimbleOne__InvoiceTemplate__c.Label}"/>
+                    <apex:inputField id="invTemplateInput" value="{!InvoicingModel.KimbleOne__InvoiceTemplate__c}"/>
+                </apex:pageblockSectionItem>
+
+                <apex:pageblockSectionItem >
+                    <apex:outputLabel value="{!$ObjectType.KimbleOne__AccountInvoicingModel__c.fields.KimbleOne__TaxCode__c.Label}"/>
+                    <apex:inputField id="taxCodeTemplateInput" value="{!InvoicingModel.KimbleOne__TaxCode__c}"/>
+                </apex:pageblockSectionItem>
+
+                <apex:pageblockSectionItem >
+                    <apex:outputLabel value="{!$ObjectType.KimbleOne__AccountInvoicingModel__c.fields.KimbleOne__InvoicePaymentTermDays__c.Label}"/>
+                    <apex:inputField id="paymentTermDaysInput" value="{!InvoicingModel.KimbleOne__InvoicePaymentTermDays__c}"/>
+                </apex:pageblockSectionItem>
+
+                <apex:pageblockSectionItem rendered="{!!Account.KimbleOne__IsCustomer__c}">
+                    <apex:outputLabel value="{!$ObjectType.KimbleOne__AccountInvoicingModel__c.fields.KimbleOne__InvoiceMatchingTolerancePct__c.Label}"/>
+                    <apex:inputField id="invToleranceInput" value="{!InvoicingModel.KimbleOne__InvoiceMatchingTolerancePct__c}"/>
+                </apex:pageblockSectionItem>
+
+                <apex:pageblockSectionItem >
+                    <apex:outputLabel value="{!$ObjectType.KimbleOne__AccountInvoicingModel__c.fields.KimbleOne__AllowPartItemInvoicing__c.Label}"/>
+                    <apex:inputField id="allowPartTimeInput" value="{!InvoicingModel.KimbleOne__AllowPartItemInvoicing__c}"/>
+                </apex:pageblockSectionItem>
+
+                <apex:pageblockSectionItem rendered="{!!Account.KimbleOne__IsSupplier__c}">
+                    <apex:outputLabel value="{!$ObjectType.KimbleOne__AccountInvoicingModel__c.fields.KimbleOne__Locale__c.Label}"/>
+                    <apex:inputField id="localeInput" value="{!InvoicingModel.KimbleOne__Locale__c}"/>
+                </apex:pageblockSectionItem>
+
+                <apex:pageblockSectionItem >
+                    <apex:outputLabel value="{!$ObjectType.KimbleOne__AccountInvoicingModel__c.fields.KimbleOne__TaxCodeReference__c.Label}"/>
+                    <apex:inputField value="{!InvoicingModel.KimbleOne__TaxCodeReference__c}"/>
+                </apex:pageblockSectionItem>
+                
+            </apex:pageBlockSection>
+
+            <apex:pageBlockSection title="{!$Label.kimbleone__invoicedetailsheading}" rendered="{!(Account.KimbleOne__IsCustomer__c || Account.KimbleOne__IsInternal__c || Account.KimbleOne__IsSupplier__c) && (!$ObjectType.KimbleOne__AccountInvoicingModel__c.updateable || !CanEditMode)}" columns="1">
+
+                <apex:outputField value="{!InvoicingModel.KimbleOne__PurchaseOrderRule__c}"/>
+                <apex:outputField value="{!InvoicingModel.KimbleOne__InvoicingCurrencyIsoCode__c}"/>
+                <apex:outputField value="{!InvoicingModel.KimbleOne__InvoiceFormat__c}"/>
+                <apex:outputField value="{!InvoicingModel.KimbleOne__InvoiceTemplate__c}"/>
+                <apex:outputField value="{!InvoicingModel.KimbleOne__TaxCode__c}"/>
+                <apex:outputField value="{!InvoicingModel.KimbleOne__InvoicePaymentTermDays__c}"/>
+                <apex:outputField value="{!InvoicingModel.KimbleOne__InvoiceMatchingTolerancePct__c}"/>
+                <apex:outputField value="{!InvoicingModel.KimbleOne__AllowPartItemInvoicing__c}"/>
+                <apex:outputField value="{!InvoicingModel.KimbleOne__Locale__c}"/>
+                <apex:outputField value="{!InvoicingModel.KimbleOne__TaxCodeReference__c}"/>
+
+            </apex:pageBlockSection>
+
+            <apex:pageBlockButtons location="Bottom">
+                <apex:commandButton id="edit2" action="{!EditAccount}" value="{!$Label.kimbleone__edit}" rendered="{!CanEdit && !CanEditMode}" />
+                <apex:commandButton id="save2" action="{!SaveAccount}" value="{!$Label.kimbleone__save}" rendered="{!CanEdit && CanEditMode}" />
+                <apex:commandButton id="cancel2" action="{!cancelEdit}" value="{!$Label.kimbleone__cancel}" rendered="{!CanEdit && CanEditMode}"/>
+            </apex:pageBlockButtons>
+        </apex:pageBlock>
+
+        <apex:actionFunction action="{!EditSupplierProduct}" name="editSupplierProduct" rerender="SupplierProductSection">
+            <apex:param name="spId" value="" />
+        </apex:actionFunction>
+
+        <apex:actionFunction action="{!DeleteSupplierProduct}" name="deleteSupplierProduct" rerender="SupplierProductSection">
+            <apex:param name="spId" value="" />
+        </apex:actionFunction>
+
+        <apex:actionFunction action="{!AddSupplierProduct}" name="addSupplierProduct" rerender="SupplierProductSection">
+        </apex:actionFunction>
+
+        <apex:actionFunction action="{!EditSupplierApprovalRule}" name="editSupplierApprovalRule" rerender="SupplierApprovalRuleSection">
+        </apex:actionFunction>
+
+    </apex:form>
+    
+    <style>
+        .second-action-link {padding-left: 5px}
+        
+    </style>
+    
+    <script>
+    
+        jQuery(window).load(function()
+        {
+            initialisePageTips();
+        });
+    
+        /* Tooltips */
+        var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+        var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+        var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+        var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+        var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+        var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+    
+        function initialisePageTips()
+        {
+            ApplyTipAttributes();
+            initialiseTips();
+        }
+    
+        // add tip attributes to elements
+        function ApplyTipAttributes()
+        {
+            if(enableTips)
+            {
+                jQuery('[id$="accountCode"]').attr('kimble-tip','AccountCode').addClass('tip-right').attr('kimble-tip-extended-text','AccountCodeExtendedText').attr('kimble-tip-help-link','PageHelp');
+                jQuery('[id$="businessUnitInput"]').attr('kimble-tip','BusinessUnitOperating').addClass('tip-right').attr('kimble-tip-extended-text','BusinessUnitOperatingExtendedText').attr('kimble-tip-help-link','PageHelp');
+                jQuery('[id$="tradingEntityInput"]').attr('kimble-tip','BusinessUnitTrading').addClass('tip-right').attr('kimble-tip-extended-text','BusinessUnitTradingExtendedText').attr('kimble-tip-help-link','PageHelp');
+                jQuery('[id$="accountIsCustomer"]').attr('kimble-tip','IsCustomer').addClass('tip-right').attr('kimble-tip-help-link','PageHelp');
+                jQuery('[id$="accountIsInternal"]').attr('kimble-tip','IsInternal').addClass('tip-right').attr('kimble-tip-help-link','PageHelp');
+                jQuery('[id$="accountIsSupplier"]').attr('kimble-tip','IsSupplier').addClass('tip-right').attr('kimble-tip-help-link','SupplierReqHelp');
+                jQuery('[id$="actionColumn"]').attr('kimble-tip','Action').addClass('tip-right').attr('kimble-tip-help-link','SupplierReqHelp');
+                jQuery('[id$="poRuleInput"]').attr('kimble-tip','PurchaseOrderRule').addClass('tip-right').attr('kimble-tip-extended-text','PurchaseOrderRuleExtendedText').attr('kimble-tip-help-link','EditPORuleHelp');
+                jQuery('[id$="incCcyInput"]').attr('kimble-tip','InvoicingCurrency').addClass('tip-right').attr('kimble-tip-extended-text','InvoicingCurrencyExtendedText').attr('kimble-tip-help-link','CurrencyHelp');
+                jQuery('[id$="InvFormSupplier"]').attr('kimble-tip','InvoiceFormat').addClass('tip-right').attr('kimble-tip-extended-text','InvoiceFormatExtendedText').attr('kimble-tip-help-link','CustomInvoiceFormatsHelp');
+                jQuery('[id$="invTemplateInput"]').attr('kimble-tip','InvoiceTemplate').addClass('tip-right');
+                jQuery('[id$="taxCodeTemplateInput"]').attr('kimble-tip','TaxCode').addClass('tip-right');
+                jQuery('[id$="paymentTermDaysInput"]').attr('kimble-tip','PaymentTermDays').addClass('tip-right').attr('kimble-tip-extended-text','PaymentTermDaysExtendedText');
+                jQuery('[id$="invToleranceInput"]').attr('kimble-tip','TolerancePct').addClass('tip-right').attr('kimble-tip-extended-text','TolerancePctExtendedText');
+                jQuery('[id$="allowPartTimeInput"]').attr('kimble-tip','PartItemInvoicing').addClass('tip-right').attr('kimble-tip-extended-text','PartItemInvoicingExtendedText');
+                jQuery('[id$="localeInput"]').attr('kimble-tip','Locale').addClass('tip-right').attr('kimble-tip-extended-text','LocaleExtendedText');
+                
+            }
+        }
+        
+    </script>
+    
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

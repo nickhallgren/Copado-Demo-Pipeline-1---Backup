@@ -1,0 +1,345 @@
+<apex:page standardController="Opportunity" extensions="KimbleOne.OpportunityProposalController,KimbleOne.SecurityController" sidebar="false" showHeader="false">
+	<apex:outputPanel layout="none" rendered="{!!ISBLANK(Opportunity.Id)}">
+	<apex:composition template="KimbleOne__SiteMaster">
+
+		<apex:define name="Menu">
+			<c:Menu MenuContextName="{!$Label.kimbleone__proposaldetailslabel}" />
+		</apex:define>
+		     
+		<apex:define name="Content">
+			<apex:form id="TheForm">  
+				<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+				<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+				<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleJS, 'Charm.js')}"/>
+			
+				<apex:outputPanel id="newProposal" rendered="{!ISBLANK(Opportunity.KimbleOne__Proposal__c)}" >
+			      
+					<apex:pageBlock id="newProposalPB">
+							
+					<apex:outputField value="{!Opportunity.AccountId}" rendered="false" />
+			
+					<apex:pagemessages id="formPageMessages" escape="false"/>
+					
+					<apex:variable value="{!TheProposals.Size > 1}" var="hasProposals" />
+			
+					<apex:outputPanel id="proposalDetailsPanel" layout="none" rendered="{!ISBLANK(Opportunity.KimbleOne__Proposal__c)}">
+
+						<apex:pageBlockSection collapsible="false" columns="1">
+							<apex:pageBlockSectionItem rendered="{!hasProposals}">
+								<apex:actionRegion >
+						        	<apex:selectRadio disabled="{!Opportunity.IsClosed && Opportunity.IsWon && !HasPermission['AddProposalToWonOpportunity']}" styleClass="proposal-action-radio-buttons" value="{!theProposalAction}">
+						            	<apex:selectOptions value="{!TheProposalActions}"/>
+						            	<apex:actionSupport event="onchange" action="{!RefreshProposalDetails}" rerender="proposalDetailsPanel,proposalButtonsPanel"/>
+						            </apex:selectRadio>
+					            </apex:actionRegion>
+							</apex:pageBlockSectionItem>  	
+						</apex:pageBlockSection>
+						
+						<apex:pageBlockSection collapsible="false">	
+							<apex:pageBlockSectionItem rendered="{!theProposalAction=='CREATENEW'}">
+				            	<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__BusinessUnit__c.Label}" />            
+								<apex:outputPanel layout="none">
+									<div class="requiredInput" id="businessUnit-reqd">
+										<div class="requiredBlock"></div>
+										
+										<apex:variable var="DisplayBUAsDropdown" value="{!Opportunity.IsClosed && Opportunity.IsWon  && !HasPermission['AddProposalToWonOpportunity'] || !UseBusinessUnitEnhancedLookup}"/>
+										<apex:actionRegion >
+											<apex:selectList id="proposalBusinessUnit" styleClass="kimble-proposal-select" disabled="{!Opportunity.IsClosed && Opportunity.IsWon && !HasPermission['AddProposalToWonOpportunity']}" value="{!Proposal.KimbleOne__BusinessUnit__c}" size="1" required="true" rendered="{!DisplayBUAsDropdown}">
+												<apex:selectOptions value="{!TheBusinessUnits}" />
+												<apex:actionSupport event="onchange" rerender="proposalProposition"/>
+											</apex:selectList>
+										</apex:actionRegion>	
+																								
+										<apex:actionRegion >
+											<apex:outputPanel id="businessunit-panel">
+												<apex:inputField id="enhanced-input-businessunit" value="{!Proposal.KimbleOne__BusinessUnit__c}" required="true" styleclass="kimbleSearch " html-data-typename="ActiveOperatingBusinessUnit" rendered="{!!DisplayBUAsDropdown}">
+													<apex:actionSupport onsubmit="disableButtons();" event="onchange" rerender="businessunit-panel, proposalProposition, formPageMessages" oncomplete="enableButtons();"/>
+												</apex:inputField>
+											</apex:outputPanel>
+										</apex:actionRegion>	
+									</div>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>  	        
+			
+							<apex:pageBlockSectionItem rendered="{!theProposalAction=='CREATENEW'}"> 
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__Proposition__c.Label}" />      
+								<apex:outputPanel layout="none">
+									<div class="requiredInput" id="proposition-reqd">
+										<div class="requiredBlock"></div>
+					        			<apex:selectList id="proposalProposition" styleClass="kimble-proposal-select" disabled="{!Opportunity.IsClosed && Opportunity.IsWon && !HasPermission['AddProposalToWonOpportunity']}" value="{!Proposal.KimbleOne__Proposition__c}" size="1" required="true" >
+											<apex:selectOptions value="{!ThePropositions}" />
+										</apex:selectList>          
+									</div>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!theProposalAction=='USEEXISTING'}">
+			           			<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.Name.Label}" />            
+								<apex:outputPanel layout="none">
+									<div class="requiredInput" id="proposal-reqd">
+										<div class="requiredBlock"></div>
+										<apex:selectList id="opportunityProposal" disabled="{!Opportunity.IsClosed && Opportunity.IsWon && !HasPermission['AddProposalToWonOpportunity']}" styleClass="existing-proposal-field" value="{!Opportunity.KimbleOne__Proposal__c}" size="1" required="false" >
+											<apex:selectOptions value="{!TheProposals}" />
+										</apex:selectList>
+									</div>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							
+						</apex:pageBlockSection>
+
+					</apex:outputPanel>
+						<apex:pageBlockButtons location="bottom">
+							<apex:actionStatus id="SaveButtonStatus">
+							<apex:facet name="stop">
+								<apex:outputPanel id="proposalButtonsPanel">
+				 					<apex:commandButton id="createProposal" disabled="{!Opportunity.IsClosed && Opportunity.IsWon && !HasPermission['AddProposalToWonOpportunity']}" action="{!CreateProposal}" value="{!$Label.kimbleone__save}" rendered="{!theProposalAction=='CREATENEW'}" status="SaveButtonStatus" rerender="TheForm"/>
+				 					<apex:commandButton id="linkProposal" disabled="{!Opportunity.IsClosed && Opportunity.IsWon && !HasPermission['AddProposalToWonOpportunity']}" action="{!AssociateExistingProposal}" value="{!$Label.kimbleone__add}" rendered="{!theProposalAction=='USEEXISTING'}" status="SaveButtonStatus" rerender="TheForm"/>
+			 					</apex:outputPanel>
+			 				</apex:facet>
+				 			<apex:facet name="start">
+						        <apex:commandButton value="{!$Label.kimbleone__savinglabel}..." disabled="true" />
+							</apex:facet>
+							</apex:actionStatus>
+						</apex:pageBlockButtons>
+			
+					</apex:pageBlock>
+					
+					<script>
+						function disableButtons() {
+							jQuery('[id$="createProposal"]').prop('disabled', true).addClass('btnDisabled');
+							
+						}
+						
+						function enableButtons() {
+							jQuery('[id$="createProposal"]').prop('disabled', false).removeClass('btnDisabled');
+						}					
+					</script>
+				
+				</apex:outputPanel>
+				
+				<apex:outputPanel id="existingProposalView" layout="none" rendered="{!!ISBLANK(Opportunity.KimbleOne__Proposal__c) && PageMode='VIEW'}">
+			      
+					<apex:pageBlock id="existingProposalViewPB">
+							
+						<apex:pagemessages id="formPageMessages" escape="false"/>
+			
+						<div id="proposal-title">
+							<apex:outputPanel id="ProposalCard" layout="none">
+							<div class="title-card-container">
+							<div class="title-card">
+								<div class="title-card-heading" title="{!JSINHTMLENCODE(Opportunity.Proposal__r.Name)}">
+									<div class="title-card-heading-icon">
+										<apex:variable value="{!Opportunity.Proposal__r.ForecastStatus__r.KimbleOne__StyleClass__c}" var="ForecastStatusValue"/>
+										<div class="fa fa-square kimble-probability {!JSINHTMLENCODE(ForecastStatusValue)}"></div>
+									</div>
+									<div class="title-card-heading-text">
+										<apex:outputPanel rendered="{!$User.UIThemeDisplayed == 'Theme3'}">
+										<apex:outputLink styleClass="undecorated-link" value="/{!Opportunity.KimbleOne__Proposal__c}" target="_top" ><apex:outputText value="{!Opportunity.Proposal__r.Name}"/></apex:outputLink>
+										</apex:outputPanel>
+										<apex:outputPanel rendered="{!OR($User.UIThemeDisplayed == 'Theme4d',$User.UIThemeDisplayed == 'Theme4u')}">
+										<apex:outputLink styleClass="undecorated-link" value="/{!Opportunity.KimbleOne__Proposal__c}" ><apex:outputText value="{!Opportunity.Proposal__r.Name}"/></apex:outputLink>
+										</apex:outputPanel>
+									</div>
+								</div>
+								
+								<div class="title-card-body">
+									<div class="title-card-body-field">
+										<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ContractRevenue__c.Label}" />
+										<span ><apex:outputField id="proposal-contract-revenue" styleClass="center-aligned-block" value="{!Opportunity.Proposal__r.KimbleOne__ContractRevenue__c}"/></span>
+									</div>
+									<div class="title-card-body-field">
+										<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ContractCost__c.Label}" />
+					  					<span ><apex:outputField styleClass="center-aligned-block" value="{!Opportunity.Proposal__r.KimbleOne__ContractCost__c}"/></span>
+									</div>
+									<div class="title-card-body-field">
+										<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ContractMargin__c.Label}" />
+					  					<span ><apex:outputField styleClass="center-aligned-block" value="{!Opportunity.Proposal__r.KimbleOne__ContractMargin__c}"/></span>
+									</div>
+						  			<div id="embeddedCharmsContainer" pageSource="ProposalCharmsCard"></div>
+								</div>
+								
+								<div class="title-card-menu">
+									<div id="proposal-menu" data-floating-dropdown="#{!JSINHTMLENCODE(TheProposalId)}-menu-data" class="title-card-menu fa fa-bars burger-menu"></div>
+								</div>	
+											
+								<div id="{!JSINHTMLENCODE(TheProposalId)}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+						   			 <ul class="floating-dropdown-menu">
+							        	<li><apex:commandLink action="{!editProposal}"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.Edit}</apex:commandLink></li>
+							        	<apex:outputPanel layout="none" rendered="{!!IsChangeOrder}">
+							        		<li><apex:commandLink action="{!deleteProposal}"><i class="fa fa-trash dropdown-icon"></i>{!$Label.DeleteButton}</apex:commandLink></li>
+							        	</apex:outputPanel>
+							        	<apex:outputPanel layout="none" rendered="{!IsChangeOrder}">
+							        		<li><apex:commandLink action="{!disconnectChangeOrder}"><i class="fa fa-unlink dropdown-icon"></i>{!$Label.DisconnectChangeOrder}</apex:commandLink></li>
+							        	</apex:outputPanel>
+										<apex:outputPanel layout="none" rendered="{!HasPermission['LoseProposalOnOpportunity'] && CanLoseProposal}">
+											<li><apex:commandLink onclick="var d = confirmDelete();if(!d) return false;" action="{!LoseProposal}"><i class="fa fa-ban dropdown-icon"></i>{!$label.GenericLabel12}</apex:commandLink></li>
+										</apex:outputPanel>
+								    </ul>
+								</div>
+							</div>
+							</div>
+				  			</apex:outputPanel>
+				  		</div>
+				  								
+						<apex:pageBlockSection collapsible="false">
+							
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__BusinessUnit__c.Label}" />
+								<apex:outputField value="{!Opportunity.Proposal__r.BusinessUnit__r.Name}" />
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__Proposition__c.Label}" />
+								<apex:outputField value="{!Opportunity.Proposal__r.Proposition__r.Name}" />
+							</apex:pageBlockSectionItem>
+									
+						</apex:pageBlockSection>
+						
+					</apex:pageBlock>
+					
+				</apex:outputPanel>
+			
+				<apex:outputPanel id="existingProposalEdit" layout="none" rendered="{!!ISBLANK(Opportunity.KimbleOne__Proposal__c) && PageMode='EDIT'}">
+			      
+					<apex:pageBlock id="existingProposalEditPB">
+										
+							<apex:pagemessages id="formPageMessages" escape="false"/>
+			
+							<apex:pageBlockButtons location="bottom">
+								<apex:actionStatus id="SaveButtonStatus">
+								<apex:facet name="stop">
+				       				<apex:outputPanel >
+										<apex:commandButton action="{!UpdateProposal}" value="{!$Label.kimbleone__save}" rerender="formPageMessages" status="SaveButtonStatus"/>						
+					 				</apex:outputPanel>
+				 				</apex:facet>
+					 			<apex:facet name="start">
+									<apex:outputPanel >
+								        <apex:commandButton value="{!$Label.kimbleone__savinglabel}..." disabled="true" />
+									</apex:outputPanel>
+								</apex:facet>
+								</apex:actionStatus>
+							</apex:pageBlockButtons>
+			
+							<apex:pageBlockSection collapsible="false">
+							
+							<apex:pageBlockSectionItem >
+				            	<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__BusinessUnit__c.Label}" />            
+								<apex:outputPanel layout="none">
+									<div class="requiredInput" id="businessUnit-reqd">
+										<div class="requiredBlock"></div>
+										<apex:variable var="DisplayBUAsDropdown" value="{!!UseBusinessUnitEnhancedLookup}"/>
+
+					        			<apex:selectList id="proposalBusinessUnit" styleClass="kimble-proposal-select" value="{!Proposal.KimbleOne__BusinessUnit__c}" size="1" required="true" rendered="{!DisplayBUAsDropdown}" >
+											<apex:selectOptions value="{!TheBusinessUnits}" />
+										</apex:selectList>
+										
+										<apex:actionRegion >
+											<apex:outputPanel id="businessunit-existing-panel">
+												<apex:inputField id="enhanced-input-businessunit" value="{!Proposal.KimbleOne__BusinessUnit__c}" required="true" styleclass="kimbleSearch " html-data-typename="ActiveOperatingBusinessUnit" rendered="{!!DisplayBUAsDropdown}">
+													<apex:actionSupport event="onchange" rerender="businessunit-existing-panel, formPageMessages" />
+												</apex:inputField>
+											</apex:outputPanel>
+										</apex:actionRegion>										
+									</div>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>  	        
+			
+							<apex:pageBlockSectionItem rendered="{!!IsChangeOrder}"> 
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__Proposition__c.Label}" />      
+								<apex:outputPanel layout="none">
+									<div class="requiredInput" id="proposition-reqd">
+										<div class="requiredBlock"></div>
+					        			<apex:selectList id="proposalProposition" styleClass="kimble-proposal-select" value="{!Proposal.KimbleOne__Proposition__c}" size="1" required="true" >
+											<apex:selectOptions value="{!ThePropositions}" />
+										</apex:selectList>          
+									</div>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!CanEditForecastStatus}"> 
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ForecastStatus__c.Label}" />      
+								<apex:outputPanel layout="none">
+									<div class="requiredInput" id="forecast-status-reqd">
+										<div class="requiredBlock"></div>
+					        			<apex:selectList id="proposalForecastStatus" value="{!Proposal.KimbleOne__ForecastStatus__c}" size="1" required="true" >
+											<apex:selectOptions value="{!TheForecastStatuses}" />
+										</apex:selectList>          
+									</div>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+						</apex:pageBlockSection>
+					
+					</apex:pageBlock>
+					
+				</apex:outputPanel>
+			
+				<apex:outputPanel rendered="{!RedirectToProposal}">
+					<script>
+						window.parent.location='/{!TheProposalId}';
+					</script>
+				</apex:outputPanel>
+				
+				</apex:form>
+		</apex:define>
+	</apex:composition>
+
+	<style>
+	
+		table.proposal-action-radio-buttons {
+			text-align: left;
+			font-size: 12px;
+			font-weight: bold;
+		}
+		
+		table.proposal-action-radio-buttons label {
+		   vertical-align: bottom;
+		}
+		
+		/* emulates the SF table cell which ensures buttons are 30% indented from the left */
+		.footer-button-left-padding {
+			width: 30%;
+			display: inline-block;
+			height: 1px;
+		}
+		
+		.footer-button {
+			margin-top: 5px !important;;
+		}
+		div[id$='existingProposalViewPB'] {
+			min-height: 115px;
+		}
+	</style>
+
+	<apex:outputPanel layout="none" rendered="{!OR($User.UIThemeDisplayed == 'Theme4d',$User.UIThemeDisplayed == 'Theme4u')}">
+	<!-- Lightning styling for embedded VF page -->
+	<style>
+		div[id$='newProposalPB'], 
+		div[id$='existingProposalViewPB'], 
+		div[id$='existingProposalEditPB'] {
+		    border: none !important;
+		    background-color: white !important;
+		    padding: initial !important;
+		    margin: initial !important;
+	        border-bottom: 1px solid rgb(216, 221, 230) !important;
+		}
+		div[id$='newProposalPB'] .pbBody,
+		div[id$='existingProposalViewPB'] .pbBody, 
+		div[id$='existingProposalEditPB'] .pbBody {
+		    background-color: #FFF;
+		    border-radius: 2px;
+		    padding: 15px !important;
+		    margin: 1px 1px 7px !important;
+		}
+		.kimble-proposal-select {
+		    width: 220px;
+		}
+		div[id$='newProposalPB'] .pbBottomButtons,
+		div[id$='existingProposalViewPB'] .pbBottomButtons, 
+		div[id$='existingProposalEditPB'] .pbBottomButtons {
+		    border-top: initial !important;
+		    margin-top: 5px !important;
+	        padding-bottom: 10px;
+		}		
+	</style>
+	</apex:outputPanel>
+	</apex:outputPanel>
+</apex:page>

@@ -1,0 +1,406 @@
+<apex:page standardcontroller="KimbleOne__Proposal__c" extensions="KimbleOne.ProposalRiskDashboardController" sidebar="false" tabStyle="KimbleOne__ReferenceData__c">
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+	<c:Menu DefaultHelpPage="Risks.html" MenuContextType="Proposal" MenuContextId="{!KimbleOne__Proposal__c.Id}" MenuContextName="{!KimbleOne__Proposal__c.Name}"/>
+
+</apex:define>  
+   
+<apex:define name="Content">
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'RiskStyle.css')}"/>
+
+	<!-- Hidden fields for use in controller -->
+	<apex:outputField value="{!KimbleOne__Proposal__c.KimbleOne__Account__c}" rendered="False"/>
+	<apex:variable var="IsProposalWon" value="{!KimbleOne__Proposal__c.ForecastStatus__r.ProbabilityCode__r.KimbleOne__Enum__c == P1ForecastStatusProbabilityCodeEnumValue}"/>
+	
+    <apex:form id="TheForm">
+		<apex:outputPanel id="RisksManagerPanel" >
+			<apex:pageMessages escape="false"/>
+			<div class="card full-width min-horizontal-padding">
+				<div class="cardHeading risk-header-title">
+					<h3 class="cardTitle"><apex:outputText value="{!$ObjectType.KimbleOne__RiskAssessment__c.Label}"/></h3>
+					<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheSelectedRiskAssessmentId) && !HasMultipleRiskAssessments && !ISBLANK(TheRiskAssessmentDate.KimbleOne__InputDate__c)}">
+						<span class="assessment-date">&nbsp;-&nbsp;<apex:outputField value="{!TheRiskAssessmentDate.KimbleOne__InputDate__c}"/>:<apex:outputText value="{!TheRiskAssessmentStatus}"/></span>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheSelectedRiskAssessmentId) && HasMultipleRiskAssessments}">
+						<div class="assessment-navigator">
+							<apex:outputLink disabled="{!!HasPreviousAssessment}" value="#" onclick="goPreviousAssessment()" title="{!$Label.kimbleone__previous} {!$ObjectType.KimbleOne__RiskAssessment__c.Label}">
+								<apex:image styleClass="assessment-btn {!JSENCODE(IF(!HasPreviousAssessment, 'disabled-assessment-btn', ''))}" url="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'PreviousButtonSquare.png')}" alt="{!$Label.kimbleone__previous} {!$ObjectType.KimbleOne__RiskAssessment__c.Label}" />
+							</apex:outputLink>
+							<span class="assessment-date"><apex:outputField value="{!TheRiskAssessmentDate.KimbleOne__InputDate__c}"/>:<apex:outputText value="{!TheRiskAssessmentStatus}"/></span>
+							<apex:outputLink disabled="{!!HasNextAssessment}" value="#" onclick="goNextAssessment()" title="{!$Label.kimbleone__next} {!$ObjectType.KimbleOne__RiskAssessment__c.Label}">
+								<apex:image styleClass="assessment-btn {!JSENCODE(IF(!HasNextAssessment, 'disabled-assessment-btn', ''))}" url="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'NextButtonSquare.png')}" alt="{!$Label.kimbleone__next} {!$ObjectType.KimbleOne__RiskAssessment__c.Label}" />
+							</apex:outputLink>
+						</div>
+					</apex:outputPanel>					
+					<div class="risk-header">
+						<table>
+							<tr>
+							<apex:repeat value="{!TheRiskAssessment.TheRiskSummary.TheOverallRiskSummaryLevels}" var="theRiskSummaryLevel">
+								<td class="header-risk-summary-type-cell"><apex:outputText value="{!theRiskSummaryLevel.DimensionOne}"/></td>
+								<apex:outputPanel layout="none" rendered="{!!ISBLANK(theRiskSummaryLevel.Outcome)}">
+									<td class="risk-attribute-cell header-risk-outcome-cell risk-outcome-cell {!JSENCODE(theRiskSummaryLevel.Style)}"><apex:outputText value="{!theRiskSummaryLevel.Outcome}"/></td>
+								</apex:outputPanel>
+								<apex:outputPanel layout="none" rendered="{!ISBLANK(theRiskSummaryLevel.Outcome)}">
+									<td class="risk-attribute-cell header-risk-outcome-cell risk-outcome-cell risk-severity-class-0"><apex:outputText value="-"/></td>
+								</apex:outputPanel>
+
+	    					</apex:repeat>
+							</tr>
+						</table>
+					</div>
+					<div class="risk-assessment-burger">
+						<div data-floating-dropdown="#risk-assessment-menu-data" class="fa fa-bars delivery-element-menu burger-menu"></div>
+						<div class="Loading" style="display:none"></div>
+						<div id="risk-assessment-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+				   			 <ul class="floating-dropdown-menu">
+						        <apex:outputPanel layout="none" rendered="{!!IsLatest}">
+						        	<li><a href="#" class="disabled-link" onClick="javascript:void(0);" title="{!$Label.AssessmentFrozenMessage}"><i class="fa fa-camera dropdown-icon" style="margin-top: 12px;"></i><apex:outputLabel value="{!$Label.kimbleone__freezeriskassessment}"/></a></li>
+					        	</apex:outputPanel>
+						        <apex:outputPanel layout="none" rendered="{!!IsFrozen && IsLatest}">
+						        	<li><a href="#" onClick="freezeRiskAssessment('{!JSINHTMLENCODE(Proposal__c.Id)}', false);return false;"><i class="fa fa-camera dropdown-icon" style="margin-top: 12px;"></i><apex:outputLabel value="{!$Label.kimbleone__freezeriskassessment}"/></a></li>
+					        	</apex:outputPanel>
+								<apex:outputPanel layout="none" rendered="{!IsFrozen && IsLatest}">
+					        		<li><a href="#" onClick="freezeRiskAssessment('{!JSINHTMLENCODE(Proposal__c.Id)}', true);return false;"><i class="fa fa-camera dropdown-icon" style="margin-top: 12px;"></i><apex:outputLabel value="{!$Label.kimbleone__freezeriskassessment}"/></a></li>
+								</apex:outputPanel>
+						     </ul>
+						</div>
+					</div>
+				</div>
+				<div class="cardBody">
+					<div class="left-hand-panel">
+						<apex:repeat value="{!TheRiskAssessment.TheRiskCategorySummaries}" var="theRiskCategorySummary">
+						<div class="inner-card" >								
+							<div class="inner-card-body">
+								<div class="inner-card-header">
+									<div class="inner-card-title">
+										<apex:outputText value="{!theRiskCategorySummary.DisplayName}"/>
+									</div>
+								</div>
+	
+								<table class="list risk-summary-table">
+					    			<thead>
+					    				<th>{!$ObjectType.KimbleOne__RiskCategory__c.label}</th>
+					    				<th>{!$ObjectType.KimbleOne__RiskImpact__c.label}</th>
+					    				<th>{!$ObjectType.KimbleOne__RiskProbability__c.label}</th>
+					    				<th>{!$ObjectType.KimbleOne__RiskSeverity__c.label}</th>
+					    			</thead>
+					    			<tbody>
+				    					<apex:repeat value="{!theRiskCategorySummary.TheRiskCategories}" var="theRiskCategory">
+				    						<apex:repeat value="{!theRiskCategorySummary.RiskDisplaySummaryMap[theRiskCategory]}" var="theRiskCategoryDisplaySummary">
+				    							<tr>
+				    								<td>
+				    									<apex:outputLink rendered="{!!IsProposalWon}" disabled="{!!IsLatest}" styleClass="actionLink" value="javascript:void(0)" onclick="newRiskForCategory('{!JSINHTMLENCODE(theRiskCategory.id)}', 'prdb');" title="{!JSENCODE(IF(!IsLatest, $Label.kimbleone__riskassessmentnonewrisksmessage, $Label.kimbleone__new))}"><span class="fa fa-plus-square {!JSENCODE(IF(!IsLatest, 'disabled-assessment-btn', ''))} add-risk-icon"></span></apex:outputLink>
+				    									<apex:outputLink disabled="{!!IsLatest}" styleClass="undecorated-link actionLink" value="javascript:void(0)" onclick="viewRisksForCategory('{!JSINHTMLENCODE(theRiskCategory.id)}');" title="{!JSENCODE(IF(!IsLatest, $Label.kimbleone__assessmentfrozenmessage, $Label.kimbleone__viewriskslabel))}"><apex:outputText value="{!theRiskCategory.Name}"/></apex:outputLink>
+				    								</td>
+				    								<apex:outputPanel layout="none" rendered="{!!ISBLANK(theRiskCategoryDisplaySummary.Outcome)}">
+					    								<td class="risk-attribute-cell"><apex:outputText value="{!theRiskCategoryDisplaySummary.DimensionOne}"/></td>
+					    								<td class="risk-attribute-cell"><apex:outputText value="{!theRiskCategoryDisplaySummary.DimensionTwo}"/></td>
+					    								<td class="risk-attribute-cell risk-outcome-cell {!JSINHTMLENCODE(theRiskCategoryDisplaySummary.Style)}"><apex:outputText value="{!theRiskCategoryDisplaySummary.Outcome}"/></td>
+				    								</apex:outputPanel>
+				    								
+				    								<apex:outputPanel layout="none" rendered="{!ISBLANK(theRiskCategoryDisplaySummary.Outcome)}">
+					    								<td class="risk-attribute-cell"><apex:outputText value="-"/></td>
+					    								<td class="risk-attribute-cell"><apex:outputText value="-"/></td>
+					    								<td class="risk-attribute-cell risk-outcome-cell risk-severity-class-0"><apex:outputText value="-"/></td>
+				    								</apex:outputPanel>
+				    							</tr>
+				    						</apex:repeat>
+				    					</apex:repeat>
+					    			</tbody>
+					    		</table>
+							</div>
+								
+							<div class="inner-card-footer"></div>							
+						</div>
+						</apex:repeat>
+					</div>
+					<div class="right-hand-panel">
+					<div class="inner-card" >								
+						<div class="inner-card-body">
+							<div class="inner-card-header">
+								<div class="inner-card-title">
+									<apex:outputText value="{!$ObjectType.KimbleOne__RiskAssessmentArea__c.Label}"/>
+								</div>
+							</div>
+
+							<table class="list risk-summary-table">
+				    			<thead>
+				    				<th><apex:outputText value="{!$Label.kimbleone__levelheading}"/></th>
+				    				<th>{!$ObjectType.KimbleOne__RiskAssessmentArea__c.Fields.KimbleOne__RiskArea__c.label}</th>
+				    				<th>{!$ObjectType.KimbleOne__RiskAssessmentArea__c.Fields.KimbleOne__RiskSeverity__c.label}</th>
+				    			</thead>
+				    			<tbody>
+			    					<apex:repeat value="{!TheRiskAssessment.TheRiskSummary.TheOverallRiskSummaryLevels}" var="theRiskSummaryLevel">
+		    							<tr class="risk-summary-type">
+		    								<td colspan="3" class="risk-summary-type-cell"><apex:outputText value="{!theRiskSummaryLevel.DimensionOne}"/></td>
+										</tr>				    							
+										<apex:variable value="{!TheRiskAssessment.TheRiskSummary.TheOverallRiskSummaryLevelsMap[theRiskSummaryLevel.SourceId]}" var="theRiskSummaryLevelSummaries"/>
+			    						<apex:repeat value="{!theRiskSummaryLevelSummaries}" var="theRiskSummary">
+			    							<tr>
+			    								<td></td>
+			    								<td><apex:outputText value="{!theRiskSummary.DimensionOne}"/></td>
+			    								<apex:outputPanel layout="none" rendered="{!!ISBLANK(theRiskSummary.Outcome)}">
+			    									<td class="risk-attribute-cell risk-outcome-cell {!JSENCODE(theRiskSummary.Style)}"><apex:outputText value="{!theRiskSummary.Outcome}"/></td>
+			    								</apex:outputPanel>
+			    								<apex:outputPanel layout="none" rendered="{!ISBLANK(theRiskSummary.Outcome)}">
+			    									<td class="risk-attribute-cell risk-outcome-cell risk-severity-class-0"><apex:outputText value="-"/></td>
+			    								</apex:outputPanel>
+			    							</tr>
+			    						</apex:repeat>
+			    					</apex:repeat>
+				    			</tbody>
+				    		</table>
+						</div>
+							
+						<div class="inner-card-footer"></div>							
+					</div>
+
+					</div>
+			</div>
+				</div>
+
+		</apex:outputPanel>
+
+		<apex:actionFunction action="{!GoPreviousAssessment}" name="goPreviousAssessment" rerender="RisksManagerPanel, AssessmentNotes"/>
+		<apex:actionFunction action="{!GoNextAssessment}" name="goNextAssessment" rerender="RisksManagerPanel, AssessmentNotes"/>
+
+		<apex:actionFunction action="{!newRiskForCategory}" name="newRiskForCategory" rerender="" oncomplete="">
+       		<apex:param name="riskCategoryId" value="" />
+       		<apex:param name="dbRedir" value="" />
+       	</apex:actionFunction>
+
+		<apex:actionFunction action="{!viewRisksForCategory}" name="viewRisksForCategory" rerender="" oncomplete="">
+       		<apex:param name="riskCategoryId" value="" />
+       	</apex:actionFunction>
+    
+    </apex:form>
+
+	<apex:outputPanel id="AssessmentNotes" rendered="{!!ISBLANK(TheSelectedRiskAssessmentId)}">
+		<apex:relatedList subject="{!TheSelectedRiskAssessmentId}" list="CombinedAttachments"/>
+	</apex:outputPanel>
+		<script>
+			function freezeRiskAssessment(proposalId, refreeze)
+			{
+				jQuery('.burger-menu').hide();
+				jQuery('.Loading').show();
+				
+				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ProposalRiskDashboardController.FreezeRiskAssessment}',
+		       		proposalId, refreeze, 
+		      			function(result, event){          
+		             		if (event.status) 
+				            {
+				             	//reload screen
+				             	window.location.reload();
+				         	} 
+				         	else if (event.type === 'exception') 
+				         	{
+				             	alert(event.message);
+				             	jQuery('.burger-menu').show();
+								jQuery('.Loading').hide();
+				         	} 
+				         	else 
+				         	{
+				             	alert(event.message);
+				             	jQuery('.burger-menu').show();
+								jQuery('.Loading').hide();
+				         	}
+		         }, 
+		         {escape: true, timeout: 60000});
+			}
+ 		</script>
+ 		
+ 		<style>
+			.disabled-link {
+			    cursor: default !important;    
+			    color: #ddd !important;
+			}
+ 			.assessment-navigator {
+				display: inline-block;
+				height: 20px;
+				margin-left: 15px;
+ 			}
+ 			.assessment-btn {
+				vertical-align: top;
+  				position: relative;
+  				top: -5px;
+ 			}
+ 			.assessment-date {
+ 				font-size: 16px;
+/* 				margin-left: 5px; */
+				margin-right: 5px;
+ 			}
+ 			.disabled-assessment-btn {
+				opacity: 0.5;
+			}
+ 			.related-items-label {
+				font-weight: bold;
+			}
+ 			.related-items {
+				margin-left: 10px;
+				margin-bottom: 10px;
+			}
+ 			.full-width {
+ 				display: block;
+ 			}
+ 			.add-risk-icon {
+ 				left: -10px;
+				position: relative;
+ 			}
+ 			.second-action-link {
+			margin-left: 6px;
+ 			}
+ 			.filter-text {
+			margin-bottom: 8px;
+		  	width: 100%;
+		}
+		.left-hand-panel {
+			display: inline-block;
+		}
+		.right-hand-panel {
+			display: inline-block;
+			position: relative;
+			top: 0;
+			vertical-align: top;
+			margin-left: 13px;
+		}
+		.inner-card {
+			min-width: 490px;
+		}
+		.risk-header {
+			text-align: right;
+			display: inline-block;
+			vertical-align: middle;
+		    right: 39px;
+			position: absolute;
+			top: 4px;
+		}
+		.risk-assessment-burger {
+		    display: inline-block;
+		    position: absolute;
+		    right: 12px;
+		}
+		.risk-summary-column {
+			width: 320px;
+		}
+		.risk-header-title {
+			position: relative;
+		}
+		
+		.risk-summary-type {
+			border-bottom: 2px solid #bbb;
+			font-weight: bold;
+			font-style: italic;
+		}
+		.risk-summary-type-cell {
+			font-weight: bold;
+			font-style: italic;
+			border-bottom: 2px solid #bbb !important;
+		}
+		.overall-risk-summary-type-cell {
+			font-weight: bold;
+			font-size: 20px;
+		}
+		.header-risk-summary-type-cell {
+			font-size: 16px;
+			color: inherit;
+			font-family: inherit;
+			font-weight: 500;
+			line-height: 1.1;
+			padding-left: 34px;
+			padding-right: 15px;
+		}
+		.risk-template-table {
+			width: 700px !important;
+		}
+		
+		.related-risk-table {
+			width: 850px !important;
+		}
+
+		.table-wrapper {
+			height: 355px;
+		  	overflow-y: auto;
+ 				overflow-x: hidden;
+		}
+		.risk-summary-container {
+			display: inline-block;
+		}
+		.risk-severity-summary-container {
+			margin-left: 20px;
+		}
+		.cardBody {
+			margin-bottom: 10px;
+		}
+		.card.min-horizontal-padding {
+		  	margin-bottom: 10px;
+		}
+		
+		.risk-summary-table {
+			width: 100%;
+		}
+		li a.disabled-link {
+		    opacity: 0.5;
+		}
+		li a.disabled-link:hover {
+		    text-decoration: none !important;
+		    background-color: white !important;
+		}
+		
+		li a.disabled-link label:hover {
+		    text-decoration: none !important;
+		    background-color: white !important;
+		    color: #555 !important;
+		    cursor: default !important;
+		}
+		
+		.loadingIndicator {
+		   top:0;
+		   right:0;
+		   width:100%;
+		   height:100%;
+		   font-weight: bold;
+		   position:absolute;
+		   text-align:center;
+		   /* IE filter */
+		   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+		   -moz-opacity:0.7;    /* Mozilla extension */
+		   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+		   opacity:0.7; /* CSS3 */
+		   z-index:1000;
+		   background-color:white;
+		}
+		
+		.loadingIndicator img {
+		    margin-right:9px;
+		}
+		
+		#loadingIndicatorInnerContainer { 
+		    position:absolute; 
+		    top:50%;
+		    height:10em; 
+		    margin-top:-2em;
+		    width:100%;
+		}
+		.Loading 
+		{
+			background-image: url('{!URLFOR($Resource.JobImages, 'running16.gif')}') !important;
+			background-repeat:no-repeat !important;
+			background-position: 50%, 50%;
+			width:18px;
+			height:18px;
+		}
+		#riskAssessmentDetailsContainer {
+			display: block;
+		}
+		.floating-dropdown .floating-dropdown-menu LI > A, .floating-dropdown .floating-dropdown-menu LABEL {
+			display: -webkit-box;
+		}
+	</style>
+
+    </apex:define>
+    </apex:composition>
+
+</apex:page>

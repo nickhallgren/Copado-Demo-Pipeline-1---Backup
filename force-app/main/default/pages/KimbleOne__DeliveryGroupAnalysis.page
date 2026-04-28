@@ -1,0 +1,789 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.DeliveryGroupAnalysisController,KimbleOne.SecurityController"  showHeader="true" sidebar="false" standardStylesheets="true" 
+
+tabStyle="KimbleOne__DeliveryGroup__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+        
+        <c:Menu DefaultHelpPage="Milestones.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryGroup__c.Id}" MenuContextName="{!KimbleOne__DeliveryGroup__c.Name}" />
+         
+    </apex:define>
+    
+    <apex:define name="Content">
+    
+    <apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryFlot, 'jquery.flot.min.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryFlot, 'jquery.flot.stack.min.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryFlot, 'jquery.flot.navigate.min.js')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryFlot, 'jquery.flot.symbol.min.js')}"/>
+        
+    <div id="select-analysis-mode" class="timeline-view-toggle">
+		<span class="clickable selected left"><a class="toggleLink" id="revenue-invoice-mode" href="javascript:changeMode('#revenue-invoice-mode', 'RevenueInvoice');"><span class="linkText"><i class="fa fa-money toggle-icon"></i>{!$Label.Revenue} / {!$ObjectType.KimbleOne__Invoice__c.Label}</span></a></span><span class="clickable middle"><a class="toggleLink" id="margin-mode" href="javascript:changeMode('#margin-mode', 'Margin');"><span class="linkText"><i class="fa fa-line-chart toggle-icon"></i>{!$Label.MarginLabel}</span></a></span><span class="clickable right"><a class="toggleLink" id="cost-mode" href="javascript:changeMode('#cost-mode', 'Cost');"><span class="linkText"><i class="fa fa-money toggle-icon"></i>{!$Label.Cost}</span></a></span>
+	</div>
+            
+    <div id="container">
+        <div id="forecast-status-color" style="display:none" class="{!JSENCODE(ForecastStatus.StyleClass__c)}"></div>
+        <div id="legend" style="margin: 0 auto;width: 50%;"></div>
+        <div id="timeline-container">
+            <div id="flot-container" style="height:300px;"></div>
+            <div id="scroll-left">
+                <img src="{!URLFOR($Resource.AssignmentImages, 'PreviousButtonSquare.png')}" alt="{!$Label.PreviousPeriod}" />
+            </div>
+            <div id="scroll-right">
+                <img src="{!URLFOR($Resource.AssignmentImages, 'NextButtonSquare.png')}" alt="{!$Label.NextPeriod}" />
+            </div>
+        </div>
+         
+        <apex:outputPanel layout="none" rendered="{!RenderRevenueMilestones}">
+        <div id="revenue-milestones-container" style="margin-top: 10px;display:none;">
+             <apex:pageBlock id="revenueMilestones">
+                <apex:pageBlockButtons location="top">
+                    <input type="button" class="btn" value="{!$Label.New} {!$ObjectType.Milestone__c.label}" onclick="newMilestone('{!JSINHTMLENCODE(RevenueRecognitionMilestoneId)}');"></input>
+                    <apex:outputPanel layout="none" rendered="{!IF(RevenueMilestonePctSum.KimbleOne__InputDecimal__c <> 100, true, false)}">
+                    	<span class="fa fa-exclamation-circle pct-total-ind"/><apex:outputText styleClass="pct-total-message" value="{!$Label.kimbleone__recogmilestonepctmusttotal100}"/>
+                    </apex:outputPanel>
+                </apex:pageBlockButtons>
+
+                <apex:pageBlockTable value="{!TheRevenueRecognitionMilestones}" var="milestone">
+                    <apex:column >
+                        <a href="javascript:editMilestone('{!milestone.Id}')" class="fa fa-pencil"></a>
+                    </apex:column>
+                    <apex:column value="{!milestone.Name}">
+                    	<apex:facet name="footer">
+			                <apex:outputText value="{!$Label.kimbleone__total}"/>
+			            </apex:facet>
+                    </apex:column>
+                    <apex:column value="{!milestone.KimbleOne__MilestoneDate__c}"/>
+                    <apex:column value="{!milestone.KimbleOne__MilestonePercentage__c}">
+                    	<apex:facet name="footer">
+			                <apex:outputpanel layout="none">
+			                	<apex:variable value="{!IF(RevenueMilestonePctSum.KimbleOne__InputDecimal__c <> 100, 'pct-total-invalid','pct-total-ok')}" var="percentStyleClass"/>
+			                	<span class="{!JSENCODE(percentStyleClass)}"><apex:outputField value="{!RevenueMilestonePctSum.KimbleOne__InputDecimal__c}"/><apex:outputText value="%"/></span>
+			                </apex:outputpanel>
+			            </apex:facet>
+                    </apex:column>
+                    <apex:column value="{!milestone.KimbleOne__MilestoneStatus__c}"/>
+                    <apex:column value="{!milestone.KimbleOne__Event__c}"/>
+                    
+                </apex:pageBlockTable>
+             
+             </apex:pageBlock>
+        </div>
+        </apex:outputPanel>
+        
+        <apex:outputPanel layout="none" rendered="{!RenderCostMilestones}">
+        <div id="cost-milestones-container" style="margin-top: 10px; display:none;">
+             <apex:pageBlock id="costMilestones">
+                <apex:pageBlockButtons location="top">
+                    <input type="button" class="btn" value="{!$Label.New} {!$ObjectType.Milestone__c.label}" onclick="newMilestone('{!JSINHTMLENCODE(CostRecognitionMilestoneId)}');"></input>
+                    <apex:outputPanel layout="none" rendered="{!IF(CostMilestonePctSum.KimbleOne__InputDecimal__c <> 100, true, false)}">
+                    	<span class="fa fa-exclamation-circle pct-total-ind"/><apex:outputText styleClass="pct-total-message" value="{!$Label.kimbleone__recogmilestonepctmusttotal100}"/>
+                    </apex:outputPanel> 
+                </apex:pageBlockButtons>
+             
+                <apex:pageBlockTable value="{!TheCostRecognitionMilestones}" var="milestone">
+                    <apex:column >
+                        <a href="javascript:editMilestone('{!milestone.Id}')" class="fa fa-pencil"></a>
+                    </apex:column>
+                    <apex:column value="{!milestone.Name}">
+                    	<apex:facet name="footer">
+			                <apex:outputText value="{!$Label.kimbleone__total}"/>
+			            </apex:facet>
+                    </apex:column>
+                    <apex:column value="{!milestone.KimbleOne__MilestoneDate__c}"/>
+                    <apex:column value="{!milestone.KimbleOne__MilestonePercentage__c}">
+						<apex:facet name="footer">
+			                <apex:outputpanel layout="none">
+			                	<apex:variable value="{!IF(CostMilestonePctSum.KimbleOne__InputDecimal__c <> 100, 'pct-total-invalid','pct-total-ok')}" var="percentStyleClass"/>
+			                	<span class="{!JSENCODE(percentStyleClass)}"><apex:outputField value="{!CostMilestonePctSum.KimbleOne__InputDecimal__c}"/><apex:outputText value="%"/></span>
+			                </apex:outputpanel>
+			            </apex:facet>
+                    </apex:column>
+                    <apex:column value="{!milestone.KimbleOne__MilestoneStatus__c}"/>
+                    <apex:column value="{!milestone.KimbleOne__Event__c}"/>
+                    
+                </apex:pageBlockTable>
+             
+             </apex:pageBlock>
+        </div>
+        </apex:outputPanel>
+        
+        <apex:form >
+        <apex:actionFunction action="{!NewMilestone}" name="newMilestoneFunction" rerender="MilestonePanel" oncomplete="showModalBoxy(); initialiseItems();">
+            <apex:param name="milestoneTypeId" value="" />
+          </apex:actionFunction>
+
+          <apex:actionFunction action="{!ReadMilestone}" name="editMilestoneFunction" rerender="MilestonePanel" oncomplete="showModalBoxy(); initialiseItems();">
+            <apex:param name="milestoneId" value="" />
+         </apex:actionFunction>
+         
+        </apex:form>
+        
+        <apex:form id="MilestoneForm">  
+    <div id="MilestonePopup" style="display:none">
+      
+        <apex:outputPanel id="MilestonePanel">
+        
+          <div id="milestoneErrors">
+                <apex:pageMessages escape="false"/>
+            </div>
+            
+          <apex:pageBlock >
+            <apex:pageBlockButtons location="bottom">
+                <apex:commandButton id="saveMilestone" styleclass="DisableButtonWhileBusy" action="{!saveMilestone}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#milestoneErrors');initialiseItems();loadTheAnalysis();" reRender="costMilestones, revenueMilestones, MilestonePanel"/>
+                
+                <apex:outputPanel layout="none" rendered="{!CanComplete}">
+                    <apex:commandButton id="saveAndCompleteMilestone" styleclass="DisableButtonWhileBusy" action="{!saveAndCompleteMilestone}" value="{!$Label.kimbleone__complete}" oncomplete="hideModalBoxyWithErrorCheck('#milestoneErrors');initialiseItems();loadTheAnalysis();" reRender="costMilestones, revenueMilestones, MilestonePanel"/>
+                </apex:outputPanel>
+                    
+                <apex:commandButton action="{!RevertMilestone}" styleclass="DisableButtonWhileBusy"  rerender="costMilestones, revenueMilestones, MilestonePanel" rendered="{!CanRevert && HasPermission['RevertCompletedMilestone']}" value="{!$Label.kimbleone__reverttodraft}" oncomplete="hideModalBoxyWithErrorCheck('#milestoneErrors');loadTheAnalysis();"/>
+                
+                <apex:commandButton id="deleteMilestone" styleclass="DisableButtonWhileBusy"  rerender="costMilestones, revenueMilestones, MilestonePanel" action="{!DeleteMilestone}" value="{!$Label.kimbleone__deletebutton}" oncomplete="hideModalBoxyWithErrorCheck('#milestoneErrors');loadTheAnalysis();" rendered="{!CanDelete}"/>
+                
+                <input id="cancelMilestone" class="btn" type="button" onclick="hideModalBoxy();EnableButton('milestoneButton');" value="{!$Label.Cancel}" />
+                
+            </apex:pageBlockButtons>
+
+            <apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+                
+                <apex:pageBlockSectionItem rendered="{!CanEdit && !ISBLANK(TheEventOptions) && TheEventOptions.size > 1}" >
+                    <apex:outputLabel >{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__Event__c.Label}</apex:outputLabel>
+                    <apex:actionRegion >
+                        <apex:selectList value="{!TheMilestone.KimbleOne__Event__c}" size="1">
+                            <apex:selectOptions value="{!TheEventOptions}"/>
+                            <apex:actionSupport event="onchange" action="{!EventChanged}" rerender="MilestonePanel" oncomplete="EnableButton('milestoneButton');"/>
+                        </apex:selectList>
+                    </apex:actionRegion>
+                </apex:pageBlockSectionItem>
+                
+                <apex:outputfield value="{!TheMilestone.KimbleOne__Event__c}" rendered="{!!ISBLANK(TheMilestone.KimbleOne__Event__c) && !CanEdit}"/>
+                
+                <apex:inputfield id="milestoneName" value="{!TheMilestone.Name}" required="true" rendered="{!CanEdit}"/>
+                
+                <apex:outputfield value="{!TheMilestone.Name}" rendered="{!!CanEdit}" />
+                
+                <apex:inputfield id="milestoneDateInput" rendered="{!ISBLANK(TheMilestone.KimbleOne__Event__c) && CanEdit}" styleclass="kimbleDatePicker" value="{!TheMilestone.KimbleOne__MilestoneDate__c}" required="true" />
+                
+                <apex:outputfield id="milestoneDateOutput" rendered="{!!ISBLANK(TheMilestone.KimbleOne__Event__c) || !CanEdit}" value="{!TheMilestone.KimbleOne__MilestoneDate__c}" />
+                
+                <apex:inputfield id="milestonePercentage" value="{!TheMilestone.KimbleOne__MilestonePercentage__c}" required="true" rendered="{!CanEdit}"/>
+                
+                <apex:outputfield value="{!TheMilestone.KimbleOne__MilestonePercentage__c}" rendered="{!!CanEdit}" />
+                
+                <apex:inputField value="{!TheMilestone.KimbleOne__Notes__c}" style="width:200px" rendered="{!CanEdit}"/>
+                
+                <apex:outputField value="{!TheMilestone.KimbleOne__Notes__c}" style="width:200px" rendered="{!!CanEdit}"/>
+                
+                <apex:repeat var="f" value="{!$ObjectType.KimbleOne__Milestone__c.FieldSets.KimbleOne__MilestoneDetails}">
+                    <apex:inputField rendered="{!!CONTAINS(f.FieldPath,'.')}" value="{!TheMilestone[f]}" required="{!f.Required}" styleClass="{!IF(AND($ObjectType.KimbleOne__Milestone__c.Fields[f].type == 'date',$ObjectType.KimbleOne__Milestone__c.Fields[f].updateable),'kimbleDatePicker','')}" />
+                    <apex:outputField rendered="{!CONTAINS(f.FieldPath,'.')}" value="{!TheMilestone[f]}"/>
+                </apex:repeat>
+                
+            </apex:pageBlockSection>
+            
+          </apex:pageBlock>
+
+        </apex:outputPanel>
+
+      </div>
+       </apex:form>
+        
+    </div>
+    
+    <script>	    
+        function newMilestone(typeId)
+        {
+            initialiseModalBoxy('#MilestonePopup', '{!JSENCODE($Label.New)}  {!$ObjectType.Milestone__c.label}', jQuery('form[id$=\'MilestoneForm\']'));
+            newMilestoneFunction(typeId);
+        }
+        
+        function editMilestone(milestoneId)
+        {
+            initialiseModalBoxy('#MilestonePopup', '{!JSENCODE($Label.Edit)}  {!$ObjectType.Milestone__c.label}', jQuery('form[id$=\'MilestoneForm\']'));
+            editMilestoneFunction(milestoneId);
+        }
+        
+        var analysisData = {};
+        
+        var analysisMode = 'RevenueInvoice';
+        var analysisModeFields = {"RevenueInvoice": {Forecast:"ForecastRevenue", Actual:"ActualRevenue", ShowInvoice:true, Milestones:"TheRevenueRecognitionMilestones", MilestonesContainer:'#revenue-milestones-container'}, "Margin": {Forecast:"ForecastMarginAmount", Actual:"ActualMarginAmount", ShowInvoice:false}, "Cost": {Forecast:"ForecastCost", Actual:"ActualCost", ShowInvoice:false, Milestones:"TheCostRecognitionMilestones", MilestonesContainer:'#cost-milestones-container'}};
+  
+        function loadTheAnalysis()
+        {
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupAnalysisController.GetTheAnalysis}',
+                '{!JSINHTMLENCODE(ContextId)}',
+                    function(result, event){          
+                        if (event.status) 
+                        {
+                            analysisData = result;
+                            drawAnalysis();
+                        } 
+                        else if (event.type === 'exception') 
+                        {
+                            alert(event.message);
+                        } 
+                        else 
+                        {
+                            alert(event.message);
+                        }
+             }, 
+             {escape: true, timeout: 60000});
+        }
+        
+        function changeMode(obj, newMode)
+        {
+            jQuery('#select-analysis-mode span').removeClass('selected');
+            
+            jQuery(obj).parent('span').addClass('selected');
+            
+            analysisMode = newMode;
+            
+            drawAnalysis();
+        }
+        
+        function sortPeriods()
+        {
+            return function(a, b) {
+                var x = analysisData.TheTimePeriods[a].StartDate.toDate().valueOf();
+                var y = analysisData.TheTimePeriods[b].StartDate.toDate().valueOf();
+                
+                if (x < y) //sort string ascending
+                    return -1;
+                if (x > y)
+                    return 1;
+                return 0; //default return value (no sorting)
+            }
+        }
+        
+        var maxWidth;
+        
+        jQuery(window).load(function(){
+            //resize
+            jQuery(window).resize(function() {
+                
+                maxWidth = jQuery(window).width() - 367;
+                jQuery('#timeline-container').width(maxWidth);
+                
+                loadTheAnalysis();
+                                
+            });
+            
+            jQuery('#scroll-left').click(function (e) {
+                    e.preventDefault();
+                    var from = {property: 0};
+                    var to = {property: 40};
+                     
+                    jQuery(from).animate(to, {
+                        duration: 400,
+                        step: function() {
+                            //console.log( 'Currently @ ' + this.property );
+                            chart.pan({left:-this.property});
+                        }
+                    });
+                });
+            
+            jQuery('#scroll-right').click(function (e) {
+                    e.preventDefault();
+                                        
+                    var from = {property: 0};
+                    var to = {property: 40};
+                     
+                    jQuery(from).animate(to, {
+                        duration: 400,
+                        step: function() {
+                            //console.log( 'Currently @ ' + this.property );
+                            chart.pan({left:this.property});
+                        }
+                    });
+                    
+                });
+            
+            jQuery(window).resize();
+        
+        });
+        
+        var chart;
+        
+        function drawAnalysis()
+        {
+            jQuery('#revenue-milestones-container').hide();
+            jQuery('#cost-milestones-container').hide();
+            
+            jQuery(analysisModeFields[analysisMode].MilestonesContainer).show();                
+            
+            jQuery('#scroll-right').hide();
+            jQuery('#scroll-left').hide();
+            
+            var numberOfPeriods = Object.keys(analysisData.TheTimePeriods).length;
+            
+            if (numberOfPeriods == 0) return;
+            
+            var flotContainer = jQuery('#flot-container');
+            
+            var zoomFactor;
+            
+            if (numberOfPeriods <=8)
+            {
+                flotContainer.width(numberOfPeriods * maxWidth / 8);
+            }
+            else
+            {
+                flotContainer.width(maxWidth);
+                zoomFactor = numberOfPeriods / 8;
+            }
+            
+            jQuery('#scroll-right').show();
+            jQuery('#scroll-left').show();
+            
+            var xaxisData = [];
+            var actualData = [];
+            var actualExceedsForecastData = [];
+            var forecastData = [];
+            var invoiceData = [];
+            var openMilestoneData = [];
+            var completedMilestoneData = [];
+            
+            var actualRunningTotal = 0;
+            var currentAndPreviousPeriodActual = 0;
+            var forecastRunningTotal = 0;
+            var invoiceRunningTotal = 0;
+            
+            var actualForDisplay = 0;
+            var actualExceedsForecastForDisplay = 0;
+            var forecastForDisplay = 0;
+            
+            jQuery.each(Object.keys(analysisData.TheTimePeriods).sort(sortPeriods()), function (i, periodId)
+            {
+                var period = analysisData.TheTimePeriods[periodId];
+                xaxisData.push([i, period.Name]);
+                
+                var thisPeriodActual = period[analysisModeFields[analysisMode].Actual];
+                var thisPeriodForecast = period[analysisModeFields[analysisMode].Forecast];
+                
+                actualRunningTotal += thisPeriodActual;
+                forecastRunningTotal += thisPeriodForecast;
+                
+                if(forecastRunningTotal >= actualRunningTotal)
+                {
+                    actualForDisplay = actualRunningTotal;
+                    forecastForDisplay = (forecastRunningTotal - actualRunningTotal);
+                    actualExceedsForecastForDisplay = 0;
+                }
+                else
+                {
+                    actualForDisplay = 0;
+                    forecastForDisplay = forecastRunningTotal;
+                    actualExceedsForecastForDisplay = (actualRunningTotal - forecastRunningTotal);
+                }
+
+                invoiceRunningTotal += period.ActualInvoiced;
+                
+                // don't display the actual or invoiced amounts on future periods, instead consider it as forecast
+                if(period.FuturePeriod)
+                {
+                    forecastForDisplay += actualForDisplay + actualExceedsForecastForDisplay;
+                    actualForDisplay = 0;
+                    actualExceedsForecastForDisplay = 0;
+                    
+                    invoiceRunningTotal = null;
+                }
+                
+                actualData.push([i, actualForDisplay, period]);
+                actualExceedsForecastData.push([i, actualExceedsForecastForDisplay , period]);
+                forecastData.push([i, forecastForDisplay, period]);
+                invoiceData.push([i, invoiceRunningTotal, period]);
+                
+                if (analysisModeFields[analysisMode].Milestones != null && period[analysisModeFields[analysisMode].Milestones].length != 0)
+                {
+                    jQuery.each(period[analysisModeFields[analysisMode].Milestones], function (j, milestone) {
+                    
+                        // -0.4 => 1st of month
+                        // 0.4 => last of month
+                        
+                        var periodStartDate = period.StartDate.toDate();
+                        
+                        var daysInPeriod = new Date(periodStartDate.getFullYear(), periodStartDate.getMonth(), 0).getDate();
+                        
+                        var milestoneDate = milestone.MilestoneDate.toDate();
+                        
+                        var pctThroughPeriod = milestoneDate.getDate() / daysInPeriod;
+                        
+                        var position = i + ((pctThroughPeriod / 1.25) - 0.4);
+                        
+                        if (milestone.Status == 'Completed')
+                            completedMilestoneData.push([position, 0, milestone]);
+                        else
+                            openMilestoneData.push([position, 0, milestone]);
+                    });
+                }
+                
+            });
+            
+            var flotOptions = {series: {stack: true, shadowSize:0},
+                               legend: {labelBoxBorderColor:'transparent', show: true, container:'#legend', noColumns: 6},
+                                grid: {
+                                    hoverable: true,
+                                    clickable: true,
+                                    tickColor: '#f0f0f0', // the color in the background (i.e. cell border color)
+                                    borderWidth: 0, // the border for the graph container
+                                    color: '#333333', // the color of the label (on the right-hand-side),
+                                    autoHighlight : false,
+                                },
+                                xaxis:{ticks: xaxisData, zoomRange:[0,numberOfPeriods], panRange: [-0.5, numberOfPeriods]},
+                                yaxis: {
+                                    ticks: 5,
+                                    min: 0,
+                                    tickDecimals: 0,
+                                    tickFormatter: function(val, axis) {
+                                        return '<apex:outputText value="{!KimbleOne__DeliveryGroup__c.CurrencyISOCode}"/> ' + kimble.formatNumber(val, '#,##0');
+                                    },
+                                    panRange:false,
+                                    zoomRange:false,
+                                },
+                                pan: {interactive: false},zoom: {interactive:false}
+            };
+            
+            var barOptions = {
+                show: true,
+                align: 'center', // alignment for the bar
+                lineWidth: 0, // the border width of the bar
+                fill: 1, // fill with color?
+                barWidth: 0.8 // the width of the bars in units of the axis
+            };
+            
+            var lineOptions = {
+                show: true, // whether to show the line between ticks
+                lineWidth: 2, // the thickness of the line
+                fill: false
+            };
+
+            var graphData = [];
+            
+            graphData.push({label: '<apex:outputText value="{!$Label.kimbleone__actuallabel}"/>', bars: barOptions, color: '#729BC7', data: actualData});
+            
+            var forecastColor = jQuery('#forecast-status-color').css('color');
+            
+            graphData.push({label: '<apex:outputText value="{!$Label.kimbleone__forecastlabel}"/>', bars: barOptions, color: forecastColor, data: forecastData});
+
+            graphData.push({bars: barOptions, color: '#729BC7', data: actualExceedsForecastData});
+                        
+            if (analysisModeFields[analysisMode].ShowInvoice)
+            {
+                graphData.push({label: '<apex:outputText value="{!$ObjectType.KimbleOne__Invoice__c.Label}"/>', lines: lineOptions, stack: false, color: '#4A4A56', points: {radius: 5, show: true}, data: invoiceData});
+            }
+            
+            if (openMilestoneData.length > 0)
+            {
+                graphData.push({label: '<apex:outputText value="{!$ObjectType.KimbleOne__Milestone__c.LabelPlural}"/>', stack: false, color: 'gold', points: {symbol:'diamond', radius: 6, show: true}, data: openMilestoneData});
+            }
+            
+            if (completedMilestoneData.length > 0)
+            {
+                graphData.push({label: '<apex:outputText value="{!$ObjectType.KimbleOne__Milestone__c.LabelPlural}"/>', stack: false, color: 'gold', points: {symbol:'diamond', radius: 6, show: true, fillColor:'gold'},  data: completedMilestoneData});
+            }
+            
+            chart = jQuery.plot(jQuery('#flot-container'), graphData, flotOptions);
+            
+            if (zoomFactor != null) chart.zoom({amount: zoomFactor, center: { left: 0, top: 0 } });
+            
+            jQuery('#flot-container').qtip('destroy', true);
+                
+            var tooltip = jQuery('#flot-container').qtip({
+                id: 'flot-container',
+                prerender: true,
+                content: ' ',
+                position: {
+                    target: 'mouse',
+                    viewport: jQuery('#flot-container'),
+                    adjust: {
+                        x: 5,
+                        mouse:false
+                    }
+                },
+                show: false, //{event: 'click'},
+                hide: {event: false, fixed: true},//{event: 'unfocus'},
+                style: {classes: 'qtip-light qtip-shadow qtip-rounded'}
+            });
+
+            var previousPoint = null;
+            jQuery('#flot-container').bind('plotclick', function (event, coords, item) {
+                
+                var graph = $(this),
+                api = graph.qtip(),
+                previousPoint;
+                chart.unhighlight();
+                
+                // If we weren't passed the item object, hide the tooltip and remove cached point data
+                if (!item) {
+                    api.cache.point = false;
+                    return api.hide(item);
+                }
+                
+                chart.highlight(item.series, item.datapoint);
+                
+                previousPoint = api.cache.point;
+                if (previousPoint !== item.dataIndex) {
+                    api.cache.point = item.dataIndex;
+
+                    api.set('content.text', generateGraphPointTipHtml(item.dataIndex));  //.series.data[item.dataIndex][2])
+
+                    api.elements.tooltip.stop(1, 1);
+                    api.show(item);
+                }
+            });
+            
+        }
+        
+        function generateGraphPointTipHtml(ind)
+        {
+            var html = '<table class="data-point-tooltip" cellspacing="0" cellpadding="0" border="0">';
+            
+            var allData = chart.getData();
+            
+            var actualData = allData[0];
+            var forecastData = allData[1];
+            var actualExceedsForecastData = allData[2];
+            var invoiceData = allData[3];
+            
+            var actualExceedsForecastVal = 0;
+            
+            var actualVal = 0;
+            
+            var finalActualVal = 0;
+            
+            var isFuturePeriod = false;
+                        
+            if (actualData != null && actualData.data.length > ind)
+            {
+                actualVal = actualData.data[ind][1];
+                isFuturePeriod = actualData.data[ind][2].FuturePeriod
+            }
+            
+            // if we have an actual of 0 check whether or not there is an entry in the 3rd series (only populated
+            // when the actual exceeds the forecast
+            if (actualExceedsForecastData != null && actualExceedsForecastData.data.length > ind)
+            {
+                actualExceedsForecastVal = actualExceedsForecastData.data[ind][1];            
+			}
+			
+            var forecastVal = 0;
+            
+            if (forecastData != null && forecastData.data.length > ind)
+            {
+                forecastVal = forecastData.data[ind][1] + actualVal;
+            }
+
+            if(actualVal == 0 && actualExceedsForecastVal > actualVal)
+            {
+                finalActualVal = actualExceedsForecastVal + forecastVal;
+            }
+            else
+            {
+                finalActualVal = actualVal;
+            }
+                            
+            var invoiceVal = null;
+            
+            if (invoiceData != null && invoiceData.data.length > ind)
+            {
+                invoiceVal = invoiceData.data[ind][1];
+            }
+            
+			if(!isFuturePeriod)
+			{
+            	html += '<tr><td><apex:outputText value="{!$Label.kimbleone__actuallabel}"/></td><td><apex:outputText value="{!KimbleOne__DeliveryGroup__c.CurrencyISOCode}"/> ' + kimble.formatNumber(finalActualVal, '#,##0') + '</td></tr>';
+           	}
+
+            html += '<tr><td><apex:outputText value="{!$Label.kimbleone__forecastlabel}"/></td><td><apex:outputText value="{!KimbleOne__DeliveryGroup__c.CurrencyISOCode}"/> ' + kimble.formatNumber(forecastVal, '#,##0') + '</td></tr>';
+                
+            if (analysisMode == 'RevenueInvoice' && !isFuturePeriod)
+            {
+                html += '<tr><td><apex:outputText value="{!$ObjectType.KimbleOne__Invoice__c.Label}"/></td><td><apex:outputText value="{!KimbleOne__DeliveryGroup__c.CurrencyISOCode}"/> ' + kimble.formatNumber(invoiceVal, '#,##0') + '</td></tr>';
+            }
+            
+            html += '</table>';
+            
+            return html;
+        
+        }
+
+        function initialiseItems()
+        {
+            SetupDatePicker();
+        }
+        
+        function SetupDatePicker()
+        {
+            jQuery('.kimbleDatePicker').datepicker({
+                    dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+                    showOtherMonths: true,
+                    selectOtherMonths: true});
+        }
+    </script>
+    
+    <style>
+    
+    .timeline-view-toggle>span
+    {
+        -webkit-background-clip: border-box;
+        -webkit-background-origin: padding-box;
+        -webkit-background-size: auto;
+        background-attachment: scroll;
+        background-clip: border-box;
+        background-color: rgb(232, 232, 233);
+        background-image: url(/img/alohaSkin/togglePill_bg.png);
+        background-origin: padding-box;
+        background-size: auto;
+        display: inline-block;
+        padding-bottom: 2px;
+        padding-left: 2px;
+        padding-right: 5px;
+        padding-top: 2px;
+        border-top-color: rgb(181, 181, 181);
+        border-top-style: solid;
+        border-top-width: 1px;
+        border-bottom-color: rgb(181, 181, 181);
+        border-bottom-style: solid;
+        border-bottom-width: 1px;
+        border-collapse: separate;
+    }
+    
+    .timeline-view-toggle span.right
+    {
+        
+        border-right-color: rgb(181, 181, 181);
+        border-right-style: solid;
+        border-right-width: 1px;        
+        border-bottom-right-radius: 3px;
+        border-top-right-radius: 3px;       
+        border-left-style: solid;
+        border-left-width: 1px;
+        border-left-color: rgb(181,181,181);
+    }
+    .timeline-view-toggle span.left
+    {               
+        border-left-color: rgb(181, 181, 181);
+        border-left-style: solid;
+        border-left-width: 1px;     
+        border-bottom-left-radius: 3px;
+        border-top-left-radius: 3px;
+        border-left-style: solid;
+        border-left-width: 1px;
+        border-left-color: rgb(181,181,181);
+        border-right-style: solid;
+        border-right-width: 1px;
+        border-right-color: rgb(181,181,181);       
+    }
+    .timeline-view-toggle span.selected
+    {
+        background-color: rgb(232, 232, 233);
+        background-image: url(/img/alohaSkin/togglePill_bg.png);
+        background-position: 0% -120px;
+        background-size: auto;
+    }
+    .timeline-view-toggle span a.toggleLink
+    {
+        text-decoration: none;              
+    }
+    
+    .timeline-view-toggle span a.toggleLink .linkText
+    {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 11px;
+        font-weight: bold;
+        height: 14px;
+        margin-top: 1px;
+        padding-right: 5px;
+        color:#333;
+        white-space: nowrap;
+    }
+    .timeline-view-toggle span.selected a.toggleLink .linkText
+    {
+        color: rgb(255, 255, 255);
+    }           
+    .toggle-icon {
+        padding: 2px 4px;
+        font-size: 14px;
+    }
+    
+    #select-analysis-mode {
+        height: 28px;
+        right: 10px;
+        position: absolute;
+        top: 35px;
+    }
+        
+    #container {
+        position:relative;
+        margin-top:10px;
+    }
+        
+    #timeline-container {
+        margin-left:81px;
+        margin-right:36px;
+        overflow-x: hidden;
+        position:relative;
+        padding-bottom: 40px;
+    }
+        
+    #timeline-legend {
+        text-align: center;
+        
+    }
+        
+    table.data-point-tooltip td {
+        padding: 8px;
+        font-size: 11px;
+        color: #4A4A56;
+    }
+    
+    table.data-point-tooltip tbody tr:nth-child(odd) {
+        background-color: #ededed;
+    }
+    
+    #scroll-right {
+        position: absolute;
+        right: 0px;
+        bottom: 0px;
+        font-size: 24px;
+        color: #B7B6B6;
+        cursor: pointer;
+        z-index: 100;
+    }
+    
+    #scroll-left {
+        position: absolute;
+        left: 0px;
+        bottom: 0px;
+        font-size: 24px;
+        color: #B7B6B6;
+        cursor: pointer;
+        z-index: 100;
+    }
+    
+    /* custom override of style for the invoice legend to be a black circle with white fill */
+    #legend > table > tbody > tr > td:nth-child(5) > div > div {
+    	width: 6px !important;
+    	height: 6px !important;
+    	border: 2px solid #4A4A56 !important;
+    	border-radius: 50%;
+    }
+    span.pct-total-invalid {
+	    color: red;
+	}
+	span.pct-total-message {
+		font-weight: bold;
+		color: red;
+	}
+	span.pct-total-ind {
+	    color: #f00;
+	    font-size: 16px;
+	    padding-left: 10px;
+	    padding-right: 5px;
+	}
+</style>
+
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

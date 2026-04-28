@@ -1,0 +1,217 @@
+<apex:page standardController="KimbleOne__Resource__c" extensions="KimbleOne.ResourceMentionsController" sidebar="false" tabStyle="KimbleOne__Resource__c">
+<apex:composition template="KimbleOne__SiteMaster">
+	<apex:define name="Menu"><c:Menu rendered="{!!ISBLANK(KimbleOne__Resource__c.Id)}" DefaultHelpPage="MaintainResource.html" MenuContextType="Resource" MenuContextId="{!KimbleOne__Resource__c.Id}" MenuContextName="{!KimbleOne__Resource__c.Name}"/></apex:define>
+	<apex:define name="Content">
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleJS, 'Charm.js')}"/>
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+
+	<style>
+		.download-btn {
+		    margin-right: 11px;
+		    font-size: 26px;
+		}
+		.action-btn {
+			color: #BBB;
+			cursor: pointer;
+		}
+		.action-btn:hover {
+			color: #333;
+		}
+		.mention-type-heading {
+		    font-size: 12px;
+		}
+		.expand-collapse-btn {
+			color: #333;
+		    margin-right: 11px;
+		    font-size: 12px;
+			cursor: pointer;
+		}
+	
+	</style>
+
+	<div class="page-container">
+
+		<div id="resource-mentions-title">
+			<div class="title-card-container">
+			<div class="title-card">
+				<div class="title-card-heading" >
+					<div class="title-card-heading-text">
+						<apex:outputText title="{!$Label.kimbleone__resourcementions}" value="{!$Label.kimbleone__resourcementions}"/>
+					</div>
+				</div>
+				
+				<div class="title-card-body">
+					<i class="download-btn action-btn fa fa-download" title="{!$Label.ExportToCsv}" onclick="outputResourceMentions(true, '');"></i>
+				</div>
+			</div>
+			</div>
+
+			<apex:repeat value="{!mentionObjectTypes}" var="objectType">
+				<apex:outputPanel layout="none" rendered="{!mentionObjectTypesCountMap[objectType] > 0}">
+				<div class="title-card-container">
+					<div class="title-card">
+						<div class="title-card-heading" >
+							<div class="mention-type-heading">
+								<i id="{!objectType}-expand-collapse-btn" class="expand-collapse-btn fa fa-plus-square" title="{!$Label.Expand}" onclick="outputResourceMentions(false, '{!objectType}');"></i>
+								<apex:outputText title="{!mentionObjectTypes[objectType]}" value="{!mentionObjectTypes[objectType]} ({!mentionObjectTypesCountMap[objectType]})"/>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div id="{!objectType}-mentions" class="card-container">
+				</div>
+				</apex:outputPanel>
+			</apex:repeat>
+  		</div>
+	</div>
+
+	</apex:define>
+	</apex:composition>
+	<script>
+		function exportToCsv(filename, rows) 
+		{
+	        var processRow = function (row) 
+	        {
+	            var finalVal = formatCsvValue(row.Id);
+				finalVal += ',';
+	            finalVal += formatCsvValue(row.ContextLink);
+				finalVal += ',';
+				finalVal += formatCsvValue(row.Type);
+				finalVal += ',';
+				finalVal += formatCsvValue(row.MentionText);
+				return finalVal + '\r\n';
+	        };
+	
+	        var csvFile = '';
+	        for (var i = 0; i < rows.length; i++) 
+	        {
+	            csvFile += processRow(rows[i]);
+	        }
+			
+			var hiddenElement = document.createElement('a');
+			hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURI(csvFile);
+			hiddenElement.target = '_self'; // 
+			hiddenElement.download = filename; 
+			document.body.appendChild(hiddenElement); 
+			hiddenElement.click(); 
+	    }
+						
+		function formatCsvValue(val)
+		{
+			var innerValue = val === null ? '' : val.toString();
+		    var result = innerValue.replace(/"/g, '""');
+		    result = '"' + result + '"';
+			return result;
+		}
+		
+		var mentionTypes;
+		var mentionTypesCounter = 0;
+		var mentionItems = [];
+		var abortOutput = false;
+
+		function outputResourceMentions(toCsv, objectType)
+		{
+			var resourceId = '{!JSENCODE(Resource__c.Id)}';
+			mentionItems = [];
+
+			jQuery.unsubscribe('kimble.resource-mention-retrieval-oncomplete');
+			if (toCsv)
+			{
+				jQuery.subscribe('kimble.resource-mention-retrieval-oncomplete', function(event, data) { doExport() });
+				mentionTypes = JSON.parse('{!mentionObjectTypesJSON}');
+				mentionTypesCounter = Object.keys(mentionTypes).length;
+			}
+			else
+			{
+				if (jQuery('#' + objectType + '-expand-collapse-btn').hasClass('fa-plus-square'))
+				{
+					jQuery.subscribe('kimble.resource-mention-retrieval-oncomplete', function(event, data) { doDisplay(objectType) });
+					mentionTypes = JSON.parse('{"' + objectType + '":""}');
+				}
+				else
+				{
+					// clear html and toggle back to +
+					toggleExpandCollapse(objectType);
+					jQuery('#' + objectType + '-mentions').html('');
+				}
+			}
+			
+			for (mentionType in mentionTypes)
+			{
+				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ResourceMentionsController.GetResourceMentionsByObjectType}', resourceId, mentionType,
+		      	    function(result, event)
+		      	    {          
+						if (event.status) 
+						{
+							var resourceMentions = result;
+	
+							for (j = 0; j < resourceMentions.length; j++)
+							{ 
+							    mentionItems.push(resourceMentions[j]);
+							}						
+						} 
+						else 
+						{
+							abortOutput = true;
+							if (onError != null)
+								onError(event.message);
+							else
+								alert(event.message);
+						}
+						
+						jQuery.publish('kimble.resource-mention-retrieval-oncomplete'); 
+			
+					}, 
+					{escape: false, timeout: 60000});
+			}
+		}
+		
+		function doExport()
+		{
+			mentionTypesCounter -= 1;
+			
+			if (!abortOutput && mentionTypesCounter == 0)
+			{
+				exportToCsv('ResourceMentionsExport.csv', mentionItems);
+			}
+		}
+
+		function doDisplay(objectType)
+		{
+			if (!abortOutput)
+			{
+				var html;
+				html = '<table class="list">';
+				html += '<thead>';
+				html += '<th>{!$Label.ActionLinksHeader}</th>';
+				html += '<th>{!$Label.TextHeader}</th>';
+				html += '</thead>';
+				html += '<tbody>';
+				
+				for (var i = 0; i < mentionItems.length; i++) 
+				{
+					html += '<tr>';
+					html += '<td><a href="' + mentionItems[i].ContextLink + '"' + ' target="_blank">{!$Label.View}</a></td>';
+					html += '<td>' + mentionItems[i].MentionText + '</td>';
+					html += '</tr>';
+				}
+				
+				html += '</tbody>';
+				html += '</table>';
+				
+				jQuery('#' + objectType + '-mentions').html(html);
+				
+				toggleExpandCollapse(objectType);
+			}
+		}
+
+		function toggleExpandCollapse(objectType)
+		{
+			jQuery('#' + objectType + '-expand-collapse-btn').toggleClass('fa-plus-square').toggleClass('fa-minus-square');
+		}
+	</script>
+</apex:page>

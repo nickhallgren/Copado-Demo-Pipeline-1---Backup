@@ -1,0 +1,154 @@
+<apex:page standardController="KimbleOne__Resource__c" extensions="KimbleOne.ResourceRedactController" sidebar="false" tabStyle="KimbleOne__Resource__c">
+<apex:composition template="KimbleOne__SiteMaster">
+	<apex:define name="Menu"><c:Menu rendered="{!!ISBLANK(KimbleOne__Resource__c.Id)}" DefaultHelpPage="MaintainResource.html" MenuContextType="Resource" MenuContextId="{!KimbleOne__Resource__c.Id}" MenuContextName="{!KimbleOne__Resource__c.Name}"/></apex:define>
+	<apex:define name="Content">
+
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleJS, 'Charm.js')}"/>
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+
+		<apex:form id="TheForm">
+			<div id="pageErrors">
+				<apex:pageMessages escape="False" />
+			</div>
+		
+			<apex:pageBlock title="{!$Label.kimbleone__redactbutton} {!$Label.kimbleone__resourcedetails}">
+		
+			<apex:pageBlockButtons location="bottom">
+				<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__Resource__c.updateable}">
+					<input class="btn" id="btnRedact" onclick="jQuery(this).addClass('DisableButtonWhileBusy');redactResource();" type="button" value="{!$Label.RedactButton}" style="width:60px;"/>								
+				</apex:outputPanel>
+			</apex:pageBlockButtons>
+					
+			<apex:pageblockSection title="{!$Label.kimbleone__current} {!$Label.kimbleone__resourcedetails}" collapsible="false" showheader="true" columns="2" >
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__FirstName__c.Label}"/>
+					<apex:outputField value="{!KimbleOne__Resource__c.KimbleOne__FirstName__c}" />
+				</apex:pageBlockSectionItem>
+	
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__LastName__c.Label}"/>
+					<apex:outputField value="{!KimbleOne__Resource__c.KimbleOne__LastName__c}" />
+				</apex:pageBlockSectionItem>
+		
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__Contact__c.Label}"/>
+					<apex:outputField value="{!KimbleOne__Resource__c.KimbleOne__Contact__c}" />
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.Contact.Fields.Email.Label}"/>
+					<apex:outputField value="{!KimbleOne__Resource__c.Contact__r.Email}" />
+				</apex:pageBlockSectionItem>
+		
+			</apex:pageblockSection>
+		
+			<apex:pageblockSection title="{!$Label.kimbleone__redactbutton} {!$Label.kimbleone__to}" collapsible="false" showheader="true" columns="2" >
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__FirstName__c.Label}"/>
+					<apex:inputField id="input-first-name" value="{!redactionDetail.KimbleOne__FirstName__c}" />
+				</apex:pageBlockSectionItem>
+	
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__LastName__c.Label}"/>
+					<apex:inputField id="input-last-name" value="{!redactionDetail.KimbleOne__LastName__c}" />
+				</apex:pageBlockSectionItem>
+		
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.Contact.Fields.Email.Label}"/>
+					<apex:inputField id="input-email" value="{!redactionDetail.Name}" />
+				</apex:pageBlockSectionItem>
+		
+			</apex:pageblockSection>
+
+			</apex:pageBlock>
+      
+		</apex:form>
+	</apex:define>
+	</apex:composition>
+
+	<script>
+		var redactionTypes;
+		var redactionTypesCounter = 0;
+		var abortRedaction = false;
+
+		function redactResource()
+		{
+			var resourceId = '{!JSENCODE(Resource__c.Id)}';
+			var firstName = $('[id$=input-first-name]').val();
+			var lastName = $('[id$=input-last-name]').val();
+			var email = $('[id$=input-email]').val();
+
+			jQuery.unsubscribe('kimble.related-records-oncomplete');
+			jQuery.subscribe('kimble.related-records-oncomplete', function(event, data) { completeRelatedRecordsRedaction(resourceId, firstName, lastName, email) });
+
+			redactionTypes = JSON.parse('{!redactionObjectTypesJSON}');
+			redactionTypesCounter = Object.keys(redactionTypes).length;
+			
+			// Redacts the related objects
+			for (redactionType in redactionTypes)
+			{
+				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ResourceRedactController.RedactResourceByObjectType}', resourceId, redactionType, firstName, lastName, email, 
+		      	    function(result, event)
+		      	    {          
+						if (event.status) 
+						{
+							// fire event to complete the redaction
+							jQuery.publish('kimble.related-records-oncomplete'); 	
+						} 
+						else if (event.type === 'exception') 
+						{
+							alert(event.message);
+							abortRedaction = true;
+						} 
+						else 
+						{
+							alert(event.message);
+							abortRedaction = true;
+						}
+					}, 
+					{escape: false, timeout: 60000});
+			}
+		}
+		
+		function completeRelatedRecordsRedaction(resId, fn, ln, em)
+		{
+			redactionTypesCounter -= 1;
+			
+			if (!abortRedaction && redactionTypesCounter == 0)
+			{
+				jQuery.unsubscribe('kimble.resource-oncomplete');
+				jQuery.subscribe('kimble.resource-oncomplete', function(event, data) { redirectToHome() });
+	
+				// Handles the Resource and Contact
+				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ResourceRedactController.RedactResourceByObjectType}', resId, '', fn, ln, em, 
+		      	    function(result, event)
+		      	    {          
+						if (event.status) 
+						{
+							// fire event to redirect
+							jQuery.publish('kimble.resource-oncomplete'); 
+						} 
+						else if (event.type === 'exception') 
+						{
+							alert(event.message);
+							abortRedaction = true;
+						} 
+						else 
+						{
+							alert(event.message);
+							abortRedaction = true;
+						}
+					}, 
+					{escape: false, timeout: 60000});
+			}
+		}
+
+		function redirectToHome()
+		{
+			if (!abortRedaction)
+			{
+				safeNavigateToSForceURL('{!$Page.ResourceHome}?id={!KimbleOne__Resource__c.Id}');
+			}
+		}
+	</script>
+</apex:page>

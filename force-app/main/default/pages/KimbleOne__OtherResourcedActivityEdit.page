@@ -1,0 +1,207 @@
+<apex:page standardcontroller="KimbleOne__ResourcedActivity__c"  extensions="KimbleOne.OtherResourcedActivityEditController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__ReferenceData__c">
+
+	<apex:composition template="KimbleOne__SiteMaster">
+		
+		<apex:define name="Menu">
+		
+	    	<c:Menu rendered="{!KimbleOne__ResourcedActivity__c.Id != null}" MenuContextType="ResourcedActivity" MenuContextId="{!KimbleOne__ResourcedActivity__c.Id}" MenuContextName="{!KimbleOne__ResourcedActivity__c.Name}"/> 
+		
+		</apex:define>
+		  
+		<apex:define name="Content">
+			
+	 	  <apex:form >
+	 	  	<apex:inputHidden value="{!KimbleOne__ResourcedActivity__c.KimbleOne__ForecastUnitType__c}"/>
+	 	  		<apex:actionFunction action="{!cancelPage}" name="cancelPage" immediate="true">
+				</apex:actionFunction>
+			  
+				<apex:actionFunction action="{!UsageTrackingModelChanged}" name="usageTrackingModelChanged" rerender="forecastingDetailsSection,ResourcedActivityOtherErrors" onComplete="getReferenceData();">
+					<apex:param name="theUTM" value="" />
+				</apex:actionFunction>
+			  
+				<apex:outputPanel id="ResourcedActivityOtherErrors">	
+           			<apex:pageMessages escape="false"/>
+           		</apex:outputPanel>          	
+           		<apex:pageBlock id="ResourcedActivityOther" >
+            	
+            		<apex:pageBlockButtons location="bottom">
+            			<apex:commandButton action="{!upsertActivity}" value="{!$Label.kimbleone__save}" oncomplete="getReferenceData()" styleclass="DisableButtonWhileBusy" reRender="ResourcedActivityOther,ResourcedActivityOtherErrors"/> 							
+						<input type="button" class="btn" value="{!$Label.Cancel}"   onclick="cancelPage()"/>
+						<apex:commandButton value="{!$Label.kimbleone__clonelabel}" action="{!cloneOtherActivity}" onclick="var d = confirmDelete();if(!d) return false;" reRender="ResourcedActivityOther,ResourcedActivityOtherErrors"/>
+					</apex:pageBlockButtons>
+            
+             		<apex:pageblockSection collapsible="false" showheader="false"  columns="2">
+             
+               			<apex:inputfield id="name" value="{!KimbleOne__ResourcedActivity__c.Name}"  />
+						
+						<apex:outputfield id="activitystatus" value="{!KimbleOne__ResourcedActivity__c.KimbleOne__ActivityStatus__c}"  rendered="{!StatusOptions.size == 1}" />
+
+                        <apex:pageBlockSectionItem rendered="{!StatusOptions.size > 1}">
+                            <apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__ActivityStatus__c.Label}" />
+
+                            <apex:outputPanel layout="none">
+                                <apex:actionRegion >
+                                    <apex:selectList id="activitystatus" styleClass="kimble-proposal-select" value="{!KimbleOne__ResourcedActivity__c.KimbleOne__ActivityStatus__c}" size="1">
+                                        <apex:selectOptions value="{!StatusOptions}" />
+                                    </apex:selectList>
+                                </apex:actionRegion>
+                            </apex:outputPanel>
+                        </apex:pageBlockSectionItem>
+						
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.Name.Label}" />								  
+
+							<apex:outputPanel layout="none">
+								<apex:actionRegion >
+									<apex:selectList id="activityBusinessUnit" styleClass="kimble-proposal-select" disabled="{!}" value="{!KimbleOne__ResourcedActivity__c.KimbleOne__BusinessUnit__c}" size="1" required="{!IsBusinessUnitMandatory}" rendered="true">
+										<apex:selectOptions value="{!TheBusinessUnits}" />
+										<apex:actionSupport event="onchange" action="{!BusinessUnitChanged}" rerender="ResourcedActivityOther" oncomplete="getReferenceData()"/>
+									</apex:selectList>
+								</apex:actionRegion>	
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+						
+						<apex:inputfield id="code" value="{!KimbleOne__ResourcedActivity__c.KimbleOne__Code__c}"  />
+						
+						<apex:pageBlockSectionItem rendered="{!TheTimePatterns.size > 1}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__TimePattern__c.Label}" />								  
+							<apex:selectList value="{!KimbleOne__ResourcedActivity__c.KimbleOne__TimePattern__c}" size="1" >
+								<apex:selectOptions value="{!TheTimePatterns}" />
+							</apex:selectList>
+						</apex:pageBlockSectionItem>
+						
+						<apex:pageBlockSectionItem rendered="{!TheTimePatternRules.size > 1}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__TimePatternRule__c.Label}" />								  
+							<apex:selectList value="{!KimbleOne__ResourcedActivity__c.KimbleOne__TimePatternRule__c}" size="1" >
+								<apex:selectOptions value="{!TheTimePatternRules}" />
+							</apex:selectList>
+						</apex:pageBlockSectionItem>
+						
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__UsageUnitType__c.Label}" />								  
+							<apex:inputText value="{!KimbleOne__ResourcedActivity__c.KimbleOne__UsageUnitType__c}" styleclass="kimblecustomlookup GetUnitTypeList null true true"/>
+						</apex:pageBlockSectionItem>
+						
+						<apex:pageblockSectionItem >
+	               			<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__TimeEntryRule__c.Label}" />
+	               			<apex:selectList value="{!KimbleOne__ResourcedActivity__c.KimbleOne__TimeEntryRule__c}" size="1">
+								<apex:selectOptions value="{!TheTimeEntryRules}" />	             	
+							</apex:selectList>
+						</apex:pageblockSectionItem>
+						
+						<apex:inputfield id="isTOIL" value="{!KimbleOne__ResourcedActivity__c.KimbleOne__IsTOIL__c}">
+							<apex:actionSupport event="onchange" reRender="ToilSettingsPanel"/>
+						</apex:inputfield>
+
+						</apex:pageblockSection>
+
+					<apex:outputPanel id="ToilSettingsPanel" layout="none">
+						<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__toilsettings}"  columns="2" rendered="{!KimbleOne__ResourcedActivity__c.KimbleOne__IsTOIL__c}">
+
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__MaximumToilAccrual__c.Label} ({!KimbleOne__ResourcedActivity__c.ForecastUnitType__r.KimbleOne__Suffix__c})" />
+								<apex:inputField value="{!KimbleOne__ResourcedActivity__c.KimbleOne__MaximumToilAccrual__c}"  />
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__MinimumToilAccrual__c.Label} ({!KimbleOne__ResourcedActivity__c.ForecastUnitType__r.KimbleOne__Suffix__c})" />
+								<apex:inputField value="{!KimbleOne__ResourcedActivity__c.KimbleOne__MinimumToilAccrual__c}"  />
+							</apex:pageBlockSectionItem>
+
+						</apex:pageblockSection>
+					</apex:outputPanel>
+						<apex:outputPanel id="forecastingDetailsPanel" layout="none">
+							<apex:pageblockSection id="forecastingDetailsSection" collapsible="false" showheader="true" title="{!$Label.kimbleone__forecastingsettings}"  columns="2">
+						
+               				<apex:inputfield id="canSelfForecast" value="{!KimbleOne__ResourcedActivity__c.KimbleOne__CanSelfForecast__c}">
+               					<apex:actionSupport event="onchange" rerender="forecastingDetailsPanel" oncomplete="getReferenceData()"/>
+               				</apex:inputfield>
+               			
+               				<apex:inputfield id="selfForecastApprovalRequired" value="{!KimbleOne__ResourcedActivity__c.KimbleOne__SelfForecastApprovalRequired__c}" rendered="{!KimbleOne__ResourcedActivity__c.KimbleOne__CanSelfForecast__c}"/>
+               				<apex:pageBlockSectionItem rendered="{!!KimbleOne__ResourcedActivity__c.KimbleOne__CanSelfForecast__c}">&nbsp;</apex:pageBlockSectionItem>
+               			
+               				<apex:inputfield id="actualiseForecastOnly" value="{!KimbleOne__ResourcedActivity__c.KimbleOne__ActualiseForecastOnly__c}" />
+               				<apex:pageBlockSectionItem />
+               				
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__UsageTrackingModel__c.Label}" />								  
+								<apex:selectList value="{!KimbleOne__ResourcedActivity__c.KimbleOne__UsageTrackingModel__c}" size="1"  onchange="usageTrackingModelChanged(this.options[this.selectedIndex].value);">
+									<apex:selectOptions value="{!TheUsageTrackingModels}" />
+								</apex:selectList>
+							</apex:pageBlockSectionItem>
+
+							<apex:inputfield id="isUnavailable" value="{!KimbleOne__ResourcedActivity__c.KimbleOne__IsUnavailable__c}"  />
+								
+							<apex:pageBlockSectionItem id="utilRulePageBlock" rendered="{!!UsageTrackingModelIsActualUntracked}" >
+								<apex:outputLabel id="utilRule" value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__UtilisationRule__c.Label}" />
+								<apex:inputText id="utilisationRule" value="{!KimbleOne__ResourcedActivity__c.KimbleOne__UtilisationRule__c}" styleclass="kimblecustomlookup GetItems UtilisationRule true null" required="true"/>
+							</apex:pageBlockSectionItem>
+
+							<apex:inputfield rendered="{!!UsageTrackingModelIsActualUntracked}" id="isTimeUnpaid" value="{!KimbleOne__ResourcedActivity__c.KimbleOne__IsTimeUnpaid__c}"  />
+								
+							<apex:inputfield value="{!KimbleOne__ResourcedActivity__c.KimbleOne__DisableAssignmentRollups__c}"  />
+							<apex:inputfield value="{!KimbleOne__ResourcedActivity__c.KimbleOne__HideForecastTimeEntries__c}"  />
+								
+               			</apex:pageblockSection>
+               			</apex:outputPanel>
+               			
+               			<apex:pageBlockSection title="{!$Label.kimbleone__calendarsettingsheading}" columns="2" collapsible="false">
+               				<apex:pageBlockSectionItem >
+	               				<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__CalendarShowAs__c.Label}" />	
+	               				<apex:inputText id="calendarShowAs" value="{!KimbleOne__ResourcedActivity__c.KimbleOne__CalendarShowAs__c}" styleclass="kimbledropdown CalendarShowAs"/>
+	               			</apex:pageBlockSectionItem>
+
+							<apex:pageblockSectionItem >
+		               			<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__ScheduledTimeRule__c.Label}" />
+		               			<apex:selectList value="{!KimbleOne__ResourcedActivity__c.KimbleOne__ScheduledTimeRule__c}" size="1">
+									<apex:selectOptions value="{!TheScheduledTimeRules}" />	             	
+								</apex:selectList>
+							</apex:pageblockSectionItem>
+
+	               			<apex:inputfield id="calendarIsPrivate" value="{!KimbleOne__ResourcedActivity__c.KimbleOne__CalendarIsPrivate__c}"  />
+
+	               			<apex:inputfield id="includeInAssignmentSummary" value="{!KimbleOne__ResourcedActivity__c.KimbleOne__IncludeInResourceAssignmentSummary__c}"  />
+
+						</apex:pageBlockSection>
+               			
+               			<apex:pageBlockSection title="{!$Label.kimbleone__otherdetailslabel}" columns="2" collapsible="false" rendered="{!$ObjectType.KimbleOne__ResourcedActivity__c.FieldSets.KimbleOne__ResourcedActivityDetails.size > 0}">
+              	
+	              			<apex:repeat var="f" value="{!$ObjectType.KimbleOne__ResourcedActivity__c.FieldSets.KimbleOne__ResourcedActivityDetails}">
+	      						<apex:inputField value="{!KimbleOne__ResourcedActivity__c[f]}" rendered="{!!CONTAINS(f.FieldPath,'.')}" required="{!f.Required}" styleClass="{!IF(AND($ObjectType.KimbleOne__ResourcedActivity__c.Fields[f].type == 'date',$ObjectType.KimbleOne__ResourcedActivity__c.Fields[f].updateable),'kimbleDatePicker','')}"/>
+								<apex:outputField value="{!KimbleOne__ResourcedActivity__c[f]}" rendered="{!CONTAINS(f.FieldPath,'.')}"/>
+							</apex:repeat>
+              			</apex:pageBlockSection>
+        		</apex:pageBlock>
+
+         	</apex:form>
+
+
+			<script>
+
+			jQuery(window).load(function(){
+			    initialiseItems();
+   			});
+
+			function initialiseItems()
+			{
+			    SetupDatePicker();
+   			}
+
+			function SetupDatePicker()
+            {
+                //dateFormat: 'yy-mm-dd',
+                jQuery('.kimbleDatePicker').datepicker({
+                        dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+                        showOtherMonths: true,
+                        selectOtherMonths: true,
+                        changeMonth: true,
+                        changeYear: true});
+            }
+
+			</script>
+
+		</apex:define>
+
+	</apex:composition>
+
+</apex:page>

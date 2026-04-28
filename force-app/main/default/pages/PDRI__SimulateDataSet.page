@@ -1,0 +1,230 @@
+<apex:page showheader="{! IF( NOT ISNULL( $CurrentPage.parameters.showheadersidebar ), $CurrentPage.parameters.showheadersidebar, 'true' ) }"
+    sidebar="{! IF( NOT ISNULL( $CurrentPage.parameters.showsidebar ), $CurrentPage.parameters.showsidebar, 'true' ) }"
+    standardController="PDRI__DataSet__c"
+    extensions="PDRI.SimulationController"
+    title="Simulate Data Set"
+    standardStylesheets="false">
+
+    <script src="/soap/ajax/65.0/connection.js"></script>
+    <script src="/soap/ajax/65.0/apex.js" type="text/javascript"></script>
+
+    <!-- MD-3266: Static resource updated from SLDS080 to SLDS -->
+    <!-- <apex:stylesheet value="{!URLFOR($Resource.SLDS080, 'SLDS080/assets/styles/salesforce-lightning-design-system-vf.css')}"/>  -->
+    <apex:stylesheet value="{!URLFOR($Resource.PDRI__SLDS, '/styles/salesforce-lightning-design-system-vf.css')}"/>
+
+    <!--MD-1499-->
+    <apex:includeScript value="{!URLFOR($Resource.PDRI__MooverResources, 'scripts/general.js')}"/>
+    <style>
+        .slds-select1 {
+            height : 98px !important;
+        }
+        /*MD-1499*/
+        .dsLabel {
+            font-size: 14px !important;
+        }
+        .tooltipIcon {
+            display: inline-block !important;
+            left: -11px;
+        }
+        /*MD-2713*/
+		.tabblock{
+			position: fixed;
+		    z-index: 999999999;
+		    width: 100%;
+		    top: 0;
+		    left: 0;
+		    background: rgba(0, 0, 0, 0.29);
+		    height: 100%;
+		}
+    </style>
+    <script type="text/javascript">
+
+        function cancelSimulateDataSet() {
+            window.location.href = 'apex/DataSetEditor?id={!rootDataSet.Id}';
+        }
+
+        function hideElemVisibility(elemId) {
+            var elem = document.getElementById(elemId);
+            if( !elem ) {
+                return;
+            }
+
+            var elemClass = elem.getAttribute("class");
+
+            if( elemClass.indexOf("slds-show") != -1 ) {
+                elemClass = elemClass.replace("slds-show", "slds-hide");
+                elem.setAttribute("class", elemClass);
+            }
+        }
+
+        function showElemVisibility(elemId) {
+            var elem = document.getElementById(elemId);
+            var elemClass = elem.getAttribute("class");
+
+            if( elemClass.indexOf("slds-hide") != -1 ) {
+                elemClass = elemClass.replace("slds-hide", "slds-show");
+                elem.setAttribute("class", elemClass);
+            }
+        }
+
+        function tooltipDisplay(tooltipId) {
+            toggleElemVisibility(tooltipId);
+        }
+
+        function toolTipDisplayOut(tooltipId) {
+            toggleElemVisibility(tooltipId);
+        }
+    </script>
+
+    <apex:form id="theForm">
+
+        <!--  This script is to check how many orgs have been selected for deployment and accordingly it opens the deployment screen in the same/new window -->
+        <!--  <a href="" id="ancherId" target="_blank"></a>
+        <script type="text/javascript">
+            var deploymentRe1sultIds =  '{!deploymentResults}';
+
+            if(deploymentRe1sultIds != null && deploymentRe1sultIds != '') {
+                var idArray = deploymentRe1sultIds.split(',');
+                console.log('array ' + idArray);
+                for(var i=0; i< idArray.length; i++) {
+                    console.log('/' + idArray[i]);
+                    if(i == 0) {
+                        //MD-1680
+                        document.getElementById("ancherId").setAttribute('target', '_parent');
+                    }
+                    else {
+                        document.getElementById("ancherId").setAttribute('target', '_blank');
+                    }
+                    //MD-1404 Added toast parameter
+                    document.getElementById("ancherId").href = '/' + idArray[i]; //MD-1561 +'?isToastVisible=true';
+                    document.getElementById("ancherId").click();
+                }
+            }
+
+        </script> -->
+
+        <apex:actionFunction action="{!doSimulate}" name="simulateDataSet" rerender="theForm"/>
+        <apex:actionFunction action="{!onDismissAlert}" name="dismissAlert" rerender="theForm"/>
+
+       <apex:outputPanel id="fullPanel" layout="block">
+        <div class="slds">
+                <div id="progressSpinner" class="slds-hide">
+                    <div class="slds-grid slds-grid--align-center slds-m-vertical--xx-large">
+                        <div class="slds-spinner--large slds-m-vertical--xx-large">
+                            <!-- MD-3266: Static resource updated from SLDS080 to SLDS -->
+                            <img class="slds-m-vertical--xx-large" src="{!URLFOR($Resource.SLDS, '/images/spinners/slds_spinner_brand.gif')}" alt="Loading..." />
+                        </div>
+                    </div>
+                </div>
+                <apex:outputPanel id="alertPanel" layout="block" rendered="{!isAlertShown}">
+
+                    <div class="slds-grid slds-m-top--large slds-show" id="alertPanelDiv">
+                        <div class="slds-notify slds-notify--alert slds-theme--error slds-theme--inverse-text slds-theme--alert-texture slds-size--1-of-1" role="alert">
+                            <span class="slds-assistive-text">Info</span>
+                            <button onclick="dismissAlert(); return false;" class="slds-button slds-button--icon-inverse slds-notify__close">
+                                <!-- MD-3266: Static resource updated from SLDS080 to SLDS -->
+                                <img src="{!URLFOR($Resource.SLDS, '/icons/action/close_60.png')}" alt="Close" class="slds-button__icon" />
+                                <span class="slds-assistive-text">Close</span>
+                            </button>
+                            <h2>{!alertMessage}</h2>
+                        </div>
+                    </div>
+                </apex:outputPanel>
+
+                <apex:outputPanel id="settingsPanel">
+                    <div id="settingsPanelAll" class="slds-show">
+                        <div class="slds-grid">
+                            <div class="slds-col slds-size--4-of-6">
+                                <div role="form" class="slds-form--stacked slds-grid slds-wrap">
+                                    <div class="slds-form-element slds-m-top--large slds-size--3-of-6">
+                                        <label class="slds-form-element__label dsLabel" for="selectSample1"><!--MD-1499 comment<div class="slds-text-heading--small">-->Source Salesforce Organization<!--</div>--></label>
+                                        <!-- MD-1499 START -->
+                                        <div class="slds-form-element tooltipIcon"  onmouseover="tooltipDisplay('tooltipSource');" onmouseout="toolTipDisplayOut('tooltipSource');">
+                                            <div class="slds-form-element__icon slds-align-middle" >
+                                                <!--MD-3266: Changed the static resource from SLDS_Resource to SLDS -->
+                                                <img class="slds-button__icon" src="{!URLFOR($Resource.SLDS, '/icons/utility/info_60.png')}" alt="Table" />
+                                            </div>
+
+                                            <div class="slds-popover slds-popover--tooltip slds-nubbin--left-top toggle slds-hide" role="tooltip" style="position: absolute;top: -26px;left: 28px;float: left;min-width: 312px;" id="tooltipSource">
+                                            <div class="slds-popover__body">{!$Label.TOOL_TIP_SOURCE_SALESFORCE_ORGANIZATION}</div>
+                                            </div>
+                                            </div>
+                                        <!-- MD-1499 END -->
+                                        <div class="slds-form-element__control slds-m-top--small">
+                                            <apex:selectList id="sourceList" value="{!selectedSourceConnectionId}" size="1" required="false" styleClass="slds-select" onchange="queryCount({!JSENCODE(rootDataSet.ObjectName__c)}, {! JSENCODE(rootDataSet.Query_Filter__c) })">                                                 <apex:selectOptions value="{!connectionOptions}"/>
+                                                <apex:actionSupport event="onchange" action="{!onSourceSelect}" reRender="alertPanel"/>
+                                            </apex:selectList>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="slds-col">
+                                <div class="slds-button-group slds-m-top--large">
+                                    <!-- MD-2197 Start -->
+                                    <button id="simulateButton" onclick="simulateDataSet(); return false;" class="slds-button slds-button--neutral">Simulate</button>
+                                    <script>
+                                        setSimulateButtonDisable();
+
+                                        function setSimulateButtonDisable() {
+                                            if( {!isNoConnectionError} ) {
+                                                document.getElementById('simulateButton').disabled = true;
+                                            } else {
+                                                document.getElementById('simulateButton').disabled = false;
+                                            }
+                                        }
+                                    </script>
+                                    <!-- MD-2197 End -->
+                                    <button onclick="cancelSimulateDataSet(); return false;" class="slds-button slds-button--neutral">Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="slds-grid slds-m-top--x-large">
+                            <div role="form" class="slds-form--stacked slds-grid slds-wrap">
+                                <div class="slds-form-element">
+                                    <label class="slds-form-element__label dsLabel" for="selectSample1"><!--MD-1499 comment<div class="slds-text-heading--small">-->Simulation Selection<!--</div>--></label>
+                                    <!-- MD-1499 START -->
+                                    <div class="slds-form-element tooltipIcon"  onmouseover="tooltipDisplay('tooltipSelection');" onmouseout="toolTipDisplayOut('tooltipSelection');">
+                                        <div class="slds-form-element__icon slds-align-middle" >
+                                            <!--MD-3266: Changed the static resource from SLDS_Resource to SLDS -->
+                                            <img class="slds-button__icon" src="{!URLFOR($Resource.SLDS, '/icons/utility/info_60.png')}" alt="Table" />
+                                        </div>
+
+                                        <div class="slds-popover slds-popover--tooltip slds-nubbin--left-top toggle slds-hide" role="tooltip" style="position: absolute;top: -21px;left: 26px;float: left;di;min-width: 210px;" id="tooltipSelection">
+                                        <div class="slds-popover__body">{!$Label.TOOL_TIP_SIMULATEDATASET_SELECTION}</div>
+                                        </div>
+                                        </div>
+                                    <!-- MD-1499 END -->
+                                    <div class="slds-form-element__control" style="width: 700px;">
+                                        <table class="slds-table slds-table--bordered slds-m-top--medium">
+                                            <thead>
+                                                <tr class="slds-text-heading--label">
+                                                    <th scope="col">
+                                                        <span class="slds-truncate">Data Set Name</span>
+                                                    </th>
+                                                    <th scope="col">
+                                                        <!--MD-1499-->
+                                                        <span class="slds-truncate">Deployment Object</span>
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr class="slds-hint-parent">
+                                                    <td>
+                                                        <span class="slds-truncate"><a href="javascript:window.open('/{!rootDataSet.Id}','{!rootDataSet.Id}');" class="slds-truncate">{!rootDataSet.Name}</a></span><!-- MD-2486 -->
+                                                    </td>
+                                                    <td>
+                                                        <span class="slds-truncate">{!rootObjectLabel}</span>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </apex:outputPanel>
+            </div>
+        </apex:outputPanel>
+    </apex:form>
+</apex:page>

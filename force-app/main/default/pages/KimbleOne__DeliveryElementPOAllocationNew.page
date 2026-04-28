@@ -1,0 +1,186 @@
+<apex:page standardController="KimbleOne__PurchaseOrderAllocation__c" extensions="KimbleOne.DeliveryElementPOAllocationNewController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__ReferenceData__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+     		<c:Menu rendered="{!!ISBLANK(ThePurchaseOrderAllocationCreationWizard.TheDeliveryGroupContext)}" DefaultHelpPage="BudgetsPOs.html" MenuContextType="DeliveryGroup" MenuContextId="{!ThePurchaseOrderAllocationCreationWizard.TheDeliveryGroupContext.Id}" MenuContextName="{!ThePurchaseOrderAllocationCreationWizard.TheDeliveryGroupContext.Name}" CurrentPage="{!$Page.KimbleOne__DeliveryGroupBudgets}"/>
+       		<c:Menu rendered="{!ISBLANK(ThePurchaseOrderAllocationCreationWizard.TheDeliveryGroupContext)}" DefaultHelpPage="BudgetsPOs.html" MenuContextType="PurchaseOrder" MenuContextId="{!ThePurchaseOrderAllocationCreationWizard.ThePurchaseOrderContext.Id}" MenuContextName="{!ThePurchaseOrderAllocationCreationWizard.ThePurchaseOrderContext.Name}" CurrentPage="{!$Page.KimbleOne__PurchaseOrderHome}"/>   	 
+    </apex:define>
+    
+    <apex:define name="Content">
+    	<apex:form id="TheForm" enctype="multipart/form-data">
+    	<div id="pageErrors">
+    		<apex:pageMessages escape="False" />
+		</div>
+		<apex:pageBlock title="{!$Label.kimbleone__allocatepurchaseorderbutton}">
+           	<apex:pageBlockButtons location="bottom">
+           		<apex:commandButton action="{!Cancel}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__cancel}" rerender="TheForm" rendered="{!ThePurchaseOrderAllocationCreationWizard.CanCancel && !ThePurchaseOrderAllocationCreationWizard.HasFinished}"/>
+           		<apex:commandButton action="{!ThePurchaseOrderAllocationCreationWizard.GoPrevious}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__previous}" reRender="TheForm" rendered="{!ThePurchaseOrderAllocationCreationWizard.CanGoPrevious}" onComplete="initialiseItems();"/>
+            	<apex:commandButton action="{!ThePurchaseOrderAllocationCreationWizard.GoNext}" styleclass="DisableButtonWhileBusy" value="{!ThePurchaseOrderAllocationCreationWizard.NextLabel}" reRender="TheForm" rendered="{!ThePurchaseOrderAllocationCreationWizard.CanGoNext}" onComplete="initialiseItems();"/>
+            </apex:pageBlockButtons>
+			
+			<!-- SELECT DELIVERY ELEMENTS TO INCLUDE -->
+			<apex:outputPanel layout="none" rendered="{!ThePurchaseOrderAllocationCreationWizard.CurrentStep.StepName == 'SelectDeliveryElements'}">
+			<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__selectdeliveryelementsforpoallocationheading}" columns="1" >
+           	</apex:pageblockSection>	
+           		<apex:pageBlockTable value="{!ThePurchaseOrderAllocationCreationWizard.TheDeliveryElements}" var="element">
+						<apex:column width="10%" style="text-align:center;" headerValue="{!$Label.kimbleone__selectlabel}">
+							<apex:inputField value="{!ThePurchaseOrderAllocationCreationWizard.TheDeliveryElementsForSelection[element].InputCheckbox__c}"/>
+						</apex:column>
+						<apex:column value="{!element.KimbleOne__DeliveryGroup__c}" rendered="{!ISBLANK(ThePurchaseOrderAllocationCreationWizard.TheDeliveryGroupContext)}"/>
+						<apex:column value="{!element.Name}" />
+						<apex:column headervalue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ContractRevenue__c.Label}" >
+							<apex:outputPanel layout="none">
+								<apex:outputText value="{!ThePurchaseOrderAllocationCreationWizard.TheDeliveryElementsMap[element].InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+								<apex:outputField value="{!ThePurchaseOrderAllocationCreationWizard.TheDeliveryElementsMap[element].InvoicingCurrencyContractRevenue__c}" />
+							</apex:outputPanel>
+ 						</apex:column>
+ 						
+						<apex:column headervalue="{!$Label.kimbleone__allocatedlabel}">
+							<apex:outputPanel layout="none">
+								<apex:outputText value="{!ThePurchaseOrderAllocationCreationWizard.TheDeliveryElementExistingAllocationValueMap[element].CurrencyISOCode}" styleclass="kimbleCurrencyCode" />
+								<apex:outputField value="{!ThePurchaseOrderAllocationCreationWizard.TheDeliveryElementExistingAllocationValueMap[element].InputCurrency__c}" />
+							</apex:outputPanel>
+						</apex:column>
+						
+						<apex:column value="{!element.PurchaseOrderRule__r.Name}" />
+						
+					</apex:pageBlockTable>
+
+			</apex:outputPanel>
+			
+			<!-- SELECT PO -->
+			<apex:outputPanel layout="none" rendered="{!ThePurchaseOrderAllocationCreationWizard.CurrentStep.StepName == 'SelectPurchaseOrder'}">
+			<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__selectunallocatedpoheading}"  columns="1">
+           	</apex:pageBlockSection>
+           		<div style="maxHeight:300px;overflow-y:auto;">
+           		<apex:inputText value="{!ThePurchaseOrderAllocationCreationWizard.SelectedPOId}" style="display:none" styleclass="selectedPOId"/>
+           		<apex:pageBlockTable value="{!ThePurchaseOrderAllocationCreationWizard.TheAvailablePurchaseOrders}" var="po" rendered="{!ThePurchaseOrderAllocationCreationWizard.TheAvailablePurchaseOrders.size != 0}">
+					<apex:column headerValue="{!$Label.kimbleone__selectlabel}">
+						<input id="{!po.Id}" type="radio" name="selectPO" onclick="if(this.checked) $('.selectedPOId').val('{!JSINHTMLENCODE(po.Id)}');" />
+					</apex:column>
+					<apex:column value="{!po.Name}" />
+					<apex:column value="{!po.KimbleOne__OrderDate__c}" />
+					<apex:column value="{!po.KimbleOne__ExpiryDate__c}" />
+					<apex:column value="{!po.KimbleOne__OrderValue__c}" />
+					<apex:column value="{!po.KimbleOne__AllocatedValue__c}" />
+					<apex:column value="{!po.KimbleOne__InvoicedValue__c}" />
+					<apex:column value="{!po.KimbleOne__UnallocatedValue__c}" />
+				</apex:pageBlockTable>
+				
+				<apex:outputText value="{!$Label.kimbleone__nounallocatedpurchaseordersmessage}" rendered="{!ThePurchaseOrderAllocationCreationWizard.TheAvailablePurchaseOrders.size == 0}"/>
+				</div>
+		    
+		    
+		    <apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__createlabel} {!$ObjectType.KimbleOne__PurchaseOrder__c.Label}"  columns="1">
+		    	<input id="newPO" type="radio" name="selectPO" onclick="if(this.checked) $('.selectedPOId').val('NEWPO');" />
+		    	<label for="newPO">{!$Label.kimbleone__createlabel} {!$ObjectType.KimbleOne__PurchaseOrder__c.Label}</label>
+		    </apex:pageblockSection>
+		     
+		    <script>
+					$(function () {
+		                	$('#' + $('.selectedPOId').val()).attr('checked', true);
+		            });
+		        </script>
+		    
+			</apex:outputPanel>
+			
+			<!-- NEW PO -->
+			<apex:outputPanel layout="none" rendered="{!ThePurchaseOrderAllocationCreationWizard.CurrentStep.StepName == 'CreateNewPurchaseOrder'}">
+				<apex:pageBlockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__createlabel} {!$ObjectType.KimbleOne__PurchaseOrder__c.Label}"  columns="2">
+							<apex:inputField id="newPOReference" required="true" value="{!ThePurchaseOrderAllocationCreationWizard.NewPurchaseOrder.Name}"/>
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__PurchaseOrder__c.Fields.KimbleOne__OrderValue__c.Label} ({!ThePurchaseOrderAllocationCreationWizard.NewPurchaseOrder.CurrencyIsoCode})"/>
+		                        <apex:inputField id="newPOOrderValue" required="true" value="{!ThePurchaseOrderAllocationCreationWizard.NewPurchaseOrder.KimbleOne__OrderValue__c}"/>
+							</apex:pageBlockSectionItem>
+							<apex:inputField id="newPOOrderDate" required="true" value="{!ThePurchaseOrderAllocationCreationWizard.NewPurchaseOrder.KimbleOne__OrderDate__c}" styleClass="kimbleDatePicker"/>
+							<apex:inputField id="newPOExpiryDate" value="{!ThePurchaseOrderAllocationCreationWizard.NewPurchaseOrder.KimbleOne__ExpiryDate__c}" styleClass="kimbleDatePicker"/>
+							
+							<apex:inputField id="newEarliestItemDate" value="{!ThePurchaseOrderAllocationCreationWizard.NewPurchaseOrder.KimbleOne__EarliestInvoiceItemDate__c}" styleClass="kimbleDatePicker"/>
+							<apex:inputField id="newLatestItemDate" value="{!ThePurchaseOrderAllocationCreationWizard.NewPurchaseOrder.KimbleOne__LatestInvoiceItemDate__c}" styleClass="kimbleDatePicker"/>
+							
+							<apex:repeat value="{!$ObjectType.KimbleOne__PurchaseOrder__c.FieldSets.KimbleOne__PurchaseOrderDetails}" var="f">
+			     				<apex:inputField rendered="{!!CONTAINS(f.FieldPath,'.')}" value="{!ThePurchaseOrderAllocationCreationWizard.NewPurchaseOrder[f]}" required="{!f.Required}" styleClass="{!IF(AND($ObjectType.KimbleOne__PurchaseOrder__c.Fields[f].type == 'date',$ObjectType.KimbleOne__PurchaseOrder__c.Fields[f].updateable),'kimbleDatePicker','')}" />
+								<apex:outputField rendered="{!CONTAINS(f.FieldPath,'.')}" value="{!ThePurchaseOrderAllocationCreationWizard.NewPurchaseOrder[f]}"/>
+			   				</apex:repeat>							
+						</apex:pageBlockSection>
+			</apex:outputPanel>
+			
+			<!-- ALLOCATE PO -->
+			<apex:outputPanel layout="none" rendered="{!ThePurchaseOrderAllocationCreationWizard.CurrentStep.StepName == 'AllocatePurchaseOrder' && ThePurchaseOrderAllocationCreationWizard.HasFinished == false}">
+				<apex:pageBlockSection collapsible="false" showheader="false" columns="2">
+					<apex:outputField value="{!ThePurchaseOrderAllocationCreationWizard.TheSelectedPurchaseOrder.Name}"/>
+					<apex:pageBlockSectionItem >
+						<apex:outputLabel >{!$ObjectType.KimbleOne__PurchaseOrder__c.Fields.KimbleOne__UnallocatedValue__c.Label}</apex:outputLabel>
+                  	 	<apex:outputField value="{!ThePurchaseOrderAllocationCreationWizard.TheUnallocatedValue.KimbleOne__InputCurrency__c}" />
+               		</apex:pageBlockSectionItem>
+				</apex:pageBlockSection>
+				
+				<apex:pageBlockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__allocate}"  columns="1">
+				</apex:pageBlockSection>	
+					<apex:pageBlockTable value="{!ThePurchaseOrderAllocationCreationWizard.TheDeliveryElementIdsToBeAllocated}" var="eleId">
+						<apex:column value="{!ThePurchaseOrderAllocationCreationWizard.TheDeliveryElementsMap[eleId].Name}"/>
+						<apex:column headervalue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ServicesContractRevenue__c.Label}" >
+							<apex:outputPanel layout="none">
+								<apex:outputText value="{!ThePurchaseOrderAllocationCreationWizard.TheDeliveryElementsMap[eleId].InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+								<apex:outputField value="{!ThePurchaseOrderAllocationCreationWizard.TheDeliveryElementsMap[eleId].InvoicingCurrencyServicesContractRevenue__c}" />
+							</apex:outputPanel>
+ 						</apex:column>
+						<apex:column headervalue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ExpensesContractRevenue__c.Label}" >
+							<apex:outputPanel layout="none">
+								<apex:outputText value="{!ThePurchaseOrderAllocationCreationWizard.TheDeliveryElementsMap[eleId].InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+								<apex:outputField value="{!ThePurchaseOrderAllocationCreationWizard.TheDeliveryElementsMap[eleId].InvoicingCurrencyExpensesContractRevenue__c}" />
+							</apex:outputPanel>
+ 						</apex:column>
+ 						<apex:column headervalue="{!$Label.kimbleone__allocatedlabel}" >
+							<apex:outputPanel layout="none">
+								<apex:outputField value="{!ThePurchaseOrderAllocationCreationWizard.TheDeliveryElementExistingAllocationValueMap[eleId].InputCurrency__c}" />
+							</apex:outputPanel>
+ 						</apex:column>
+						<apex:column headervalue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__PurchaseOrderRule__c.Label}" >
+							<apex:outputText value="{!ThePurchaseOrderAllocationCreationWizard.TheDeliveryElementsMap[eleId].PurchaseOrderRule__r.Name}" /> 
+						</apex:column>
+						<apex:column headerValue="{!$Label.kimbleone__allocationlabel} ">
+							<table cellpadding="0" cellspacing="0" border="0">
+								<apex:repeat value="{!ThePurchaseOrderAllocationCreationWizard.ThePurchaseOrderAllocationItemsMap[eleId]}" var="itm">
+									<tr>
+										<td class="labelCol" style="border:0px;min-width: 80px"><apex:outputLabel value="{!ThePurchaseOrderAllocationCreationWizard.ThePurchaseOrderAllocationTypes[itm.PurchaseOrderAllocationType__c].Name} {!ThePurchaseOrderAllocationCreationWizard.TheSelectedPurchaseOrder.CurrencyISOCode}"/></td>
+										<td style="border:0px"><apex:inputField id="allocationCapField" value="{!itm.AllocationCap__c}"/></td>
+									</tr>	
+							</apex:repeat>
+							</table>	
+						</apex:column>
+					</apex:pageBlockTable>
+				
+					
+			</apex:outputPanel>
+			<apex:outputPanel rendered="{!ThePurchaseOrderAllocationCreationWizard.HasFinished}">
+                 <script>
+		                safeNavigateToSForceURL('{!JSENCODE(RedirectDeliveryElementFinancials)}');
+		          </script>
+	               	   
+           	</apex:outputPanel>
+		</apex:pageBlock>
+		</apex:form>
+
+		<script>
+			jQuery(window).load(function(){
+				initialiseItems();
+			});
+			function initialiseItems()
+			{
+				SetupDatePicker();
+			}
+			function SetupDatePicker()
+			{
+				//dateFormat: 'yy-mm-dd',
+				jQuery('.kimbleDatePicker').datepicker({
+						dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+						showOtherMonths: true,
+						selectOtherMonths: true,
+						changeMonth: true,
+						changeYear: true});
+			}
+		</script>
+	</apex:define>
+</apex:composition>
+</apex:page>

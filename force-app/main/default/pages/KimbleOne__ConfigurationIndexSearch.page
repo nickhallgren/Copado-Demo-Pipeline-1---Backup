@@ -1,0 +1,301 @@
+<apex:page id="ConfigurationIndexSearch" controller="KimbleOne.ConfigurationIndexSearchController" sidebar="false">
+    <apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Content">
+    <style>
+        input#indexSearchTerm {
+            padding: 10px;
+            margin: 10px;
+            width: 600px;
+            font-size: 20px;
+            text-align: center;
+            border-radius: 4px;
+            border-style: none;
+        }
+        .search-term-container {
+            position: relative;
+            display: inline-block;
+        }
+        .search-ind {
+            position: absolute;
+            top: 18px;
+            left: 22px;
+            font-size: 26px;
+            color: #75758b;
+        }
+        .search-results-num,
+        .search-working {
+            position: absolute;
+            top: 18px;
+            left: 644px;
+            font-size: 26px;
+            color: white;
+            text-align: left;
+            white-space: nowrap;
+        }
+        .search-container {
+            text-align: center;
+            background-color: #242126;
+            padding: 10px;
+        }
+        .search-logo {
+            background: url({!URLFOR($Resource.DynamicHelp, 'img/Kimble_WHITE_200.svg')}) no-repeat center center;
+            height: 60px;
+            text-align: center;
+            width: 100%;
+            margin: 20px;
+        }
+        .search-results-container {
+            background-color: #efefef;
+            padding: 10px;
+            color: #242126;
+            text-align: center;
+        }
+        .itm-dets-container {
+            display: table-row;
+        }
+        .itm-icn {
+            display: table-cell;
+        }
+        .itm-dets {
+            display: table-cell;
+            vertical-align: middle;
+            padding-left: 8px;
+            text-align: left;
+        }
+        div.itm-jmp-link {
+            display: inline-block;
+            cursor: pointer;
+        }
+        .itm-card {
+            display: inline-flex;
+            padding: 10px;
+            width: 380px;
+            min-height: 40px;
+            margin: 8px;
+            border-radius: 2px;
+            box-shadow: rgba(31, 31, 31, 0.16) 1px 2px 5px 1px;
+            background-color: white;
+        }
+        .itm-icn .fa {
+            font-size: 32px;
+            padding: 3px;
+        }
+        .itm-name {
+            font-weight: bold;
+            font-size: 14px;
+            padding-bottom: 3px;
+        }
+        .itm-descr {
+            font-style: italic;
+            color: grey;
+        }
+        .itm-card:hover {
+            background-color: #e7f4f8;
+        }
+        .itm-card.HelpPage .fa {
+            color: #428BCA;
+        }
+        .itm-card.SObjectType .fa,
+        .itm-card.OrgWideSetting .fa {
+            color: #242126;
+        }
+        .itm-card.ConfigCatalogItem .fa {
+            color: #00843e;
+        }
+        .itm-card.Page .fa {
+            color: #d57f0e;
+        }
+        .itm-card.Url .fa {
+            color: #a42a2e;
+        }
+        .itm-card.InternalUrl .fa {
+            color: #0092da;
+        }
+        a.itm-jmp-link, a.itm-jmp-link:hover {
+            text-decoration: none;
+        }
+    </style>
+    <div class="search-content-container">
+        <div class="search-container">
+            <div class="search-logo"></div>
+            <div class="search-term-container">
+                <i class="fa fa-search search-ind"></i>
+                <input id="indexSearchTerm" placeholder="{!JSENCODE($Label.Label011)}"/>
+                <div class="search-results-num"></div>
+                <div class="search-working hidden-item"><i class="fa fa-circle-o-notch fa-spin"></i></div>
+            </div>
+        </div>
+        <div class="search-results-container">
+            <div class="search-results"></div>
+        </div>
+    </div>
+
+    <script>
+
+        function showWorking()
+        {
+            //console.clear();
+            //console.log('Searching for ' + jQuery('#indexSearchTerm').val());
+            //console.time('Index Search');
+            jQuery('.search-results-num').addClass('hidden-item');
+            jQuery('.search-working').removeClass('hidden-item');
+        }
+        function hideWorking()
+        {
+            //console.log('Searching complete ');
+            //console.timeEnd('Index Search');
+            jQuery('.search-results-num').removeClass('hidden-item');
+            jQuery('.search-working').addClass('hidden-item');
+        }
+
+        var searchIndexLookupTimeout;
+
+        jQuery(window).ready(function ()
+        {
+            initialiseIndexSearch();
+        });
+
+        function initialiseIndexSearch()
+        {
+            jQuery(document).off('keydown', '#indexSearchTerm').on('keydown', '#indexSearchTerm', indexSearch);
+        }
+
+        function indexSearch()
+        {
+            window.clearTimeout(searchIndexLookupTimeout);
+
+            if(jQuery('#indexSearchTerm').val().length < 2) return;
+
+            /* TODO 1.31
+                working ind
+                search scope
+            */
+            var searchScope = ['ALL'];
+            
+            searchIndexLookupTimeout = window.setTimeout(function() {
+
+            var searchTerm = jQuery('#indexSearchTerm').val();
+
+            if(searchTerm.length < 2) return;
+
+            showWorking();
+
+<apex:outputPanel layout="none" rendered="{!UserIsAdmin}">
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ConfigurationIndexSearchController.SearchAdminIndex}',
+                    searchTerm, searchScope,
+                        function(result, event){
+                            if (event.status)
+                            {
+                                displayResults(result);
+                            }
+                            else
+                            {
+                                alert(event.message);
+                            }
+                        hideWorking();
+                    },
+                    {escape: true, timeout: 60000}
+                )
+</apex:outputPanel>
+
+<apex:outputPanel layout="none" rendered="{!!UserIsAdmin}">
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ConfigurationIndexSearchController.SearchIndex}',
+                    searchTerm, searchScope,
+                        function(result, event){
+                            if (event.status)
+                            {
+                                displayResults(result);
+                            }
+                            else
+                            {
+                                alert(event.message);
+                            }
+                        hideWorking();
+                    },
+                    {escape: true, timeout: 60000}
+                )
+</apex:outputPanel>
+            }, 2000);
+        }
+
+        function displayResults(result)
+        {
+            jQuery('.search-results-num').text(result.NumRes + ' {!JSENCODE($Label.Items)}');
+            jQuery('.search-results').html(buildIndexResultsHtml(result.Results));
+
+            //console.table(result.Results);
+        }
+
+        function getIndexIcon(itmType)
+        {
+            var icnCls = 'fa-cog';
+
+            if(itmType == 'SObjectType' || itmType == 'ConfigCatalogItem') icnCls = 'fa-list-ul';
+            else if(itmType == 'Page') icnCls = 'fa-file-text';
+            else if(itmType == 'HelpPage') icnCls = 'fa-question-circle';
+            else if(itmType == 'OrgWideSetting') icnCls = 'fa-cog';
+            else if(itmType == 'Url') icnCls = 'fa-external-link-square';
+            else if(itmType == 'InternalUrl') icnCls = 'fa-cloud';
+
+            return icnCls;
+        }
+
+        function isInternalLink(itmType)
+        {
+            return !(itmType == 'Url' || itmType == 'HelpPage');
+        }
+
+        function buildIndexResultsHtml(results)
+        {
+            var html = '';
+
+            for(var i = 0; i < results.length; i++) {
+                var itm = results[i];
+
+                if(itm.JumpUrl != undefined && itm.JumpUrl != '')
+                {
+                    if(!isInternalLink(itm.CIType))
+                        html += '<a class="itm-jmp-link" target="_new" href="' + itm.JumpUrl + '">';
+                    else
+                    {
+                        var linkHtml = "safeNavigateToSForceURLNewTab('" + itm.JumpUrl + "')";
+                        html += '<div class="itm-jmp-link" onclick="' + linkHtml + '">';
+                    }
+                }
+
+                html += '<div class="itm-card ' + itm.CIType + '" ci-id="' + itm.CIId + '">';
+                    html += '<div class="itm-dets-container">';
+                        html += '<div class="itm-icn">';
+                        html += '<i class="fa ' + getIndexIcon(itm.CIType) + '"></i>';
+                        html += '</div>';
+                        html += '<div class="itm-dets">';
+                            html += '<div class="itm-name">';
+                            html += itm.Name;
+                            html += '</div>';
+                            if(itm.Descr != undefined && itm.Descr != '')
+                            {
+                                html += '<div class="itm-descr">';
+                                html += itm.Descr;
+                                html += '</div>';
+                            }
+                        html += '</div>';
+                    html += '</div>';
+                html += '</div>';
+
+                if(itm.JumpUrl != undefined && itm.JumpUrl != '')
+                {
+                    if(!isInternalLink(itm.CIType))
+                        html += '</a>';
+                    else
+                    {
+                        html += '</div>';
+                    }
+                }
+            }
+
+            return html;
+        }
+    </script>
+    </apex:define>
+    </apex:composition>
+</apex:page>

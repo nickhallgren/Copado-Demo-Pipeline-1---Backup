@@ -1,0 +1,78 @@
+<apex:page id="ActivityAssignmentDelete" controller="KimbleOne.ActivityAssignmentDeleteController" extensions="KimbleOne.ActivityAssignmentRemoteActions" showHeader="false" sidebar="false">
+
+    <div id="LostAssignmentPopup" style="display: none">
+        <apex:outputPanel id="LostAssignment">
+            <apex:form >
+                <apex:actionFunction action="{!LoadActivityAssignmentToLose}" name="loadActivityAssignmentToLose" rerender="LostAssignment" oncomplete="showModalBoxy();">
+                    <apex:param name="assignmentId" value="" />
+                </apex:actionFunction>
+                <apex:actionFunction action="{!SaveActivityAssignmentToLose}" name="saveActivityAssignmentToLose" rerender="LostAssignment" oncomplete="hideModalBoxyWithErrorCheck('#LostAssignmentErrors');jQuery.publish('kimble.assignmentChanged', {assignmentId:theAssignmentToLoseId});" />
+
+                <div id="LostAssignmentErrors">
+                    <apex:pageMessages escape="false"/>
+                </div>
+                <apex:pageBlock mode="edit" rendered="{!!ISBLANK(ActivityAssignmentToLose)}">
+
+                    <apex:pageBlockSection collapsible="false" showheader="false" columns="1">
+
+                        <apex:inputField value="{!ActivityAssignmentToLose.KimbleOne__LostReason__c}"  required="true"/>
+
+                        <apex:pageBlockSectionItem >
+                            <apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__LostReasonNarrative__c.Label}" />
+                            <apex:outputPanel layout="none">
+                                <apex:outputPanel layout="block" styleClass="requiredInput">
+                                    <apex:outputPanel layout="block" styleClass="requiredBlock"/>
+                                    <apex:inputTextarea rows="4" cols="95" value="{!ActivityAssignmentToLose.KimbleOne__LostReasonNarrative__c}" required="true" style="margin-top: 2px; margin-bottom: 0px; height: 60px; margin-left: 2px; margin-right: 2px; width: 502px; " />
+
+                                </apex:outputPanel>
+                            </apex:outputPanel>
+                        </apex:pageBlockSectionItem>
+
+                    </apex:pageBlockSection>
+                    <apex:pageBlockButtons location="bottom">
+
+                        <apex:outputpanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.updateable}">
+                            <input class="btn DisableButtonWhileBusy" type="button" onclick="saveActivityAssignmentToLose()" id="save" value="{!$Label.Save}" />
+                        </apex:outputpanel>
+                        <input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}" />
+                    </apex:pageBlockButtons>
+                    <script>
+                    theAssignmentToLoseId = '{!JSENCODE(ActivityAssignmentToLose.Id)}';
+                    </script>
+                </apex:pageBlock>
+            </apex:form>
+        </apex:outputPanel>
+    </div>
+
+    <script>
+
+     var theAssignmentToLoseId;
+     function deleteTheActivityAssignment(id, onerror)
+     {
+        Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.DeleteAssignment}',
+                id,
+                    function(result, event){
+                        if (event.status)
+                        {
+                            // delete resource rows
+                            jQuery.publish('kimble.activityassignmentdeleted', {assignmentId:id});
+                        }
+                        else if (event.type === 'exception')
+                        {
+                            alert(event.message);
+                            if (onerror != null) onerror();
+                        }
+                        else
+                        {
+                            alert(event.message);
+                            if (onerror != null) onerror();
+                        }
+
+                        deleteRunning = false;
+                },
+                {escape: true, timeout: 60000}
+            );
+      }
+    </script>
+
+</apex:page>

@@ -1,0 +1,126 @@
+<apex:page standardcontroller="KimbleOne__RevenueAdjustment__c" extensions="KimbleOne.RevenueAdjustmentApproveController,KimbleOne.SecurityController" standardStylesheets="true" showHeader="true" sidebar="false" >
+  	<apex:Composition template="KimbleOne__SiteMaster">
+
+		<apex:define name="Menu">
+			<c:Menu DefaultHelpPage="Approvingapprovalrequests.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__RevenueAdjustment__c.DeliveryElement__r.KimbleOne__DeliveryGroup__c}"  MenuContextName="{!KimbleOne__RevenueAdjustment__c.DeliveryElement__r.DeliveryGroup__r.Name}" CurrentPage="{!$Page.KimbleOne__DeliveryElementRevenueAdjustments}"/>
+		</apex:define>
+
+		<apex:define name="Content">
+			
+			<!-- Revenue Adjustment Details -->
+			<apex:form id="TheForm">
+
+				<apex:outputPanel id="revenueAdjustmentPanel">
+							    		    
+				<apex:outputPanel id="pageErrors">
+   					<apex:pageMessages escape="False" />
+				</apex:outputPanel>
+
+				<apex:pageBlock title="{!$ObjectType.KimbleOne__RevenueAdjustment__c.Label} - {!KimbleOne__RevenueAdjustment__c.Name}">
+			 		    	
+	 		    	<apex:pageBlockButtons location="top">
+						<apex:commandButton id="sendForApprovalBtn" action="{!SendForApproval}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__sendforapprovalbutton}" rerender="TheForm, ApprovalHistoryPanel" rendered="{!KimbleOne__RevenueAdjustment__c.Status__r.KimbleOne__Enum__c = 'Draft' && $ObjectType.KimbleOne__RevenueAdjustment__c.updateable && KimbleOne__RevenueAdjustment__c.DeliveryElement__r.KimbleOne__AllowNewRevenueAdjustments__c}"/>
+						<apex:commandButton id="revertBtn" action="{!Revert}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__reverttodraft}" rerender="TheForm" rendered="{!CanRevertRevenueAdjustment && HasPermission['RevertApprovedRevenueAdjustment'] && KimbleOne__RevenueAdjustment__c.DeliveryElement__r.KimbleOne__AllowNewRevenueAdjustments__c}"/>
+			   		</apex:pageBlockButtons>
+			 		    	
+			 		<apex:pageBlockSection columns="2">
+						
+						<apex:outputField value="{!KimbleOne__RevenueAdjustment__c.Account__r.Name}"/>																																								
+									
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__RevenueAdjustment__c.Fields.KimbleOne__RevenueAdjustmentReason__c.Label}"></apex:outputLabel>
+							<apex:outputField value="{!KimbleOne__RevenueAdjustment__c.RevenueAdjustmentReason__r.Name}"/>																					
+						</apex:pageBlockSectionItem>
+									
+						<apex:outputField value="{!KimbleOne__RevenueAdjustment__c.Name}"/>
+																		
+						<apex:outputField value="{!KimbleOne__RevenueAdjustment__c.KimbleOne__Description__c}"/>
+									
+						<apex:outputField value="{!KimbleOne__RevenueAdjustment__c.KimbleOne__AdjustmentDate__c}"/>
+						<apex:outputField value="{!KimbleOne__RevenueAdjustment__c.KimbleOne__AdjustmentRevenue__c}" rendered="{!NOT(KimbleOne__RevenueAdjustment__c.RevenueAdjustmentReason__r.KimbleOne__IsInvoiceable__c)}"/>
+									
+						<apex:pageBlockSectionItem rendered="{!KimbleOne__RevenueAdjustment__c.RevenueAdjustmentReason__r.KimbleOne__IsInvoiceable__c}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__RevenueAdjustment__c.Fields.KimbleOne__AdjustmentRevenue__c.Label}" />
+							<apex:outputText value="{!KimbleOne__RevenueAdjustment__c.KimbleOne__InvoicingCurrencyIsoCode__c} {!KimbleOne__RevenueAdjustment__c.KimbleOne__InvoicingCurrencyAdjustmentRevenue__c}" />
+              			</apex:pageBlockSectionItem>
+              						
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__RevenueAdjustment__c.Fields.KimbleOne__Status__c.Label}"></apex:outputLabel>
+							<apex:outputField value="{!KimbleOne__RevenueAdjustment__c.Status__r.Name}"/>
+						</apex:pageBlockSectionItem>
+									
+			        </apex:pageBlockSection>
+				</apex:pageBlock>
+			
+				</apex:outputPanel>
+		
+		</apex:form>
+				
+		<!-- Revenue Adjustment Items Details -->
+		<apex:outPutPanel id="revenueAdjustmentItemPanel">
+		
+			<apex:pageBlock >
+	 				
+			    <apex:pageBlockSection collapsible="false" showheader="true" columns="1">
+			
+					<apex:facet name="header">
+						{!$ObjectType.KimbleOne__RevenueAdjustmentItem__c.LabelPlural}
+					</apex:facet>
+			
+					<apex:facet name="body">
+			
+						<apex:pageBlockTable value="{!RevenueAdjustmentItems}" var="WOItem">
+																	
+							<apex:column headerValue="{!$ObjectType.KimbleOne__RevenueAdjustmentItem__c.Fields.KimbleOne__DeliveryElement__c.Label}" width="100px" style="text-align:left;" value="{!WOItem.KimbleOne__DeliveryElement__c}"></apex:column>																		
+							<apex:column headerValue="{!$ObjectType.KimbleOne__RevenueAdjustmentItem__c.Fields.KimbleOne__AdjustmentRevenue__c.Label}" style="text-align:right;" width="100px" value="{!WOItem.KimbleOne__AdjustmentRevenue__c}"></apex:column>
+				
+							<!-- Invoice Types -->
+							<apex:column headerValue="{!$ObjectType.KimbleOne__RevenueAdjustmentItem__c.Fields.KimbleOne__ActivityAssignment__c.Label}" width="100px" style="text-align:center;" value="{!WOItem.ActivityAssignment__r.Name}"></apex:column>
+							<apex:column headerValue="{!$ObjectType.KimbleOne__RevenueAdjustmentItem__c.Fields.KimbleOne__TimeEntry__c.Label}" width="100px" style="text-align:center;" value="{!WOItem.TimeEntry__r.Resource__r.Name} {!WOItem.TimeEntry__r.TimePeriod__r.Name}"></apex:column>
+							<apex:column headerValue="{!$ObjectType.KimbleOne__RevenueAdjustmentItem__c.Fields.KimbleOne__ExpenseItem__c.Label}" width="100px" style="text-align:center;" value="{!WOItem.ExpenseItem__r.Resource__r.Name} {!WOItem.ExpenseItem__r.ActivityExpenseCategory__r.Name}"></apex:column>																							
+							<apex:column headerValue="{!$ObjectType.KimbleOne__RevenueAdjustmentItem__c.Fields.KimbleOne__PeriodRevenue__c.Label}" width="100px" style="text-align:center;" value="{!WOItem.PeriodRevenue__r.TimePeriod__r.Name}"></apex:column>
+							<apex:column headerValue="{!$ObjectType.KimbleOne__RevenueAdjustmentItem__c.Fields.KimbleOne__Milestone__c.Label}" width="100px" style="text-align:center;" value="{!WOItem.Milestone__r.Name}"></apex:column>
+										
+						</apex:pageBlockTable>
+					
+					</apex:facet>
+				
+				</apex:pageBlockSection>
+
+			</apex:pageBlock>
+		
+		</apex:outPutPanel>
+
+		<!-- Approval History -->
+		<apex:include pageName="{!$Page.ApproveRejectItem}" rendered="{!InPageApproveRejectEnabled}"/>
+		<apex:relatedList list="ProcessSteps" id="RevenueAdjustmentApprovalHistory"></apex:relatedList>
+
+		<apex:outputPanel layout="none" rendered="{!InPageApproveRejectEnabled}">
+		<script>
+			jQuery(window).load(function()
+			{
+				var approvalItemId = '<apex:outputText value="{!KimbleOne__RevenueAdjustment__c.Id}"/>';
+
+				overrideSFApproveRejectLink(approvalItemId);
+			});
+		</script>
+		</apex:outputPanel>
+
+		<script>
+				$(document).ready(function(){
+					$(function() {
+						hideSalesForceApprovalProcessButtons();
+					})
+				});
+				function hideSalesForceApprovalProcessButtons()
+				{
+						$('input[name="piSubmit"]').remove();
+						$('input[name="piRemove"]').remove();
+				}
+		</script>
+
+		</apex:define>
+
+	</apex:Composition>
+
+</apex:page>

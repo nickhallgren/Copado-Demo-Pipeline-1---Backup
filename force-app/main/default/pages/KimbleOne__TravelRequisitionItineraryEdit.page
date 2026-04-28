@@ -1,0 +1,788 @@
+<apex:page standardController="KimbleOne__TravelRequisition__c" sidebar="false" extensions="KimbleOne.TravelRequisitionItineraryEditController" action="{!CheckStatus}">
+
+<apex:composition template="KimbleOne__SiteMaster">
+	 
+<apex:define name="Menu"><c:Menu MenuContextName="{!KimbleOne__TravelRequisition__c.Name}"/></apex:define>
+	
+<apex:define name="Content">
+    	<div id="left" style="float:left;width:75%" >
+			<apex:form id="TheForm">
+			<apex:outputPanel id="ThePage">
+			<apex:pageMessages escape="False" />
+				
+			<apex:outputPanel layout="none" rendered="{!ISBLANK(TheRequisitionVersion)}">
+			<apex:pageBlock title="{!$Label.kimbleone__travelrequestheading}" >
+			<apex:pageBlockButtons location="top">
+           		
+           		<apex:commandButton action="{!Cancel}" value="{!$Label.kimbleone__cancel}"/>
+           		<apex:commandButton action="{!Save}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__save}" reRender="TheForm"/>
+           		       		
+            </apex:pageBlockButtons>
+            
+			<apex:pageblockSection collapsible="false" showheader="false" columns="2" >
+           	
+           	<apex:outputField value="{!KimbleOne__TravelRequisition__c.KimbleOne__Resource__c}" />
+           	
+           	<apex:pageBlockSectionItem >
+           		<apex:outputLabel value="{!$ObjectType.KimbleOne__TravelRequisition__c.Fields.KimbleOne__TravelFromDate__c.Label}"/>
+           		<apex:outputPanel >
+           			<apex:outputField value="{!KimbleOne__TravelRequisition__c.KimbleOne__TravelFromDate__c}"/>
+           			<apex:outputPanel layout="none" rendered="{!!ISBLANK(KimbleOne__TravelRequisition__c.KimbleOne__TravelToDate__c)}">
+           				<apex:outputField value="{!KimbleOne__TravelRequisition__c.KimbleOne__TravelToDate__c}"/>
+           			</apex:outputPanel>
+           		</apex:outputPanel>
+           	</apex:pageBlockSectionItem>
+           	
+           	<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__TravelRequisition__c.Fields.KimbleOne__Status__c.Label}"/>
+					<apex:outputText value="{!KimbleOne__TravelRequisition__c.Status__r.Name}"/>
+			</apex:pageBlockSectionItem>
+
+			</apex:pageblockSection>
+           
+			<apex:pageBlockSection >
+				<apex:repeat value="{!$ObjectType.KimbleOne__TravelRequisition__c.FieldSets.KimbleOne__TravelRequisitionDetails}" var="f" >
+					<apex:outputField value="{!KimbleOne__TravelRequisition__c[f]}" />
+	   			</apex:repeat>
+			</apex:pageBlockSection>
+        
+        <apex:outputPanel >
+        	
+			<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['Flight'] != 0}">
+        	<div class="travelCategoryHeading flight"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__flightsheading}</h2></div>
+			<div class="travelCategoryContent">
+        	
+        		<apex:variable value="{!0}" var="rowNum"/> 
+      			<apex:pageBlockTable value="{!TheRequisitionItems['Flight']}" var="itm">
+      				<apex:column headervalue="{!$Label.kimbleone__detailsheading}">
+      					<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+      						(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+      					</apex:outputPanel>
+      					<apex:outputText escape="false" value="{!itm.Description__c}"/>
+      				</apex:column>
+       				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" >
+      					<apex:outputField value="{!itm.RequisitionNotes__c}" />
+      				</apex:column>
+      				<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}">
+      					<table class="travelBasis" border="0" cellpadding="0" cellspacing="2">
+      						<apex:variable value="{!0}" var="rowNum"/>
+      						<apex:repeat value="{!TheItineraryItems[itm.Id]}" var="itinerary">
+      							<tr>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id != itm.SelectedTravelItineraryItem__c || ISBLANK(itm.SelectedTravelItineraryItem__c) || ISBLANK(itinerary.id)}">
+      									<td rowspan="4">
+      										<apex:outputLink style="color: #015BA7;text-decoration: none;" value="javascript:void(0)" onclick="removeItinerary( '{!JSINHTMLENCODE(itm.Id)}', {!ROUND(rowNum,0)})">{!$Label.kimbleone__remove}</apex:outputLink>
+      									</td>
+      								</apex:outputPanel>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id = itm.SelectedTravelItineraryItem__c && !ISBLANK(itm.SelectedTravelItineraryItem__c)}">
+      									<td rowspan="4" class="selectedOption">
+      										&nbsp;
+      									</td>
+      								</apex:outputPanel>
+      								
+      								<td rowspan="4">
+      									<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="48" rows="8"/>
+      									      									
+      								</td>
+      								<td style="width:60px">
+      									<apex:selectList value="{!itinerary.CurrencyISOCode}" size="1">
+											<apex:selectOptions value="{!TheCurrencies}" />
+										</apex:selectList>
+      								</td>
+      								<td>
+      									<apex:inputField value="{!itinerary.NetAmount__c}" style="width:70px;"/>      									
+      								</td>
+      							</tr>
+      							<tr>
+      								<td class="label">{!$ObjectType.KimbleOne__TravelItineraryItem__c.Fields.KimbleOne__FlightDepartureAirline__c.Label}</td>
+      								<td><apex:inputField value="{!itinerary.FlightDepartureAirline__c}"/></td>
+      							</tr>
+      							<tr>
+      								<td class="label">{!$ObjectType.KimbleOne__TravelItineraryItem__c.Fields.KimbleOne__FlightReturnAirline__c.Label}</td>
+      								<td><apex:inputField value="{!itinerary.FlightReturnAirline__c}"/></td>
+      							</tr>
+      							<tr>
+      								<td class="label">{!$ObjectType.KimbleOne__TravelItineraryItem__c.Fields.KimbleOne__RequiresApproval__c.Label}</td>
+      								<td><apex:inputField value="{!itinerary.RequiresApproval__c}"/></td>
+      							</tr>
+      							<apex:variable value="{!rowNum+1}" var="rowNum"/>
+      						</apex:repeat>
+      						<apex:outputPanel layout="none" rendered="{!itm.ActionRequest__c != ActionRequestMap['CancelRequest']}">
+      							<tr>
+      								<td colspan="3" style="text-align:right"><a style="color: #015BA7;text-decoration: none;" href="javascript:void(0);" onclick="addItinerary('{!JSINHTMLENCODE(itm.Id)}');">{!$Label.AddOptionLink}</a></td>
+      							</tr>
+      						</apex:outputPanel>
+      					</table>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" >
+      					<!--  only update supplier if New Request -->
+      					<apex:outputField value="{!itm.SupplierAccount__c}" />      					
+      				</apex:column>
+      			</apex:pageBlockTable>
+      		</div>
+      		</apex:outputPanel>
+      		<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['Hotel'] != 0}">
+        	<div class="travelCategoryHeading hotel"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__hotelsheading}</h2></div>
+			<div class="travelCategoryContent">
+        	
+        		<apex:variable value="{!0}" var="rowNum"/>
+      			<apex:pageBlockTable value="{!TheRequisitionItems['Hotel']}" var="itm">
+      				<apex:column headervalue="{!$Label.kimbleone__detailsheading}">
+      					<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+      						(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+      					</apex:outputPanel>
+      					<apex:outputText escape="false" value="{!itm.Description__c}"/>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" >
+      					<apex:outputField value="{!itm.RequisitionNotes__c}" />
+      				</apex:column>
+      				<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}">
+      					<table class="travelBasis" border="0" cellpadding="2" cellspacing="0">
+      						<apex:variable value="{!0}" var="rowNum"/>
+      						<apex:repeat value="{!TheItineraryItems[itm.Id]}" var="itinerary">
+      							<tr>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id != itm.SelectedTravelItineraryItem__c || ISBLANK(itm.SelectedTravelItineraryItem__c) || ISBLANK(itinerary.id)}">
+      									<td rowspan="2">
+      										<apex:outputLink style="color: #015BA7;text-decoration: none;" value="javascript:void(0)" onclick="removeItinerary( '{!JSINHTMLENCODE(itm.Id)}', {!ROUND(rowNum,0)})">{!$Label.kimbleone__remove}</apex:outputLink>
+      									</td>
+      								</apex:outputPanel>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id = itm.SelectedTravelItineraryItem__c && !ISBLANK(itm.SelectedTravelItineraryItem__c)}">
+      									<td rowspan="2" class="selectedOption">
+      										&nbsp;
+      									</td>
+      								</apex:outputPanel>
+      								<td rowspan="2">
+      									<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="48" rows="6"/>
+      								</td>
+      								<td style="width:60px">
+      									<apex:selectList value="{!itinerary.CurrencyISOCode}" size="1">
+											<apex:selectOptions value="{!TheCurrencies}" />
+										</apex:selectList>
+      								</td>
+      								<td>
+      									<apex:inputField value="{!itinerary.NetAmount__c}" style="width:70px;"/>
+      								</td>
+      								
+      							</tr>
+      							<tr>
+      								<td class="label">{!$ObjectType.KimbleOne__TravelItineraryItem__c.Fields.KimbleOne__RequiresApproval__c.Label}</td>
+      								<td><apex:inputField value="{!itinerary.RequiresApproval__c}"/></td>
+      							</tr>
+      							<apex:variable value="{!rowNum+1}" var="rowNum"/>
+      						</apex:repeat>
+      							<tr>
+      								<td colspan="3" style="text-align:right"><a style="color: #015BA7;text-decoration: none;" href="javascript:void(0);" onclick="addItinerary('{!JSINHTMLENCODE(itm.Id)}');">{!$Label.AddOptionLink}</a></td>
+      							</tr>
+      					</table>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" >
+      					<apex:outputField value="{!itm.SupplierAccount__c}" />
+      				</apex:column>
+      			</apex:pageBlockTable>
+      		</div>
+      		</apex:outputPanel>
+      		
+      		<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['Train'] != 0}">
+        	<div class="travelCategoryHeading train"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__trainsheading}</h2></div>
+			<div class="travelCategoryContent">
+        	
+        		<apex:variable value="{!0}" var="rowNum"/>
+      			<apex:pageBlockTable value="{!TheRequisitionItems['Train']}" var="itm">
+      				<apex:column headervalue="{!$Label.kimbleone__detailsheading}">
+      					<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+      						(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+      					</apex:outputPanel>
+      					<apex:outputText escape="false" value="{!itm.Description__c}"/>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" >
+      					<apex:outputField value="{!itm.RequisitionNotes__c}" />
+      				</apex:column>
+      				<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}">
+      					<table class="travelBasis" border="0" cellpadding="0" cellspacing="0">
+      						<apex:variable value="{!0}" var="rowNum"/>
+      						<apex:repeat value="{!TheItineraryItems[itm.Id]}" var="itinerary">
+      							<tr>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id != itm.SelectedTravelItineraryItem__c || ISBLANK(itm.SelectedTravelItineraryItem__c) || ISBLANK(itinerary.id)}">
+      									<td rowspan="2">
+      										<apex:outputLink style="color: #015BA7;text-decoration: none;" value="javascript:void(0)" onclick="removeItinerary( '{!JSINHTMLENCODE(itm.Id)}', {!ROUND(rowNum,0)})">{!$Label.kimbleone__remove}</apex:outputLink>
+      									</td>
+      								</apex:outputPanel>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id = itm.SelectedTravelItineraryItem__c && !ISBLANK(itm.SelectedTravelItineraryItem__c)}">
+      									<td rowspan="2" class="selectedOption">
+      										&nbsp;
+      									</td>
+      								</apex:outputPanel>
+      								<td rowspan="2">
+      									<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="48" rows="6"/>
+      								</td>
+      								<td>
+      									<apex:selectList value="{!itinerary.CurrencyISOCode}" size="1">
+											<apex:selectOptions value="{!TheCurrencies}" />
+										</apex:selectList>
+      								</td>
+      								<td>
+      									<apex:inputField value="{!itinerary.NetAmount__c}"/>
+      								</td>
+      								
+      							</tr>
+      							<tr>
+      								<td class="label">{!$ObjectType.KimbleOne__TravelItineraryItem__c.Fields.KimbleOne__RequiresApproval__c.Label}</td>
+      								<td><apex:inputField value="{!itinerary.RequiresApproval__c}"/></td>
+      							</tr>
+      							<apex:variable value="{!rowNum+1}" var="rowNum"/>
+      						</apex:repeat>
+      							<tr>
+      								<td colspan="3" style="text-align:right"><a style="color: #015BA7;text-decoration: none;" href="javascript:void(0);" onclick="addItinerary('{!JSINHTMLENCODE(itm.Id)}');">{!$Label.AddOptionLink}</a></td>
+      							</tr>
+      					</table>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" >
+      					<apex:outputField value="{!itm.SupplierAccount__c}" />
+      				</apex:column>
+      			</apex:pageBlockTable>
+      		</div>
+      		</apex:outputPanel>
+      		
+      		<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['Taxi'] != 0}">
+        	<div class="travelCategoryHeading taxi"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__taxiheading}</h2></div>
+			<div class="travelCategoryContent">
+        	
+        		<apex:variable value="{!0}" var="rowNum"/>
+      			<apex:pageBlockTable value="{!TheRequisitionItems['Taxi']}" var="itm">
+      				<apex:column headervalue="{!$Label.kimbleone__detailsheading}">
+      					<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+      						(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+      					</apex:outputPanel>
+      					<apex:outputText escape="false" value="{!itm.Description__c}"/>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" >
+      					<apex:outputField value="{!itm.RequisitionNotes__c}" />
+      				</apex:column>
+      				<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}">
+      					<table class="travelBasis" border="0" cellpadding="0" cellspacing="0">
+      						<apex:variable value="{!0}" var="rowNum"/>
+      						<apex:repeat value="{!TheItineraryItems[itm.Id]}" var="itinerary">
+      							<tr>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id != itm.SelectedTravelItineraryItem__c || ISBLANK(itm.SelectedTravelItineraryItem__c) || ISBLANK(itinerary.id)}">
+      									<td rowspan="2">
+      										<apex:outputLink style="color: #015BA7;text-decoration: none;" value="javascript:void(0)" onclick="removeItinerary( '{!JSINHTMLENCODE(itm.Id)}', {!ROUND(rowNum,0)})">{!$Label.kimbleone__remove}</apex:outputLink>
+      									</td>
+      								</apex:outputPanel>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id = itm.SelectedTravelItineraryItem__c && !ISBLANK(itm.SelectedTravelItineraryItem__c)}">
+      									<td rowspan="2" class="selectedOption">
+      										&nbsp;
+      									</td>
+      								</apex:outputPanel>
+      								<td rowspan="2">
+      									<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="48" rows="6"/>	
+      								</td>
+      								<td>
+      									<apex:selectList value="{!itinerary.CurrencyISOCode}" size="1">
+											<apex:selectOptions value="{!TheCurrencies}" />
+										</apex:selectList>
+      								</td>
+      								<td>
+      									<apex:inputField value="{!itinerary.NetAmount__c}" />
+      								</td>
+      								
+      							</tr>
+      							<tr>
+      								<td class="label">{!$ObjectType.KimbleOne__TravelItineraryItem__c.Fields.KimbleOne__RequiresApproval__c.Label}</td>
+      								<td><apex:inputField value="{!itinerary.RequiresApproval__c}"/></td>
+      							</tr>
+      							<apex:variable value="{!rowNum+1}" var="rowNum"/>
+      						</apex:repeat>
+      							<tr>
+      								<td colspan="3" style="text-align:right"><a style="color: #015BA7;text-decoration: none;" href="javascript:void(0);" onclick="addItinerary('{!JSINHTMLENCODE(itm.Id)}');">{!$Label.AddOptionLink}</a></td>
+      							</tr>
+      					</table>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" >
+      					<apex:outputField value="{!itm.SupplierAccount__c}" />
+      				</apex:column>
+      			</apex:pageBlockTable>
+      		</div>
+      		</apex:outputPanel>
+      		
+      		<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['CarHire'] != 0}">
+        	<div class="travelCategoryHeading carHire"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__carhirelabel}</h2></div>
+			<div class="travelCategoryContent">
+        	
+        		<apex:variable value="{!0}" var="rowNum"/>
+      			<apex:pageBlockTable value="{!TheRequisitionItems['CarHire']}" var="itm">
+      				<apex:column headervalue="{!$Label.kimbleone__detailsheading}">
+      					<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+      						(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+      					</apex:outputPanel>
+      					<apex:outputText escape="false" value="{!itm.Description__c}"/>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" >
+      					<apex:outputField value="{!itm.RequisitionNotes__c}" />
+      				</apex:column>
+      				<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}">
+      					<table class="travelBasis" border="0" cellpadding="0" cellspacing="0">
+      						<apex:variable value="{!0}" var="rowNum"/>
+      						<apex:repeat value="{!TheItineraryItems[itm.Id]}" var="itinerary">
+      							<tr>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id != itm.SelectedTravelItineraryItem__c || ISBLANK(itm.SelectedTravelItineraryItem__c) || ISBLANK(itinerary.id)}">
+      									<td rowspan="2">
+      										<apex:outputLink style="color: #015BA7;text-decoration: none;" value="javascript:void(0)" onclick="removeItinerary( '{!JSINHTMLENCODE(itm.Id)}', {!ROUND(rowNum,0)})">{!$Label.kimbleone__remove}</apex:outputLink>
+      									</td>
+      								</apex:outputPanel>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id = itm.SelectedTravelItineraryItem__c && !ISBLANK(itm.SelectedTravelItineraryItem__c)}">
+      									<td rowspan="2" class="selectedOption">
+      										&nbsp;
+      									</td>
+      								</apex:outputPanel>
+      								<td rowspan="2">
+      									<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="48" rows="6"/>
+      								</td>
+      								<td>
+      									<apex:selectList value="{!itinerary.CurrencyISOCode}" size="1">
+											<apex:selectOptions value="{!TheCurrencies}" />
+										</apex:selectList>
+      								</td>
+      								<td>
+      									<apex:inputField value="{!itinerary.NetAmount__c}"/>
+      								</td>
+      								
+      							</tr>
+      							<tr>
+      								<td class="label">{!$ObjectType.KimbleOne__TravelItineraryItem__c.Fields.KimbleOne__RequiresApproval__c.Label}</td>
+      								<td><apex:inputField value="{!itinerary.RequiresApproval__c}"/></td>
+      							</tr>
+      							<apex:variable value="{!rowNum+1}" var="rowNum"/>
+      						</apex:repeat>
+      							<tr>
+      								<td colspan="3" style="text-align:right"><a style="color: #015BA7;text-decoration: none;" href="javascript:void(0);" onclick="addItinerary('{!JSINHTMLENCODE(itm.Id)}');">{!$Label.AddOptionLink}</a></td>
+      							</tr>
+      					</table>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" >
+      					<apex:outputField value="{!itm.SupplierAccount__c}" />
+      				</apex:column>
+      			</apex:pageBlockTable>
+      		</div>
+      		</apex:outputPanel>
+      		
+      	</apex:outputPanel>
+      	
+      	<apex:outputPanel layout="none" rendered="{!TheTravellers.Size != 0}">
+			<div class="travelCategoryHeading other"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$ObjectType.KimbleOne__Traveller__c.LabelPlural}</h2></div>
+			<div class="travelCategoryContent">
+				<apex:pageBlockTable value="{!TheTravellers}" var="traveller" rendered="{!TheTravellers.size != 0}">
+      				   					
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__Traveller__c.Fields.KimbleOne__Contact__c.Label}" width="400px">
+      					<apex:outputField value="{!traveller.KimbleOne__Contact__c}"/>
+      				</apex:column>
+      				
+      				<apex:repeat var="f" value="{!$ObjectType.Contact.FieldSets.KimbleOne__TravellerDetails}">
+      				   <apex:column headerValue="{!f.label}">
+			                <apex:outputField value="{!TheContactTravellerDetails[traveller.KimbleOne__Contact__c][f]}" />
+			            </apex:column>
+			        </apex:repeat> 
+      			</apex:pageBlockTable>
+			</div>
+		</apex:outputPanel>
+      	
+        </apex:pageBlock>
+        	</apex:outputPanel>
+        	
+        	<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheRequisitionVersion)}">
+			<apex:pageBlock title="{!$Label.kimbleone__travelrequestheading}" >
+			<apex:pageBlockButtons location="top">
+           		
+           		<apex:commandButton action="{!Cancel}" value="{!$Label.kimbleone__cancel}"/>
+           		<apex:commandButton action="{!Save}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__save}" reRender="TheForm"/>
+           		       		
+            </apex:pageBlockButtons>
+            
+			<apex:pageblockSection collapsible="false" showheader="false" columns="2" >
+           	
+           	<apex:outputField value="{!KimbleOne__TravelRequisition__c.KimbleOne__Resource__c}" />
+           		
+           	<apex:outputField value="{!KimbleOne__TravelRequisition__c.KimbleOne__TravelFromDate__c}"/>
+           	
+           	<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__TravelRequisition__c.Fields.KimbleOne__Status__c.Label}"/>
+					<apex:outputText value="{!KimbleOne__TravelRequisition__c.Status__r.Name}"/>
+			</apex:pageBlockSectionItem>
+
+			<apex:outputField value="{!KimbleOne__TravelRequisition__c.KimbleOne__TravelToDate__c}"/>
+
+			</apex:pageblockSection>
+           
+			<apex:pageBlockSection >
+				<apex:repeat value="{!$ObjectType.KimbleOne__TravelRequisition__c.FieldSets.KimbleOne__TravelRequisitionDetails}" var="f" >
+					<apex:outputField value="{!KimbleOne__TravelRequisition__c[f]}" />
+	   			</apex:repeat>
+			</apex:pageBlockSection>
+        
+           
+        
+        <apex:outputPanel id="TravelCategories">
+        	
+			<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['Flight'] != 0}">
+        	<div class="travelCategoryHeading flight"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__flightsheading}</h2></div>
+			<div class="travelCategoryContent">
+        	
+        		<apex:variable value="{!0}" var="rowNum"/> 
+      			<apex:pageBlockTable value="{!TheRequisitionItems['Flight']}" var="itm">
+      				<apex:column headervalue="{!$Label.kimbleone__detailsheading}">
+      					<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+      						(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+      					</apex:outputPanel>
+      					<apex:outputText escape="false" value="{!itm.Description__c}"/>
+      				</apex:column>
+       				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" >
+      					<apex:outputField value="{!itm.RequisitionNotes__c}" />
+      				</apex:column>
+      				<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}">
+      					<table class="travelBasis" border="0" cellpadding="0" cellspacing="2">
+      						<apex:variable value="{!0}" var="rowNum"/>
+      						<apex:repeat value="{!TheItineraryItems[itm.Id]}" var="itinerary">
+      							<tr>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id != itm.SelectedTravelItineraryItem__c || ISBLANK(itm.SelectedTravelItineraryItem__c) || ISBLANK(itinerary.id)}">
+      									<td>
+      										<apex:outputLink style="color: #015BA7;text-decoration: none;" value="javascript:void(0)" onclick="removeItinerary( '{!JSINHTMLENCODE(itm.Id)}', {!ROUND(rowNum,0)})">{!$Label.kimbleone__remove}</apex:outputLink>
+      									</td>
+      								</apex:outputPanel>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id = itm.SelectedTravelItineraryItem__c && !ISBLANK(itm.SelectedTravelItineraryItem__c)}">
+      									<td class="selectedOption">
+      										&nbsp;
+      									</td>
+      								</apex:outputPanel>
+      								
+      								<td>
+      									<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="48" rows="6"/>
+      								</td>
+      								<td>
+      									<apex:selectList value="{!itinerary.CurrencyISOCode}" size="1">
+											<apex:selectOptions value="{!TheCurrencies}" />
+										</apex:selectList>
+      								</td>
+      								<td>
+      									<apex:inputField value="{!itinerary.NetAmount__c}" style="width:70px;"/>
+      								</td>
+      							</tr>
+      							<apex:variable value="{!rowNum+1}" var="rowNum"/>
+      						</apex:repeat>
+      						<apex:outputPanel layout="none" rendered="{!itm.ActionRequest__c != ActionRequestMap['CancelRequest']}">
+      							<tr>
+      								<td colspan="3" style="text-align:right"><a style="color: #015BA7;text-decoration: none;" href="javascript:void(0);" onclick="addItinerary('{!JSINHTMLENCODE(itm.Id)}');">{!$Label.AddOptionLink}</a></td>
+      							</tr>
+      						</apex:outputPanel>
+      					</table>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" >
+      					<!--  only update supplier if New Request -->
+      					<apex:outputField value="{!itm.SupplierAccount__c}" rendered="{!itm.ActionRequest__c != ActionRequestMap['NewRequest']}"/>
+      					<apex:selectList value="{!itm.SupplierAccount__c}" size="1" rendered="{!itm.ActionRequest__c = ActionRequestMap['NewRequest']}">
+							<apex:selectOptions value="{!theTravelCategorySuppliers['Flight']}" />
+						</apex:selectList>
+      				</apex:column>
+      			</apex:pageBlockTable>
+      		</div>
+      		</apex:outputPanel>
+      		<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['Hotel'] != 0}">
+        	<div class="travelCategoryHeading hotel"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__hotelsheading}</h2></div>
+			<div class="travelCategoryContent">
+        	
+        		<apex:variable value="{!0}" var="rowNum"/>
+      			<apex:pageBlockTable value="{!TheRequisitionItems['Hotel']}" var="itm">
+      				<apex:column headervalue="{!$Label.kimbleone__detailsheading}">
+      					<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+      						(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+      					</apex:outputPanel>
+      					<apex:outputText escape="false" value="{!itm.Description__c}"/>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" >
+      					<apex:outputField value="{!itm.RequisitionNotes__c}" />
+      				</apex:column>
+      				<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}">
+      					<table class="travelBasis" border="0" cellpadding="2" cellspacing="0">
+      						<apex:variable value="{!0}" var="rowNum"/>
+      						<apex:repeat value="{!TheItineraryItems[itm.Id]}" var="itinerary">
+      							<tr>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id != itm.SelectedTravelItineraryItem__c || ISBLANK(itm.SelectedTravelItineraryItem__c) || ISBLANK(itinerary.id)}">
+      									<td>
+      										<apex:outputLink style="color: #015BA7;text-decoration: none;" value="javascript:void(0)" onclick="removeItinerary( '{!JSINHTMLENCODE(itm.Id)}', {!ROUND(rowNum,0)})">{!$Label.kimbleone__remove}</apex:outputLink>
+      									</td>
+      								</apex:outputPanel>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id = itm.SelectedTravelItineraryItem__c && !ISBLANK(itm.SelectedTravelItineraryItem__c)}">
+      									<td class="selectedOption">
+      										&nbsp;
+      									</td>
+      								</apex:outputPanel>
+      								<td>
+      									<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="48" rows="6"/>
+      								</td>
+      								<td>
+      									<apex:selectList value="{!itinerary.CurrencyISOCode}" size="1">
+											<apex:selectOptions value="{!TheCurrencies}" />
+										</apex:selectList>
+      								</td>
+      								<td>
+      									<apex:inputField value="{!itinerary.NetAmount__c}" style="width:70px;"/>
+      								</td>
+      								
+      							</tr>
+      							<apex:variable value="{!rowNum+1}" var="rowNum"/>
+      						</apex:repeat>
+      							<tr>
+      								<td colspan="3" style="text-align:right"><a style="color: #015BA7;text-decoration: none;" href="javascript:void(0);" onclick="addItinerary('{!JSINHTMLENCODE(itm.Id)}');">{!$Label.AddOptionLink}</a></td>
+      							</tr>
+      					</table>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" >
+      					<apex:selectList value="{!itm.SupplierAccount__c}" size="1">
+							<apex:selectOptions value="{!theTravelCategorySuppliers['Hotel']}" />
+						</apex:selectList>
+      				</apex:column>
+      			</apex:pageBlockTable>
+      		</div>
+      		</apex:outputPanel>
+      		
+      		<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['Train'] != 0}">
+        	<div class="travelCategoryHeading train"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__trainsheading}</h2></div>
+			<div class="travelCategoryContent">
+        	
+        		<apex:variable value="{!0}" var="rowNum"/>
+      			<apex:pageBlockTable value="{!TheRequisitionItems['Train']}" var="itm">
+      				<apex:column headervalue="{!$Label.kimbleone__detailsheading}">
+      					<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+      						(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+      					</apex:outputPanel>
+      					<apex:outputText escape="false" value="{!itm.Description__c}"/>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" >
+      					<apex:outputField value="{!itm.RequisitionNotes__c}" />
+      				</apex:column>
+      				<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}">
+      					<table class="travelBasis" border="0" cellpadding="0" cellspacing="0">
+      						<apex:variable value="{!0}" var="rowNum"/>
+      						<apex:repeat value="{!TheItineraryItems[itm.Id]}" var="itinerary">
+      							<tr>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id != itm.SelectedTravelItineraryItem__c || ISBLANK(itm.SelectedTravelItineraryItem__c) || ISBLANK(itinerary.id)}">
+      									<td>
+      										<apex:outputLink style="color: #015BA7;text-decoration: none;" value="javascript:void(0)" onclick="removeItinerary( '{!JSINHTMLENCODE(itm.Id)}', {!ROUND(rowNum,0)})">{!$Label.kimbleone__remove}</apex:outputLink>
+      									</td>
+      								</apex:outputPanel>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id = itm.SelectedTravelItineraryItem__c && !ISBLANK(itm.SelectedTravelItineraryItem__c)}">
+      									<td class="selectedOption">
+      										&nbsp;
+      									</td>
+      								</apex:outputPanel>
+      								<td>
+      									<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="48" rows="6"/>
+      								</td>
+      								<td>
+      									<apex:selectList value="{!itinerary.CurrencyISOCode}" size="1">
+											<apex:selectOptions value="{!TheCurrencies}" />
+										</apex:selectList>
+      								</td>
+      								<td>
+      									<apex:inputField value="{!itinerary.NetAmount__c}"/>
+      								</td>
+      								
+      							</tr>
+      							<apex:variable value="{!rowNum+1}" var="rowNum"/>
+      						</apex:repeat>
+      							<tr>
+      								<td colspan="3" style="text-align:right"><a style="color: #015BA7;text-decoration: none;" href="javascript:void(0);" onclick="addItinerary('{!JSINHTMLENCODE(itm.Id)}');">{!$Label.AddOptionLink}</a></td>
+      							</tr>
+      					</table>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" >
+      					<apex:selectList value="{!itm.SupplierAccount__c}" size="1">
+							<apex:selectOptions value="{!theTravelCategorySuppliers['Train']}" />
+						</apex:selectList>
+      				</apex:column>
+      			</apex:pageBlockTable>
+      		</div>
+      		</apex:outputPanel>
+      		
+      		<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['Taxi'] != 0}">
+        	<div class="travelCategoryHeading taxi"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__taxiheading}</h2></div>
+			<div class="travelCategoryContent">
+        	
+        		<apex:variable value="{!0}" var="rowNum"/>
+      			<apex:pageBlockTable value="{!TheRequisitionItems['Taxi']}" var="itm">
+      				<apex:column headervalue="{!$Label.kimbleone__detailsheading}">
+      					<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+      						(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+      					</apex:outputPanel>
+      					<apex:outputText escape="false" value="{!itm.Description__c}"/>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" >
+      					<apex:outputField value="{!itm.RequisitionNotes__c}" />
+      				</apex:column>
+      				<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}">
+      					<table class="travelBasis" border="0" cellpadding="0" cellspacing="0">
+      						<apex:variable value="{!0}" var="rowNum"/>
+      						<apex:repeat value="{!TheItineraryItems[itm.Id]}" var="itinerary">
+      							<tr>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id != itm.SelectedTravelItineraryItem__c || ISBLANK(itm.SelectedTravelItineraryItem__c) || ISBLANK(itinerary.id)}">
+      									<td>
+      										<apex:outputLink style="color: #015BA7;text-decoration: none;" value="javascript:void(0)" onclick="removeItinerary( '{!JSINHTMLENCODE(itm.Id)}', {!ROUND(rowNum,0)})">{!$Label.kimbleone__remove}</apex:outputLink>
+      									</td>
+      								</apex:outputPanel>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id = itm.SelectedTravelItineraryItem__c && !ISBLANK(itm.SelectedTravelItineraryItem__c)}">
+      									<td class="selectedOption">
+      										&nbsp;
+      									</td>
+      								</apex:outputPanel>
+      								<td>
+      									<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="48" rows="6"/>	
+      								</td>
+      								<td>
+      									<apex:selectList value="{!itinerary.CurrencyISOCode}" size="1">
+											<apex:selectOptions value="{!TheCurrencies}" />
+										</apex:selectList>
+      								</td>
+      								<td>
+      									<apex:inputField value="{!itinerary.NetAmount__c}" />
+      								</td>
+      								
+      							</tr>
+      							<apex:variable value="{!rowNum+1}" var="rowNum"/>
+      						</apex:repeat>
+      							<tr>
+      								<td colspan="3" style="text-align:right"><a style="color: #015BA7;text-decoration: none;" href="javascript:void(0);" onclick="addItinerary('{!JSINHTMLENCODE(itm.Id)}');">{!$Label.AddOptionLink}</a></td>
+      							</tr>
+      					</table>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" >
+      					<apex:selectList value="{!itm.SupplierAccount__c}" size="1">
+							<apex:selectOptions value="{!theTravelCategorySuppliers['Taxi']}" />
+						</apex:selectList>
+      				</apex:column>
+      			</apex:pageBlockTable>
+      		</div>
+      		</apex:outputPanel>
+      		
+      		<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['CarHire'] != 0}">
+        	<div class="travelCategoryHeading carHire"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__carhirelabel}</h2></div>
+			<div class="travelCategoryContent">
+        	
+        		<apex:variable value="{!0}" var="rowNum"/>
+      			<apex:pageBlockTable value="{!TheRequisitionItems['CarHire']}" var="itm">
+      				<apex:column headervalue="{!$Label.kimbleone__detailsheading}">
+      					<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+      						(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+      					</apex:outputPanel>
+      					<apex:outputText escape="false" value="{!itm.Description__c}"/>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" >
+      					<apex:outputField value="{!itm.RequisitionNotes__c}" />
+      				</apex:column>
+      				<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}">
+      					<table class="travelBasis" border="0" cellpadding="0" cellspacing="0">
+      						<apex:variable value="{!0}" var="rowNum"/>
+      						<apex:repeat value="{!TheItineraryItems[itm.Id]}" var="itinerary">
+      							<tr>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id != itm.SelectedTravelItineraryItem__c || ISBLANK(itm.SelectedTravelItineraryItem__c) || ISBLANK(itinerary.id)}">
+      									<td>
+      										<apex:outputLink style="color: #015BA7;text-decoration: none;" value="javascript:void(0)" onclick="removeItinerary( '{!JSINHTMLENCODE(itm.Id)}', {!ROUND(rowNum,0)})">{!$Label.kimbleone__remove}</apex:outputLink>
+      									</td>
+      								</apex:outputPanel>
+      								<apex:outputPanel layout="none" rendered="{!itinerary.id = itm.SelectedTravelItineraryItem__c && !ISBLANK(itm.SelectedTravelItineraryItem__c)}">
+      									<td class="selectedOption">
+      										&nbsp;
+      									</td>
+      								</apex:outputPanel>
+      								<td>
+      									<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="48" rows="6"/>
+      								</td>
+      								<td>
+      									<apex:selectList value="{!itinerary.CurrencyISOCode}" size="1">
+											<apex:selectOptions value="{!TheCurrencies}" />
+										</apex:selectList>
+      								</td>
+      								<td>
+      									<apex:inputField value="{!itinerary.NetAmount__c}"/>
+      								</td>
+      								
+      							</tr>
+      							<apex:variable value="{!rowNum+1}" var="rowNum"/>
+      						</apex:repeat>
+      							<tr>
+      								<td colspan="3" style="text-align:right"><a style="color: #015BA7;text-decoration: none;" href="javascript:void(0);" onclick="addItinerary('{!JSINHTMLENCODE(itm.Id)}');">{!$Label.AddOptionLink}</a></td>
+      							</tr>
+      					</table>
+      				</apex:column>
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" >
+      					<apex:selectList value="{!itm.SupplierAccount__c}" size="1">
+							<apex:selectOptions value="{!theTravelCategorySuppliers['CarHire']}" />
+						</apex:selectList>
+      				</apex:column>
+      			</apex:pageBlockTable>
+      		</div>
+      		</apex:outputPanel>
+      		
+      	</apex:outputPanel>
+      	
+      	<apex:outputPanel layout="none" rendered="{!TheTravellers.Size != 0}">
+			<div class="travelCategoryHeading other"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$ObjectType.KimbleOne__Traveller__c.LabelPlural}</h2></div>
+			<div class="travelCategoryContent">
+				<apex:pageBlockTable value="{!TheTravellers}" var="traveller" rendered="{!TheTravellers.size != 0}">
+      				   					
+      				<apex:column headervalue="{!$ObjectType.KimbleOne__Traveller__c.Fields.KimbleOne__Contact__c.Label}" width="400px">
+      					<apex:outputField value="{!traveller.KimbleOne__Contact__c}"/>
+      				</apex:column>
+      				
+      				<apex:repeat var="f" value="{!$ObjectType.Contact.FieldSets.KimbleOne__TravellerDetails}">
+      				   <apex:column headerValue="{!f.label}">
+			                <apex:outputField value="{!TheContactTravellerDetails[traveller.KimbleOne__Contact__c][f]}" />
+			            </apex:column>
+			        </apex:repeat> 
+      			</apex:pageBlockTable>
+			</div>
+		</apex:outputPanel>
+      	
+        </apex:pageBlock>
+        </apex:outputPanel>
+        </apex:outputPanel>
+        
+        <apex:actionFunction action="{!AddItinerary}" name="addItinerary" rerender="ThePage">
+			<apex:param name="itemId" value=""/>
+		</apex:actionFunction>
+		
+		<apex:actionFunction action="{!RemoveItinerary}" name="removeItinerary" rerender="ThePage">
+			<apex:param name="itemId" value=""/>
+			<apex:param name="pos" value=""/>
+		</apex:actionFunction>
+        
+		</apex:form>
+		</div>
+		<div id="right" style="float:left;width:23%; margin-left:8px;margin-top:-10px;">
+			<chatter:feed entityId="{!KimbleOne__TravelRequisition__c.Id}"/>
+		</div>
+		<div id="clear" style="clear:both;"></div>
+		 <style>
+           	.flight{height:32px;background-image: url('{!URLFOR($Resource.TravelIcons, 'Flight32.png')}');background-repeat: no-repeat;background-position-x: 8px;background-position-y: 2px;}
+           	.hotel{height:32px;background-image: url('{!URLFOR($Resource.TravelIcons, 'Hotel32.png')}');background-repeat: no-repeat;background-position-x: 8px;background-position-y: 2px;}
+           	.train{height:32px;background-image: url('{!URLFOR($Resource.TravelIcons, 'Train32.png')}');background-repeat: no-repeat;background-position-x: 8px;background-position-y: 2px;}
+           	.taxi{height:32px;background-image: url('{!URLFOR($Resource.TravelIcons, 'Taxi32.png')}');background-repeat: no-repeat;background-position-x: 8px;background-position-y: 2px;}
+           	.carHire{height:32px;background-image: url('{!URLFOR($Resource.TravelIcons, 'CarHire32.png')}');background-repeat: no-repeat;background-position-x: 8px;background-position-y: 2px;}
+           	.other{height:32px;background-image: url('{!URLFOR($Resource.TravelIcons, 'Other32.png')}');background-repeat: no-repeat;background-position-x: 8px;background-position-y: 2px;}
+           	.selectedOption{background-color:#A1F78D !important;}
+           	.travelBasis>tbody>tr>td{border:0px !important;}
+   			.travelBasis>tbody>tr>td.label{font-weight: bold;color: #4A4A56;font-size: 91%;text-align: right;}
+   			.travelBasis>tbody>tr>td>input{vertical-align:baseline !important;}
+   			.travelBasis>tbody>tr>td{padding:2px !important; margin:0px !important;}
+   			.travelBasis>tbody>tr>td>select{margin-left:0px !important;}
+   			.travelCategoryHeading {
+				margin: 1px;
+				padding: 3px 10px;
+				position: relative;
+				vertical-align: middle;
+				line-height: 32px;}
+			.travelCategoryContent {
+			padding: 0px 10px;
+			}
+        </style>
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

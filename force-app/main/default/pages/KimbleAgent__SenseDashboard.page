@@ -1,0 +1,332 @@
+<apex:page controller="KimbleAgent.AgentDashboardController" sidebar="false">
+    <apex:slds />
+    <apex:includeScript value="{!URLFOR($Resource.KimbleAgent__JQuery, 'jquery-1.10.1.min.js')}"/>
+    <apex:stylesheet value="{!URLFOR($Resource.KimbleAgent__FontAwesome, 'font-awesome-4.7.0/css/font-awesome.min.css')}"/>
+    <apex:stylesheet value="{!URLFOR($Resource.KimbleAgent__KimbleStyles, 'CardStyle.css')}"/>
+    
+    <style>
+        .icon-large {
+            z-index: 2 !important;
+            font-size: 36px;
+            left: 5px;
+            bottom: 1px;  
+        }
+        .icon-small {
+            z-index: 2 !important;
+            font-size: 18px;
+            left: 5px;
+            bottom: 0px;  
+        }
+        .fa-toggle-on{
+            margin-top: -5px;
+            color:#008752;
+        }
+        .fa-toggle-off{
+            margin-top: -5px;   
+            color:#cccccc;
+        }
+        .card-title-container {
+            margin-top: 10px;
+            margin-left: 20px;
+        }
+        .agent-dashboard {
+            display: block;
+        }
+        .right-align {
+            text-align: right !important;
+        }
+        .center-align {
+            text-align: center !important;
+        }
+        .fa-exclamation-triangle {
+            color: #F8CE00;
+            margin-top: -15% !important;
+        }
+        .fa-check-square {
+            color: #008752 !important;
+        }
+        .status-header {
+            display: inline-block;
+            height: 26px;
+            width: 26px;
+            position: relative;
+            bottom: 17px;
+        }
+        .disabled {
+            pointer-events: none;
+            opacity: 0.4;
+        }
+        .commandLink{
+            text-decoration: none !important;
+        }        
+        .sectionHeight{
+            height: 87vh !important;
+            overflow-x:auto;
+        }
+        .card{
+            min-width:0px !important;
+        }
+        .slds-scope .slds-tabs_default__item, .slds-scope .slds-tabs--default__item{
+            text-align: center;
+            padding-top: 15px;
+        }
+        .col-button {
+            display: inline;
+            cursor: pointer;
+        }
+        .orgDetailsColPanel {
+            max-width:30px; 
+            background-color: #F5F5F5;
+            overflow-x: hidden;
+        }
+        .orgDetailColTitle {
+            transform: translateX(-100%) rotate(-90deg); 
+            transform-origin: right top; 
+            width: max-content;
+        }  
+        .card-title-container {
+            margin-top: 5px  !important;
+            margin-bottom: 5px  !important;
+        }
+        .bold {
+            font-weight: bold;
+        }
+    </style>
+    
+    <apex:form >
+        <apex:pageBlock id="organisationDashboard">
+            <div class="slds">
+                <div class="cardHeading" style="padding-left:0px !important;">
+                    <div class="card-title-container">
+                        <h3 class="cardTitle"> 
+                            <apex:image id="theImage" value="{!'/servlet/servlet.FileDownload?file=' &AgentImage}" width="30" height="30"/>
+                            <span><apex:outputText value="{!orgInfo.Name} {!$Label.kimbleagent__dashboard}"/></span>
+                        </h3>
+                    </div>
+                    <div style="float:right;">
+                        <apex:outputPanel id="scheduledStatus" layout="block" >
+                            <div id="play">
+                                <apex:outputPanel layout="block" styleClass="card-heading-icon icon-large fa fa-toggle-off col-button" rendered="{!scheduledJob==null}">
+                                    <apex:actionSupport event="onclick" action="{!EnableAgent}" rerender="scheduledStatus"/>
+                                </apex:outputPanel>
+                            </div>
+                            <div id="pause">
+                                <apex:outputPanel layout="block"  styleClass="card-heading-icon icon-large fa fa-toggle-on col-button" rendered="{!scheduledJob!=null}">
+                                    <apex:actionSupport event="onclick" action="{!DisableAgent}" rerender="scheduledStatus"/>
+                                </apex:outputPanel>
+                            </div>
+                        </apex:outputPanel>
+                    </div>
+                </div>
+                <div class="slds-grid" id="agentDashboardDetails">                
+                    <div id="orgDetailsColPanel" class="cardContainer sectionHeight card min-horizontal-padding slds-col slds-size_1-of-12 orgDetailsColPanel">
+                       <div class="inner-card-title orgDetailColTitle">
+                        <apex:outputText styleClass="bold" value="Organisation Details"/>
+                            <div id="expandOrgButton" class="commandLink card-heading-icon col-button">
+                                <apex:outputPanel layout="block" styleClass="fa fa-chevron-down"/>
+                            </div>
+                        </div> 
+                    </div>
+                    <div id="orgDetailsExpPanel" class="cardContainer sectionHeight card inverted  min-horizontal-padding slds-col slds-size_2-of-12" style="display:none;">
+                        <apex:outputPanel id="organisationDetails">
+                            <div class="cardHeading inverted">
+                                <div class="inner-card-title">
+                                    <div id="collapseOrgButton" class="commandLink card-heading-icon col-button">
+                                        <apex:outputPanel layout="block" styleClass="fa fa-chevron-left"/>
+                                    </div>
+                                    <apex:outputText styleClass="bold" value="Organisation Details"/>
+                                </div>
+                            </div>
+                            <div id="summaryCardBody" class="cardBody">
+                                <div class="inverted">
+                                    <apex:outputPanel layout="block" styleClass="inner-card-body">          
+                                        <apex:pageblockSection collapsible="false" showheader="false" columns="1">
+                                            <apex:pageBlockSectionItem >
+                                                <apex:outputLabel value="{!$ObjectType.Organization.Fields.Id.Label}"/>
+                                                <apex:outputText value="{!orgInfo.ShortId}"/>
+                                            </apex:pageBlockSectionItem>
+                                            <apex:pageBlockSectionItem >
+                                                <apex:outputLabel value="{!$ObjectType.Organization.Fields.OrganizationType.Label}"/>
+                                                <apex:outputText value="{!orgInfo.OrganisationType}"/>
+                                            </apex:pageBlockSectionItem>
+                                            <apex:pageBlockSectionItem >
+                                                <apex:outputLabel value="{!$ObjectType.Organization.Fields.InstanceName.Label}"/>
+                                                <apex:outputText value="{!orgInfo.InstanceName}"/>
+                                            </apex:pageBlockSectionItem>
+                                            <apex:pageBlockSectionItem >
+                                                <apex:outputLabel value="{!$ObjectType.Organization.Fields.LanguageLocaleKey.Label}"/>
+                                                <apex:outputText value="{!orgInfo.LanguageLocaleKey}"/>
+                                            </apex:pageBlockSectionItem>
+                                            <apex:pageBlockSectionItem >
+                                                <apex:outputLabel value="{!$Label.kimbleagent__subdomain}"/>
+                                                <apex:outputText value="{!orgInfo.SubDomain}"/>
+                                            </apex:pageBlockSectionItem>
+                                            <apex:pageBlockSectionItem >
+                                                <apex:outputLabel value="{!$Label.kimbleagent__corporatecurrency}"/>
+                                                <apex:outputText value="{!orgInfo.CorporateCurrency}"/>
+                                            </apex:pageBlockSectionItem>
+                                        </apex:pageblockSection>
+                                    </apex:outputPanel>
+                                </div>
+                            </div>
+                        </apex:outputPanel>
+                    </div>
+                    <div id="installedPackageSection" class="cardContainer sectionHeight card inverted  min-horizontal-padding slds-col slds-medium-size--4-of-12 slds-large-size--4-of-12" style="max-width: calc(75% - 33.7%);">
+                        <apex:outputPanel id="installedPackageDetails">
+                            <div class="cardHeading inverted">
+                                <div class="inner-card-title">
+                                    <apex:outputText styleClass="bold" value="Installed Packages"/>
+                                </div>
+                                <div style="float:right;">
+                                    <apex:outputPanel layout="block" styleClass="fa fa-file-excel-o" style="cursor:pointer;" title="{!$Label.kimbleagent__downloadlicensesubscriptionstocsv}" onclick="exportLicenseSubscriptionsToCsv();"/>
+                                </div>
+                            </div>
+                            <div id="summaryCardBody" class="cardBody">
+                                <div class="inverted">
+                                    <apex:outputPanel layout="block" styleClass="inner-card-body">  
+                                        <c:Licensing />
+                                    </apex:outputPanel>
+                                </div>
+                            </div>
+                        </apex:outputPanel>
+                    </div>
+                    <div id="reportedProblemsPanel" class="cardContainer sectionHeight card inverted  min-horizontal-padding slds-col slds-medium-size--7-of-12 slds-large-size--7-of-12" style="max-width: calc(75% - 8.33%);">
+                        <div class="cardHeading inverted">
+                            <div class="inner-card-title">
+                                <apex:outputText styleClass="bold" value="Reported Problems"/>
+                            </div>
+                            <div style="float:right;">
+                                <apex:outputPanel layout="block" styleClass="card-heading-icon icon-large fa fa-exclamation-triangle" rendered="{!Status=='Red'}" title="{!$Label.kimbleagent__agentdashboardtitle}"/>
+                                <apex:outputPanel layout="block" styleClass="card-heading-icon icon-large fa fa-check-square" rendered="{!Status=='Green'}" title="{!$Label.kimbleagent__agentdashboardtitle}"/>
+                            </div>
+                        </div>
+                        <div id="summaryCardBody" class="cardBody">
+                            <div class="inverted slds-m-top_xx-small">
+                                <apex:outputPanel id="reportedProblemDetails">
+                                    <apex:pageblocktable value="{!unresolvedProblems}" var="prob">
+                                        <apex:column headerValue="{!$ObjectType.KimbleAgent__Measure__c.Fields.Name.Label}">
+                                            <div class="slds-m-left_xx-small">
+                                                <apex:outputText value="{!prob.measure.name}"/>
+                                            </div>
+                                        </apex:column>
+                                        <apex:column headerValue="{!$Label.kimbleagent__resolutionmessage}">
+                                            <div class="slds-m-left_xx-small">
+                                                <apex:outputText value="{!prob.ResolutionMessage}"/>
+                                            </div>
+                                        </apex:column>
+                                        <apex:column headerValue="{!$ObjectType.KimbleAgent__Problem__c.Fields.KimbleAgent__LastUpdated__c.Label}" styleClass="center-align" headerClass="center-align">
+                                            <div class="slds-m-left_xx-small">
+                                                <apex:outputText value="{!prob.LastUpdated}"/>
+                                            </div>
+                                        </apex:column>
+                                    </apex:pageblocktable>
+                                </apex:outputPanel>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </apex:pageBlock>
+    </apex:form>
+
+    <script>
+        $( document ).ready(function() {
+            
+            jQuery( "#agentDashboardDetails" ).on( "click", "#collapseOrgButton", function() {          
+                toggleCollapseIcon();
+            });
+            
+            jQuery( "#agentDashboardDetails" ).on( "click", "#expandOrgButton", function() {                    
+                toggleExpandIcon();
+            });
+            
+            if(!{!isAdmin})
+            {
+                jQuery('#play').addClass('disabled');
+                jQuery('#pause').addClass('disabled');
+            }
+        });
+        
+        function toggleCollapseIcon() {
+            jQuery("#orgDetailsExpPanel").toggle();  
+            jQuery("#orgDetailsColPanel").toggle(); 
+            jQuery("#reportedProblemsPanel").removeClass("slds-medium-size--4-of-12 slds-large-size--4-of-12").addClass("slds-medium-size--7-of-12 slds-large-size--7-of-12");            
+            clickActiveTab();
+        }
+        
+        function toggleExpandIcon() {
+            jQuery("#orgDetailsExpPanel").toggle();  
+            jQuery("#orgDetailsColPanel").toggle(); 
+            jQuery("#reportedProblemsPanel").removeClass("slds-medium-size--7-of-12 slds-large-size--7-of-12").addClass("slds-medium-size--4-of-12 slds-large-size--4-of-12");    
+            clickActiveTab();
+        }
+        
+        function clickActiveTab() {
+            var act = $('.slds-is-active');
+            $('.slds-tabs_default__item').click();
+            act.click();
+        }
+        
+        function exportToCsv(rows)
+        {
+            var processRow = function (row)
+            {
+                var finalVal = formatCsvValue(row.ltn);
+                finalVal += ',';
+                if(row.un != null && row.un.length)
+                {
+                    finalVal += formatCsvValue(row.un);
+                    finalVal += ',';
+                }
+                if(row.rn != null && row.rn.length)
+                {
+                    finalVal += formatCsvValue(row.rn);
+                    finalVal += ',';
+                }
+                if(row.rbun != null && row.rbun.length)
+                    finalVal += formatCsvValue(row.rbun);
+                return finalVal + '\r\n';
+            };
+    
+            var csvFile = '';
+            csvFile = 'License Type,User Name, Resource, Business Unit \r\n';
+            
+            for (var i = 0; i < rows.length; i++) 
+            {
+                csvFile += processRow(rows[i]);
+            }
+            
+            var hiddenElement = document.createElement('a');
+            hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURI(csvFile);
+            hiddenElement.target = '_self'; // 
+            hiddenElement.download = 'LicenseSubscriptionExport.csv'; 
+            document.body.appendChild(hiddenElement); 
+            hiddenElement.click(); 
+        }
+        
+        function formatCsvValue(val)
+        {
+            var innerValue = ((val === null) || (typeof val == 'undefined')) ?  '' : val.toString();
+            var result = innerValue.replace(/"/g, '""');
+            result = '"' + result + '"';
+            return result;
+        }
+
+        function exportLicenseSubscriptionsToCsv()
+        {
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.AgentDashboardController.GetLicenseSubscriptions}',
+                    function(result, event){
+                        if (event.status)
+                        {
+                            exportToCsv(result);
+                        }
+                        else
+                        {
+                            alert(event.message);
+                        }
+                },
+                {escape: false, timeout: 60000}
+            );
+        }
+    </script>
+</apex:page>

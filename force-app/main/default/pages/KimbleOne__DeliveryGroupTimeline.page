@@ -1,0 +1,1348 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.DeliveryGroupTimelineController,KimbleOne.SecurityController"  showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__DeliveryGroup__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+     	
+     	<c:Menu DefaultHelpPage="Milestones.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryGroup__c.Id}" MenuContextName="{!KimbleOne__DeliveryGroup__c.Name}" />
+     	 
+    </apex:define>
+    
+    <apex:define name="Content">
+    
+    <!-- Important Owl stylesheet -->
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__OwlCarousel, 'assets/owl.carousel.css')}"/>
+	
+	<!-- Include js plugin -->
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__OwlCarousel, 'owl.carousel.js')}"/>			
+	<div id="select-snapshot-mode" class="timeline-view-toggle">
+    		 <span class="clickable selected left"><a class="toggleLink" id="revenue-cost-mode" href="javascript:changeSnapshotMode('#revenue-cost-mode', 'RevenueCost');"><span class="linkText"><i class="fa fa-money toggle-icon"></i>{!$Label.Revenue} / {!$Label.Cost}</span></a></span><span class="clickable middle"><a class="toggleLink" id="margin-mode" href="javascript:changeSnapshotMode('#margin-mode', 'Margin');"><span class="linkText"><i class="fa fa-line-chart toggle-icon"></i>{!$Label.MarginLabel}</span></a></span><span class="clickable right"><a class="toggleLink" id="usage-mode" href="javascript:changeSnapshotMode('#usage-mode', 'Usage');"><span class="linkText"><i class="fa fa-clock-o toggle-icon"></i>{!$Label.UsageLabel}</span></a></span></div>
+    		
+	<div id="container" class="zoom-day">
+		<div id="vertical-axis-container">
+			<div id="y-axis-units"></div>
+			<div id="vertical-100" style="top:-5px" class="vertical-marker"><div class="horizontal-marker"></div><span></span></div>
+			<div id="vertical-75" style="top:45px" class="vertical-marker"><div class="horizontal-marker"></div><span></span></div>
+			<div id="vertical-50" style="top:95px" class="vertical-marker"><div class="horizontal-marker"></div><span></span></div>
+			<div id="vertical-25" style="top:145px" class="vertical-marker"><div class="horizontal-marker"></div><span></span></div>
+			<div id="vertical-0" style="top:195px" class="vertical-marker">0</div>
+			<div id="scroll-left">
+				<img src="{!URLFOR($Resource.AssignmentImages, 'PreviousButtonSquare.png')}" alt="{!$Label.PreviousPeriod}" />
+			</div>
+		</div>
+			
+		<div id="zoom-container">
+			<a class="zoom-in fa fa-plus-circle" onclick="zoomIn()" ></a>
+			<div id="zoom-level"></div>
+			<a class="zoom-out fa fa-minus-circle" onclick="zoomOut()" ></a>
+			<div id="scroll-right">
+				<img src="{!URLFOR($Resource.AssignmentImages, 'NextButtonSquare.png')}" alt="{!$Label.NextPeriod}" />
+			</div>
+			<apex:outputPanel layout="none" rendered="{!TheManualEventClasses.size > 0}">
+				<div id="new-event-button" onclick="addNewEvent();" title="{!$Label.kimbleone__neweventlabel}">
+					<apex:image url="{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Blank_BtnSqShdw.png')}" />
+					<i class="fa fa-map-marker new-event-icon"></i>
+				</div>
+			</apex:outputPanel>
+			<div id="new-snapshot-button" onclick="createSnapshot();" title="{!$Label.kimbleone__newsnapshotlabel}">
+				<apex:image url="{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Blank_BtnSqShdw.png')}" />
+				<i class="fa fa-camera snapshot-icon"></i>
+			</div>
+		</div>
+		<div id="timeline-container">
+				
+			<div id="horizontal-axis-container">
+				<div id="canvas-container">
+					<!-- DO NOT REMOVE HEIGHT ATTRIBUTE - CANVAS ONLY SUPPORTS HEIGHT AND WIDTH NOT STYLED USING CSS -->
+					<canvas id="graph-canvas" height="200px"></canvas>
+				</div>
+				<div id="period-segments-container">
+				
+				</div>
+			</div>
+			<div id="timeline-legend"></div>
+			<div id="events-container" class="owl-carousel"></div>
+			<div class="owl-pointer"><i class="fa fa-play fa-rotate-270"/></div>
+		</div>
+		
+	</div>
+	
+	<apex:form id="EventEditForm">
+	<div id="EventEditPopup" style="display:none">
+  
+		<apex:outputPanel id="EventEdit">
+				
+       			<div id="EventEditErrors">
+           			<apex:pageMessages id="EventEditMessages" escape="false" />
+           		</div>
+           		           		
+           		<apex:pageBlock >
+           		 
+            		<apex:pageBlockButtons location="bottom">
+						<apex:commandButton id="saveEvent" styleclass="DisableButtonWhileBusy" action="{!SaveEvent}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#EventEditErrors');loadTheTimeline();" rerender="EventEdit" rendered="{!ISBLANK(TheEvent.Id) || !TheEvent.KimbleOne__IsComplete__c}"/>
+						<apex:commandButton id="deleteEvent" styleclass="DisableButtonWhileBusy" action="{!DeleteEvent}" value="{!$Label.kimbleone__delete}" oncomplete="hideModalBoxyWithErrorCheck('#EventEditErrors');loadTheTimeline();"  rerender="EventEdit" rendered="{!!TheEvent.KimbleOne__IsComplete__c && !ISBLANK(TheEvent.Id)}"/>
+						<apex:commandButton id="revertEvent" styleclass="DisableButtonWhileBusy" action="{!RevertEvent}" value="{!$Label.kimbleone__reverttodraft}" oncomplete="hideModalBoxyWithErrorCheck('#EventEditErrors');loadTheTimeline();"  rerender="EventEdit" rendered="{!CanRevertEvent && HasPermission['RevertCompletedMilestone']}"/>
+						
+						<input id="cancelGroup" class="btn"  type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+					</apex:pageBlockButtons>
+             		
+             		<!-- NEW EVENT OR INCOMPLETE MANUAL EVENT -->
+             		<apex:pageblockSection collapsible="false" showheader="false"  columns="1" rendered="{!ISBLANK(TheEvent.Id) || (IsManualEvent && !TheEvent.KimbleOne__IsComplete__c)}">
+              			<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__Event__c.Fields.KimbleOne__EventClass__c.Label}"/>
+							<apex:selectList value="{!TheEvent.KimbleOne__EventClass__c}" size="1" required="true">
+								<apex:selectOptions value="{!TheManualEventClasses}" />
+								<apex:actionSupport event="onchange" action="{!EventClassChange}" oncomplete="SetupDatePicker();" rerender="EventEdit" />
+							</apex:selectList>
+						</apex:pageBlockSectionItem>
+						
+						<apex:inputField value="{!TheEvent.Name}"/>
+						
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__Event__c.Fields.KimbleOne__EventNarrative__c.Label}"/>
+							<apex:inputTextArea style="width:200px" rows="7" value="{!TheEvent.KimbleOne__EventNarrative__c}"/> 
+						</apex:pageBlockSectionItem>
+						
+						<apex:inputField styleclass="kimbleDatePicker" value="{!TheEvent.KimbleOne__EventDate__c}" />
+						
+						<apex:inputfield value="{!TheEvent.KimbleOne__IsComplete__c}" rendered="{!!TheEvent.KimbleOne__IsComplete__c}"/>
+               			<apex:outputfield value="{!TheEvent.KimbleOne__IsComplete__c}" rendered="{!TheEvent.KimbleOne__IsComplete__c}"/>
+						
+						<!-- TODO Can only complete an event which has milestones if all elements for all milestones are P1 -->
+              		</apex:pageblockSection>
+              		
+              		<!-- SYSTEM EVENT OR COMPLETE MANUAL EVENT -->
+              		<apex:pageblockSection collapsible="false" showheader="false"  columns="1" rendered="{!!IsManualEvent || (TheEvent.KimbleOne__IsComplete__c && !ISBLANK(TheEvent.Id))}">
+	              		
+              			<apex:outputfield value="{!TheEvent.EventClass__r.Name}"/>
+              			<apex:outputfield value="{!TheEvent.Name}"/>
+              			<apex:outputfield value="{!TheEvent.KimbleOne__EventNarrative__c}"/>   
+              			<apex:outputField value="{!TheEvent.KimbleOne__BaselineDate__c}" rendered="{!!ISBLANK(TheEvent.KimbleOne__BaselineDate__c)}"/>
+               			<apex:outputField styleclass="kimbleDatePicker" value="{!TheEvent.KimbleOne__EventDate__c}" />
+               			<apex:inputfield value="{!TheEvent.KimbleOne__IsComplete__c}" rendered="{!!TheEvent.KimbleOne__IsComplete__c && TheEvent.EventClass__r.CompletionMode__r.KimbleOne__Enum__c = 'Manual'}"/>
+               			<apex:outputfield value="{!TheEvent.KimbleOne__IsComplete__c}" rendered="{!TheEvent.KimbleOne__IsComplete__c || TheEvent.EventClass__r.CompletionMode__r.KimbleOne__Enum__c != 'Manual'}"/>
+               		</apex:pageblockSection>
+               		
+               		<div class="milestone-contatainer">
+               		<apex:pageBlockTable var="milestone" value="{!TheEvent.Milestones__r}" rendered="{!!ISBLANK(TheEvent.Milestones__r) && TheEvent.Milestones__r.size > 0}">
+							<apex:column value="{!milestone.DeliveryElement__r.Name}"/>
+							<apex:column value="{!milestone.Name}"/>
+							<apex:column headervalue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneType__c.Label}" value="{!milestone.MilestoneType__r.Name}"/>
+							<apex:column headervalue="{!$Label.kimbleone__valuelabel}">
+								<apex:outputField value="{!milestone.KimbleOne__MilestoneValue__c}" rendered="{!milestone.MilestoneType__r.KimbleOne__Enum__c = 'Cost'}"/>
+								<apex:outputField value="{!milestone.KimbleOne__InvoicingCurrencyIsoCode__c}" rendered="{!milestone.MilestoneType__r.KimbleOne__Enum__c = 'Revenue'}"/>
+								<apex:outputField value="{!milestone.KimbleOne__InvoicingCurrencyMilestoneValue__c}" rendered="{!milestone.MilestoneType__r.KimbleOne__Enum__c = 'Revenue'}"/>
+							</apex:column>
+							
+					</apex:pageBlockTable>
+					</div>
+               			  
+        		</apex:pageBlock>				
+         
+        </apex:outputPanel> <!-- end newEvent -->
+  		
+  	</div>	
+	</apex:form>
+	
+	<apex:form >
+		<apex:actionFunction action="{!NewEvent}" name="newEvent" rerender="EventEdit" oncomplete="SetupDatePicker();showModalBoxy()">
+   		</apex:actionFunction>
+   		
+		<apex:actionFunction action="{!ReadEvent}" name="readEvent" rerender="EventEdit" oncomplete="SetupDatePicker();showModalBoxy()">
+       		<apex:param name="eventId" value="" />
+       	</apex:actionFunction>
+ 
+	</apex:form>
+	
+	<script>
+		Math.log10 = Math.log10 || function(x) {
+  			return Math.log(x) / Math.LN10;
+		};
+		
+		var timelineData = {};
+				
+		var timeline = {};
+				
+		var zoomMode;
+		
+		var snapshotMode = 'RevenueCost';
+		var snapshotModeFields = {"RevenueCost":{Units:"{!JSENCODE(DeliveryGroup__c.CurrencyISOCode)}", 
+												 Format:'#,###', 
+												 Fields:[{Field:"ContractRevenue", Label:"{!JSENCODE($Label.ProjectedRevenue)}",Color: "#729BC7;",Icon:"fa fa-circle circle-graph-point"}
+												 		 <apex:outputPanel layout="none" rendered="{!ShowCosts}">,{Field:"ContractCost", Label:"{!JSENCODE($Label.kimbleone__projectedcost)}", Color: "#729BC7",Icon:"fa fa-square diamond-graph-point"}</apex:outputPanel> 
+												 		 ,{Field:"BaselineContractRevenue", Label:"{!JSENCODE($Label.kimbleone__baselinerevenue)}",Color: "#bbbbbb;",Icon:"fa fa-circle circle-graph-point"}
+												 		 <apex:outputPanel layout="none" rendered="{!ShowCosts}">,{Field:"BaselineContractCost", Label:"{!JSENCODE($Label.kimbleone__baselinecost)}",Color: "#bbbbbb;",Icon:"fa fa-square diamond-graph-point"}</apex:outputPanel> 
+												 		 ]},
+								   		"Margin":{Units:"%",
+								   				  Format:'#,###', 
+								   				  Fields:[{Field:"Margin", Label:"{!JSENCODE($Label.MarginLabel)}",Color: "#729BC7;",Icon:"fa fa-circle circle-graph-point"}, 
+								   				  	{Field:"BaselineMargin", Label:"{!JSENCODE($Label.BaselineLabel)}", Color: "#bbbbbb",Icon:"fa fa-circle circle-graph-point"}]}, 
+								   		 "Usage":{Units:"{!JSENCODE(UsageUnits)}",
+								   		 		  Format:'#,###.##', 
+								   		 		  Fields:[{Field:"BaselineUsage", Label:"{!JSENCODE($Label.BaselineLabel)}",Color: "#bbbbbb;",Icon:"fa fa-circle circle-graph-point"}, 
+								   		 		  		  {Field:"ActualUsage", Label:"{!JSENCODE($Label.ActualLabel)}", Color: "#008752",Icon:"fa fa-circle circle-graph-point"}, 
+								   		 		  		  {Field:"ForecastUsage", Label:"{!JSENCODE($Label.ProjectedLabel)}", Color: "#729BC7",Icon:"fa fa-circle circle-graph-point"}]}};
+		
+		var showEvent = '{!JSENCODE($CurrentPage.parameters.EventId)}';
+		
+		var earliest;
+		var latest;
+		var months;
+		
+		var owl;
+		
+		var firstDayOfWeekPos = 1; //Monday
+		
+		var zoomModeWidths = {"day":16, "week":6, "month":2};
+		
+		function createSnapshot()
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupTimelineController.CreateSnapshot}',
+	       		'{!JSINHTMLENCODE(DeliveryGroup__c.Id)}',
+	      			function(result, event){          
+	             		if (event.status) 
+			            {
+			             	timelineData = result;
+			             	initialiseContainer(zoomMode);
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+	         }, 
+	         {escape: true, timeout: 60000});
+		}
+		
+		function deleteSnapshot(snapshotId)
+		{
+			jQuery('#delete-snapshot-btn').prop('disabled',true).removeClass('btn').addClass('btnDisabled');
+	   
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupTimelineController.DeleteSnapshot}',
+	       		'{!JSINHTMLENCODE(DeliveryGroup__c.Id)}', snapshotId,
+	      			function(result, event){          
+	             		if (event.status) 
+			            {
+			             	timelineData = result;
+			             	initialiseContainer(zoomMode);
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+	         }, 
+	         {escape: true, timeout: 60000});
+		}
+		
+		function loadTheTimeline()
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupTimelineController.GetTheTimeline}',
+	       		'{!JSINHTMLENCODE(DeliveryGroup__c.Id)}',
+	      			function(result, event){          
+	             		if (event.status) 
+			            {
+			             	timelineData = result;
+			             	initialiseContainer(zoomMode);
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+	         }, 
+	         {escape: true, timeout: 60000});
+		}
+		
+		function addNewEvent()
+		{
+			initialiseModalBoxy('#EventEditPopup', '{!JSENCODE($Label.New)}  {!$ObjectType.Event__c.label}', jQuery('form[id$=\'EventEditForm\']'));
+			newEvent();
+		}
+		
+		function viewEventDetail(eventId)
+		{
+			initialiseModalBoxy('#EventEditPopup', '{!JSENCODE($Label.Edit)}  {!$ObjectType.Event__c.label}', jQuery('form[id$=\'EventEditForm\']'));
+			readEvent(eventId);
+		}
+		
+		function zoomOut()
+		{
+			if (zoomMode == 'month') return;
+			
+			if (zoomMode == 'day') 
+				initialiseContainer('week');
+			else
+				initialiseContainer('month');
+		}
+		
+		function zoomIn()
+		{
+			if (zoomMode == 'day') return;
+			
+			if (zoomMode == 'month')
+				initialiseContainer('week');
+			else
+				initialiseContainer('day');
+		}
+	
+		function changeSnapshotMode(obj, newMode)
+		{
+			jQuery('#select-snapshot-mode span').removeClass('selected');
+			
+			jQuery(obj).parent('span').addClass('selected');
+			
+			snapshotMode = newMode;
+			
+			drawSnapshots();
+		}
+		
+		function sortEvents()
+		{
+			return function(a, b) {
+				var x = a.toDate().valueOf();
+				var y = b.toDate().valueOf();
+				
+				if (x < y) //sort string ascending
+		  			return -1;
+		 		if (x > y)
+		  			return 1;
+		 		return 0; //default return value (no sorting)
+			}
+		}
+		var totalWidth = 0;
+		
+		function initialiseZoomMode()
+		{
+			timeline = {};
+			months = new Array();
+			
+			jQuery('#container').removeClass().addClass('zoom-' + zoomMode);
+			var showMonthSeparator = true;
+			
+			jQuery.each(Object.keys(timelineData).sort(sortEvents()), function (i, dte) { 
+			
+				var theDate = dte.toDate();
+				var startDate;
+				var key;
+				var name;
+				var shortName;
+				
+				if (zoomMode == 'day')
+				{
+					startDate = theDate;
+					key = dte;
+					name = kimble.regional.monthNamesShort[theDate.getMonth()] + ' ' + theDate.getDate()
+					shortName = theDate.getDate();
+				}
+				else if (zoomMode == 'week') //week starting to ending i.e. M-F //snapshot uses last in week
+				{
+					//combine all events in the week
+					var startDate = kimbleGetStartOfWeek(theDate);
+					var theDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + 6 , 0, 0, 0, 0);
+					key = theDate.toKimbleUTC();
+					name = generateWeekName(startDate);
+					shortName = generateShortWeekName(startDate);
+		
+				}
+				else //month // all events in a month - snapshot uses last in month
+				{
+					var startDate = new Date(theDate.getFullYear(), theDate.getMonth(), 1, 0, 0, 0, 0);
+					var theDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0); //end-of-month
+					var key = theDate.toKimbleUTC();
+					name = kimble.regional.monthNamesShort[theDate.getMonth()] + ' ' + theDate.getFullYear();
+					shortName = kimble.regional.monthNamesShort[theDate.getMonth()] + ' ' + theDate.getFullYear().toString().substr(2,2);
+					showMonthSeparator = false;
+				}
+				
+				if(timeline[key] == null) timeline[key] = {shortname:shortName, name:name, startDate:startDate, endDate:theDate, events:[], isComplete:true, snapshots:[]};
+					
+				jQuery.each(timelineData[dte].Events, function (j, e) {
+					timeline[key].events.push(e);
+					if (!e.IsComplete) timeline[key].isComplete = false;
+				});
+				
+				jQuery.each(timelineData[dte].Snapshots, function (j, e) {
+					timeline[key].snapshots.push(e);
+				});
+				
+				if (earliest == null || earliest > theDate) earliest = theDate;
+				
+				if(latest == null || latest < theDate) latest = theDate;
+			});
+			
+			if (earliest == null) earliest = new Date();
+			
+			earliest = new Date(earliest.getFullYear(), earliest.getMonth(),1, 0, 0, 0, 0);
+			
+			var startDate = new Date(earliest.getFullYear(), earliest.getMonth(),1, 0, 0, 0, 0);
+			
+			//build array of months
+			while (earliest <= latest)
+			{
+				months.push(new Date(earliest.getFullYear(), earliest.getMonth(), 1, 0, 0, 0, 0));
+				earliest.setMonth(earliest.getMonth() + 1);
+			}
+			
+			earliest = startDate;
+			
+			//iterate through the months // adding div to timeline - month width depends on number of days - 12 px per day?
+			var timelineHtml = '';
+			
+			
+			
+			jQuery.each(months, function (i, dte) {
+				
+				var width = (new Date(dte.getFullYear(), dte.getMonth()+1, 0, 0, 0, 0)).getDate() * zoomModeWidths[zoomMode];
+				totalWidth += width;
+				var monthName = (showMonthSeparator ? kimble.regional.monthNames[dte.getMonth()] + ' ' + dte.getFullYear() : '');
+				
+				timelineHtml += '<div id="month-' + dte.valueOf() + '" style="width:' + width + 'px;" class="timeline-month"><div class="timeline-month-line">' + (timelineHtml == ''?'':'<div class="month-break"></div>') + '</div><div class="timeline-month-header">' + monthName + '</div></div>';
+			
+			});
+			
+			jQuery('.horizontal-marker').width(totalWidth);
+			var canvas = document.getElementById('graph-canvas');
+			canvas.width = totalWidth;
+			
+			var timelineContainer = jQuery('#period-segments-container');
+			timelineContainer.empty();
+			jQuery(timelineHtml).appendTo(timelineContainer);
+		}
+		
+		function generateWeekName(dte)
+    	{
+    		var weekStart = kimbleGetStartOfWeek(dte);
+    		var weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6 , 0, 0, 0, 0);
+  			return weekStart.getDate() + ' ' + kimble.regional.monthNamesShort[weekStart.getMonth()] + ' - ' + weekEnd.getDate() + ' ' + kimble.regional.monthNamesShort[weekEnd.getMonth()];
+   		}	
+		
+		function generateShortWeekName(dte)
+    	{
+	    	var weekStart = kimbleGetStartOfWeek(dte);
+	    	var weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6 , 0, 0, 0, 0);
+	  		return weekStart.getDate() + '-' + weekEnd.getDate();
+	   	}	
+	   	
+	   	function initialiseContainer(zoom)
+	   	{
+	   		zoomMode = zoom;
+	   		
+	   		initialiseZoomMode();
+			
+			if (owl != null) owl.trigger('destroy');
+			jQuery('#events-container').empty();
+			
+			var eventHtml = '';
+			
+			//draw event dates on line and in events container
+			var eventIndex = 0;
+			jQuery.each(Object.keys(timeline).sort(sortEvents()), function (i, dte) { 
+				
+				var timelinePoint = timeline[dte];
+				
+				var theDate = timelinePoint.startDate;
+				
+				var key = '#month-' + (new Date(timelinePoint.endDate.getFullYear(), timelinePoint.endDate.getMonth(), 1)).valueOf();
+				
+				var left = Math.max(0, daysBetween(theDate, earliest) * zoomModeWidths[zoomMode]);
+				
+				var snapshotStatus = 'none';
+				if(timelinePoint.snapshots.length > 0) {
+					// determine if there are any active snaphots today, these should supercede any draft today
+					snapshotStatus = 'draft';
+					
+					for (var i = 0; i < timelinePoint.snapshots.length; i++)
+					{
+					    if(timelinePoint.snapshots[i].Status == 'actual')
+					    {
+					    	snapshotStatus = 'actual';
+					    }
+					}
+				}
+				
+				// rules for the icon on the timeline in order or precedence:
+				// 1) if there are any events on this day then an event marker is placed which is either:
+				// 1.a) complete
+				// 1.b) incomplete
+				// 2) if there are no events then there will be a snapshot which is either:
+				// 2.a) a draft snaphot (a placeholder snapshot created to show the current position TODAY)
+				// 2.b) a real snapshot
+				var icon = (timelinePoint.events.length > 0 ? (timelinePoint.isComplete?'fa-map-marker complete-event':'fa-map-marker incomplete-event') : (snapshotStatus == 'actual' ? 'fa-camera timeline-snapshot-marker-icon':'fa-play fa-rotate-270 timeline-draft-snapshot-marker-icon'));
+				
+				var dateHtml = '<div id="dte-' + dte + '" ' + (timelinePoint.events.length > 0 ? 'event-index="' + eventIndex + '"' : '') +  ' style="left:' + left + 'px;" class="timeline-date ' + (timelinePoint.events.length > 0 ? 'event-date ' : '') + (timelinePoint.snapshots.length > 0 ? 'snapshot-date ' : '') +  '"><div class="timeline-date-marker"><i class="fa ' + icon + '"/></div><div class="timeline-date-header">' + timelinePoint.shortname + '</div></div>';
+				
+				jQuery(dateHtml).appendTo(jQuery(key));
+				
+				if (timelinePoint.events.length > 0) 
+				{
+					eventIndex++;
+					eventHtml += '<div class="event-date-card"><div class="event-date-card-header"><a class="event-date-card-header-text">' + timeline[dte].name + '</a></div><div class="event-date-card-body"><table width="100%" cellpadding="0" cellspacing="0" border="0">'; 
+				
+					//event body
+					jQuery.each(timelinePoint.events, function (i, e){
+						eventHtml += '<tr><td>' + (e.HasMilestones?'<i style="color:gold;" class="fa fa-square fa-rotate-45"></i>':'') + '</td><td><div class="event-detail"><a href="javascript:viewEventDetail(\'' + e.Id + '\')" class="undecorated-link" >' + e.Name + '</a></div></td><td style="font-size: 14px;"><i class="fa ' + (e.IsComplete?'fa-check-square-o':'fa-square-o') + '"></i></td></tr>';
+					});
+					
+					eventHtml += '</table></div></div>';
+				}
+			});
+			
+			jQuery(eventHtml).appendTo('#events-container');
+		
+			/*jQuery('.event-date').qtip({content:{text:'Event Summary'},
+									position: {my: 'bottom center', at: 'top center'},
+									style: {classes: 'qtip-light qtip-shadow qtip-rounded'}});
+			*/
+			
+			jQuery('.event-date').click(function (){
+				var e = jQuery(this);
+				jumpToSlide(new Number(e.attr('event-index')));
+			});
+			
+			jQuery('.event-date-card-header-text').click(function (){
+				var e = jQuery(this);
+				jumpToSlide(e.closest('.owl-item').index());
+			});
+			
+			owl = jQuery("#events-container").owlCarousel({margin:5, 
+														   autoWidth:true,
+														   loop:false, 
+														   center:true, 
+														   startPosition:2, 
+														   dots:false});
+			
+			owl.on('changed.owl.carousel', function(event) {
+  		 			jQuery('.event-date.selected').removeClass('selected');
+  		 			
+  		 			var d = jQuery('.event-date[event-index=' + event.item.index + ']');
+  		 			
+  		 			d.addClass('selected');
+  		 			if (!d.isOnScreen())
+  		 				jQuery('#horizontal-axis-container').scrollTo(d, 800);
+			});
+			
+			drawSnapshots();
+			
+			if (showEvent != '')
+			{
+				viewEventDetail(showEvent);
+				showEvent = '';
+			}
+	   	}
+	   	
+		jQuery(window).load(function(){	
+			
+			zoomMode = 'day';
+			
+			//scroll
+			jQuery('#scroll-left').click(function() {
+				var t = jQuery('#horizontal-axis-container');
+				t.scrollTo(Math.max(0, t.scrollLeft() - (t.width()* 0.90)), 800);
+			});	
+			jQuery('#scroll-right').click(function() {
+				var t = jQuery('#horizontal-axis-container');
+				t.scrollTo(Math.min(totalWidth-(t.width()/2), t.scrollLeft() + (t.width() * 0.90)), 800);
+			});
+			
+			//resize
+			jQuery(window).resize(function() {
+	            
+	            var newWidth = jQuery(window).width() - 367;
+	            jQuery('#events-container, #horizontal-axis-container').width(newWidth);
+	            
+				jQuery('.horizontal-marker').css('max-width', newWidth);
+				
+				loadTheTimeline();
+					            
+	        });
+			
+			jQuery(window).resize();
+		
+		});
+		
+		function drawSnapshots()
+		{
+			var canvas = document.getElementById('graph-canvas');
+			var canvasContainer = jQuery('#canvas-container');
+			
+			var context = canvas.getContext('2d');
+			
+			//reset the canvas
+			context.clearRect(0, 0, canvas.width, canvas.height);
+     		jQuery('#canvas-container div').remove();
+     		
+			context.globalCompositeOperation='destination-over';
+			
+			jQuery('#timeline-legend').empty();
+			
+			var legendHtml = '';
+			
+			jQuery.each(snapshotModeFields[snapshotMode].Fields, function (j, field) {
+				legendHtml += '<div class="x-axis-legend"><i class="' + field.Icon + '" style="color:' + field.Color + '"></i>' + field.Label + '</div>';	
+			});
+			
+			// add icons for events and snapshots
+			legendHtml += '<div class="x-axis-legend"><i class="fa fa-map-marker incomplete-event"></i>{!$Label.EventLabel}</div>';
+			legendHtml += '<div class="x-axis-legend"><i class="fa fa-camera" style="color:#565656"></i>{!$Label.SnapshotButton}</div>';
+			legendHtml += '<div class="x-axis-legend"><i class="fa fa-play fa-rotate-270" style="color:#00CFFF"></i>{!$Label.CurrentPositionLabel}</div>';	
+			
+			jQuery(legendHtml).appendTo(jQuery('#timeline-legend'));
+			
+			//Calculate bounds 
+			var maxVal = 0;
+			var minVal = 0;
+			
+			jQuery.each(Object.keys(timeline).sort(sortEvents()), function (i, dte) { 
+				
+				var timelinePoint = timeline[dte];
+				
+				jQuery.each(timelinePoint.snapshots, function (s, snapshot) {
+				
+					jQuery.each(snapshotModeFields[snapshotMode].Fields, function (j, field) {
+						if (snapshot[field.Field] != null)
+						{
+							if (snapshot[field.Field] < minVal) minVal = snapshot[field.Field];
+							if (snapshot[field.Field] > maxVal) maxVal = snapshot[field.Field];
+						}
+					});
+				
+				});
+			
+			});
+			
+			/* vertical axis range */
+			maxVal++;
+			jQuery('#y-axis-units').text(snapshotModeFields[snapshotMode].Units);
+			
+			var range = maxVal - minVal;
+			var tickRange = range / 4;
+			var a = Math.ceil(Math.log10(tickRange)-1);
+			var pow10x = Math.pow(10,a);
+			var b = Math.ceil(tickRange / pow10x) * pow10x;
+			var format = snapshotModeFields[snapshotMode].Format;
+			
+			jQuery('#vertical-0>span').text(kimble.formatNumber(minVal, format));
+			jQuery('#vertical-25>span').text(kimble.formatNumber(minVal + b, format));
+			jQuery('#vertical-50>span').text(kimble.formatNumber(minVal + b * 2, format));
+			jQuery('#vertical-75>span').text(kimble.formatNumber(minVal + b * 3, format));
+			jQuery('#vertical-100>span').text(kimble.formatNumber(minVal + b * 4, format));
+			
+			
+			jQuery.each(snapshotModeFields[snapshotMode].Fields, function (i, field) {
+				var prevY;
+				context.beginPath();
+				
+				jQuery.each(Object.keys(timeline).sort(sortEvents()), function (j, dte) { 
+				
+					var timelinePoint = timeline[dte];
+				
+					jQuery.each(timelinePoint.snapshots, function (s, snapshot) {
+					
+						var dteObj = jQuery('#dte-' + dte);
+						var x = (dteObj.position().left + (dteObj.width() / 2));
+						var y = (snapshot[field.Field] == null ? prevY : 200 - (snapshot[field.Field] / b * 50));
+						
+						prevY = y;
+						
+						if (j==0) 
+							context.moveTo(x, y);
+						else
+							context.lineTo(x, y);
+					});
+				});
+				
+				context.lineWidth = 2;
+				context.strokeStyle = field.Color;
+				context.stroke();
+				
+				
+				jQuery.each(Object.keys(timeline).sort(sortEvents()), function (i, dte) { 
+					
+					var timelinePoint = timeline[dte];
+				
+					jQuery.each(timelinePoint.snapshots, function (s, snapshot) {
+					
+						var dteObj = jQuery('#dte-' + dte);
+						var x = (dteObj.position().left + (dteObj.width() / 2));
+						var y = (snapshot[field.Field] == null ? prevY : 200 - (snapshot[field.Field] / b * 50));
+						
+						prevY = y;
+						
+						if(snapshot[field.Field] != null) {
+							// draw a div for each graphpoint
+							jQuery('<div ' + (snapshot.Id != null ? ('snapshot-id="' + snapshot.Id + '"') : '') + 'data-dte="' + dte + '" class="graph-point ' + field.Icon + '" style="left:' + (x - 5) + 'px;top:' + (y - 5) + 'px;color:' + field.Color +'"></div>').appendTo(jQuery('#canvas-container'))
+						}											
+					});
+				});
+				
+			});
+			
+			jQuery('.graph-point').qtip('destroy', true);
+			
+			jQuery('.graph-point').qtip({content:{text: function(event, api) {							           
+							            return generateGraphPointTipHtml(jQuery(this).attr('snapshot-id'), jQuery(this).attr('data-dte'));
+							        }},
+									show: {event: 'click'},
+									hide: {event: 'unfocus'},
+									position: {my: 'bottom center', at: 'top center'},
+									style: {classes: 'qtip-light qtip-shadow qtip-rounded'}});
+		}
+		
+		function generateGraphPointTipHtml(snapshotId, dte)
+		{
+			var timelinePoint = timeline[dte];
+				
+			var html = '<table class="data-point-tooltip" cellspacing="0" cellpadding="0" border="0">';
+			
+			if (snapshotId != null)
+				html += '<thead><th colspan="2" style="text-align: center;padding-bottom: 5px;"><input id="delete-snapshot-btn" class="btn" type="button" value="{!$Label.DeleteButton}" onclick="deleteSnapshot(\'' + snapshotId + '\')"/></th></thead>';
+			
+			jQuery.each(timelinePoint.snapshots, function (s, snapshot) {
+			
+				if (snapshot.Id != snapshotId) return true;
+				
+				jQuery.each(snapshotModeFields[snapshotMode].Fields, function(i, field) {
+					html += '<tr><td>' + field.Label + ' (' + snapshotModeFields[snapshotMode].Units  + ')</td><td>' + kimble.formatNumber(snapshot[field.Field], snapshotModeFields[snapshotMode].Format) + '</td></tr>';
+				});
+			
+			});
+			
+			html += '</table>';
+			
+			return html;
+		
+		}
+		
+		function jumpToSlide(index)
+		{
+			owl.trigger('to.owl.carousel', [index,300,true]);
+		}	
+		
+		function SetupDatePicker()
+		{
+			jQuery('.kimbleDatePicker').datepicker({
+					dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true,
+					selectOtherMonths: true});
+		}
+	</script>
+	
+	<script>
+	(function ($) {
+
+    $.fn.isOnScreen = function(x, y){
+
+        if(x == null || typeof x == 'undefined') x = 1;
+        if(y == null || typeof y == 'undefined') y = 1;
+
+        var win = this.scrollParent();
+
+        var viewport = {
+            top : win.scrollTop(),
+            left : win.scrollLeft()
+        };
+        viewport.right = viewport.left + win.width();
+        viewport.bottom = viewport.top + win.height();
+
+        var height = this.outerHeight();
+        var width = this.outerWidth();
+
+        if(!width || !height){
+            return false;
+        }
+
+        var bounds = this.position();
+        bounds.right = bounds.left + width;
+        bounds.bottom = bounds.top + height;
+
+        var visible = (!(viewport.right < bounds.left || viewport.left > bounds.right || viewport.bottom < bounds.top || viewport.top > bounds.bottom));
+
+        if(!visible){
+            return false;
+        }
+
+        var deltas = {
+            top : Math.min( 1, ( bounds.bottom - viewport.top ) / height),
+            bottom : Math.min(1, ( viewport.bottom - bounds.top ) / height),
+            left : Math.min(1, ( bounds.right - viewport.left ) / width),
+            right : Math.min(1, ( viewport.right - bounds.left ) / width)
+        };
+
+        return (deltas.left * deltas.right) >= x && (deltas.top * deltas.bottom) >= y;
+
+    };
+
+})(jQuery);
+	</script>
+	
+	<style>
+	
+	.timeline-view-toggle>span
+	{
+		-webkit-background-clip: border-box;
+		-webkit-background-origin: padding-box;
+		-webkit-background-size: auto;
+		background-attachment: scroll;
+		background-clip: border-box;
+		background-color: rgb(232, 232, 233);
+		background-image: url(/img/alohaSkin/togglePill_bg.png);
+		background-origin: padding-box;
+		background-size: auto;
+		display: inline-block;
+		padding-bottom: 2px;
+		padding-left: 2px;
+		padding-right: 5px;
+		padding-top: 2px;
+		border-top-color: rgb(181, 181, 181);
+		border-top-style: solid;
+		border-top-width: 1px;
+		border-bottom-color: rgb(181, 181, 181);
+		border-bottom-style: solid;
+		border-bottom-width: 1px;
+		border-collapse: separate;
+	}
+	
+	.timeline-view-toggle span.right
+	{
+		
+		border-right-color: rgb(181, 181, 181);
+		border-right-style: solid;
+		border-right-width: 1px;		
+		border-bottom-right-radius: 3px;
+		border-top-right-radius: 3px;		
+		border-left-style: solid;
+		border-left-width: 1px;
+		border-left-color: rgb(181,181,181);
+	}
+	.timeline-view-toggle span.left
+	{				
+		border-left-color: rgb(181, 181, 181);
+		border-left-style: solid;
+		border-left-width: 1px;		
+		border-bottom-left-radius: 3px;
+		border-top-left-radius: 3px;
+		border-left-style: solid;
+		border-left-width: 1px;
+		border-left-color: rgb(181,181,181);
+		border-right-style: solid;
+		border-right-width: 1px;
+		border-right-color: rgb(181,181,181);		
+	}
+	.timeline-view-toggle span.selected
+	{
+		background-color: rgb(232, 232, 233);
+		background-image: url(/img/alohaSkin/togglePill_bg.png);
+		background-position: 0% -120px;
+		background-size: auto;
+	}
+	.timeline-view-toggle span a.toggleLink
+	{
+		text-decoration: none;				
+	}
+	
+	.timeline-view-toggle span a.toggleLink .linkText
+	{
+		font-family: Arial, Helvetica, sans-serif;
+		font-size: 11px;
+		font-weight: bold;
+		height: 14px;
+		margin-top: 1px;
+		padding-right: 5px;
+		color:#333;
+		white-space: nowrap;
+	}
+	.timeline-view-toggle span.selected a.toggleLink .linkText
+	{
+		color: rgb(255, 255, 255);
+	}			
+	.toggle-icon {
+		padding: 2px 4px;
+		font-size: 14px;
+	}
+	
+	#select-snapshot-mode {
+		height: 28px;
+		right: 10px;
+		position: absolute;
+		top: 35px;
+	}
+		
+	#container {
+		position:relative;
+		margin-top:10px;
+	}
+		
+	#vertical-axis-container {
+		height:202px;
+		position:absolute;
+		width:80px;
+		margin-top:4px;
+	}
+		
+	#zoom-container {
+		width:30px;
+		height:200px;
+		position:absolute;
+		right:0;
+	}
+		
+	#timeline-container {
+		position:relative;
+		margin-left:81px;
+		margin-right:36px;
+		min-height:421px;
+	}
+		
+	#canvas-container {
+		position:relative;
+		margin-top:4px;
+	}
+		
+	#period-segments-container {
+		position:relative;
+		top:-11px;
+	}
+
+	#timeline-legend {
+		text-align: center;
+		position: relative;
+		top: -12px;
+	}
+	
+	#new-event-button {
+		position: absolute;
+		right: 100px;
+		bottom: -78px;
+		color: #B7B6B6;
+		cursor: pointer;
+		z-index: 100;
+	}
+	
+	#new-snapshot-button {
+	    position: absolute;  
+	    right: 68px;  
+	    bottom: -77px;  
+		color: #B7B6B6;
+		cursor: pointer;
+		z-index: 100;
+	}
+	
+	#scroll-right {
+		position: absolute;
+		right: 36px;
+		bottom: -60px;
+		font-size: 24px;
+		color: #B7B6B6;
+		cursor: pointer;
+		z-index: 100;
+	}
+	
+	#scroll-left {
+		position: absolute;
+		left: 80px;
+		bottom: -57px;
+		font-size: 24px;
+		color: #B7B6B6;
+		cursor: pointer;
+		z-index: 100;
+	}
+	
+	.snapshot-icon {
+		font-size: 17px;
+		position: relative;
+		left: 5px;
+		top: -23px;
+		color: #565656;
+	}
+	
+	.new-event-icon {
+		font-size: 18px;
+		position: relative;
+		left: 9px;
+		top: -24px;
+		color: #565656;"
+	}
+	
+	.vertical-marker {
+		text-align: right;
+		font-weight: bold;
+		color: #4A4A56;
+		font-size: 11px;
+		position: absolute;
+		right: 4px;
+		width: 100%;
+	}
+	
+	.horizontal-marker {
+		position: absolute;
+		height: 0px;
+		border-bottom: 1px dashed #BDBDBD;
+		left: 84px;
+		top: 6px;
+	}
+	
+	#horizontal-axis-container {
+		white-space: nowrap;
+		overflow-x: hidden;
+		position: relative;
+	}
+	
+	.x-axis-legend {
+		display: inline-block;
+		margin-right: 6px;
+		font-size: 11px;
+		color: #4A4A56;
+	}
+	
+	.x-axis-legend i {
+		margin-right: 4px;
+	}
+	
+	#y-axis-units {
+		text-align: left;
+		font-weight: bold;
+		color: #4A4A56;
+		font-size: 11px;
+		position: absolute;
+		top: 195px;
+		right: 15px;
+	}
+	
+	.timeline-month {
+		display: inline-block;
+		height: 50px;
+		vertical-align:top;
+	}
+	
+	.timeline-month-header {
+		text-align: center;
+		font-size: 18px;
+		font-weight: bold;
+		color: #D2D2D2;
+		position: relative;
+		top: -109px;
+	}
+	
+	.timeline-month-line {
+		height: 10px;
+		border-bottom: 1px solid #b7b6b6;
+		position: relative;
+	}
+	
+	.month-break {
+		border-left: 1px dotted #B7B6B6;
+		position: absolute;
+		left: 0px;
+		height: 203px;
+		bottom: -5px;
+	}
+	
+	.timeline-date {
+		position: absolute;
+		text-align: center;
+		top: 5px;
+	}
+	
+	.zoom-day .timeline-date {
+		width: 16px;
+	}
+	
+	.zoom-week .timeline-date {
+		width: 42px;
+	}
+	
+	.zoom-month .timeline-date {
+		width: 60px;
+	}
+	
+	.timeline-date-header {
+		font-size: 12px;
+		color: #5C5C5C;
+		padding-bottom: 2px;
+		font-weight: bold;
+	}
+	
+	a.event-date-card-header-text {
+		cursor: pointer;
+		text-decoration: none;
+		margin: 7px 0;
+		font-size: 16px;
+		color: inherit;
+		font-family: inherit;
+		font-weight: 500;
+		line-height: 1.1;
+	}
+	
+	.timeline-date-marker i {
+		font-size: 22px;
+		cursor: pointer;
+		bottom: 2px;
+		position: relative;
+	}
+	
+	.timeline-draft-snapshot-marker-icon {
+		font-size: 15px !important;
+		color: #00CFFF;
+		margin-bottom: 7px;
+	}
+	
+	.timeline-snapshot-marker-icon {
+		font-size: 15px !important;
+		color: #565656;
+		margin-bottom: 7px;
+	}
+	
+	.incomplete-event {
+		color: #729BC8;
+	}
+	
+	.complete-event {
+		color: #008852;
+	}
+	
+	.event-date-card {
+		min-height: 120px;
+		cursor: -webkit-grab;
+		background-color: #FFF;
+		border: 1px solid rgba(0, 0, 0, 0);
+		border-radius: 4px;
+		-webkit-box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+		box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+		display: inline-block;
+		border-color: #DDD;
+		margin: 2px;
+		vertical-align: top;
+		width: 210px;		
+	}
+	
+	.event-date-card-header {
+		color: #333;
+		background-color: #F5F5F5;
+		border-color: #DDD;
+		padding: 10px 15px;
+		border-bottom: 1px solid #DDD;
+		border-top-right-radius: 3px;
+		border-top-left-radius: 3px;
+	}
+	
+	.event-date.selected i {
+		color: #E58E1A;
+	}
+	
+	.owl-item.active.center {
+		
+	}
+	
+	.center .event-date-card {
+		min-height: 136px;
+		height: auto;
+		position: relative;
+		top: -8px;
+		background-color: #fff;
+		border-radius: 4px;
+		cursor: default;
+		
+		-webkit-box-shadow: 0px 3px 7px 0px rgba(0,0,0,0.2);
+		-moz-box-shadow: 0px 3px 7px 0px rgba(0,0,0,0.2);
+		box-shadow: 0px 3px 7px 0px rgba(0,0,0,0.2);
+	}
+	
+	.center .event-date-card .event-date-card-header-text {
+		color: #E58E1A !important;
+	}
+	
+	.event-date-card-body {
+		padding: 7px 17px;
+	}
+	
+	.owl-stage {
+		padding-top: 8px;
+	}
+	
+	#zoom-level {
+		height: 108px;
+		width: 23px;
+		zoom: 1;
+		position: relative;
+		left: 2px;
+		margin-top: 16px;
+		margin-bottom: 16px;
+		background-image: url({!URLFOR($Resource.AssignmentImages, 'assignmentSprite.png')});
+		background-repeat: no-repeat;
+	}
+	.zoom-month #zoom-level {
+		background-position: -118px -4px; 
+	}
+	.zoom-week #zoom-level {
+		background-position: -184px -4px; 
+	}
+	.zoom-day #zoom-level {
+		background-position: -248px -4px; 
+	}
+	
+	.zoom-in, .zoom-out {
+	 	cursor: pointer;  
+	 	display: block;
+	 	height: 30px;
+	 	text-align: center;
+	 	font-size: 31px !important;
+		color: #737373 !important;
+		opacity: 0.6;
+	}
+	
+	.zoom-in {
+		position: relative;
+		top: 10px;
+	}
+	
+	.zoom-out {
+		position: relative;
+		bottom: 10px;
+	}
+	
+	.zoom-in:hover, .zoom-out:hover {
+		color: #9FD7FF !important;
+		opacity: 1;
+		text-decoration: none;
+	}
+	
+	a.toolbar-button {
+		display: inline-block;
+		padding: 6px 10px 6px 10px;
+		background-color: #EDEDED;
+		margin-right: 4px;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		text-decoration: none;
+		color: #4A4A56;
+	}
+	
+	div.toolbar {
+		position: absolute;
+		right: 169px;
+		top: 15px;
+	}
+	
+	a.toolbar-button:hover {
+		color: #fff;
+		text-decoration: none;
+		background: linear-gradient(#819EBD, #6B8FB5);
+	}
+	
+	a.toolbar-button.selected,a.toolbar-button.selected:hover {
+		background: #FFF;
+		color: #4A4A56;
+		text-decoration: none;
+		font-weight: bolder;
+	}
+	
+	a.toolbar-button.button-left {
+		border-top-right-radius: 0px;
+		border-bottom-right-radius: 0px;
+		margin-right: 0px;
+	}
+	
+	a.toolbar-button.button-right {
+		border-top-left-radius: 0px;
+		border-left: 0;
+		border-bottom-left-radius: 0px;
+	}
+	
+	a.toolbar-button .fa {
+		font-size: 14px;
+	}
+	
+	a.toolbar-button.disabled {
+		background-color: #ccc;
+		color: darkgray;
+	}
+	
+	a.toolbar-button.disabled:hover {
+		background-color: #ccc;
+		color: darkgray;
+	}
+	
+	a.toolbar-button span {
+		margin-left: 6px;
+	}
+		
+	.fa-rotate-45 {
+		-webkit-transform: rotate(45deg);
+		-ms-transform: rotate(45deg);
+		transform: rotate(45deg);
+	}
+	
+	.event-detail a {
+		text-decoration: none;
+	}
+	
+	.graph-point {
+		position: absolute;
+		width: 10px;
+		height: 8px;
+		background-color: transparent;
+		cursor: pointer;
+	}
+	
+	.circle-graph-point {
+		font-size: 11px;
+	}
+	
+	.diamond-graph-point {
+		font-size: 10px;
+		padding-top: 1px;
+		transform: rotate(45deg);
+	}
+	
+	table.data-point-tooltip td {
+		padding: 8px;
+		font-size: 11px;
+		color: #4A4A56;
+	}
+	
+	table.data-point-tooltip td:nth-child(1) {
+		width: 180px;
+	}
+	
+	table.data-point-tooltip td:nth-child(2) {
+		width: 100px;
+		text-align: right;
+	}
+	
+	table.data-point-tooltip tbody tr:nth-child(odd) {
+		background-color: #ededed;
+	}
+	
+	.owl-pointer {
+		height: 20px;
+	    text-align: center;
+	    font-size: 16px;
+	    position: relative;
+	    bottom: 10px;
+	    color: #565656;
+	}
+	
+/* Make milestones list scrollable */
+	.milestone-contatainer {
+		max-height: 300px;
+		overflow-y: auto;
+	}
+</style>
+
+	<style>
+	.owl-theme .owl-controls{margin-top:10px;text-align:center;-webkit-tap-highlight-color:transparent}.owl-theme .owl-controls .owl-nav [class*=owl-]{color:#fff;font-size:14px;margin:5px;padding:4px 7px;background:#d6d6d6;display:inline-block;cursor:pointer;-webkit-border-radius:3px;-moz-border-radius:3px;border-radius:3px}.owl-theme .owl-controls .owl-nav [class*=owl-]:hover{background:#869791;color:#fff;text-decoration:none}.owl-theme .owl-controls .owl-nav .disabled{opacity:.5;cursor:default}.owl-theme .owl-dots .owl-dot{display:inline-block;zoom:1;*display:inline}.owl-theme .owl-dots .owl-dot span{width:10px;height:10px;margin:5px 7px;background:#d6d6d6;display:block;-webkit-backface-visibility:visible;-webkit-transition:opacity 200ms ease;-moz-transition:opacity 200ms ease;-ms-transition:opacity 200ms ease;-o-transition:opacity 200ms ease;transition:opacity 200ms ease;-webkit-border-radius:30px;-moz-border-radius:30px;border-radius:30px}.owl-theme .owl-dots .owl-dot.active span,.owl-theme .owl-dots .owl-dot:hover span{background:#869791}
+	</style>
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

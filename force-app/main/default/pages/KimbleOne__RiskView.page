@@ -1,0 +1,205 @@
+<apex:page standardController="KimbleOne__Risk__c" extensions="KimbleOne.RiskViewController" sidebar="false">
+
+ <apex:composition template="KimbleOne__SiteMaster">
+
+  <apex:define name="Menu">
+
+	<c:Menu DefaultHelpPage="Risks.html" MenuContextType="{!IF(ISBLANK(KimbleOne__Risk__c.KimbleOne__Proposal__c), 'DeliveryGroup','Proposal')}" MenuContextId="{!IF(ISBLANK(KimbleOne__Risk__c.KimbleOne__Proposal__c), KimbleOne__Risk__c.KimbleOne__DeliveryGroup__c,KimbleOne__Risk__c.KimbleOne__Proposal__c)}" MenuContextName="{!IF(ISBLANK(KimbleOne__Risk__c.KimbleOne__Proposal__c), KimbleOne__Risk__c.DeliveryGroup__r.Name ,KimbleOne__Risk__c.Proposal__r.Name)}"/>
+	
+
+  </apex:define>  
+   
+  <apex:define name="Content">
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'RiskStyle.css')}"/>
+
+	<style>
+ 		.full-width-field {
+ 			width: 97%;
+ 		}
+		.risk-severity-value {
+			padding: 3px 47px 3px 47px;
+		}
+	</style>
+	<!-- Hidden fields for use in controller -->
+	<apex:outputField value="{!KimbleOne__Risk__c.KimbleOne__Proposal__c}" rendered="False"/>
+	<apex:outputField value="{!KimbleOne__Risk__c.KimbleOne__DeliveryGroup__c}" rendered="False"/>
+	
+	<chatter:feedWithFollowers entityId="{!KimbleOne__Risk__c.Id}" rendered="{!ShowChatter}"/>
+	
+	<apex:form >
+    <apex:outputPanel id="RiskViewPanel" >
+    	<apex:pageBlock id="RiskViewBlock"> 
+    	   
+    	<apex:pageBlockButtons location="top">
+    	<apex:commandButton action="{!Edit}" value="{!$Label.kimbleone__edit} {!$ObjectType.KimbleOne__Risk__c.label}" rendered="{!KimbleOne__Risk__c.KimbleOne__Proposal__c != null || (KimbleOne__Risk__c.KimbleOne__DeliveryGroup__c != null && KimbleOne__Risk__c.DeliveryGroup__r.DeliveryStage__r.KimbleOne__AllowNewRisks__c)}"/>
+    	<apex:commandButton action="{!ConvertRisktoIssue}" value="{!$Label.kimbleone__convertrisktoissue}" rendered="{!KimbleOne__Risk__c.KimbleOne__DeliveryGroup__c != null && KimbleOne__Risk__c.DeliveryGroup__r.DeliveryStage__r.KimbleOne__AllowNewRisks__c && KimbleOne__Risk__c.KimbleOne__Issue__c == null}"/>    	
+    	</apex:pageBlockButtons> 
+
+           	<apex:pageblockSection collapsible="false" showheader="false" columns="3">
+
+				<apex:pageBlockSectionItem dataStyle="width:30%" labelStyle="width:10%">
+             		<apex:outputLabel value="{!$ObjectType.KimbleOne__Risk__c.Fields.Name.Label}" />
+             		<apex:outputField id="RiskNameOutput" value="{!KimbleOne__Risk__c.Name}" />
+           		</apex:pageBlockSectionItem>
+             	           		
+           		<apex:pageBlockSectionItem dataStyle="width:20%;text-align: center;" labelStyle="width:10%" >
+           		</apex:pageBlockSectionItem>
+
+             	<apex:pageBlockSectionItem dataStyle="width:20%" labelStyle="width:10%" >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__RiskSeverity__c.Label}" />
+					<apex:outputPanel id="SeverityDetails">
+						<apex:outputPanel layout="none" rendered="{!ISNULL(KimbleOne__Risk__c.KimbleOne__RiskSeverity__c)}">
+							<div class="risk-severity-class-0 risk-severity-value risk-attribute-cell">
+								<apex:outputText value="-"/>
+							</div>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!!ISNULL(KimbleOne__Risk__c.KimbleOne__RiskSeverity__c)}">
+							<apex:variable value="{!KimbleOne__Risk__c.RiskSeverity__r.KimbleOne__StyleClass__c}" var="riskStyleClass"/>
+							<div class="{!JSINHTMLENCODE(riskStyleClass)} risk-severity-value risk-attribute-cell">
+							    <apex:outputField value="{!KimbleOne__Risk__c.RiskSeverity__r.Name}"/>
+							</div>
+						</apex:outputPanel>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+				
+				<apex:pageBlockSectionItem dataStyle="width:30%" labelStyle="width:10%" >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__RaisedByContact__c.Label}" />
+					<apex:outputField value="{!KimbleOne__Risk__c.KimbleOne__RaisedByContact__c}" id="raisedbycontactblock"></apex:outputField>
+				</apex:pageBlockSectionItem>
+				
+				<apex:pageBlockSectionItem dataStyle="width:20%" labelStyle="width:10%" >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__RaisedDate__c.Label}" />
+					<apex:outputField value="{!KimbleOne__Risk__c.KimbleOne__RaisedDate__c}" />
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem dataStyle="width:20%" labelStyle="width:10%" >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__RiskImpact__c.Label}" />
+					<apex:outputField value="{!KimbleOne__Risk__c.KimbleOne__RiskImpact__c}" />
+				</apex:pageBlockSectionItem>
+								          		
+            	<apex:pageBlockSectionItem dataStyle="width:30%" labelStyle="width:10%" >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__RiskStatus__c.Label}" />
+					<apex:outputField value="{!KimbleOne__Risk__c.KimbleOne__RiskStatus__c}" />
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem dataStyle="width:20%" labelStyle="width:10%" >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__ClosedDate__c.Label}" />
+					<apex:outputField value="{!KimbleOne__Risk__c.KimbleOne__ClosedDate__c}" />
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem dataStyle="width:20%" labelStyle="width:10%" >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__RiskProbability__c.Label}" />
+					<apex:outputField value="{!KimbleOne__Risk__c.KimbleOne__RiskProbability__c}" />
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem dataStyle="width:30%" labelStyle="width:10%" >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__RiskCategory__c.Label}" />
+					<apex:outputField value="{!KimbleOne__Risk__c.KimbleOne__RiskCategory__c}" />
+				</apex:pageBlockSectionItem>
+				
+				<apex:pageBlockSectionItem dataStyle="width:20%" labelStyle="width:10%" >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__IsInternal__c.Label}" />
+					<apex:outputField value="{!KimbleOne__Risk__c.KimbleOne__IsInternal__c}" /> 
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem dataStyle="width:20%" labelStyle="width:10%" rendered="{!KimbleOne__Risk__c.DeliveryGroup__r.KimbleOne__SharedWithCustomer__c}" >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__SharedWithCustomer__c.Label}" />
+					<apex:outputField value="{!KimbleOne__Risk__c.KimbleOne__SharedWithCustomer__c}" /> 
+				</apex:pageBlockSectionItem>
+
+				<!-- Placeholder to preserve column layout -->
+           		<apex:pageBlockSectionItem dataStyle="width:20%" labelStyle="width:10%" rendered="{!!KimbleOne__Risk__c.DeliveryGroup__r.KimbleOne__SharedWithCustomer__c}"></apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem dataStyle="width:30%" labelStyle="width:10%" rendered="{!MultiGroup && ISBLANK(KimbleOne__Risk__c.KimbleOne__DeliveryGroup__c)}">
+					<apex:outputText value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__IsDeliveryGeneric__c.Label}" />
+					<apex:outputField value="{!MultiGroupInd.KimbleOne__InputCheckbox__c}" />
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem dataStyle="width:30%" labelStyle="width:10%" rendered="{!MultiGroup && !ISBLANK(KimbleOne__Risk__c.KimbleOne__DeliveryGroup__c)}">
+					<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryGroup__c.Label}" />
+					<apex:outputField value="{!KimbleOne__Risk__c.KimbleOne__DeliveryGroup__c}" />
+				</apex:pageBlockSectionItem>
+
+			</apex:pageblockSection>
+
+			<apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+
+				<apex:pageBlockSectionItem dataStyle="width:91%" labelStyle="width:9%" >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__Summary__c.Label}" />
+					<apex:outputField id="RiskSummaryOutput" styleClass="full-width-field" value="{!KimbleOne__Risk__c.KimbleOne__Summary__c}"/>
+				</apex:pageBlockSectionItem>					
+
+				<apex:pageBlockSectionItem dataStyle="width:91%" labelStyle="width:9%" >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__Description__c.Label}" />
+					<apex:outputField styleClass="full-width-field" value="{!KimbleOne__Risk__c.KimbleOne__Description__c}"/>
+				</apex:pageBlockSectionItem>
+			</apex:pageBlockSection>				
+
+           	<apex:pageblockSection collapsible="false" showheader="false"  columns="3">
+             	
+				<apex:pageBlockSectionItem dataStyle="width:31%" labelStyle="width:9%" >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__OwnedByContact__c.Label}" />
+					<apex:outputField value="{!KimbleOne__Risk__c.KimbleOne__OwnedByContact__c}">
+					</apex:outputField>
+           		</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem dataStyle="width:20%" labelStyle="width:13%" >
+					<apex:outputPanel layout="none" rendered="{!!ISBLANK(KimbleOne__Risk__c.KimbleOne__RiskStrategy__c)}">
+						<apex:outputText value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__RiskStrategy__c.Label}" />
+						<apex:outputField value="{!KimbleOne__Risk__c.KimbleOne__RiskStrategy__c}" />
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+           		
+				<!-- Placeholder to preserve column layout -->
+           		<apex:pageBlockSectionItem dataStyle="width:20%" labelStyle="width:10%" ></apex:pageBlockSectionItem>
+
+			</apex:pageBlockSection>
+
+			<apex:pageblockSection collapsible="false" showheader="false"  columns="1">	
+				
+				<apex:pageBlockSectionItem dataStyle="width:91%" labelStyle="width:9%" >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__Mitigation__c.Label}" />
+					<apex:outputField styleClass="mitigation-text full-width-field" value="{!KimbleOne__Risk__c.KimbleOne__Mitigation__c}" ></apex:outputField>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem dataStyle="width:30%" labelStyle="width:9%" >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__MitigationDueDate__c.Label}" />
+					<apex:outputField value="{!KimbleOne__Risk__c.KimbleOne__MitigationDueDate__c}" />						
+				</apex:pageBlockSectionItem>
+				
+				<apex:pageBlockSectionItem dataStyle="width:91%" labelStyle="width:9%" >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__Contingency__c.Label}" />
+					<apex:outputField styleClass="contingency-text full-width-field" value="{!KimbleOne__Risk__c.KimbleOne__Contingency__c}" ></apex:outputField>
+				</apex:pageBlockSectionItem>
+				
+				<apex:pageBlockSectionItem dataStyle="width:91%" labelStyle="width:9%" >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Risk__c.Fields.KimbleOne__Issue__c.Label}" />
+					<apex:outputField value="{!KimbleOne__Risk__c.KimbleOne__Issue__c}" ></apex:outputField>
+				</apex:pageBlockSectionItem>				
+								
+			</apex:pageblockSection>
+			
+			<apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+
+				<apex:repeat value="{!$ObjectType.KimbleOne__Risk__c.FieldSets.KimbleOne__RiskFields}" var="r">
+					<apex:pageBlockSectionItem dataStyle="width:91%" labelStyle="width:9%" >
+						<apex:outputText value="{!r.Label}" />
+    					<apex:outputField styleClass="{!CASE(r.Type, 'textarea', 'full-width-field', 'string', 'full-width-field','')}" value="{!KimbleOne__Risk__c[r]}"/>
+					</apex:pageBlockSectionItem>
+ 				</apex:repeat>
+				
+            </apex:pageBlockSection>						
+								
+    	</apex:pageBlock>			
+			
+	</apex:outputPanel>
+	</apex:form>
+	
+ 	<script>
+ 	</script>
+
+ </apex:define>
+ 
+ </apex:composition>
+
+</apex:page>

@@ -1,0 +1,1329 @@
+<apex:page controller="KimbleOne.AssignmentDemandCandidateReviewCntrllr" extensions="KimbleOne.ActivityAssignmentRemoteActions,KimbleOne.CapabilitySearchRemoteAction" showHeader="false" sidebar="false">
+    <div id="AssignmentDemandCandReviewDetails" style="display:none">
+        <apex:outputPanel id="DemandDetails">
+            <style>
+                div#layout-container_Demand {
+                    overflow: auto;
+                    max-height: calc(min(100vh - 130px, 700px));
+                    max-width: calc(min(100vw - 130px, 1000px));
+                }
+                div#layout-container_Demand.no-caps {
+                    max-height: calc(min(100vh - 130px, 500px));
+                }
+                div#demand-rej-reasons-container {
+                    display: none;
+                }
+                input.btn.cardBtn:hover {
+                    background-color: #f4f6f9 !important;
+                }
+                input.btn.cardBtn {
+                    font-family: Arial,Helvetica,sans-serif;
+                    display: inline-block;
+                    padding: 6px 10px 6px 10px !important;
+                    background-color: #ffffff !important;
+                    border: 1px solid #ccc;
+                    border-radius: 2px;
+                    cursor: pointer;
+                    background: none;
+                    font-size: 12px;
+                    font-weight: normal;
+                    margin-left: 3px;
+                }
+                input.btn.cardBtn.acc-rej-btn {
+                    padding-right: 30px !important;
+                }
+                .fabtn-c {
+                    position: relative;
+                    display: inline-block;
+                }
+                .fabtn-c i.fa {
+                    position: absolute;
+                    top: 6px;
+                    right: 10px;
+                }
+                .dem-res-name,
+                .cand-res-name {
+                    font-size: 14px;
+                    width: 150px;
+                    white-space: nowrap;
+                    text-overflow: ellipsis;
+                    overflow: hidden;
+                }
+                .res-details-tooltip {
+                    cursor: pointer;
+                }
+                .res-details-tooltip-qtip {
+                    z-index: 9999 !important;
+                }
+                table.demand-table tr:hover {
+                    background-color: #e7f4f8;
+                }
+                div.src-ind i.fa {
+                    padding: 4px;
+                    font-size: 18px;
+                    border-radius: 4px;
+                    display: inline-block;
+                    vertical-align: middle;
+                }
+                div.src-ind {
+                    text-align: left;
+                    white-space: nowrap;
+                }
+                .cand-pill {
+                    font-size: 11px;
+                    padding: 4px;
+                    border-radius: 2px;
+                    display: inline-block;
+                    border: none !important;
+                    margin-left: 4px;
+                    font-style: normal;
+                    white-space: normal;
+                    width: 70px;
+                    text-align: center;
+                    vertical-align: middle;
+                }
+                .cand-pill.cons-ind {
+                    color: white;
+                    background-color: #428bca;
+                }
+                i.exp-ind.ideal-c-ind,
+                .cand-pill.ideal-ind {
+                    color: #111;
+                    background-color: gold;
+                }
+                i.man-ind.pref-c-ind,
+                .cand-pill.prf-ind {
+                    color: white;
+                    background-color: green;
+                }
+                i.c-notes-ind {
+                    color: #428BCA;
+                }
+                i.auto-ind {
+                    background-color: #E58E1A;
+                    color: white;
+                }
+                i.exp-ind {
+                    background-color: #428bca;
+                    color: white;
+                }
+                i.man-ind {
+                    background-color: #333435;
+                    color: white;
+                }
+                .demand-table td {
+                    padding: 6px !important;
+                }
+                #demand-dets-container table tr td:nth-child(1) {
+                    text-align: left;
+                    font-weight: bold;
+                    background-color: #eeeeee;
+                }
+                #demand-dets-container table tr td:nth-child(2) {
+                    font-weight: bold;
+                    background-color: #eeeeee;
+                }
+                #demand-dets-container table tr td:nth-child(1) div {
+                    width: 170px;
+                }
+                #demand-dets-container thead th,
+                #demand-dets-container tr.cand-src,
+                #demand-dets-container tr.cap-hdr td {
+                    background-color: #eeeeee;
+                    font-style: italic;
+                    font-size: 14px;
+                }
+                #demand-dets-container tr.action-row {
+                    background-color: #eeeeee;
+                }
+                .cand-rev-qtip {
+                    z-index: 2000 !important;
+                }
+                .rej-reasons {padding: 5px;}
+                .rej-reason-lab {font-weight: bold;margin-bottom: 5px;}
+                .rej-reason-actions .fa {
+                    font-size: 19px;
+                    padding: 2px;
+                }
+                .rej-reason-actions {
+                    display: inline-block;
+                    margin-left: 10px;
+                    cursor: pointer;
+                    color: #BBB;
+                    vertical-align: middle;
+                }
+                select.rej-reason-select {
+                    display: inline-block;
+                    vertical-align: middle;
+                }
+                .rej-reason-actions .fa {
+                    margin: 0px 3px;
+                }
+                .rej-reason-actions .fa:hover {
+                    color: #333;
+                }
+                .rev-action-item {
+                    background-color: #fff;
+                    padding: 3px 5px;
+                    margin: 0px 2px;
+                    font-size: 16px;
+                    border: 1px solid white;
+                }
+                .rev-action-item:hover {
+                    background-color: #f4f6f9;
+                }
+                .accepted-c .rev-c-acc {
+                    border: 1px solid #2fa812;
+                }
+                .rejected-c .rev-c-rej {
+                    border: 1px solid #8f0000;
+                }
+                .deleted-c .rev-c-del {
+                    border: 1px solid #6e6f70;
+                }
+                .cap-held {
+                    background-color: #eee;
+                }
+                .cap-missing {
+                    background-color: pink !important;
+                }
+                tr.cap-det td {
+                    background-color: #eee;
+                    position: relative;
+                }
+                .cap-r {
+                    color: #1797c0;
+                    font-weight: bold;
+                    text-align: center;
+                    font-size: 16px;
+                }
+                #demand-dets-container .cap-missing i.fa-times {
+                    color: #f44336;
+                    right: 12px;
+                    top: -10px;
+                    font-size: 20px;
+                    margin-left: 2px;
+                    position: absolute;
+                }
+                tr.cap-det .c-cap-r .expiry-cap-ind {
+                    left: 9px;
+                    top: -1px;
+                    font-size: 20px;
+                    margin-right: 2px;
+                    position: absolute;
+                    text-align: left;
+                }
+                tr.cap-det .c-cap-r .expiry-cap-ind.expired {
+                    color: red;
+                }
+                .c-cap-r {
+                    text-align: center;
+                    font-size: 14px;
+                    position: relative;
+                }
+                .mand-cap i.fa-asterisk {
+                    color: red;
+                    margin-left: 2px;
+                }
+                .cap-held .c-cap-r i.fa-check-square {
+                    color: green;
+                    font-size: 20px;
+                    position: absolute;
+                    margin-left: 2px;
+                    right: 11px;
+                    top: -1px;
+                }
+                .cap-held .c-cap-r i.fa-arrow-circle-down,
+                .cap-held .c-cap-r i.fa-arrow-circle-up {
+                    font-size: 20px;
+                    position: absolute;
+                    margin-left: 2px;
+                    right: 11px;
+                    top: -1px;
+                }
+                tr.cap-det.mand-cap .c-cap-r .fa-exclamation-triangle {
+                    color: red;
+                    left: 5px;
+                    top: -11px;
+                    font-size: 20px;
+                    margin-right: 2px;
+                    position: absolute;
+                }
+                .cap-held i.fa-check {
+                    font-size: 16px !important;
+                }
+                i.rev-ind {
+                    color: orange;
+                    font-size: 20px;
+                    position: absolute;
+                    right: 8px;
+                    top: 2px;
+                }
+                i.neg-ind {
+                    color: #f44336;
+                    font-size: 20px;
+                    position: absolute;
+                    right: 11px;
+                    top: 2px;
+                }
+                i.pos-ind {
+                    color: #008000;
+                    font-size: 20px;
+                    position: absolute;
+                    right: 11px;
+                    top: 2px;
+                }
+                .demand-table tr td {
+                    text-align: center;
+                    position: relative;
+                    vertical-align: middle;
+                    max-width: 180px !important;
+                }
+                div#demand-hdr-container,
+                div#demand-dets-container {
+                    margin-right: 10px;
+                }
+                div#demand-dets-container {
+                    margin-bottom: 10px;
+                }
+                div#demand-hdr-container .review-toolbar.title-card {
+                    text-align: right;
+                    margin-bottom: 2px;
+                }
+                #demand-hdr-container .save-rev-c-btn,
+                #demand-hdr-container .close-rev-c-btn {
+                    margin-right: 11px;
+                    margin-bottom: 2px;
+                    font-size: 26px;
+                }
+                td.no-dets {
+                    background-color: #eeeeee;
+                }
+                i.exp-ind.neg-c-ind, .cand-pill.neg-c-ind {
+                    color: #f1f1f1;
+                    background-color: #9E9E9E;
+                }
+                .track-changes.has-crev-changes {
+                    color: #ffa500;
+                }
+                /* progress */
+                .loadingIndicator {
+                    right:0;
+                    width:100%;
+                    height:100%;
+                    font-weight: bold;
+                    position: fixed;
+                    margin-top: 0px;
+                    top: 0px;
+                    text-align:center;
+                    /* IE filter */
+                    filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+                    -moz-opacity:0.7;	/* Mozilla extension */
+                    -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+                    opacity:0.7; /* CSS3 */
+                    z-index:1000;
+                    background-color:white;
+                    display:none;
+                }
+                .loadingIndicator img {
+                    margin-right:9px;
+                }
+                #loadingIndicatorInnerContainer,
+                #savingIndicatorInnerContainer{
+                    position:absolute;
+                    top:50%;
+                    height:10em;
+                    margin-top:-2em;
+                    width:100%;
+                }
+                div#savingIndicatorInnerContainer_Demand {
+                    position: relative;
+                    top: 50%;
+                }
+                div#loadingIndicatorInnerContainer_Demand {
+                    position: relative;
+                    top: 50%;
+                }
+            </style>
+
+                <apex:outputPanel id="ErrorMessages_Demand">
+                    <apex:pageMessages escape="false"/>
+                </apex:outputPanel>
+                <div id="remote-action-error" style="display:none"><span><div class="message errorM3"><table border="0" cellpadding="0" cellspacing="0" class="messageTable" style="padding:0px;margin:0px;"><tbody><tr valign="top"><td><img alt="error" class="msgIcon" src="/s.gif" title="{!$Label.Error}"/></td><td class="messageCell"><div class="messageText" id="remote-action-error-text"><br/></div></td></tr><tr><td></td><td></td></tr></tbody></table></div></span></div>
+
+                <div id="loadingIndicatorOuterContainer_Demand" class="loadingIndicator" style="display:none">
+                    <div id="loadingIndicatorInnerContainer_Demand">
+                        <img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+                    </div>
+                </div>
+
+                <div id="savingIndicatorOuterContainer_Demand" class="loadingIndicator" style="display:none">
+                    <div id="savingIndicatorInnerContainer_Demand">
+                        <img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.SavingLabel}
+                    </div>
+                </div>
+
+                <div id="layout-container_Demand">
+                    <div id="demand-hdr-container"></div>
+                    <div id="demand-rej-reasons-container"></div>
+                    <div id="demand-dets-container"></div>
+                </div>
+
+            <script>
+                var dId;
+
+                var revLab = {};
+
+                revLab['CapMeetsRequirement'] = '{!JSENCODE($Label.MeetsRequirementLabel)}';
+                revLab['CapMeetsOrExceedsRequirement'] = '{!JSENCODE($Label.MeetsOrExceedsRequirementLabel)}';
+                revLab['CapMissingMandatoryRequirement'] = '{!JSENCODE($Label.MissingMandatoryRequirementLabel)}';
+                revLab['CapMissingRequirement'] = '{!JSENCODE($Label.MissingRequirementLabel)}';
+                revLab['CapFallsShortOfRequirement'] = '{!JSENCODE($Label.FallsShortOfRequirementLabel)}';
+                revLab['CapExceedsRequirement'] = '{!JSENCODE($Label.ExceedsRequirementLabel)}';
+                revLab['CapExpiryDate'] = '{!$ObjectType.ResourceCapability__c.fields.ExpiryDate__c.label}';
+                revLab['CapExpired'] = '{!JSENCODE($Label.ExpiredCapabilityLabel)}';
+                revLab['CapExpiring'] = '{!JSENCODE($Label.ExpiredCapabilityLabel)}';
+
+                var theDemand;
+
+                function initialise_Demand()
+                {
+                    initialiseActions_Demand();
+                }
+
+                function initialiseDynamicElements_Demand()
+                {
+                    initialiseDetailCurrencies_Demand();
+                    setReviewPanelDimensions();
+                    overlayAnnotations();
+                }
+
+                function setReviewPanelDimensions()
+                {
+                    jQuery('div#layout-container_Demand').toggleClass('no-caps', theDemand.OrderedCapabilityIds == undefined || theDemand.OrderedCapabilityIds.length == 0);
+                    jQuery('#AssignmentDemandCandReviewDetails').resizable({alsoResize: '#layout-container_Demand'});
+                }
+
+                function overlayAnnotations()
+                {
+                    jQuery('#AssignmentDemandCandReviewDetails').find('.meets-cap-ind').prop('title', revLab['CapMeetsRequirement']);
+                    jQuery('#AssignmentDemandCandReviewDetails').find('.mand-cap-missing').prop('title', revLab['CapMissingMandatoryRequirement']);
+                    jQuery('#AssignmentDemandCandReviewDetails').find('.cap-missing').prop('title', revLab['CapMissingRequirement']);
+                    jQuery('#AssignmentDemandCandReviewDetails').find('.below-cap-ind').prop('title', revLab['CapFallsShortOfRequirement']);
+                    jQuery('#AssignmentDemandCandReviewDetails').find('.exceeds-cap-ind').prop('title', revLab['CapExceedsRequirement']);
+                    jQuery('#AssignmentDemandCandReviewDetails').find('.expiry-cap-ind:not(.expired)').prop('title', function() { return revLab['CapExpiryDate'] + ': ' + kimble.formatDate(jQuery(this).attr('expiry-date'));});
+                    jQuery('#AssignmentDemandCandReviewDetails').find('.expiry-cap-ind.expired').prop('title', function() { return revLab['CapExpired'] + ': ' + kimble.formatDate(jQuery(this).attr('expiry-date'));});
+                    
+                    jQuery(document).off('click', '.res-details-tooltip').on('click', '.res-details-tooltip', function (){
+                        jQuery(this).qtip('destroy', true);
+        
+                        jQuery(this).qtip({
+                            content: {
+                                            text: function(event, api) {
+                                            jQuery.ajax({ url: jQuery(this).attr('data-tt-url')})
+                                                .done(function(html) {
+                                                    api.set('content.text', html)
+                                                })
+                                                .fail(function(xhr, status, error) {
+                                                    api.set('content.text', status + ': ' + error)
+                                                })
+                                        return '{!JSENCODE($Label.Loading)}';
+                                    }
+                                },
+                                show: {
+                                event: 'click',
+                                solo: true,
+                                ready:true
+                            },
+                                hide: 'unfocus',
+                               position: {
+                                    my: 'top left',
+                                    at: 'bottom center',
+                                    viewport: jQuery('#container')
+                                },
+                                style: {
+                                    classes: 'qtip-light qtip-shadow qtip-rounded res-details-tooltip-qtip'
+                                }
+                        });
+        
+                    });
+                }
+
+                function initialiseDetailCurrencies_Demand()
+                {
+                    jQuery.each(jQuery('.temp-revenue-rate'), function (i, obj) {
+                            var j = jQuery(obj);
+                            var revRateSummary = parseRevenueJson(j.attr('data-revenue-rate'));
+
+                            if (revRateSummary.length > 0)
+                            {
+                                var revRate = revRateSummary[0].R / j.attr('conv-factor');
+
+                                j.text(jQuery.formatNumber(revRate, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+
+                                if (revRateSummary.length > 1)
+                                {
+                                    var $futureRevChange = jQuery('<span class="fa fa-map-marker future-revenue-change"/>');
+                                    $futureRevChange.data('revenues', revRateSummary);
+                                    j.after($futureRevChange);
+                                }
+                            }
+                    });
+
+                    jQuery.each(jQuery('.temp-cost-rate'), function (i, obj) {
+                            var j = jQuery(obj);
+                            var costRateSummary = parseCostJson(j.attr('data-cost-rate'));
+                            var costRate = costRateSummary[0].R / j.attr('conv-factor');
+
+                            j.text(jQuery.formatNumber(costRate, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+
+                            if (costRateSummary.length > 1)
+                            {
+                                var $futureCostChange = jQuery('<span class="fa fa-map-marker future-cost-change"/>');
+                                $futureCostChange.data('costs', costRateSummary);
+                                j.after($futureCostChange);
+                            }
+                    });
+                }
+
+                function parseCostJson(j)
+                {
+                    // due to the way this string is injected into the html it has an extra set of quotes
+                    // TODO 1.31 - talk to Stu about this
+                    j = j.substring(1, j.length-1);
+                    return kimble.parseJSON(j.replace(/"CostRate"/g, '"R"').replace(/"FromDate"/g, '"D"'));
+                };
+
+                function parseRevenueJson(j)
+                {
+                    // due to the way this string is injected into the html it has an extra set of quotes
+                    // TODO 1.31 - talk to Stu about this
+                    j = j.substring(1, j.length-1);
+                    return kimble.parseJSON(j.replace(/"RevenueRate"/g, '"R"').replace(/"FromDate"/g, '"D"'));
+                };
+
+                function loadDemandDetails(demandId)
+                {
+                    dId = demandId;
+
+                    initialise_Demand();
+
+                    getDemandDetails();
+                }
+
+                function initialiseActions_Demand()
+                {
+                    jQuery(document).off('click', '.close-rev-c-btn').on('click', '.close-rev-c-btn', closeDemandDetails);
+
+                    jQuery.unsubscribe('kimble.candreviewrefresh');
+                    jQuery.subscribe('kimble.candreviewrefresh', function(){
+                        loadDemandDetails(dId);
+                    });
+                }
+
+                function candReviewAccept(assignmentId, demandAssignmentId, itm)
+                {
+                    showSaving_Demand();
+
+                    // reject action is different in assignment search as the page has it's own refresh handler
+                    if(typeof isAssignmentSearch != 'undefined' && isAssignmentSearch)
+                    {
+                        acceptCandidate(assignmentId, true, demandAssignmentId);
+                    }
+                    else
+                    {
+                        Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.AcceptCandidate}',
+                            assignmentId,
+                                function(result, event){
+                                    if (event.status)
+                                    {
+                                        hideModalBoxy();
+                                        hideSaving_Demand();
+
+                                        // activity assignment delivery implementation of refresh
+                                        jQuery.publish('kimble.activityassignmentcandidatestatuschange', true);
+                                    }
+                                    else
+                                    {
+                                        hideSaving_Demand();
+                                        alert(event.message);
+                                    }
+                            },
+                            {escape: true, timeout: 60000}
+                        );
+                    }
+                }
+
+                function candReviewReject(assignmentId, itm)
+                {
+                    var rejectionReason = '';
+
+                    if(theDemand.OrderedRejectionReasonIds.length > 0)
+                        showRejectionReasons(assignmentId, itm);
+                    else
+                        candReviewRejectSave(assignmentId, rejectionReason);
+                }
+
+                function showRejectionReasons(assignmentId, itm)
+                {
+                    jQuery('.rej-reason-select').attr('assignment-id', assignmentId);
+                    itm.qtip({
+                            overwrite: true,
+                            show: { solo: true, ready: true },
+                            hide: false,
+                            style: {
+                                classes: 'qtip-light qtip-shadow qtip-rounded cand-rev-qtip'
+                            },
+                            content: {text: jQuery('#layout-container_Demand div#demand-rej-reasons-container').html()},
+                            position: {my: 'top right', at: 'center center'}
+                        }, event);
+                }
+
+                function candReviewRejectCancel()
+                {
+                    jQuery('.rev-c-rej').qtip('destroy', true);
+                }
+
+                function candReviewRejectSave(assignmentId, rejectionReason)
+                {
+                    showSaving_Demand();
+
+                    if(assignmentId == null) assignmentId = jQuery('.rej-reason-select:visible').attr('assignment-id');
+                    if(rejectionReason == null) rejectionReason = jQuery('.rej-reason-select:visible').val();
+
+                    candReviewRejectCancel();
+
+                    // reject action is different in assignment search as the page has it's own refresh handler
+                    if(typeof isAssignmentSearch != 'undefined' && isAssignmentSearch)
+                    {
+                        saveRejectCandidate(assignmentId, rejectionReason, true);
+                    }
+                    else
+                    {
+                        Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.RejectCandidate}',
+                            assignmentId, rejectionReason, null, null,
+                                function(result, event){
+                                    if (event.status)
+                                    {
+                                        // refresh the popup to remove the rejected candidate
+                                        jQuery.publish('kimble.candreviewrefresh');
+
+                                        // activity assignment delivery implementation of refresh
+                                        jQuery.publish('kimble.activityassignmentcandidatestatuschange', false);
+                                    }
+                                    else
+                                    {
+                                        hideSaving_Demand();
+                                        alert(event.message);
+                                    }
+                            },
+                            {escape: true, timeout: 60000}
+                        );
+                    }
+                }
+
+                function closeDemandDetails()
+                {
+                    hideModalBoxy();
+                }
+
+                function hideWorking_Demand()
+                {
+                    jQuery('#loadingIndicatorOuterContainer_Demand').hide();
+                }
+
+                function showWorking_Demand()
+                {
+                    jQuery('#loadingIndicatorOuterContainer_Demand').show();
+                }
+
+                function hideSaving_Demand()
+                {
+                    jQuery('#savingIndicatorOuterContainer_Demand').hide();
+                }
+
+                function showSaving_Demand()
+                {
+                    jQuery('#savingIndicatorOuterContainer_Demand').show();
+                }
+
+                function getDemandTableHeaderHtml(d)
+                {
+                    var html = '';
+
+                    html += '<thead>';
+                    html += '<th></th>'; //row headings
+                    html += '<th>';
+                    html += '<div class="dem-res-name res-details-tooltip" title="' + d.resName + '" data-tt-url="{!$Page.ResourceHover}?id=' + d.resId + '">' + d.resName + '</div>';
+                    html += '</th>';
+
+                    d.OrderedCandidateIds.forEach(function(k)
+                    {
+                        var c = d.CandidateMap[k];
+                        html += '<th>';
+                        html += '<div class="cand-res-name res-details-tooltip" title="' + c.cResName + '" data-tt-url="{!$Page.ResourceHover}?id=' + c.cResId + '">' + c.cResName + '</div>';
+                        html += '</th>';
+                    });
+
+                    d.OrderedNegativeCandidateIds.forEach(function(k)
+                    {
+                        var c = d.NegativeCandidateMap[k];
+                        html += '<th>';
+                        html += '<div class="cand-res-name res-details-tooltip" title="' + c.cResName + '" data-tt-url="{!$Page.ResourceHover}?id=' + c.cResId + '">' + c.cResName + '</div>';
+                        html += '</th>';
+                    });
+                    html += '</thead>';
+
+                    return html;
+                }
+
+                function getDemandTableSourceAndPrefRowHtml(d)
+                {
+                    var html = '';
+
+                    var lbl = '{!JSENCODE($Label.DetailsHeading)}';
+                    var val = '';
+
+                    html += '<tr class="cand-src">';
+                    html += '<td class="hdr-lbl"><div>' + lbl + '</div></td>'; //row headings
+                    html += '<td>' + val + '</td>';
+
+                    d.OrderedCandidateIds.forEach(function(k)
+                    {
+                        var c = d.CandidateMap[k];
+                        html += '<td>';
+                        html += '<div class="src-ind ' + c.srcEnum + '">';
+
+                        html += '<i class="fa ' + (c.isCandRes != undefined && c.isCandRes ? 'fa-user-circle' : 'fa-user') + ' fa-resource-type-specific ' + (c.cResType != undefined ? c.cResType.replace(/ /g,'-') : '') + '" title="' + c.cResType + '"></i>';
+
+                        if(c.srcEnum == 'Manual') html += '<i class="fa fa-search man-ind' + (c.isPreferred ? ' pref-c-ind' : '') + '" title="{!JSENCODE($Label.ManuallyAssignedSource)}"></i>';
+                        if(c.isPreferred) html += '<div class="cand-pill prf-ind" title="{!JSENCODE($Label.PreferredCandidate)}">{!UPPER(JSENCODE($Label.PreferredCandidatePill))}</div>';
+
+                        if(c.srcEnum == 'AutoMatch') html += '<i class="fa fa-puzzle-piece auto-ind" title="{!JSENCODE($Label.AutoMatchCandidateIndicator)}"></i>';
+
+                        if(c.srcEnum == 'ExpressInterest') html += '<i class="fa fa-bullhorn exp-ind' + (c.prefEnum == 'IdealRole' ? ' ideal-c-ind' : '') + '" title="{!JSENCODE($Label.ExpressInterestIndicator)}"></i>';
+                        if(c.prefEnum == 'IdealRole') html += '<div class="cand-pill ideal-ind" title="{!JSENCODE($Label.CandidateIdealRole)}">{!UPPER(JSENCODE($Label.CandidateIdealRolePill))}</div>';
+                        if(c.prefEnum == 'Consider') html += '<div class="cand-pill cons-ind" title="{!JSENCODE($Label.CandidateConsider)}">{!UPPER(JSENCODE($Label.CandidateConsiderPill))}</div>';
+
+                        if(c.notes) html += '<i class="fa fa-comment c-notes-ind" title="' + c.notes + '"></i>';
+
+                        html += '</div>';
+                        html += '</td>';
+                    });
+                    d.OrderedNegativeCandidateIds.forEach(function(k)
+                    {
+                        var c = d.NegativeCandidateMap[k];
+                        html += '<td>';
+                        html += '<div class="src-ind ' + c.srcEnum + '">';
+
+                        html += '<i class="fa fa-bullhorn exp-ind neg-c-ind" title="{!JSENCODE($Label.ExpressInterestIndicator)}"></i>';
+                        html += '<div class="cand-pill neg-c-ind" title="{!JSENCODE($Label.ResourceDoNotConsider)}">{!UPPER(JSENCODE($Label.ResourceDoNotConsiderPill))}</div>';
+
+                        if(c.notes) html += '<i class="fa fa-comment c-notes-ind" title="' + c.notes + '"></i>';
+
+                        html += '</div>';
+                        html += '</td>';
+                    });
+                    html += '</tr>';
+
+                    return html;
+                }
+
+                function getDemandTableActionRowHtml(d)
+                {
+                    var html = '';
+
+                    var lbl = '';
+                    var val = '';
+
+                    html += '<tr class="action-row">';
+                    html += '<td><div>' + lbl + '</div></td>'; //row headings
+                    html += '<td>' + val + '</td>';
+
+                    d.OrderedCandidateIds.forEach(function(k)
+                    {
+                        var c = d.CandidateMap[k];
+                        html += '<td>';
+                        html += '<div>';
+
+                        html += '<a href="javascript:void(0);" onclick="candReviewAccept(\'' + c.cAssId + '\', \'' + d.dAssId + '\', jQuery(this));" class="rev-c-acc rev-action-item" title="{!$Label.AcceptLabel}"><i class="fa fa-thumbs-o-up"></i></a>';
+                        html += '<a href="javascript:void(0);" onclick="candReviewReject(\'' + c.cAssId + '\', jQuery(this));" class="rev-c-rej rev-action-item" title="{!$Label.RejectLabel}"><i class="fa fa-thumbs-o-down"></i></a>';
+                        //html += '<a href="javascript:void(0);" onclick="candReviewDelete(\'' + c.cAssId + '\', jQuery(this));" class="rev-c-del rev-action-item"  title="{!JSENCODE($Label.DeleteButton)}" ><i class="fa fa fa-trash-o"></i></a>';
+
+                        html += '</div>';
+                        html += '</td>';
+                    });
+
+                    d.OrderedNegativeCandidateIds.forEach(function(k)
+                    {
+                        html += '<td></td>';
+                    });
+
+                    html += '</tr>';
+
+                    return html;
+                }
+
+                function getDemandTableRoleRowHtml(d)
+                {
+                    var html = '';
+
+                    var lbl = '{!$ObjectType.ActivityAssignment__c.Fields.ActivityRole__c.Label}';
+                    var val = (d.RoleName ? d.RoleName : '-');
+
+                    html += '<tr class="role-name">';
+                    html += '<td><div>' + lbl + '</div></td>'; //row headings
+                    html += '<td>' + val + '</td>';
+
+                    d.OrderedCandidateIds.forEach(function(k)
+                    {
+                        var c = d.CandidateMap[k];
+                        html += '<td>';
+                        html += '<div>';
+
+                        html += (c.PrimaryRoleName ? c.PrimaryRoleName : '-');
+
+                        html += '</div>';
+                        html += '</td>';
+                    });
+
+                    d.OrderedNegativeCandidateIds.forEach(function(k)
+                    {
+                        var c = d.NegativeCandidateMap[k];
+                        html += '<td>';
+                        html += '<div>';
+
+                        html += (c.PrimaryRoleName ? c.PrimaryRoleName : '-');
+
+                        html += '</div>';
+                        html += '</td>';
+                    });
+
+                    html += '</tr>';
+
+                    return html;
+                }
+
+                function getDemandTableLocationRowHtml(d)
+                {
+                    var html = '';
+
+                    var lbl = '{!$ObjectType.ActivityAssignment__c.Fields.Location__c.Label}';
+                    var val = (d.LocName ? d.LocName : '-');
+
+                    html += '<tr class="loc-name">';
+                    html += '<td><div>' + lbl + '</div></td>'; //row headings
+                    html += '<td>' + val + '</td>';
+
+                    d.OrderedCandidateIds.forEach(function(k)
+                    {
+                        var c = d.CandidateMap[k];
+                        html += '<td>';
+                        html += '<div>';
+
+                        html += (c.LocName ? c.LocName : '-');
+
+                        html += '</div>';
+                        html += '</td>';
+                    });
+
+                    d.OrderedNegativeCandidateIds.forEach(function(k)
+                    {
+                        var c = d.NegativeCandidateMap[k];
+                        html += '<td>';
+                        html += '<div>';
+
+                        html += (c.LocName ? c.LocName : '-');
+
+                        html += '</div>';
+                        html += '</td>';
+                    });
+                    html += '</tr>';
+
+                    return html;
+                }
+
+                function getDemandTableGradeRowHtml(d)
+                {
+                    var html = '';
+
+                    var lbl = '{!$ObjectType.Resource__c.Fields.Grade__c.Label}';
+                    var val = (d.GradeName ? d.GradeName : '-');
+
+                    html += '<tr class="grade-name">';
+                    html += '<td><div>' + lbl + '</div></td>'; //row headings
+                    html += '<td>' + val + '</td>';
+
+                    d.OrderedCandidateIds.forEach(function(k)
+                    {
+                        var c = d.CandidateMap[k];
+                        html += '<td>';
+                        html += '<div>';
+
+                        html += (c.GradeName ? c.GradeName : '-');
+
+                        html += '</div>';
+                        html += '</td>';
+                    });
+
+                    d.OrderedNegativeCandidateIds.forEach(function(k)
+                    {
+                        var c = d.NegativeCandidateMap[k];
+                        html += '<td>';
+                        html += '<div>';
+
+                        html += (c.GradeName ? c.GradeName : '-');
+
+                        html += '</div>';
+                        html += '</td>';
+                    });
+                    html += '</tr>';
+
+                    return html;
+                }
+
+                function getDemandTableRevRateRowHtml(d)
+                {
+                    var html = '';
+                    if(!d.ShowRevenue) return html;
+
+                    var lbl = '{!$ObjectType.ActivityAssignment__c.Fields.RevenueRate__c.Label}' + ' (' + d.Units + ')';
+                    var val = (d.RevRates ? JSON.stringify(d.RevRates) : '');
+
+                    html += '<tr class="rev-rate">';
+                    html += '<td><div>' + lbl + '</div></td>'; //row headings
+                    html += "<td>" + d.RevCurr + " <span class='temp-revenue-rate' data-revenue-rate='" + val + "' conv-factor='" + d.ForecastToInvoiceConversionFactor + "'/></td>";
+
+                    d.OrderedCandidateIds.forEach(function(k)
+                    {
+                        var c = d.CandidateMap[k];
+                        html += '<td>';
+                        html += '<div>';
+
+                        html += (c.RevRate ? kimble.formatNumber(c.RevRate, c.RevCurr + ' #,###.00') : '');
+
+                        html += '</div>';
+                        html += '</td>';
+                    });
+                    d.OrderedNegativeCandidateIds.forEach(function(k)
+                    {
+                        html += '<td class="no-dets"></td>';
+                    });
+                    html += '</tr>';
+
+                    return html;
+                }
+
+                function getDemandTableCostRateRowHtml(d)
+                {
+                    var html = '';
+
+                    var lbl = '{!$ObjectType.ActivityAssignment__c.Fields.CostRate__c.Label}' + ' (' + d.Units+ ')';
+                    var val = (d.CostRates ? JSON.stringify(d.CostRates) : '');
+
+                    html += '<tr class="cost-rate">';
+                    html += '<td><div>' + lbl + '</div></td>'; //row headings
+                    html += "<td>" + d.CostCurr + " <span class='temp-cost-rate' data-cost-rate='" + val + "' conv-factor='" + d.ForecastToInvoiceConversionFactor + "'/></td>";
+
+                    d.OrderedCandidateIds.forEach(function(k)
+                    {
+                        var c = d.CandidateMap[k];
+                        html += '<td>';
+                        html += '<div>';
+
+                        html += (c.CostRate ? kimble.formatNumber(c.CostRate, c.CostCurr + ' #,###.00') : '');
+
+                        html += '</div>';
+                        html += '</td>';
+                    });
+                    d.OrderedNegativeCandidateIds.forEach(function(k)
+                    {
+                        html += '<td class="no-dets"></td>';
+                    });
+                    html += '</tr>';
+
+                    return html;
+                }
+
+                function getDemandTableMarginRowHtml(d)
+                {
+                    var html = '';
+                    if(!d.ShowRevenue) return html;
+
+                    var lbl = '{!JSENCODE($ObjectType.ActivityAssignment__c.fields.Margin__c.Label)}';
+                    var dMarginVal = (d.MarginPct ? d.MarginPct : 0);
+                    var val = (d.MarginPct ? kimble.formatNumber(dMarginVal, '###.##') : '');
+
+                    html += '<tr class="d-marg">';
+                    html += '<td><div>' + lbl + '</div></td>'; //row headings
+                    html += '<td>' + val + '</td>';
+
+                    d.OrderedCandidateIds.forEach(function(k)
+                    {
+                        var c = d.CandidateMap[k];
+                        html += '<td>';
+                        html += '<div>';
+
+                        var cMarginVal = (c.MarginPct ? c.MarginPct : 0);
+                        html += (c.MarginPct ? kimble.formatNumber(cMarginVal, '###.##') : '');
+                        html += '<i class="fa ' + (cMarginVal < dMarginVal ? 'fa-arrow-circle-down neg-ind' : (cMarginVal > dMarginVal ? 'fa-arrow-circle-up pos-ind' : 'fa-check-square pos-ind')) + '"></i>';
+                        html += '</div>';
+                        html += '</td>';
+                    });
+                    d.OrderedNegativeCandidateIds.forEach(function(k)
+                    {
+                        html += '<td class="no-dets"></td>';
+                    });
+                    html += '</tr>';
+
+                    return html;
+                }
+
+                function getDemandTableStartDateRowHtml(d)
+                {
+                    var html = '';
+
+                    var lbl = '{!$ObjectType.ActivityAssignmentDemand__c.Fields.StartDate__c.Label}';
+                    var val = (d.SDUTC ? kimble.formatDate(d.SDUTC) : '');
+
+                    html += '<tr class="d-sd">';
+                    html += '<td><div>' + lbl + '</div></td>'; //row headings
+                    html += '<td>' + val + '</td>';
+
+                    d.OrderedCandidateIds.forEach(function(k)
+                    {
+                        var c = d.CandidateMap[k];
+                        html += '<td>';
+                        html += '<div>';
+
+                        html += (c.SDUTC ? kimble.formatDate(c.SDUTC) : '');
+                        if(d.SDUTC != c.SDUTC) html += '<i class="fa fa-exclamation-triangle rev-ind"></i>';
+
+                        html += '</div>';
+                        html += '</td>';
+                    });
+                    d.OrderedNegativeCandidateIds.forEach(function(k)
+                    {
+                        html += '<td class="no-dets"></td>';
+                    });
+                    html += '</tr>';
+
+                    return html;
+                }
+
+                function getDemandTableEndDateRowHtml(d)
+                {
+                    var html = '';
+
+                    var lbl = '{!$ObjectType.ActivityAssignmentDemand__c.Fields.EndDate__c.Label}';
+                    var val = (d.EDUTC ? kimble.formatDate(d.EDUTC) : '');
+
+                    html += '<tr class="d-ed">';
+                    html += '<td><div>' + lbl + '</div></td>'; //row headings
+                    html += '<td>' + val + '</td>';
+
+                    d.OrderedCandidateIds.forEach(function(k)
+                    {
+                        var c = d.CandidateMap[k];
+                        html += '<td>';
+                        html += '<div>';
+
+                        html += (c.EDUTC ? kimble.formatDate(c.EDUTC) : '');
+                        if(d.EDUTC != c.EDUTC) html += '<i class="fa fa-exclamation-triangle rev-ind"></i>';
+
+                        html += '</div>';
+                        html += '</td>';
+                    });
+                    d.OrderedNegativeCandidateIds.forEach(function(k)
+                    {
+                        html += '<td class="no-dets"></td>';
+                    });
+                    html += '</tr>';
+
+                    return html;
+                }
+
+                function getDemandTableUtilisationRowHtml(d)
+                {
+                    var html = '';
+
+                    var lbl = '{!$ObjectType.ActivityAssignment__c.Fields.UtilisationPercentage__c.Label}';
+                    var val = (d.Util ? kimble.formatNumber(d.Util, '###.##') : '');
+
+                    html += '<tr class="d-util">';
+                    html += '<td><div>' + lbl + '</div></td>'; //row headings
+                    html += '<td>' + val + '</td>';
+
+                    d.OrderedCandidateIds.forEach(function(k)
+                    {
+                        var c = d.CandidateMap[k];
+                        html += '<td>';
+                        html += '<div>';
+
+                        html += (c.Util ? kimble.formatNumber(c.Util, '###.##') : '');
+
+                        html += '</div>';
+                        html += '</td>';
+                    });
+                    d.OrderedNegativeCandidateIds.forEach(function(k)
+                    {
+                        html += '<td class="no-dets"></td>';
+                    });
+                    html += '</tr>';
+
+                    return html;
+                }
+
+                function getDemandTableEffortRowHtml(d)
+                {
+                    var html = '';
+
+                    var lbl = '{!JSENCODE($Label.DeliveryGroupDashboardMainContentEffort)}' + ' (' + d.UsageUnits+ ')';
+                    var val = (d.Effort ? kimble.formatNumber(d.Effort, '###.##') : '');
+
+                    html += '<tr class="d-effort">';
+                    html += '<td><div>' + lbl + '</div></td>'; //row headings
+                    html += '<td>' + val + '</td>';
+
+                    d.OrderedCandidateIds.forEach(function(k)
+                    {
+                        var c = d.CandidateMap[k];
+                        html += '<td>';
+                        html += '<div>';
+
+                        html += (c.Effort ? kimble.formatNumber(c.Effort, '###.##') : '');
+
+                        html += '</div>';
+                        html += '</td>';
+                    });
+                    d.OrderedNegativeCandidateIds.forEach(function(k)
+                    {
+                        html += '<td class="no-dets"></td>';
+                    });
+                    html += '</tr>';
+
+                    return html;
+                }
+
+                function getDemandTableNextAvailableHtml(d)
+                {
+                    var html = '';
+
+                    var lbl = '{!$ObjectType.Resource__c.Fields.LatestP1AssignmentEndDate__c.Label}';
+                    var val = (d.NADUTC ? kimble.formatDate(d.NADUTC) : '');
+
+                    html += '<tr class="d-nad">';
+                    html += '<td><div>' + lbl + '</div></td>'; //row headings
+                    html += '<td>' + val + '</td>';
+
+                    d.OrderedCandidateIds.forEach(function(k)
+                    {
+                        var c = d.CandidateMap[k];
+                        html += '<td>';
+                        html += '<div>';
+
+                        html += (c.NADUTC ? kimble.formatDate(c.NADUTC) : '-');
+                        if(c.NADUTC && c.NADUTC.toDate() > d.SDUTC.toDate()) html += '<i class="fa fa-exclamation-triangle rev-ind"></i>';
+
+                        html += '</div>';
+                        html += '</td>';
+                    });
+                    d.OrderedNegativeCandidateIds.forEach(function(k)
+                    {
+                        html += '<td class="no-dets"></td>';
+                    });
+                    html += '</tr>';
+
+                    return html;
+                }
+
+                function getDemandTableCapabilitiesHtml(d)
+                {
+                    var html = '';
+
+                    var lbl = '{!$ObjectType.RequiredCapability__c.LabelPlural}';
+
+                    html += '<tr class="cap-hdr">';
+                    html += '<td><div>' + lbl + '</div></td>'; //row headings
+                    html += '<td></td>';
+
+                    d.OrderedCandidateIds.forEach(function(k)
+                    {
+                        html += '<td></td>';
+                    });
+                    d.OrderedNegativeCandidateIds.forEach(function(k)
+                    {
+                        html += '<td></td>';
+                    });
+
+                    html += '</tr>';
+
+                    d.OrderedCapabilityIds.forEach(function(ck)
+                    {
+                        var cap = d.Capabilities[ck];
+
+                        var ratingVal = (cap.RatingType == 'NumericRating' ? (cap.MinimumNumericRating != null ? cap.MinimumNumericRating : 0) : 1);
+                        var ratingValDisp = (cap.RatingType == 'NumericRating' ? (cap.MinimumNumericRatingText != undefined && cap.MinimumNumericRatingText != null ? cap.MinimumNumericRatingText : (cap.MinimumNumericRating != null ? cap.MinimumNumericRating : '')) : '<i class="fa fa-check"></i>');
+
+                        html += '<tr class="cap-det' + (cap.IsMandatory ? ' mand-cap' : '') + '">';
+                        html += '<td><div class="cap-n">' + cap.TypeName + (cap.IsMandatory ? '<i class="fa fa-asterisk"></i>' : '') + '</div></td>'; //row headings
+                        html += '<td><div class="cap-r">' + ratingValDisp + '</div></td>';
+
+                        d.OrderedCandidateIds.forEach(function(k)
+                        {
+                            var c = d.CandidateMap[k];
+                            var cRatingValDisp = '';
+                            if(ck in c.ResCaps)
+                            {
+                                var cCap = c.ResCaps[ck];
+                                var cRatingVal = (cCap.RatingType == 'NumericRating' ? (cCap.NumericRating != null ? cCap.NumericRating : 0) : 1);
+                                cRatingValDisp = (cCap.RatingType == 'NumericRating' ? (cCap.NumericRatingCode != undefined && cCap.NumericRatingCode != null ? cCap.NumericRatingCode : (cCap.NumericRating != null ? cCap.NumericRating : '')) : '<i class="fa fa-check"></i>');
+                                var matchInd = (ratingVal == cRatingVal ? '<i class="fa fa-check-square meets-cap-ind"></i>' : (ratingVal < cRatingVal ? '<i class="fa fa-arrow-circle-up exceeds-cap-ind pos-ind"></i>' : (ratingVal > cRatingVal ? '<i class="fa fa-arrow-circle-down below-cap-ind rev-ind"></i>' : '')));
+
+                                var expInd = '';
+                                if(cCap.ExpDteUTC != undefined
+                                    && cCap.ExpDteUTC != null)
+                                {
+                                    var expiryDateAsDate = kimble.parseDate(kimble.formatDate(cCap.ExpDteUTC), true);
+                                    var expiryDateWithoutTime = new Date(expiryDateAsDate.getFullYear(), expiryDateAsDate.getMonth(), expiryDateAsDate.getDate(), 0, 0, 0, 0);
+
+                                    var expiryClass = '';
+                                    if(expiryDateWithoutTime < new Date()) expiryClass = ' expired';
+                                    expInd += '<i expiry-date="' + cCap.ExpDteUTC + '" class="expiry-cap-ind rev-ind fa fa-exclamation-circle' + expiryClass + '"></i>'
+                                }
+
+                                html += '<td class="cap-held"><div class="c-cap-r">' + cRatingValDisp + matchInd + expInd + '</div></td>';
+                            }
+                            else
+                            {
+                                cRatingVal = (cap.IsMandatory ? '<i class="fa fa-exclamation-triangle mand-cap-missing"></i>' : '') + '<i class="fa fa-times"></i>';
+                                html += '<td class="cap-missing"><div class="c-cap-r">' + cRatingVal + '</div></td>';
+                            }
+                        });
+
+                        d.OrderedNegativeCandidateIds.forEach(function(k)
+                        {
+                            html += '<td class="no-dets"></td>';
+                        });
+
+                        html += '</tr>';
+                    });
+
+                    return html;
+                }
+
+                function getDemandTableBodyHtml(d)
+                {
+                    var html = '';
+
+                    html += getDemandTableSourceAndPrefRowHtml(d);
+                    html += getDemandTableActionRowHtml(d);
+                    html += getDemandTableRoleRowHtml(d);
+                    html += getDemandTableLocationRowHtml(d);
+                    html += getDemandTableGradeRowHtml(d);
+                    html += getDemandTableRevRateRowHtml(d);
+                    if (d.CanViewCost) html += getDemandTableCostRateRowHtml(d);
+                    if (d.CanViewCost) html += getDemandTableMarginRowHtml(d);
+                    html += getDemandTableStartDateRowHtml(d);
+                    html += getDemandTableEndDateRowHtml(d);
+                    html += getDemandTableUtilisationRowHtml(d);
+                    html += getDemandTableEffortRowHtml(d);
+                    html += getDemandTableNextAvailableHtml(d);
+                    if(d.OrderedCapabilityIds.length) html += getDemandTableCapabilitiesHtml(d);
+
+                    return html;
+                }
+
+                function getDemandRejReasonsHtml(d)
+                {
+                    var html = '';
+
+                    if(d.OrderedRejectionReasonIds.length == 0) return html;
+
+                    html += '<div class="rej-reasons">';
+                    html += '<div class="rej-reason-lab">{!$ObjectType.ActivityAssignment__c.fields.CandidateRejectionReason__c.label}</div>';
+                    html += '<select class="rej-reason-select">';
+                    d.OrderedRejectionReasonIds.forEach(function(k)
+                    {
+                        var r = d.RejectionReasonsMap[k];
+                        html += '<option value="' + k + '">' + r + '</option>';
+                    });
+                    html += '</select>';
+                    html += '<div class="rej-reason-actions">';
+                    html += '<i class="fa fa-thumbs-o-down" title="{!$Label.RejectLabel}" onclick="candReviewRejectSave();"></i>';
+                    html += '<i class="fa fa-times-circle" title="{!$Label.Cancel}" onclick="candReviewRejectCancel();"></i>';
+                    html += '</div>';
+                    html += '</div>';
+
+                    return html;
+                }
+
+                function getDemandDetailsHeaderHtml(d)
+                {
+                    var html = '';
+
+                    html += '<div class="review-toolbar title-card">';
+                    html += '<i class="close-rev-c-btn action-btn fa fa-times-circle" title="{!$Label.Close}"></i>';
+                    html += '</div>';
+
+                    return html;
+                }
+
+                function getDemandDetailsHtml(d)
+                {
+                    var html = '';
+
+                    html += '<table class="demand-table list">';
+
+                    html += '<thead>';
+                    html += getDemandTableHeaderHtml(d);
+                    html += '</thead>';
+
+                    html += '<tbody>';
+                    html += getDemandTableBodyHtml(d);
+                    html += '</tbody>';
+
+                    html += '</table>';
+
+                    return html;
+                }
+
+                function populateDemand()
+                {
+                    jQuery('#demand-hdr-container').html(getDemandDetailsHeaderHtml(theDemand));
+                    jQuery('#demand-rej-reasons-container').html(getDemandRejReasonsHtml(theDemand));
+                    jQuery('#demand-dets-container').html(getDemandDetailsHtml(theDemand));
+
+                    initialiseDynamicElements_Demand();
+
+                    hideWorking_Demand()
+                    hideSaving_Demand()
+                    showModalBoxy();
+                }
+
+                function getDemandDetails()
+                {
+                    showWorking_Demand();
+
+                    Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.AssignmentDemandCandidateReviewCntrllr.GetDemandDetails}',
+                        dId,
+                            function(result, event){
+                                if (event.status)
+                                {
+                                    theDemand = result;
+                                    populateDemand();
+                                    //resetHasChanges();
+                                }
+                                else
+                                {
+                                    alert(event.message);
+                                }
+
+                                hideWorking_Demand();
+                        },
+                     {escape: false, timeout: 60000});
+                }
+            </script>
+        </apex:outputPanel>
+    </div>
+</apex:page>

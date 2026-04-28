@@ -1,0 +1,474 @@
+<apex:page controller="KimbleOne.ConfigurationDataManagementController" sidebar="false">
+	<apex:composition template="KimbleOne__SiteMaster">
+		<apex:define name="Menu">
+			<c:Menu HelpSource="CfgGuide" DefaultHelpPage="WhatcanIdoinKimble.html" MenuContextName="{!$Label.kimbleone__configdatamgmtlabel}" />
+		</apex:define>
+		<apex:define name="Content">
+		<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+		
+			<style>
+				#triggers-disabled-overlay {
+					top: 0 !important;
+					height: 16% !important;
+					background-color: #FF4242 !important;
+					position: fixed !important;
+				}
+				#triggers-disabled-message {
+					top: 0 !important;
+					color: #FFFFFF !important;
+					font-size: 28px !important;
+					margin-top: auto !important;
+					height: auto !important;
+				}
+				
+				/* Feature Management */
+				.page-link, .config-item {
+					display: block;
+					padding: 10px 15px;
+					border-bottom: 1px solid #DDD;
+					background-color: white;
+					border-radius: 3px;
+				}
+				.link-icon {
+					font-size: 26px;
+					padding-right: 10px;
+					vertical-align: middle;
+				}
+				.config-item {
+				    position: relative;
+			        height: 26px;
+				    line-height: 26px;
+				    margin-bottom: 5px;
+				    width: 1000px;
+				}
+				.config-item:hover {
+				    background-color: #e3feff;
+				}				
+				.config-item-heading {
+					padding-right: 10px;
+				    font-size: 14px;
+				}
+				.config-working-ind {
+					position: absolute;
+					right: 5px;
+				}
+				.boolean-config-item {
+					font-size: 26px;
+				    cursor: pointer;
+			        position: absolute;
+    				right: 38px;
+				}
+				.boolean-configsetting-item {
+					font-size: 26px;
+				    cursor: pointer;
+			        position: absolute;
+    				right: 38px;
+				}
+				.integer-config-item {
+				    font-size: 17px;
+				    position: absolute;
+				    right: 10px;
+				    top: 8px;
+				    text-align: center;
+				    padding: 2px;
+				    width: 80px;
+				}			
+				.string-config-item {
+				    font-size: 17px;
+				    position: absolute;
+				    right: 10px;
+				    top: 8px;
+				    text-align: center;
+				    padding: 2px; 
+				    width: 200px;
+				}
+				.date-config-item {
+				    font-size: 17px;
+				    position: absolute;
+				    right: 10px;
+				    top: 8px;
+				    text-align: center;
+				    padding: 2px; 
+				    width: 200px;
+				}
+				.config-item-placeholder {
+			        font-size: 26px;
+				    position: absolute;
+				    right: 40px;
+				    top: 8px;
+				    text-align: center;
+			        z-index: 999;
+				}
+				.select-config-item {
+				    font-size: 17px;
+				    position: absolute;
+				    right: 10px;
+				    top: 8px;
+				    text-align: left;
+				    padding: 2px; 
+				    width: 300px;
+				}
+				.hierarchy-setting-ind {
+				    font-size: 20px;
+				    color: #428BCA;
+				}
+				i.always-disabled {
+					color: #aaa;
+					cursor: default !important;
+				}
+				.alert-setting {
+				    color: #B42E34;
+				    background: yellow;
+				    border: dashed;
+				}
+				.alert-setting:hover {
+				    background: #ffff5a !important;
+				}
+				.RecalcResAnaLoading {
+				    display: inline;
+				    margin-left: 10px;
+				}
+				
+				.RecalcResAnaPanel {
+				    display: inline;
+				}				
+			</style>
+
+			<apex:pageblock rendered="{!ShowConfigIndex && $ObjectType.KimbleOne__ConfigurationIndex__c.accessible}">
+				<apex:pageBlockSection columns="1" >
+					<apex:outputLink styleClass="page-link" value="{!$Page.KimbleOne__ConfigurationIndexSearch}"><i class="fa fa-search link-icon"></i><apex:outputText value="Search all Kimble Configuration"/></apex:outputLink>
+				</apex:pageBlockSection>
+			</apex:pageblock>
+
+			<apex:pageblock >
+			<apex:pageBlockSection columns="2">
+				<apex:outputLink styleClass="page-link" value="{!ConfigurationExportObjectPage}"><i class="fa fa-upload link-icon"></i>{!ConfigurationExportObjectName}</apex:outputLink>
+				<apex:outputLink styleClass="page-link" value="{!$Page.KimbleOne__ConfigurationDataAudit}"><i class="fa fa-info-circle link-icon"></i>{!$Label.ConfigDataAuditLabel}</apex:outputLink>
+				<apex:outputLink styleClass="page-link" value="{!ConfigurationImportObjectPage}"><i class="fa fa-download link-icon"></i>{!ConfigurationImportObjectName}</apex:outputLink>
+				<apex:outputLink styleClass="page-link" value="{!$Page.KimbleOne__SecurityConfiguration}"><i class="fa fa-key link-icon"></i>Analyse Kimble Security Configuration</apex:outputLink>
+				<apex:outputLink styleClass="page-link" value="{!$Page.KimbleOne__ConfigurationSettings}"><i class="fa fa-cog link-icon"></i><apex:outputText value="{!$Label.kimbleone__orgwidesettings}"/></apex:outputLink>
+				<apex:outputLink styleClass="page-link" value="{!$Page.KimbleOne__ConfigurationCatalog}"><i class="fa fa-list-ul link-icon"></i><apex:outputText value="{!$ObjectType.KimbleOne__ConfigurationCatalogItem__c.labelPlural}"/></apex:outputLink>
+				<span></span>
+			</apex:pageBlockSection>
+			</apex:pageblock>
+
+			<!-- TODO FORMAT THESE -->
+			<apex:form >
+			<apex:pageBlock title="Moved from Upgrade Scripts">
+			<apex:pageBlockSection title="Reset Resource Temporal Fields">
+      			<div class="ResetResTempFieldsPanel">
+         			<input type="button" class="btn" value="Run" onclick="ResetResourceTemporalFields()"/>
+         		</div>
+         		<div class="ResetResTempFieldsLoading" style="display:none">
+         			<span class="job processing"><span class="ResetResTempFieldsStatus">Preparing</span></span>
+         		</div>
+         		<apex:outputText value="" styleclass="ResetResTempFieldsResult"></apex:outputText>
+         	</apex:pageBlockSection>
+			<apex:pageBlockSection title="Recalculate Resource Analyses">
+      			<div class="RecalcResAnaPanel">
+         			<input type="button" class="btn" value="Run" onclick="RecalculateResourceAnalysesForAllResources()"/>
+         		</div>
+         		<div class="RecalcResAnaLoading" style="display:none">
+         			<span class="RecalcResAnaStatus">Preparing</span>
+         		</div>
+         		<apex:outputText value="" styleclass="RecalcResAnaResult"></apex:outputText>
+         	</apex:pageBlockSection>
+			<apex:pageBlockSection title="Find references to obsolete fields in field formulas">
+	      		<input type="button" class='btn' onclick="findObsoletFormulaReferences();" value="Run" rerender="optional"/>
+	         	<div id="obsolete-formula-ref-output"></div>
+	      	</apex:pageBlockSection>
+			<apex:pageBlockSection title="Create Allowance Scheme Journey Locations for each Allowance Scheme Region">
+      			<div class="AllowJLPanel">
+         			<input type="button" class="btn" value="Run" onclick="CreateDefaultJourneyLocationsForAllSchemes()"/>
+         		</div>
+         		<div class="AllowJLLoading" style="display:none">
+         			<span class="AllowJLStatus">Working</span>
+         		</div>
+         		<apex:outputText value="" styleclass="AllowJLResult"></apex:outputText>
+         	</apex:pageBlockSection>
+			<apex:pageBlockSection title="Find references to obsolete fields in field formulas">
+	      		<input type="button" class='btn' onclick="findObsoletFormulaReferences();" value="Run" rerender="optional"/>
+	         	<div id="obsolete-formula-ref-output"></div>
+	      	</apex:pageBlockSection>
+	      	<apex:pageBlockSection title="Create Default Sales Menu">
+	      			<apex:commandButton action="{!CreateDefaultProposalMenu}" value="Run" rerender="optional"/>
+	         		<apex:outputText value="{!CreateDefaultProposalMenuMessage}"></apex:outputText>
+	      		</apex:pageBlockSection>
+		  		
+		  		<apex:pageBlockSection title="Create Default Delivery Menu">
+	      			<apex:commandButton action="{!CreateDefaultDeliveryMenu}" value="Run" rerender="optional"/>
+	         		<apex:outputText value="{!CreateDefaultDeliveryMenuMessage}"></apex:outputText>
+	      		</apex:pageBlockSection>
+	      		
+	      		<apex:pageBlockSection title="Create Default Delivery Portfolio Menu">
+	      			<apex:commandButton action="{!CreateDeliveryPortfolioMenu}" value="Run" rerender="optional"/>
+	         		<apex:outputText value="{!CreateDeliveryPortfolioMenuMessage}"></apex:outputText>
+	      		</apex:pageBlockSection>
+	      		
+	      		<apex:pageBlockSection title="Create Default Supplier Invoice Menu">
+	      			<apex:commandButton action="{!CreateSupplierInvoiceMenu}" value="Run" rerender="optional"/>
+	         		<apex:outputText value="{!CreateSupplierInvoiceMenuMessage}"></apex:outputText>
+	      		</apex:pageBlockSection>
+	      		
+	      		<apex:pageBlockSection title="Create Default Supplier Requisition Menu">
+	      			<apex:commandButton action="{!CreateSupplierRequisitionMenu}" value="Run" rerender="optional"/>
+	         		<apex:outputText value="{!CreateSupplierRequisitionMenuMessage}"></apex:outputText>
+	      		</apex:pageBlockSection>
+	      		
+	      		<apex:pageBlockSection title="Seed Daily Kimble Exchange Rate Sync Job">
+	      			<apex:commandButton action="{!SeedSyncExchangeRatesJob}" value="Run" rerender="optional"/>
+	         		<apex:outputText value="{!SeedSyncExchangeRatesJobMessage}"></apex:outputText>
+	      		</apex:pageBlockSection>
+		  		
+	      		<apex:pageBlockSection title="Seed Timesheet Notification Email Job">
+	      			<apex:commandButton action="{!SeedTimesheetNotificationEmailJob}" value="Run" rerender="optional"/>
+	         		<apex:outputText value="{!SeedTimesheetNotificationEmailJobMessage}"></apex:outputText>
+	      		</apex:pageBlockSection>
+	
+	      		<apex:pageBlockSection title="Seed Batch Generate Invoices Job">
+	      			<apex:commandButton action="{!SeedBatchGenerateInvoicesJob}" value="Run" rerender="optional"/>
+	         		<apex:outputText value="{!SeedBatchGenerateInvoicesJobMessage}"></apex:outputText>
+	      		</apex:pageBlockSection>
+	      		
+	      		<apex:pageBlockSection title="Seed Batch Generate Supplier Invoices Job">
+	      			<apex:commandButton action="{!SeedBatchGenerateSupplierInvoicesJob}" value="Run" rerender="optional"/>
+	         		<apex:outputText value="{!SeedBatchGenerateSupplierInvoicesJobMessage}"></apex:outputText>
+	      		</apex:pageBlockSection>
+
+				<apex:pageBlockSection title="Reset Rate Card Item Combination Keys">
+					<apex:commandButton action="{!ResetRateCardItemCombinationKeys}" value="Run"/>
+				</apex:pageBlockSection>
+
+				<apex:pageBlockSection title="Load Configuration Index" columns="1">
+					<apex:panelGrid columns="3">
+						<apex:commandButton action="{!LoadConfigurationIndex}" value="Load"/>
+						<input type="button" class="btn" onclick="downloadConfigurationIndexImportTemplate();" value="Download Import Template"/>
+						<input type="button" class="btn" onclick="configIndexUploadClick();" value="{!$Label.ImportFromFileLabel}"/>
+					</apex:panelGrid>
+				</apex:pageBlockSection>
+		      	</apex:pageBlock>
+		      	
+		      </apex:form>
+
+			<apex:form id="ConfigIndexUploadForm" enctype="multipart/form-data">
+				<apex:actionRegion >
+					<div id="ConfigIndexUploadPopup" style="display:none">
+						<apex:outputPanel id="ConfigIndexUploadPanel" >
+							<apex:pageMessages />
+							<apex:pageBlock >
+								<apex:pageBlockButtons styleClass="UploadPanelButtons" location="bottom">
+									<input type="button" class="btn" value="{!$Label.Upload}" onClick="DisableButtonPanel('UploadPanelButtons','Reloading...','');importIndices();"/>
+									<input type="button" class="btn" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+								</apex:pageBlockButtons>
+
+								<apex:pageBlockSection columns="1" collapsible="false" >
+									<apex:pageBlockSectionItem >
+										<apex:outputText value="{!$Label.kimbleone__file}" />
+										<apex:inputFile value="{!FileBody}" filename="{!FileName}" accept=".csv"/>
+									</apex:pageBlockSectionItem>
+								</apex:pageBlockSection>
+							</apex:pageBlock>
+						</apex:outputPanel>
+					</div>
+				</apex:actionRegion>
+				<apex:actionFunction name="importIndices" action="{!ImportConfigIndices}"/>
+			</apex:form>
+
+			<script>
+				function RecalculateResourceAnalysesForAllResources()
+				{
+					jQuery('.RecalcResAnaLoading').show();
+					
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ConfigurationDataManagementController.RecalculateResourceAnalysesForAllResources}',
+						function(result, event){
+			 				if (event.status) // finished
+			                {
+			                	var linkHref = '{!$Page.AsyncJobMonitor}?title=Recalculate%20Resource%20Aggregate%20Usage&batchid=' + result;
+			                	jQuery('.RecalcResAnaStatus').html('<a href="' + linkHref + '">Batch id:' + result + '</a>');
+			            	} 
+			            	else if (event.type === 'exception') 
+			            	{
+								jQuery('.RecalcResAnaResult').html('Failed: ' + event.message);
+			            	} 
+			            	else 
+			            	{
+								jQuery('.RecalcResAnaResult').html('Failed: ' + event.message);
+			            	}   	
+			            }, 
+			            {escape: true, buffer: false, timeout: 120000});
+				}
+				
+				function CreateDefaultJourneyLocationsForAllSchemes()
+				{
+					jQuery('.AllowJLStatus').html('Working');
+					jQuery('.AllowJLLoading').show();
+					
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ConfigurationDataManagementController.CreateDefaultJourneyLocationsForAllSchemes}',
+						function(result, event){
+			 				if (event.status) // finished
+			                {
+			                	jQuery('.AllowJLStatus').html('Complete');
+			            	} 
+			            	else if (event.type === 'exception') 
+			            	{
+								jQuery('.AllowJLResult').html('Failed: ' + event.message);
+			            	} 
+			            	else 
+			            	{
+								jQuery('.AllowJLResult').html('Failed: ' + event.message);
+			            	}   	
+			            }, 
+			            {escape: true, buffer: false, timeout: 120000});
+				}
+				
+				var recalcResFieldsCounter = 0;
+		
+				function ResetResourceTemporalFields()
+				{
+					if(!confirm('This process will clear and reset all Temporal fields on all Resources, this will include removing any current tracking of historical rates.  Are you sure?')) return;
+					
+					jQuery('.ResetResTempFieldsPanel').css('display','none');
+					jQuery('.ResetResTempFieldsLoading').css('display','');
+					
+					jQuery('.ResetResTempFieldsStatus').html('Resetting Resource fields');
+					jQuery('.ResetResTempFieldsResult').html('Working');
+								
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ConfigurationDataManagementController.ResetResourceTemporalProperties}',
+						function(result, event){
+			 				if (event.status) // finished
+			                {
+			                	jQuery('.ResetResTempFieldsStatus').html('Resetting Resource fields');
+			                	recalcResFieldsCounter = result;
+			                	
+			                	if(recalcResFieldsCounter > 0)
+			                	{
+				                	jQuery('.ResetResTempFieldsStatus').html('Resources To Process: ' + recalcResFieldsCounter);
+				                	RecalcResourceTemporalFields();
+			                	}
+			                	else
+			                	{
+			                		jQuery('.ResetResTempFieldsStatus').html('Stopped');
+			                		jQuery('.ResetResTempFieldsResult').html('No Resources to Process');
+			                		jQuery('.ResetResTempFieldsLoading').find('.job').removeClass('processing').addClass('complete');
+			                	}
+			            	} 
+			            	else if (event.type === 'exception') 
+			            	{
+								jQuery('.ResetResTempFieldsResult').html('Failed: ' + event.message);
+								jQuery('.ResetResTempFieldsLoading').find('.job').removeClass('processing').addClass('failed');
+			            	} 
+			            	else 
+			            	{
+								jQuery('.ResetResTempFieldsResult').html('Failed: ' + event.message);
+								jQuery('.ResetResTempFieldsLoading').find('.job').removeClass('processing').addClass('failed');
+			            	}   	
+			            }, 
+			            {escape: true, buffer: false, timeout: 120000});
+				}
+				
+				function RecalcResourceTemporalFields()
+				{
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ConfigurationDataManagementController.SetResourceTemporalProperties}',
+						function(result, event){
+			 				if (event.status) // finished
+			                {
+								if (result == '') // finished
+				                {
+				        			//completed
+									jQuery('.ResetResTempFieldsResult').text('Complete');
+									jQuery('.ResetResTempFieldsStatus').html('');
+									jQuery('.ResetResTempFieldsPanel').css('display','');
+									jQuery('.ResetResTempFieldsLoading').css('display','none');
+								}
+								else
+								{
+				        			recalcResFieldsCounter -= 1;
+				        			jQuery('.ResetResTempFieldsStatus').html('Resources To Process: ' + recalcResFieldsCounter);
+									RecalcResourceTemporalFields();//uncompleted run again
+								}
+			            	} 
+			            	else if (event.type === 'exception') 
+			            	{
+								jQuery('.ResetResTempFieldsResult').text('Resource Update Error: ' + event.message);
+								jQuery('.ResetResTempFieldsLoading').find('.job').removeClass('processing').addClass('failed');
+			            	} 
+			            	else 
+			            	{
+								jQuery('.ResetResTempFieldsResult').text('Resource Update Error: ' + result);
+								jQuery('.ResetResTempFieldsLoading').find('.job').removeClass('processing').addClass('failed');
+			            	}   	
+			            }, 
+			            {escape: true, buffer: false, timeout: 120000});
+				}
+				
+				var findObsoletFormulaReferences = function() {
+			jQuery('#obsolete-formula-ref-output').empty().append(jQuery('<p/>').text('searching..'))
+			var output = jQuery('<div/>');
+		
+			var fieldCount = 0;
+		    var ffv = new fieldVisitors.FieldWithObsoletePathReferenceVisitor({ 
+		        visit : function(field, object, path, walker) {
+		        	var outputEl = jQuery('<div/>').
+		        						append(jQuery('<hr/>')).
+		        						append(jQuery('<h3/>').
+		        							text('' + (fieldCount + 1) + ') ' + staticFilterTools.buildAbsolutePathString(path))).
+		        						append(jQuery('<h4/>').
+		        							text(' Contains obsolete references in the formula : ')).
+		        						append(jQuery('<p/>').
+		        							text(field.calculatedFormula));
+
+		            var paths = staticFilterTools.getObsoletePathReferences(field, object, walker);
+		            for(var i = 0; i < paths.length; i++)
+		            	outputEl.append(jQuery('<p style="color:#24f"><strong>Obsolete field </strong><span class="fa fa-arrow-right" /> ' + staticFilterTools.buildRelativePathString(paths[i]) + '</p>'));
+		            output.append(outputEl);
+		            fieldCount++;
+			    }
+			});    	
+		    	
+		
+			var walker = new SObjectWalker(100, function(){
+				console.log('!! Meta complete !!'); 
+			    walker.shallowWalkFields(ffv);
+			    console.log('!! Tree walk complete !!'); 
+			    
+			    if(fieldCount > 0)
+			    	jQuery('#obsolete-formula-ref-output').empty().append(output);
+			    else
+			    	jQuery('#obsolete-formula-ref-output').empty().append(jQuery('<h3/>').
+		        				text('No obsolete references were found'));
+		    });
+			
+		};
+
+		function downloadConfigurationIndexImportTemplate()
+		{
+		    var configIndexHeaders = [];
+		    configIndexHeaders.push(KimbleNamespaceWithUnderscores + '{!$ObjectType.ConfigurationIndex__c.Fields.Name.Name}');
+		    configIndexHeaders.push(KimbleNamespaceWithUnderscores + '{!$ObjectType.ConfigurationIndex__c.Fields.Description__c.Name}');
+		    configIndexHeaders.push(KimbleNamespaceWithUnderscores + '{!$ObjectType.ConfigurationIndex__c.Fields.IsRestricted__c.Name}');
+		    configIndexHeaders.push(KimbleNamespaceWithUnderscores + '{!$ObjectType.ConfigurationIndex__c.Fields.Keywords__c.Name}');
+			configIndexHeaders.push(KimbleNamespaceWithUnderscores + '{!$ObjectType.ConfigurationIndex__c.Fields.Parameter__c.Name}');
+			configIndexHeaders.push(KimbleNamespaceWithUnderscores + '{!$ObjectType.ConfigurationIndex__c.Fields.Target__c.Name}');
+			configIndexHeaders.push(KimbleNamespaceWithUnderscores + '{!$ObjectType.ConfigurationIndex__c.Fields.ConfigurationIndexType__c.Name}');
+
+			var headerString = configIndexHeaders.join(',');
+
+			var hiddenElement = document.createElement('a');
+	          hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(headerString);
+	          hiddenElement.target = '_self'; //
+	          hiddenElement.download = 'ExportData.csv';
+	          document.body.appendChild(hiddenElement);
+	    	  hiddenElement.click();
+  		}
+
+  		function configIndexUploadClick()
+  		{
+  		    initialiseModalBoxy('#ConfigIndexUploadPopup','{!JSENCODE($Label.ImportFromFileLabel)}',jQuery('form[id$=\'ConfigIndexUploadForm\']'));
+  		    showModalBoxy();
+    	}
+
+			</script>
+			
+		</apex:define>
+	</apex:composition>
+</apex:page>

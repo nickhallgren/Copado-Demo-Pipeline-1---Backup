@@ -1,0 +1,348 @@
+<apex:page standardController="KimbleOne__Calendar__c" showHeader="true" sidebar="false" extensions="KimbleOne.CalendarEditController,KimbleOne.CalendarEditRemoteActions"  standardStylesheets="true"> 
+	<apex:composition template="KimbleOne__SiteMaster">
+		<apex:define name="Menu">
+			<c:Menu HelpSource="CfgGuide" DefaultHelpPage="MyCalendar.html" MenuContextName="{!KimbleOne__Calendar__c.Name}" />
+		</apex:define>
+		<apex:define name="Content">
+		
+		
+		
+		<apex:pageBlock >
+			<div id="LoadingPanel" style="display:none">
+ 				<div style="height: 50%; margin: 0px auto;"></div>
+ 				<center><img src="{!URLFOR($Resource.LoadingImage)}" /> <span style="position:relative;top:-2px">{!$Label.Loading}</span></center>
+			</div>
+			<div id="MainPanel" >
+			<div id="ErrorsPanel" style="display:none">
+				<apex:pageMessage summary="{!$Label.kimbleone__errors}" severity="warning" strength="2" rendered="true">
+					<ul style=" margin:0px ;padding:0">
+							<li id="ErrorMessageText">
+								&nbsp;
+							</li>
+					</ul>
+				</apex:pageMessage>
+			</div>
+				<div id="left" style="display: inline-block;vertical-align: top; margin-bottom: 7px;">
+					<div id="calendarPanel" style="width: 400px; position: relative; overflow: hidden;display: inline-block;"> 
+				
+					</div>
+					<div style="display: inline-block;vertical-align:top;width: 40px;height:32px;padding-top:10px">
+					<apex:form id="MyForm">
+						<apex:actionFunction action="{!cancelPage}" name="cancelPage" rerender="MyForm">
+						</apex:actionFunction>
+				
+						<div >
+							<span >
+								<apex:inputText styleClass="datepicker" style="width:0px;border:0px; margin:0px; padding:0px;" value="{!GoDate.KimbleOne__InputDate__c}">
+									<apex:actionSupport event="onchange" action="{!ForecastingPeriodChange}" />
+								</apex:inputText>
+							</span>
+						</div>
+					</apex:form>
+					</div>
+				</div>
+				<div id="right" style="display: inline-block;vertical-align: bottom;width:200px">
+					<div style="margin-bottom: 4px">
+						<span class="legend " ></span>
+						{!JSENCODE(BusDayEnumName)}
+					</div>
+					<div style="margin-bottom: 4px">
+						<span class="legend NonBusDay" ></span>
+						{!JSENCODE(NonBusDayEnumName)}
+					</div>
+				
+				</div>
+			</div>
+			<apex:pageBlockButtons styleclass="ButtonPanel"  location="bottom" >
+					<input type="button" class="btn" value="{!$Label.Save}"   onclick="SaveTimePeriods('NO')"/>
+					<input type="button" class="btn" value="{!$Label.Cancel}"   onclick="cancelPage()"/>
+			</apex:pageBlockButtons>
+		</apex:pageBlock>
+			<script>
+			var contextPeriodId='{!JSENCODE($CurrentPage.Parameters.periodId)}';
+			var contextNextPeriodId=null;
+			var contextPrevPeriodId=null;
+			
+			jQuery(window).load(function() {
+			jQuery('.datepicker').datepicker({
+										dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+										showOtherMonths: true,
+										selectOtherMonths: true,
+										buttonText: '{!JSENCODE($Label.MonthTimePeriodDropdownToolTip)}',
+										buttonImageOnly: true,
+										buttonImage: '{!URLFOR($Resource.AssignmentImages, 'CalendarButtonSquare.png')}',
+										showOn: "button",
+										changeMonth: true,
+										changeYear: true
+										});
+							
+				getPeriods(contextPeriodId);
+				calledReady=true;
+        	});
+        	
+        	function goToNextMonth()
+        	{
+        		SaveTimePeriods('NEXT');
+        	}
+        	function goToPrevMonth()
+        	{
+        		SaveTimePeriods('PREV');
+        	}
+        	
+        	function getPeriods(periodid)
+        	{
+        		PreAction();
+        		jQuery('#previousPeriodBtn').unbind();
+        		jQuery('#nextPeriodBtn').unbind();
+        		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.CalendarEditRemoteActions.GetDays}',periodid,'{!$CurrentPage.Parameters.Id}',
+        	 	function(result, event){
+        	 	if(event.message)
+        	 	{
+        	 		jQuery('#ErrorMessageText').html(event.message);
+					unPreActionError();
+				}
+        	 	if(result.curPeriodId!=null)
+        	 		contextPeriodId=result.curPeriodId;
+        	 	if(result.nextPeriodId!=null)
+        	 		contextNextPeriodId=result.nextPeriodId;
+        	 	if(result.prevPeriodId!=null)
+        	 		contextPrevPeriodId=result.prevPeriodId;
+        	 	
+        	 	jQuery('#calendarPanel').html('');	
+
+        	 		var divMonthHtml = '<div><div class="calendarMonth" ><div><div class="monthHeadCal"><div id="previousPeriodBtn" class="navigatePeriodButton previousButton" title="{!$label.PreviousMonthPeriod}"></div><div id="currentPeriodDisplayName">' + result.label + '</div><div id="nextPeriodBtn" class="navigatePeriodButton nextButton" title="{!$label.NextMonthPeriod}"></div></div></div><div><table cellpadding="0" cellspacing="0" border="0">';
+        	 		divMonthHtml += '<tr>';
+        	 		for(var counter = kimble.firstDayIndex; counter < kimble.regional.dayNames.length + kimble.firstDayIndex; counter++)
+        	 		{
+        	 		    var thisIdx = counter >= kimble.regional.dayNames.length ? counter - kimble.regional.dayNames.length : counter;
+        	 		    divMonthHtml += '<td><div class="dayHeadCal">' + kimble.regional.dayNames[thisIdx].substring(0,1) + '</div></td>';
+            		}
+        	 		divMonthHtml += '</tr>';
+        	 		divMonthHtml += '</table></div>';
+
+        			jQuery('#calendarPanel').append(divMonthHtml);
+        	 		var daysInMonth = jQuery('<ol id="selectable"></ol>');
+        	 		jQuery.each(result.days,function(key,value){
+
+        	 			var kimbleDayOfWeek = value.dayOfWeek - kimble.firstDayIndex;
+						if(kimbleDayOfWeek < 0) kimbleDayOfWeek = 7 + kimbleDayOfWeek;
+
+        	 			if(key==0)
+        	 			{
+        	 				var countDays=1;
+        	 				var DayOfWeek=kimbleDayOfWeek;
+        	 				if(DayOfWeek==7)
+        	 					DayOfWeek=1;
+        	 				else
+        	 					DayOfWeek=(kimbleDayOfWeek+1);
+        	 				
+        	 				while(countDays<DayOfWeek)
+        	 				{
+        	 					var dayLastMonth=jQuery('<li class="ui-state-default nonselectable" style="visibility: hidden;"><div>&nbsp;</div></li>');
+    							dayLastMonth.appendTo(daysInMonth);
+    							countDays++;
+        	 				}
+        	 			}
+        	 			var dayLastMonth=jQuery('<li class="ui-state-default selectable" ><div>' +value.dayNumber + '</div><div class="bodyCal '+value.dayType+' click-selected" periodId="'+value.id+'"></div></li>');
+    					dayLastMonth.appendTo(daysInMonth);
+    					});
+        	 		
+        	 		
+    				jQuery('#calendarPanel').append(daysInMonth);
+        	 	
+        	 		jQuery('#calendarPanel').find('#selectable').selectable({
+        	 		
+        	 		 start: function(event, ui) {
+                		
+            		},
+            		stop: function (event, ui) {
+                //apply on or off to all selected
+                jQuery('.ui-selected').find('div.bodyCal').show();
+                jQuery('.ui-selected').addClass('click-selected');
+                jQuery('.ui-selected').removeClass('ui-selected');
+             },
+            selecting: function (event, ui) {
+             var d = ui.selecting;
+            	if(jQuery(d).is('.BusDay'))
+            	{
+            		jQuery(d).removeClass('BusDay');
+            		jQuery(d).addClass('NonBusDay');
+            	}
+            	else
+            	{	jQuery(d).removeClass('NonBusDay');
+            		jQuery(d).addClass('BusDay');
+            	}	
+            	
+            	jQuery(d).find('div.bodyCal').hide();
+            },
+            unselecting: function (event, ui) {
+            	var d = ui.unselecting;
+            	jQuery(d).find('div.bodyCal').show();
+            },filter: 'li.selectable>div.bodyCal'});        
+				
+			jQuery('#previousPeriodBtn').click(function(){
+        			goToPrevMonth();
+        		});
+        		jQuery('#nextPeriodBtn').click(function(){
+        			goToNextMonth();
+        		});
+        		
+        		unPreAction();
+        				
+        	 	}, {escape:true});
+        	
+        	
+        		
+        		
+        	}
+        	
+        	
+        	function SaveTimePeriods(goToAnotherPageAfter)
+			{
+				PreAction();
+				var newValues=new Array();
+				
+				jQuery('div.bodyCal').each(function(){
+					var timeObj=new Object();
+					timeObj.id=jQuery(this).attr('periodid');
+					if(jQuery(this).is('.BusDay'))
+						timeObj.dayType='BusDay';
+					else if(jQuery(this).is('.NonBusDay'))
+						timeObj.dayType='NonBusDay';
+					newValues[newValues.length]=timeObj;
+				});
+			
+				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.CalendarEditRemoteActions.SaveDays}',contextPeriodId,newValues,
+        	 	function(result, event){
+        	 		if(event.message)
+        	 		{
+        	 			jQuery('#ErrorMessageText').html(event.message);
+						unPreActionError();
+					}
+					else if(result.length>0)
+					{
+						jQuery('#ErrorMessageText').html(result.toString());
+						unPreActionError();
+					}
+					else
+					{
+						if(goToAnotherPageAfter=='NO')
+							unPreAction();
+						else if(goToAnotherPageAfter=='PREV')
+							getPeriods(contextPrevPeriodId);
+						else if(goToAnotherPageAfter=='NEXT')
+							getPeriods(contextNextPeriodId);
+					}	
+        		}, {escape:true});
+        	 	
+			}
+			
+			function PreAction()
+			{
+				jQuery('#ErrorsPanel').css('display','none');
+				jQuery('#LoadingPanel').css('display','block');
+				jQuery('#LoadingPanel').height(jQuery('#MainPanel').height());
+				jQuery('#MainPanel').css('display','none');
+				DisableButtonPanel('ButtonPanel','',[]);
+			}
+			function unPreActionError()
+			{
+				jQuery('#ErrorsPanel').css('display','');
+				jQuery('#LoadingPanel').css('display','none');
+				jQuery('#MainPanel').css('display','block');
+				EnableButtonPanel('ButtonPanel','',[]);
+			}
+			function unPreAction()
+			{
+				jQuery('#LoadingPanel').css('display','none');
+				jQuery('#MainPanel').css('display','block');
+				EnableButtonPanel('ButtonPanel','',[]);
+			}	
+        	</script>
+		</apex:define>
+	</apex:composition>
+	
+	<style>
+	.navigatePeriodButton
+	{
+		position: absolute;
+		top: 6px;
+		width: 30px;
+		height: 30px;
+		cursor: pointer;
+	}
+	.previousButton {background-image:url({!URLFOR($Resource.KimbleOne__AssignmentImages, 'PreviousButtonSquare.png')});
+					 background-repeat:no-repeat;
+					 left:4px;
+					 }
+	.nextButton {background-image:url({!URLFOR($Resource.KimbleOne__AssignmentImages, 'NextButtonSquare.png')});background-repeat:no-repeat;
+				right: 4px;
+				}
+	
+		#resizable h3 { text-align: center; margin: 0; }
+	.ui-resizable-ghost { border: 1px dotted gray; }
+	.ui-resizable-helper { border: 2px dotted #00F; }
+				
+				.PCT { width: 60px; position: absolute; left: 0px;bottom:0}
+				#selectable .click-selected.bodyCal { background:#4CC417; color: white; }
+				
+			    #selectable .ui-selecting  { background: #2779AA !important; z-index:2;}
+				#selectable { list-style-type: none; margin: 0; padding: 0;}
+			    #selectable li { margin: 3px; padding: 0px; float: left; width: 48px; height: 48px; font-size: 14px; text-align: center; position:relative;}
+			    .monthHeadCal{
+			    border: 1px solid #AED0EA;
+			background: #D7EBF9 url(images/ui-bg_glass_80_d7ebf9_1x400.png) 50% 50% repeat-x;
+			font-weight: bold;
+			color: #2779AA;
+			font-size: 2em;
+			text-align: center;
+			margin: 3px;
+			padding: 0px;
+			width: 385px;
+			height: 40px;
+			line-height: 40px;
+			position:relative;
+			    }
+			    .dayHeadCal {
+			        border: 1px solid #AED0EA !important;
+			background: #EEE !important;
+			font-weight: bold !important;
+			color: #2779AA !important;
+			font-size: 2em !important;
+			text-align: center !important;
+			margin: 3px;
+			padding: 0px;
+			width: 48px;
+			height: 32px;
+			line-height: 40px;
+			    }
+			    .legend
+				{
+					background-color: #4CC417;
+					display: inline-block;
+					width: 15px;
+					height: 15px;
+					vertical-align: top;
+				}
+			    .NonBusDay
+			    {
+			    	opacity:0.5;
+			    }
+			    .bodyCal
+			    {
+			        height:28px;
+			        padding-top: 2px;
+			        padding-left: 1px;padding-right: 1px;
+			        position:relative;
+			    }
+			    .nonselectable
+			    {
+			        background-color: #DDD !important;
+			        border: 1px solid #AED0EA !important;
+			        background-image: none !important;
+			    }
+    			.WarningIcon{background-image:url({!URLFOR($Resource.KimbleOne__WarningIcon)});background-repeat:no-repeat;}
+				
+				
+</style>
+</apex:page>

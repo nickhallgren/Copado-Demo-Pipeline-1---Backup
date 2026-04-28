@@ -1,0 +1,603 @@
+<apex:page standardcontroller="KimbleOne__Timesheet__c" extensions="KimbleOne.TimesheetApproveController,KimbleOne.SecurityController" sidebar="false" >
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+	<c:Menu MenuContextName="{!TheTimesheet.Name}" />
+</apex:define>
+    
+<apex:define name="Content">
+
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryTimePicker, 'jquery.timepicker.min.js')}"/>
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__HoursAndMinsHelper)}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQueryTimePicker, 'jquery.timepicker.css')}"/>
+
+
+	<style>
+		.kimbleTimePicker {
+		    width: 75px;
+		}
+		.pre-app-validation-messages {
+		    width: 500px;
+		}
+		i.inline-validation {
+		    font-size: 18px;
+		    margin-right: 5px;
+		}
+		i.inline-validation.ok {
+		    color: #2ba60d;
+		}
+		i.inline-validation.alert {
+		    color: #8f0000;
+		}
+		tr.has-errors {
+		    background-color: #F6E4DE;
+		}
+		input.entry-units, input.hours-and-mins {
+    		width: 80px;
+		}
+	</style>
+
+    <!-- Hidden fields for use in controller -->
+    <apex:outputField value="{!KimbleOne__Timesheet__c.KimbleOne__TimePeriod__c}" rendered="False"/>
+    <apex:outputField value="{!TheTimesheet.TimePeriod__r.KimbleOne__StartDate__c}" rendered="False"/>
+	<apex:variable value="{!IF(ISBLANK(TheTimesheet.ResourcedActivity__r.DeliveryElement__r.KimbleOne__DeliveryElementOperatedWith__c), TheTimesheet.ResourcedActivity__r.UsageUnitType__r.KimbleOne__Suffix__c, TheTimesheet.ResourcedActivity__r.DeliveryElement__r.DeliveryElementOperatedWith__r.ResourcedActivity__r.UsageUnitType__r.KimbleOne__Suffix__c)}" var="usageUnits"/>
+     
+	<apex:pagemessages escape="false"/>
+
+	<apex:form id="TimeForm">  
+    
+      <apex:actionFunction action="{!GetTimeEntry}" name="editTimeEntry" rerender="TimeEntryDetails" oncomplete="initialiseDynamicElements();showModalBoxyWithFocus($('.EntryUnitsText'));">
+			<apex:param name="entryId" value="" />
+	  </apex:actionFunction>
+   
+   	  <apex:outputpanel id="Timesheet">	 
+       <apex:pageBlock title="" mode="edit" >
+
+       <apex:pageBlockButtons >
+		
+         <apex:commandButton id="RevertToDraft"  action="{!RevertToDraft}" value="{!$Label.kimbleone__reverttodraft}" rendered="{!AllowRevert && HasPermission['RevertApprovedTimesheet']}" />
+         
+       </apex:pageBlockButtons>
+
+         <apex:pageBlockSection title="{!$ObjectType.KimbleOne__Timesheet__c.Label}" columns="2" >
+           <apex:outputField id="timesheetName" value="{!TheTimesheet.Name}" />
+           <apex:pageBlockSectionItem >
+				<apex:outputLabel value="{!$ObjectType.KimbleOne__Timesheet__c.Fields.KimbleOne__Status__c.Label}" />
+				<apex:outputField id="timesheetStatus" value="{!TheTimesheet.Status__r.Name}" />
+		   </apex:pageBlockSectionItem>
+		   
+		   <apex:outputField value="{!TheTimesheet.KimbleOne__TimeAdjustment__c}" rendered="{!!ISBLANK(TheTimesheet.KimbleOne__TimeAdjustment__c)}"/>
+		   
+		   <apex:outputText value="" rendered="{!!ISBLANK(TheTimesheet.KimbleOne__TimeAdjustment__c)}"/>
+		   
+           <apex:outputField id="resource" value="{!TheTimesheet.KimbleOne__Resource__c}" />
+           <apex:outputField id="deliveryGroup" value="{!TheTimesheet.ResourcedActivity__r.KimbleOne__DeliveryGroup__c}" />
+           <apex:outputField id="activity" value="{!TheTimesheet.ResourcedActivity__r.Name}" />
+           <apex:outputText id="emptyCell" value="" />
+           <apex:outputField id="trackingPeriod" value="{!TheTimesheet.TimePeriod__r.Name}" />
+           <apex:pageBlockSectionItem >
+				<apex:outputLabel value="{!$Label.kimbleone__timeperiodstatus}" />
+				<apex:outputField id="trackingPeriodStatus" value="{!TheTimesheet.TimePeriod__r.Status__r.KimbleOne__Enum__c}" />
+		   </apex:pageBlockSectionItem>
+           <apex:pageBlockSectionItem >
+				<apex:outputLabel value="{!$ObjectType.KimbleOne__Timesheet__c.Fields.KimbleOne__TotalEntryUnits__c.Label}" />
+				<apex:outputText id="totalEntryUnits" value="{!TheTimesheet.KimbleOne__TotalEntryUnits__c} {!usageUnits}" />
+		   </apex:pageBlockSectionItem>
+           <apex:pageBlockSectionItem >
+				<apex:outputLabel value="{!$ObjectType.KimbleOne__Timesheet__c.Fields.KimbleOne__TotalEntryRevenue__c.Label}" />
+				<apex:outputPanel layout="none">
+					<apex:outputText value="{!TheTimesheet.KimbleOne__InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+					<apex:outputField value="{!TheTimesheet.KimbleOne__InvoicingCurrencyTotalEntryRevenue__c}" />
+				</apex:outputPanel>
+			</apex:pageBlockSectionItem>
+           <apex:pageBlockSectionItem rendered="{!PreValidateTimesheet && TheAssignments.size == 1}">
+				<apex:outputLabel value="{!$Label.kimbleone__currentremainingusageheading}" />
+				<apex:outputText value="{!TheAssignments[0].PreApprovalRemainingUsage.InputDecimal__c} {!usageUnits}" />
+		   </apex:pageBlockSectionItem>
+           <apex:pageBlockSectionItem rendered="{!PreValidateTimesheet && TheAssignments.size == 1}">
+				<apex:outputLabel value="{!$Label.kimbleone__preapprovalvalidationheading}" />
+				<apex:outputPanel styleClass="pre-app-validation-messages">
+					<apex:outputPanel layout="none" rendered="{!!TheAssignments[0].HasErrors}">
+						<i class="fa fa-check-circle inline-validation ok"></i>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!TheAssignments[0].HasErrors}">
+						<i class="fa fa-exclamation-circle inline-validation alert"></i>
+					</apex:outputPanel>
+					<apex:outputText value="{!TheAssignments[0].ApprovalValidation}" />
+				</apex:outputPanel>
+		   </apex:pageBlockSectionItem>
+	    	<apex:pageBlockSectionItem rendered="{!PreValidateTimesheet && TheAssignments.size > 1}">
+	    	<apex:pageBlockTable var="assignment" value="{!TheAssignments}" styleClass="multi-assignment-validation-table" >
+	    		<apex:column value="{!assignment.Name}" headerValue="{!$Label.kimbleone__preapprovalvalidationheading}"/>
+	    		<apex:column value="{!assignment.PreApprovalRemainingUsage.KimbleOne__InputDecimal__c} {!usageUnits}" headerValue="{!$Label.kimbleone__currentremainingusageheading}"/>
+				<apex:column headerValue="{!$Label.kimbleone__validationmessagesheading}" styleClass="pre-app-validation-messages">
+					<apex:outputPanel layout="none" rendered="{!!assignment.HasErrors}">
+						<i class="fa fa-check-circle inline-validation ok"></i>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!assignment.HasErrors}">
+						<i class="fa fa-exclamation-circle inline-validation alert"></i>
+					</apex:outputPanel>
+					<apex:outputText value="{!assignment.ApprovalValidation}" />
+				</apex:column>    		
+	    	</apex:pageBlockTable>
+	    	</apex:pageBlockSectionItem>
+	    	<apex:pageBlockSectionItem rendered="{!PreValidateTimesheet && TheAssignments.size > 1}"/>
+			<apex:pageBlockSectionItem >
+				<apex:outputLabel value="{!$Label.kimbleone__timesheetentryview}" />
+					<apex:outputLink styleClass="k-link" value="{!$Page.KimbleOne__Timesheet}?id={!TheTimesheet.KimbleOne__Resource__c}&periodId={!TheTimesheet.KimbleOne__TimePeriod__c}">
+		      	   			{!TheTimesheet.Resource__r.Name} - {!TheTimesheet.TimePeriod__r.Name} {
+		      	   			<apex:outputField value="{!TheTimesheet.TimePeriod__r.KimbleOne__StartDate__c}"/>&nbsp;-&nbsp;<apex:outputField value="{!TheTimesheet.TimePeriod__r.KimbleOne__EndDate__c}"/>}
+		      			</apex:outputLink>
+			</apex:pageBlockSectionItem>
+         </apex:pageBlockSection>
+    
+	<apex:pageBlockSection title="{!$Label.kimbleone__timesheetapproval}" columns="2" >
+           <apex:outputField id="approvalStatus" value="{!TheTimesheet.KimbleOne__ApprovalStatus__c}" />
+           <apex:outputField id="approver1" value="{!TheTimesheet.KimbleOne__Approver1User__c}" />
+           <apex:outputField id="approvalComments" value="{!TheTimesheet.KimbleOne__ApprovalComments__c}" />
+           <apex:outputField id="approver2" value="{!TheTimesheet.KimbleOne__Approver2User__c}" />
+           <apex:pageBlockSectionItem rendered="{!TheTimesheet.CreatedById != TheTimesheet.OwnerId}" />
+           <apex:outputField id="createdBy" rendered="{!TheTimesheet.CreatedById != TheTimesheet.OwnerId}" value="{!TheTimesheet.CreatedById}" />
+	</apex:pageBlockSection>
+ 		
+	<apex:PageBlockSection Title="{!$ObjectType.KimbleOne__TimeEntry__c.Labelplural}" columns="1" >
+	   <apex:outputpanel id="TimeEntriesPane">
+	  <apex:variable var="isDisplayingRevenueUnits" value="false"/>
+	  <apex:variable var="isTaskBased" value="false"/>
+	  <apex:repeat var="entry" value="{!TimeEntries}" >
+	  	<apex:outputpanel layout="none" rendered="{!entry.ActivityAssignmentRate__r.ActivityPeriodRateBand__r.RevenueUnitsCalculationMethod__r.KimbleOne__Enum__c == 'Manual'}">
+	  		<apex:variable var="isDisplayingRevenueUnits" value="true"/>
+	  	</apex:outputpanel>
+	  	<apex:outputpanel layout="none" rendered="{!entry.ActivityAssignmentRate__r.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'Task' || entry.ActivityAssignmentRate__r.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'CategoryAndTask'}">
+	  		<apex:variable var="isTaskBased" value="true"/>
+	  	</apex:outputpanel>
+	  </apex:repeat>
+      <apex:pageBlockTable var="entry" value="{!TimeEntries}" >
+      <apex:column headerValue="{!$Label.kimbleone__actionlinksheader}" rendered="{!TheTimesheet.KimbleOne__ApprovalStatus__c=='ReadyForApproval'}">
+      	<a href="#" onclick="initialiseModalBoxy('#EditTimeEntryPopup', '{!$ObjectType.KimbleOne__TimeEntry__c.label}');editTimeEntry('{!JSENCODE(entry.Id)}')">{!$Label.kimbleone__edit}</a>
+      </apex:column>
+      	<apex:column value="{!entry.TimePeriod__r.KimbleOne__StartDate__c}" headerValue="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__TimePeriod__c.Label}"/>
+		<apex:column value="{!entry.ActivityAssignment__r.ResourcedActivity__r.Name}" rendered="{!ShowResourcedActivityColumn}"/>
+		<apex:column value="{!entry.ActivityAssignmentRate__r.ActivityPeriodRateBand__r.Name} " headerValue="{!$Label.kimbleone__periodratebandalternatenamelabel}"/>
+		<apex:column value="{!entry.ActivityAssignmentRate__r.ActivityAssignment__r.ActivityRole__r.Name}" headerValue="{!$ObjectType.KimbleOne__Resource__c.Label} {!$Label.kimbleone__role}"/>
+		<apex:column value="{!entry.KimbleOne__StartTime__c}" rendered="{!StartEndTimeRequired}"/>
+		<apex:column value="{!entry.KimbleOne__EndTime__c}" rendered="{!StartEndTimeRequired}"/>
+		<apex:column headerValue="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__EntryUnits__c.Label}" >
+			<apex:outputText rendered="{!ISBLANK(entry.KimbleOne__FormattedEntryUnits__c)}" value="{!entry.KimbleOne__EntryUnits__c} {!LOWER(If(entry.KimbleOne__EntryUnits__c>1,entry.ActivityAssignmentRate__r.ActivityAssignment__r.ResourcedActivityOperatedWith__r.UsageUnitType__r.KimbleOne__Suffix__c, entry.ActivityAssignmentRate__r.ActivityAssignment__r.ResourcedActivityOperatedWith__r.UsageUnitType__r.Name))}" />
+			<apex:outputText rendered="{!!ISBLANK(entry.KimbleOne__FormattedEntryUnits__c)}" value="{!entry.KimbleOne__FormattedEntryUnits__c}"/>
+		</apex:column>
+		<apex:column headerValue="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__RevenueUnits__c.Label}" rendered="{!isDisplayingRevenueUnits}">
+			<apex:outputText value="{!entry.KimbleOne__RevenueUnits__c} {!LOWER(If(entry.KimbleOne__RevenueUnits__c>1,entry.ActivityAssignmentRate__r.ActivityAssignment__r.ResourcedActivityOperatedWith__r.UsageUnitType__r.KimbleOne__Suffix__c, entry.ActivityAssignmentRate__r.ActivityAssignment__r.ResourcedActivityOperatedWith__r.UsageUnitType__r.Name))}" 
+					rendered="{!entry.ActivityAssignmentRate__r.ActivityPeriodRateBand__r.RevenueUnitsCalculationMethod__r.KimbleOne__Enum__c == 'Manual'}">
+		</apex:outputText>		
+		</apex:column>
+		<apex:column value="{!entry.KimbleOne__EntryRevenue__c}" headerValue="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__EntryRevenue__c.Label}"/>
+				
+		<apex:column headerValue="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__InvoicingCurrencyEntryRevenue__c.Label}" rendered="{!!ISBLANK(TheTimesheet.KimbleOne__InvoicingCurrencyTotalEntryRevenue__c)}">
+			<apex:outputText value="{!entry.KimbleOne__InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+			<apex:outputField value="{!entry.KimbleOne__InvoicingCurrencyEntryRevenue__c}" />
+		</apex:column>
+		<apex:column headerValue="{!$ObjectType.KimbleOne__Task__c.Fields.Name.Label}" rendered="{!isTaskBased}">
+			<apex:outputText rendered="{!'Task' == entry.ActivityAssignmentRate__r.ActivityPeriodRateBand__r.UsageAllocationType__r.Enum__c || 'CategoryAndTask' == entry.ActivityAssignmentRate__r.ActivityPeriodRateBand__r.UsageAllocationType__r.Enum__c || (entry.ActivityAssignmentRate__r.ActivityPeriodRateBand__r.UsageAllocationType__r.Enum__c==null && entry.ActivityAssignment__r.ResourcedActivityOperatedWith__r.UsageAllocationType__r.Enum__c = 'Task') }" value="{!entry.PlanTaskAssignment__r.PlanTask__r.Task__r.Name}" />
+		</apex:column>
+		<apex:column headerValue="{!$ObjectType.KimbleOne__PlanTaskAssignment__c.Fields.KimbleOne__DraftRemainingEffort__c.Label}" rendered="{!isTaskBased}">
+			<apex:outputText styleClass="HoursAndMinsOutput" rendered="{!'Task' == entry.ActivityAssignmentRate__r.ActivityPeriodRateBand__r.UsageAllocationType__r.Enum__c || 'CategoryAndTask' == entry.ActivityAssignmentRate__r.ActivityPeriodRateBand__r.UsageAllocationType__r.Enum__c || (entry.ActivityAssignmentRate__r.ActivityPeriodRateBand__r.UsageAllocationType__r.Enum__c==null && entry.ActivityAssignment__r.ResourcedActivityOperatedWith__r.UsageAllocationType__r.Enum__c = 'Task') }" value="{!entry.PlanTaskAssignment__r.KimbleOne__DraftRemainingEffort__c}" />
+		</apex:column>
+
+		<apex:column headerValue="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Reference__c.Label}">
+			<apex:outputText rendered="{!'Reference' == entry.ActivityAssignmentRate__r.ActivityPeriodRateBand__r.UsageAllocationType__r.Enum__c || (entry.ActivityAssignmentRate__r.ActivityPeriodRateBand__r.UsageAllocationType__r.Enum__c==null && entry.ActivityAssignment__r.ResourcedActivityOperatedWith__r.UsageAllocationType__r.Enum__c = 'Reference') }" value="{!entry.KimbleOne__Reference__c}" />
+		</apex:column>
+
+	  	<apex:column headerValue="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Case__c.Label}" rendered="{!TheTimesheet.ResourcedActivity__r.KimbleOne__HasCases__c}">
+		  	<apex:outputField value="{!entry.KimbleOne__Case__c}" />
+	  	</apex:column>
+
+		<apex:column value="{!entry.KimbleOne__Category1__c}" rendered="{!TheActivityTimeCategories[1].show}" headerValue="{!TheActivityTimeCategories[1].TheCategory.Name}"/>
+		<apex:column value="{!entry.KimbleOne__Category2__c}" rendered="{!TheActivityTimeCategories[2].show}" headerValue="{!TheActivityTimeCategories[2].TheCategory.Name}"/>
+		<apex:column value="{!entry.KimbleOne__Category3__c}" rendered="{!TheActivityTimeCategories[3].show}" headerValue="{!TheActivityTimeCategories[3].TheCategory.Name}"/>
+		<apex:column value="{!entry.KimbleOne__Category4__c}" rendered="{!TheActivityTimeCategories[4].show}" headerValue="{!TheActivityTimeCategories[4].TheCategory.Name}"/>
+		<apex:column value="{!entry.KimbleOne__Category5__c}" rendered="{!TheActivityTimeCategories[5].show}" headerValue="{!TheActivityTimeCategories[5].TheCategory.Name}"/>
+
+		<apex:column >
+			<apex:outputText rendered="{!entry.KimbleOne__Notes__c!=null && entry.KimbleOne__Notes__c!=''}">
+				<apex:image url="{!URLFOR($Resource.KimbleOne__DocIcon)}" alt="{!$Label.kimbleone__notes}"  title="{!entry.KimbleOne__Notes__c}" width="20" height="20" />
+			</apex:outputText>
+		</apex:column>
+	  </apex:pageBlockTable>
+   	</apex:outputpanel>
+
+    </apex:PageBlockSection>
+
+  </apex:pageBlock>
+	</apex:outputpanel>
+      </apex:form>
+		<apex:include pageName="{!$Page.ApproveRejectItem}" rendered="{!InPageApproveRejectEnabled}"/>
+		<apex:relatedList list="ProcessSteps"></apex:relatedList>
+
+		<div id="EditTimeEntryPopup" style="display: none">
+
+			<apex:outputPanel id="TimeEntryDetails">
+				<apex:outputPanel id="EditTimeEntryDetails" style="min-width:550px;min-height:300px;display:block">
+					<apex:form >
+
+					<apex:outputPanel id="TimeMessagePanel">
+						<div id="editErrors"><apex:pageMessages escape="false" id="errormessages" /></div>
+					</apex:outputPanel>
+
+					<apex:variable value="{!TimeEntry.Timesheet__r.KimbleOne__ApprovalStatus__c = 'ReadyForApproval'}" var="canEdit"/>
+
+					<apex:pageBlock mode="edit" rendered="{!!ISBLANK(TimeEntry)}">
+							<apex:pageBlockButtons location="bottom">
+								<apex:commandButton value="{!$Label.kimbleone__save}" action="{!SaveTimeEntry}" oncomplete="if(!hideModalBoxyWithErrorCheck('#editErrors')) initialiseDynamicElements();applyHoursAndMinutesOutputs();" rerender="TimeEntryDetails, Timesheet" styleclass="DisableButtonWhileBusy" />
+								<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}" />
+							</apex:pageBlockButtons>
+							<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+
+							<apex:pageBlockSectionItem labelStyle="width:30%">
+								<apex:outputText value="{!$Label.kimbleone__resourceactivityalternativelabel}" />
+								<apex:outputPanel layout="none">
+								<apex:outputPanel rendered="{!TheActivityAssignmentOptions.size != 1}">
+									<apex:selectList id="SelectedAssignment" value="{!TimeEntry.KimbleOne__ActivityAssignment__c}" multiselect="false" size="1" required="true">
+										<apex:selectOptions value="{!TheActivityAssignmentOptions}" />
+										<apex:actionSupport event="onchange" action="{!ActivityAssignmentChange}" rerender="TimeEntryDetails" onsubmit="DisableParentsChildren($('.DisableButtonWhileBusy'),'Reloading...');"/>
+									</apex:selectList>
+								</apex:outputPanel>
+
+								<apex:outputPanel rendered="{!TheActivityAssignmentOptions.size = 1}">
+									<apex:outputText value="{!TheActivityAssignmentOptions[0].Label}"/>
+								</apex:outputPanel>
+
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$Label.kimbleone__periodratebandalternatenamelabel}" />
+
+								<apex:selectList id="SelectedRateBand" value="{!TimeEntry.KimbleOne__ActivityAssignmentRate__c}" multiselect="false" size="1" required="true" onchange="updateRevenue()">
+									<apex:selectOptions value="{!TheRateBands}" />
+								</apex:selectList>
+
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__TimePeriod__c.Label}" />
+								<apex:outputField value="{!TimeEntry.TimePeriod__r.KimbleOne__StartDate__c}" />
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'Task'}">
+									<apex:outputText value="{!$ObjectType.KimbleOne__Task__c.Fields.Name.Label}" />
+									<apex:outputPanel layout="none">
+										<apex:outputPanel layout="block" styleClass="requiredInput" rendered="{!canEdit}">
+											<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+												<apex:actionRegion >
+													<apex:selectList value="{!TimeEntry.KimbleOne__PlanTaskAssignment__c}" multiselect="false" size="1" required="true" >
+														<apex:selectOptions value="{!ThePlanTaskOptions}" />
+														<apex:actionSupport event="onchange" action="{!PlanTaskAssignmentChange}" rerender="TimeEntryDetails" onsubmit="DisableParentsChildren($('.DisableButtonWhileBusy'),'Reloading...');"/>
+													</apex:selectList>
+												</apex:actionRegion>
+											</apex:outputPanel>
+										<apex:outputField value="{!TimeEntry.KimbleOne__PlanTaskAssignment__c}" rendered="{!!canEdit}"/>
+									</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+
+							<apex:variable var="Suffix" value="{!TheSelectedAssignment.ResourcedActivityOperatedWith__r.UsageUnitType__r.KimbleOne__Suffix__c}" />
+
+							<apex:pageBlockSectionItem rendered="{!TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'Task' || TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'CategoryAndTask'}">
+									<apex:outputText value="{!$ObjectType.KimbleOne__PlanTaskAssignment__c.Fields.KimbleOne__DraftRemainingEffort__c.Label}" />
+									<apex:outputPanel layout="none">
+										<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+										<apex:inputField required="true" value="{!ThePlanTaskAssignment.KimbleOne__DraftRemainingEffort__c}" styleclass="AllTimeFields " rendered="{!canEdit}" html-display-hours-mins="{!canEdit && KimbleOne__Timesheet__c.ResourcedActivity__r.KimbleOne__ShowUsageAsHoursAndMins__c}"/>
+									</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!StartEndTimeRequired && !ISBLANK(TheSelectedAssignmentRate)}">
+								<apex:outputText value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__StartTime__c.Label}"/>
+								<apex:outputPanel layout="none">
+									<apex:inputField id="entryStartTime" styleclass="AllTimeFields kimbleTimePicker StartTimeText" value="{!TimeEntry.KimbleOne__StartTime__c}" required="true" rendered="{!canEdit}"/>
+									<apex:outputField styleclass="AllTimeFields" value="{!TimeEntry.KimbleOne__StartTime__c}" rendered="{!!canEdit}"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!StartEndTimeRequired && !ISBLANK(TheSelectedAssignmentRate)}">
+								<apex:outputText value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__EndTime__c.Label}"/>
+								<apex:outputPanel layout="none">
+									<apex:inputField id="entryEndTime" styleclass="AllTimeFields kimbleTimePicker EndTimeText" value="{!TimeEntry.KimbleOne__EndTime__c}" required="true" rendered="{!canEdit}"/>
+									<apex:outputField styleclass="AllTimeFields" value="{!TimeEntry.KimbleOne__EndTime__c}" rendered="{!!canEdit}"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate)}">
+								<apex:outputText >
+									<div><apex:outputText value="{!$Label.kimbleone__entrylabel} {!Suffix}"/></div>
+								</apex:outputText>
+								<apex:outputPanel layout="none">
+									<apex:inputField id="EntryUnits" required="true" styleclass="EntryUnitsText" html-display-hours-mins="{!!ISBLANK(TheSelectedAssignmentRate) && canEdit && !ISBLANK(TimeEntry.KimbleOne__FormattedEntryUnits__c)}" value="{!TimeEntry.KimbleOne__EntryUnits__c}" rendered="{!canEdit}" onchange="updateRevenue()"/>
+									<apex:outputField value="{!TimeEntry.KimbleOne__EntryUnits__c}" rendered="{!!canEdit}"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && TheSelectedAssignmentRate.ActivityPeriodRateBand__r.RevenueUnitsCalculationMethod__r.KimbleOne__Enum__c = 'Manual'}">
+								<apex:outputText >
+									<div><apex:outputText value="{!$Label.kimbleone__revenuelabel} {!Suffix}"/></div>
+								</apex:outputText>
+								<apex:outputPanel layout="none">
+									<apex:inputField id="RevenueUnits" required="true" value="{!TimeEntry.KimbleOne__RevenueUnits__c}" rendered="{!canEdit}" onchange="updateRevenue()"/>
+									<apex:outputField value="{!TimeEntry.KimbleOne__RevenueUnits__c}" rendered="{!!canEdit}"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__InvoicingCurrencyEntryRevenue__c.Label}({!timeEntry.Timesheet__r.KimbleOne__InvoicingCurrencyIsoCode__c})" />
+								<apex:outputField id="EntryRevenue" value="{!InvoicingCurrencyEntryRevenue.KimbleOne__InputDecimal__c}" />
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__InvoicingCurrencyOverrideEntryRevenue__c.Label}({!timeEntry.Timesheet__r.KimbleOne__InvoicingCurrencyIsoCode__c})" />
+								<apex:outputPanel layout="none">
+									<apex:inputField value="{!timeEntry.KimbleOne__InvoicingCurrencyOverrideEntryRevenue__c}" rendered="{!canEdit}"/>
+									<apex:outputField value="{!timeEntry.KimbleOne__InvoicingCurrencyOverrideEntryRevenue__c}" rendered="{!!canEdit}"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && TheTimesheet.ResourcedActivity__r.KimbleOne__HasCases__c}">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Case__c.Label}"/>
+								<apex:inputField id="caseInput" value="{!timeEntry.KimbleOne__Case__c}"  styleclass="persist-time-field kimbleSearch" html-data-typename="LookupObjectCase" html-data-filter="TimesheetCaseFilter;{!TheTimesheet.KimbleOne__ResourcedActivity__c}:{!TheTimesheet.ResourcedActivity__r.KimbleOne__DeliveryGroup__c}" />
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate)}">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Notes__c.Label}"/>
+								<apex:outputPanel layout="none">
+									<apex:inputTextarea rows="4" cols="45" value="{!TimeEntry.KimbleOne__Notes__c}" styleclass="NoteText" rendered="{!canEdit}"/>
+									<apex:outputField value="{!TimeEntry.KimbleOne__Notes__c}" rendered="{!!canEdit}"/>
+								</apex:outputPanel>
+
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'Reference'}">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Reference__c.Label}"/>
+								<apex:outputPanel layout="none">
+									<apex:inputText value="{!TimeEntry.KimbleOne__Reference__c}"  rendered="{!canEdit}"/>
+									<apex:outputField value="{!TimeEntry.KimbleOne__Reference__c}" rendered="{!!canEdit}"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+
+
+							<apex:repeat value="{!NumberOfTimeCategories}" var="num" rendered="{!!ISBLANK(TheSelectedAssignmentRate) && TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c = 'Category'}">
+								<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c = 'Category' && TheActivityTimeCategories[num].Show}">
+
+								<apex:outputLabel value="{!TheActivityTimeCategories[num].TheCategory.Name}" />
+								<apex:outputPanel layout="none">
+									<apex:inputField value="{!TimeEntry['Category' & TEXT(TheActivityTimeCategories[num].TheCategory.DisplaySequence__c) & '__c']}" required="{!TheActivityTimeCategories[num].TheCategory.IsMandatory__c}" rendered="{!canEdit && TheActivityTimeCategories[num].TheCategory.DisplayType__r.Enum__c = 'Text'}"/>
+
+									<apex:outputPanel layout="block" styleClass="requiredInput" rendered="{!canEdit && TheActivityTimeCategories[num].TheCategory.DisplayType__r.Enum__c = 'Dropdown' && TheActivityTimeCategories[num].TheCategory.IsMandatory__c}">
+											<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+											<apex:selectList value="{!TimeEntry['Category' & TEXT(TheActivityTimeCategories[num].TheCategory.DisplaySequence__c) & '__c']}" multiselect="false" size="1" required="true">
+												<apex:selectOptions value="{!TheActivityTimeCategories[num].TheOptions}" />
+											</apex:selectList>
+									</apex:outputPanel>
+									<apex:selectList value="{!TimeEntry['Category' & TEXT(TheActivityTimeCategories[num].TheCategory.DisplaySequence__c) & '__c']}" multiselect="false" size="1" rendered="{!canEdit && TheActivityTimeCategories[num].TheCategory.DisplayType__r.Enum__c = 'Dropdown' && !TheActivityTimeCategories[num].TheCategory.IsMandatory__c}">
+										<apex:selectOptions value="{!TheActivityTimeCategories[num].TheOptions}" />
+									</apex:selectList>
+									<apex:outputField value="{!TimeEntry['Category' & TEXT(TheActivityTimeCategories[num].TheCategory.DisplaySequence__c) & '__c']}" rendered="{!!canEdit}"/>
+								</apex:outputPanel>
+
+								</apex:pageBlockSectionItem>
+							</apex:repeat>
+
+							<apex:pageBlockSectionItem labelStyle="width:30%" rendered="{!!ISBLANK(TimeEntry.Timesheet__r.KimbleOne__ApprovalComments__c)}">
+								<apex:outputText value="{!$ObjectType.KimbleOne__Timesheet__c.Fields.KimbleOne__ApprovalComments__c.Label}"  />
+								<apex:outputText value="{!TimeEntry.Timesheet__r.KimbleOne__ApprovalComments__c}" />
+							</apex:pageBlockSectionItem>
+
+			       		</apex:pageblockSection>
+
+						</apex:pageBlock>
+
+						<apex:outputPanel layout="none" rendered="{!InPageApproveRejectEnabled}">
+						<script>
+							jQuery(window).load(function()
+							{
+								var approvalItemId = '<apex:outputText value="{!KimbleOne__Timesheet__c.Id}"/>';
+
+								overrideSFApproveRejectLink(approvalItemId);
+							});
+
+							function reLoadItemId()
+							{
+								var itemId =  '<apex:outputText value="{!KimbleOne__Timesheet__c.Id}"/>';
+								return itemId;
+							}
+						</script>
+						</apex:outputPanel>
+
+						<script>
+							var theRates = {};
+							<apex:outputPanel layout="none" rendered="{!!ISBLANK(RatesJson)}">
+								theRates = kimble.parseJSON("{!JSENCODE(RatesJson)}");
+							</apex:outputPanel>
+
+							var hoursAndMinsHelper;
+
+							function initialiseDynamicElements()
+			        		{
+			        			jQuery('.kimbleTimePicker').timepicker({ 'timeFormat': 'H:i', 'show2400': 'true' });
+
+			        			if(jQuery('.kimbleTimePicker').length > 0)
+			        			{
+				        			jQuery(document).on('change', '.kimbleTimePicker, .EntryUnitsText', function ()
+									{
+										timeChange(this);
+									});
+								}
+
+								jQuery('.hours-and-mins').remove();
+
+								jQuery(document).off('change','[display-hours-mins=true]').on('change', '[display-hours-mins=true]', function(e) {
+										if (jQuery(this).next().hasClass('hours-and-mins'))
+											jQuery(this).next().val(hoursAndMinsHelper.formatHours(kimble.parseNumber(jQuery(this).val())));
+									});
+
+									jQuery(document).off('blur','.hours-and-mins').on('blur', '.hours-and-mins', function(e) {
+										var hrs = hoursAndMinsHelper.parseHours(this.value);
+										jQuery(this).qtip('destroy', true);
+
+										if (hrs == null) {
+											var h = jQuery('<div style="white-space: pre-wrap;">' + hoursAndMinsHelper.helpMessage + '</div>');
+											jQuery('.hours-and-mins').qtip({
+																		content: h,
+																		position: {my: 'bottom center', at: 'top center',viewport: $(window)},
+																		style: {classes: 'qtip-light qtip-shadow qtip-rounded t-tip-qtip'},
+																		show: {ready:true, solo: true }
+																		});
+										} else {
+											jQuery(this).prev().val(hrs).change();
+										}
+									})
+
+								jQuery('[display-hours-mins=true]').each(function(i, obj){
+									let $o = jQuery(obj);
+
+									if ($o.is('input')) {
+										$o.hide().after('<input type="text" class="hours-and-mins"/>');
+										$o.change();
+									}
+									else {
+										$o.text(hoursAndMinsHelper.formatHours(kimble.parseNumber($o.text())));
+									}
+								});
+			        		}
+
+			        		function timeChange(theField)
+							{
+								var currentStartTime = jQuery('.kimbleTimePicker.StartTimeText:visible').val();
+								var currentEndTime = jQuery('.kimbleTimePicker.EndTimeText:visible').val();
+								var currentEntryUnits = jQuery('.EntryUnitsText:visible').val();
+
+								// given a end time and a start time work out the usage
+								if (jQuery(theField).hasClass('StartTimeText') && currentEndTime != '') {
+									jQuery('.EntryUnitsText:visible').val(timeDiff(currentStartTime, currentEndTime));
+								} else if (jQuery(theField).hasClass('EndTimeText') && currentStartTime != '') {
+									jQuery('.EntryUnitsText:visible').val(timeDiff(currentStartTime, currentEndTime).toFixed(3));
+								} else if (jQuery(theField).hasClass('EntryUnitsText') && currentStartTime != '') {
+									// we only update the end time if the value is blank or the calculated value is greater
+									// meaning that you can update the usage to less than the difference
+									var newEndTime = timeAddHours(currentStartTime, currentEntryUnits);
+									if(currentEndTime == '' || currentEndTime < newEndTime)
+									{
+										jQuery('.kimbleTimePicker.EndTimeText:visible').val(newEndTime);
+									}
+								}
+							}
+
+							function timeDiff(startTime, endTime)
+							{
+								// date is unimportant, using Date construct to do time maths
+								return (new Date(2000, 0, 1, parseTime(endTime).hh, parseTime(endTime).mm) - new Date(2000, 0, 1, parseTime(startTime).hh, parseTime(startTime).mm)) / 1000 / 60 / 60;
+							}
+
+							function timeAddHours(startTime, hours)
+							{
+								var newDateTime = addHours(new Date(2000, 0, 1, parseTime(startTime).hh, parseTime(startTime).mm), hours);
+
+								var min = newDateTime.getMinutes();
+								if (min < 10) {
+									min = "0" + min;
+								}
+
+								var hour = newDateTime.getHours();
+								if (hour < 10) {
+									hour = "0" + hour;
+								}
+
+								var newTime = hour + ':' + min;
+
+								// special case - if the result is 00:00 and we are adding >0 hours then this must be 24:00
+								newTime = (newTime == "00:00" && hours > 0 ? "24:00" : newTime);
+
+								return newTime;
+							}
+
+							function addHours(theDate, hours)
+							{
+								theDate.setTime(theDate.getTime() + (hours * 60 * 60 * 1000));
+								return theDate;
+							}
+
+							function parseTime(s)
+							{
+								var part = s.match(/(\d+):(\d+)(?: )?(am|pm)?/i);
+								var hh = parseInt(part[1], 10);
+								var mm = parseInt(part[2], 10);
+								var ap = part[3] ? part[3].toUpperCase() : null;
+								if (ap === "AM") {
+									if (hh == 12) {
+										hh = 0;
+									}
+								}
+								if (ap === "PM") {
+									if (hh != 12) {
+										hh += 12;
+									}
+								}
+								return {
+									hh : hh,
+									mm : mm
+								};
+							}
+
+						</script>
+
+					</apex:form>
+				</apex:outputPanel>
+
+
+			</apex:outputPanel></div>
+
+				<script>
+						$(document).ready(function(){
+    						$(function() {
+    							$('input[name="piSubmit"]').remove();
+    							$('input[name="piRemove"]').remove();
+    						})
+
+    						jQuery('i.inline-validation.alert').closest('tr').addClass('has-errors');
+    						jQuery('.multi-assignment-validation-table').parent('td').prop('colspan', 4);
+
+							hoursAndMinsHelper = initialiseHoursAndMinsHelper('{!JSENCODE($Label.HoursPart)}','{!JSENCODE($Label.MinutesPart)}', '{!JSENCODE($Label.HoursAndMinsEntryHelp)}');
+
+							applyHoursAndMinutesOutputs();
+    					});
+
+    					function updateRevenue()
+						{
+							var rate = theRates[jQuery('[id$="SelectedRateBand"]').val()];
+
+							var entryUnits = jQuery('input[id$="EntryUnits"]').val();
+
+							if (jQuery('input[id$="RevenueUnits"]').length != 0)
+								entryUnits = jQuery('input[id$="RevenueUnits"]').val();
+
+							jQuery('[id$="EntryRevenue"]').text(jQuery.formatNumber(rate * entryUnits,{format:'#,##0.00', locale:kimble.locale, isFullLocale:false}));
+
+						}
+
+						function applyHoursAndMinutesOutputs()
+						{
+						    if({!Timesheet__c.ResourcedActivity__r.ShowUsageAsHoursAndMins__c})
+						    {
+								jQuery('.HoursAndMinsOutput').each(function()
+								{
+									var formattedValue = hoursAndMinsHelper.formatHours(jQuery(this).text());
+									jQuery(this).text(formattedValue);
+								});
+							}
+						}
+				</script>	
+
+
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

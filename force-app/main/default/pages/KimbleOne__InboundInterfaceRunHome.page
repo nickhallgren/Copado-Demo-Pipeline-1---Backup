@@ -1,0 +1,239 @@
+<apex:page standardController="KimbleOne__InterfaceRun__c" extensions="KimbleOne.InboundInterfaceRunHomeController" showHeader="true" sidebar="false" standardStylesheets="true">
+    <apex:composition template="KimbleOne__SiteMaster">
+        <apex:define name="Menu"></apex:define>
+
+        <apex:define name="Content">
+            <apex:form id="TheForm">
+                <div id="pageErrors">
+                    <apex:pageMessages escape="false"/>
+                </div>
+
+                <div id="ImportJobs">
+
+                </div>
+                <script>
+					jQuery(function () {
+		                	loadJobsInline(jQuery('#ImportJobs'), '{!JSINHTMLENCODE(InterfaceRun__c.Id)}','', importJobsComplete);
+		            });
+
+		            function importJobsComplete(ranJobs)
+		            {
+		            	if (ranJobs) // see if there are more to run
+		            	    refreshPage();
+		            	else {
+		            		jQuery('#ImportJobs').hide();
+		            		jQuery('#theFiles').show();
+		            		jQuery('#thePageView').show();
+		            	}
+		            }
+
+		        </script>
+                <apex:actionFunction name="refreshPage" rerender="TheForm"/>
+                <div id="thePageView" style="display:none">
+
+                    <apex:outputPanel layout="none" rendered="{!KimbleOne__InterfaceRun__c.KimbleOne__Status__c = ProcessingRequestId || KimbleOne__InterfaceRun__c.KimbleOne__Status__c = AwaitingCompletionId}">
+
+
+                    </apex:outputPanel>
+                    <apex:pageBlock title="{!$Label.kimbleone__importitems}" mode="edit">
+
+                        <apex:pageBlockButtons location="top">
+
+                            <apex:commandButton action="{!Delete}" value="{!$Label.kimbleone__deletebutton}" rendered="{!CompletedLinesCount.KimbleOne__InputInteger__c = 0 && $ObjectType.KimbleOne__InterfaceRun__c.deletable}"/>
+                            <apex:commandButton action="{!Reimport}" value="{!$Label.kimbleone__reimportlabel}" rendered="{!CompletedLinesCount.KimbleOne__InputInteger__c = 0 && $ObjectType.KimbleOne__InterfaceRun__c.updateable}"/>
+                            <apex:commandButton action="{!ReComplete}" value="{!$Label.kimbleone__complete}" rendered="{!ReadyLinesCount.KimbleOne__InputInteger__c > 0 && $ObjectType.KimbleOne__InterfaceRun__c.updateable}"/>
+                        </apex:pageBlockButtons>
+
+                        <apex:pageBlockSection columns="2" collapsible="false" showheader="true" title="{!$Label.kimbleone__filedetailsheading}">
+
+                            <apex:outputField value="{!KimbleOne__InterfaceRun__c.KimbleOne__InterfaceMap__c}"/>
+
+                            <apex:outputField value="{!KimbleOne__InterfaceRun__c.KimbleOne__InterfaceType__c}"/>
+
+                            <apex:outputField value="{!KimbleOne__InterfaceRun__c.InterfaceType__r.KimbleOne__Enum__c}"/>
+
+                            <apex:outputField value="{!InterfaceTypeHandler.TheInterfaceRun.KimbleOne__Status__c}"/>
+                            <apex:outputField value="{!KimbleOne__InterfaceRun__c.KimbleOne__NumberOfRecords__c}"/>
+
+                            <apex:pageBlockSectionItem >
+                                <apex:outputLabel value="{!$Label.kimbleone__numberofignoredlineslabel}" />
+                                <apex:outputField value="{!IgnoredLinesCount.KimbleOne__InputInteger__c}"/>
+                            </apex:pageBlockSectionItem>
+
+                            <apex:pageBlockSectionItem >
+                                <apex:outputLabel value="{!$Label.kimbleone__numberoferroredlineslabel}" />
+                                <apex:outputField value="{!ErroredLinesCount.KimbleOne__InputInteger__c}"/>
+                            </apex:pageBlockSectionItem>
+
+                            <apex:pageBlockSectionItem >
+                                <apex:outputLabel value="{!$Label.kimbleone__numberofcompletedlineslabel}" />
+                                <apex:outputField value="{!CompletedLinesCount.KimbleOne__InputInteger__c}"/>
+                            </apex:pageBlockSectionItem>
+
+                            <apex:pageBlockSectionItem >
+                                <apex:outputLabel value="{!$Label.kimbleone__numberofreadylineslabel}" />
+                                <apex:outputField value="{!ReadyLinesCount.KimbleOne__InputInteger__c}"/>
+                            </apex:pageBlockSectionItem>
+
+                        </apex:pageBlockSection>
+
+                        <apex:pageBlockSection columns="1" collapsible="false" showheader="false">
+
+                            <apex:pageBlockSectionItem >
+                                <apex:outputLabel value="{!$Label.kimbleone__filterbystatuslabel}" />
+                                <apex:selectList id="ActivityList" value="{!FilterStatusId}"  size="1">
+                                    <apex:actionSupport event="onchange" action="{!UpdateLines}" rerender="TheForm"/>
+                                    <apex:selectOptions value="{!TheLineStates}" />
+                                </apex:selectList>
+                            </apex:pageBlockSectionItem>
+                            <apex:inputHidden value="{!TheCurrentPageNumber}"/>
+                            <apex:variable var="counter" value="{!0}"/>
+                            <apex:variable var="objTyp" value="{!InterfaceTypeHandler.ImportObjectTypeName}"/>
+                            <apex:pageBlockTable value="{!ThePagedMatchingLines}" var="line">
+                                <apex:column headervalue="{!$Label.kimbleone__actionlinksheader}" style="text-align:center;" styleclass="actionColumn" width="60px">
+                                    <div class="actions">
+                                        <apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#LinePopup', '{!$Label.kimbleone__view}');viewItem('{!line.TheLine.Id}')">{!$Label.kimbleone__view}</apex:outputLink>
+
+                                        <apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__InterfaceRun__c.updateable && KimbleOne__InterfaceRun__c.KimbleOne__Status__c != CompletedId}">
+
+                                            <apex:outputPanel layout="block" rendered="{!line.TheLine.Status__r.KimbleOne__Enum__c = 'Errored'}">
+                                                &nbsp;|&nbsp;
+                                                <apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="$(this).closest('.actions').hide().next().show();ignoreItem('{!line.TheLine.id}')" >{!$Label.kimbleone__ignorelink}</apex:outputLink>
+                                            </apex:outputPanel>
+
+                                            <apex:outputPanel layout="block" rendered="{!line.TheLine.Status__r.KimbleOne__Enum__c = 'Ignored'}">
+                                                &nbsp;|&nbsp;
+                                                <apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="$(this).closest('.actions').hide().next().show();reinstateItem('{!line.TheLine.id}')">{!$Label.kimbleone__reinstatelink}</apex:outputLink>
+                                            </apex:outputPanel>
+
+                                            <apex:outputPanel layout="block" rendered="{!line.TheLine.Status__r.KimbleOne__Enum__c = 'Errored'}">
+                                                &nbsp;|&nbsp;
+                                                <apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="$(this).closest('.actions').hide().next().show();retryItem('{!line.TheLine.id}')">{!$Label.kimbleone__retry}</apex:outputLink>
+                                            </apex:outputPanel>
+
+                                        </apex:outputPanel>
+                                    </div>
+                                    <span class="loadingImage" style="display:none;"><img src="{!URLFOR($Resource.LoadingImage)}" /></span>
+                                    <apex:variable var="counter" value="{!counter+1}"/>
+                                </apex:column>
+
+
+                                <apex:column headervalue="{!$Label.kimbleone__object}">
+                                    <apex:outputText value="{!line.TheLine['ObjectId__c']}" styleclass="kimble-objectid-lookup" html-data-type="{!objTyp}"/>
+                                </apex:column>
+
+                                <apex:column value="{!line.TheLine.KimbleOne__Status__c}"/>
+                                <apex:column value="{!line.TheLine.KimbleOne__ExternalRequestId__c}"/>
+                                <apex:column value="{!line.TheLine.KimbleOne__ErrorMessage__c}"/>
+                                <apex:repeat value="{!TheFieldNames}" var="fld">
+                                    <apex:column value="{!line.TheObject[fld]}"/>
+                                </apex:repeat>
+                            </apex:pageBlockTable>
+                        </apex:pageBlockSection>
+                        <div style="float: right; margin-right: 15px; margin-bottom:15px;">
+                            <apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" rendered="{!CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+                            <apex:outputText styleclass="greyedLink" rendered="{!!CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+                            &nbsp;|&nbsp;
+                            <apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" rendered="{!CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+                            <apex:outputText styleclass="greyedLink" rendered="{!!CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+
+                        </div>
+                        <div style="clear:both;"></div>
+                    </apex:pageBlock>
+
+
+                </div>
+                <apex:actionFunction action="{!ViewItem}" name="viewItem" oncomplete="showModalBoxy();" rerender="LineDetails">
+                    <apex:param name="lineId" value=""/>
+                </apex:actionFunction>
+
+                <apex:actionFunction action="{!IgnoreItem}" name="ignoreItem" oncomplete="initialise();" rerender="TheForm">
+                    <apex:param name="lineId" value=""/>
+                </apex:actionFunction>
+                <apex:actionFunction action="{!ReinstateItem}" name="reinstateItem" oncomplete="initialise();" rerender="TheForm">
+                    <apex:param name="lineId" value=""/>
+                </apex:actionFunction>
+                <apex:actionFunction action="{!RetryItem}" name="retryItem" oncomplete="initialise();" rerender="TheForm">
+                    <apex:param name="lineId" value=""/>
+                </apex:actionFunction>
+            </apex:form>
+
+            <div id="LinePopup" style="display: none;">
+                <apex:outputPanel id="LineDetails" >
+
+                    <apex:pageBlock title="{!$ObjectType.KimbleOne__PaymentCardStatementLine__c.Fields.KimbleOne__RawData__c.Label}" mode="edit">
+                        <apex:pageBlockButtons location="bottom">
+                            <input type="button" onclick="hideModalBoxy()" class="btn" value="{!$Label.Cancel}" />
+                        </apex:pageBlockButtons>
+
+                        <div style="height:350px;overflow-y:auto;width:820px">
+                            <table cellpadding="0" cellspacing="0" border="0" class="list">
+                                <thead>
+                                <tr class="headerRow">
+                                    <th>Name</th>
+                                    <th>Value</th>
+                                    <th>Source Name</th>
+                                    <th>Source Value</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <apex:repeat value="{!TheObjectFields}" var="fld">
+                                    <tr class="dataRow">
+                                        <td><apex:outputText value="{!fld}"/></td>
+                                        <td><apex:outputField value="{!TheLineObject[fld]}"/></td>
+                                        <td><apex:outputText value="{!TheRawDataFields[fld]}"/></td>
+                                        <td><apex:outputText value="{!TheRawDataValues[fld]}"/></td>
+                                    </tr>
+                                </apex:repeat>
+                                </tbody>
+                            </table>
+                        </div>
+
+                    </apex:pageBlock>
+
+                </apex:outputPanel>
+            </div>
+
+            <div id="theFiles" style="display:none;">
+                <apex:relatedList list="CombinedAttachments" />
+            </div>
+            <style>
+            	.kimble-objectid-lookup{display:none;}
+
+                td.dataCell span {
+                    text-overflow: ellipsis;
+                    max-width: 400px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    display: inline-block;
+                }
+
+            </style>
+
+            <script>
+            
+            jQuery(window).load(function(){
+            	
+            	initialise();
+            
+            });
+            
+            function initialise()
+            {
+            	jQuery.each(jQuery('.kimble-objectid-lookup'), function (i, obj)
+				{
+					if (jQuery(obj).text() != '')
+					{
+						var sObject = sforce.connection.query("SELECT Id, Name FROM " + jQuery(obj).attr("data-type") + " WHERE Id = '" + jQuery(obj).text() + "'");
+					
+						jQuery(obj).parent().append('<a href="/' + jQuery(obj).text() + '">' + sObject.records.Name + '</a>');
+					}
+				
+				});
+            }
+            
+            </script>
+
+        </apex:define>
+    </apex:composition>
+</apex:page>

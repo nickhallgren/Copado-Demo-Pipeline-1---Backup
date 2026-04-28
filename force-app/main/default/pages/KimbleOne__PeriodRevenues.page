@@ -1,0 +1,155 @@
+<apex:page standardController="KimbleOne__TimePeriod__c" extensions="KimbleOne.PeriodRevenuesController" sidebar="false" tabStyle="KimbleOne__TimePeriod__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu"> 
+
+	<c:Menu DefaultHelpPage="Annuities.html" MenuContextType="Organisation" MenuContextName="Period Management"/>	
+
+</apex:define>
+    
+<apex:define name="Content">
+	<style>
+		.line {
+			padding-left: 20px;
+			background-repeat: no-repeat;
+			padding-right: 12px;
+			height: 18px;
+			display: block;
+			line-height: 18px;
+		}
+		.Pending {background-image: url('{!URLFOR($Resource.JobImages, 'pending16.gif')}');}
+		.Processing { background-image: url('{!URLFOR($Resource.JobImages, 'running16.gif')}'); }
+		.Completed { background-image: url('{!URLFOR($Resource.JobImages, 'completed16.gif')}'); }
+		.Failed { background-image: url('{!URLFOR($Resource.JobImages, 'failed16.gif')}'); }
+	</style>
+	<script>
+		jQuery(document).ready(function(){
+			setUpCheckBoxes();
+		});
+		
+		function setUpCheckBoxes()
+		{
+			jQuery('#AllPeriodRevenues').unbind('change');
+			jQuery('#AllPeriodRevenues').change(function(){
+				UncheckOrCheckGroup(jQuery(this),'PeriodRevenues');
+			});
+			jQuery('.APeriodRevenue').unbind('change');
+			jQuery('.APeriodRevenue').change(function(){
+				UnCheckParent(jQuery(this),'AllPeriodRevenues');
+			});
+		}
+		
+		function completeNextPeriodRevenue()
+		{
+			var pending = jQuery('.Pending:first');
+			
+			if (pending.length == 0)
+			{
+				refresh();
+			}
+			else
+			{
+				pending.removeClass('Pending').addClass('Processing');
+				
+				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.PeriodRevenuesController.CompletePeriodRevenue}',
+	       			pending.find('input').val(),
+	      			function(result, event)
+	      			{          
+	  					pending.removeClass('Processing');
+		  				
+		  				if (event.status)
+		  				{
+		  					pending.addClass('Completed');
+		  				}
+		  				else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			             	pending.addClass('Failed');
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			             	pending.addClass('Failed');
+			         	}
+			         	
+			         	completeNextPeriodRevenue();		  					
+	  				});
+	  		}
+		}
+		
+		function completePeriodRevenues() 
+		{
+			var selected = jQuery("input:checkbox[name=PeriodRevenues]:checked");
+			
+			selected.each(function(){
+				jQuery(this).hide().parent().addClass('Pending');
+	  			});
+	  		
+	  		completeNextPeriodRevenue();
+		}
+	</script>
+ 	<style>
+		.boxy-content {display:none;}
+	</style>
+	
+	<apex:outputPanel id="PeriodRevenuesMainPanel" >
+
+       	<apex:form id="TheForm"> 
+       	<apex:actionFunction action="{!refresh}" name="refresh" rerender="PeriodRevenuesDetailPanel" oncomplete="setUpCheckBoxes()"/>
+ 		
+		<apex:pageBlock id="PeriodRevenuesDetailPanel" title="">	
+       	    <apex:pageMessages escape="false"/>     	
+				<apex:pageBlockButtons >	            		
+            		<input type="button" class="btn DisableButtonWhileBusy" value="{!$Label.Complete}" onclick="completePeriodRevenues()"/>
+			 	</apex:pageBlockButtons>
+            	
+				<apex:pageBlockTable value="{!ThePagedPeriodRevenues.TheRecords}" var="pr" >
+					<apex:column >
+						<apex:facet name="header">
+							<div class='line'><input type="checkbox" name="AllPeriodRevenues" value="AllPeriodRevenues" id="AllPeriodRevenues" /></div>
+						</apex:facet>
+						<apex:outputPanel rendered="{!pr.Status__r.KimbleOne__Enum__c == 'Open'}" styleClass="line">
+							<input type="checkbox" name="PeriodRevenues" value="{!pr.Id}" class="APeriodRevenue"/>
+						</apex:outputPanel>
+					</apex:column>
+           			<apex:column value="{!pr.DeliveryElement__r.DeliveryGroup__r.KimbleOne__Account__c}" headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__Account__c.Label}"/>										
+					<apex:column value="{!pr.DeliveryElement__r.KimbleOne__DeliveryGroup__c}" headerValue="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.Name.Label}"/>
+					<apex:column value="{!pr.DeliveryElement__r.Name}" headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.Name.Label}"/>
+					<apex:column value="{!pr.Annuity__r.Name}" headerValue="{!$ObjectType.KimbleOne__Annuity__c.Fields.Name.Label}"/>
+					<apex:column value="{!pr.KimbleOne__StartDate__c}" headerValue="{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__StartDate__c.Label}"/>
+					<apex:column value="{!pr.KimbleOne__EndDate__c}" headerValue="{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__EndDate__c.Label}"/>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__ForecastRevenue__c.Label}" >
+						<apex:outputPanel layout="none">
+							<apex:outputText value="{!pr.KimbleOne__InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+							<apex:outputField value="{!pr.KimbleOne__InvoicingCurrencyForecastRevenue__c}"/>
+						</apex:outputPanel>
+					</apex:column>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__ForecastUnits__c.Label}">
+						<apex:outputText value="{!pr.KimbleOne__ForecastUnits__c}" />
+					</apex:column>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__Status__c.Label}" value="{!pr.Status__r.Name}"/>
+              		<apex:column value="{!pr.KimbleOne__Approver1User__c}" headerValue="{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__Approver1User__c.Label}"/>		
+			 	 	<apex:column value="{!pr.KimbleOne__Approver2User__c}" headerValue="{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__Approver2User__c.Label}"/>		
+			
+ 				</apex:pageBlockTable>
+				  
+				 <div style="float:left; margin-top:15px;">
+					<apex:outputText value="{!ThePagedPeriodRevenues.CurrentPageDescription}"/>
+				</div>
+				<div style="float: right; margin-right: 15px; margin-top:15px;">
+					    	<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPrevious}" oncomplete="setUpCheckBoxes();" rerender="PeriodRevenuesMainPanel" rendered="{!ThePagedPeriodRevenues.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+					    	<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedPeriodRevenues.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+					    	&nbsp;|&nbsp;
+					    	<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNext}" oncomplete="setUpCheckBoxes();" rerender="PeriodRevenuesMainPanel" rendered="{!ThePagedPeriodRevenues.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+					    	<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedPeriodRevenues.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+				</div>
+				<div style="clear:both;"></div>
+		     					
+			</apex:pageBlock>
+		</apex:form>
+	</apex:outputPanel>
+	
+</apex:define>
+</apex:composition>
+</apex:page>

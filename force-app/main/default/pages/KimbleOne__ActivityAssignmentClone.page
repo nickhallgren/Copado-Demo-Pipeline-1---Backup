@@ -1,0 +1,125 @@
+<apex:page id="ActivityAssignmentClone" controller="KimbleOne.ActivityAssignmentRemoteActions" showHeader="false" sidebar="false">
+
+    <div id="CloneAssignmentPopup" style="display:none">
+        <div id="clone-assignment-entry">
+            <div id="clone-no-access">
+                <apex:pageMessage summary="{!SUBSTITUTE($Label.kimbleone__insufficientprivilegesmessage,'{0}',$ObjectType.KimbleOne__ActivityAssignment__c.Label)}" severity="error" strength="1"/>
+
+                <input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}" />
+            </div>
+
+            <div id="clone-body">
+            <apex:pageBlock mode="edit" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.updateable}">
+                <apex:pageBlockSection collapsible="false" showheader="false" columns="1">
+
+                    <apex:pageBlockSectionItem >
+                        <apex:outputText value="{!$Label.kimbleone__cloneassignmentlabel}" />
+                        <span id="clone-assignment-name"></span>
+                        <span id="clone-assignment-id" style="display:none;"></span>
+                    </apex:pageBlockSectionItem>
+
+                    <apex:pageBlockSectionItem >
+                        <apex:outputText value="{!$Label.kimbleone__identifyassignmentbylabel}" />
+                        <span>
+                            <input type="text" id="clone-assignment-initials" style="width:50px"/>
+                            <input type="text" id="clone-assignment-seed" style="width:50px"/>
+                        </span>
+                    </apex:pageBlockSectionItem>
+
+                    <apex:pageBlockSectionItem >
+                        <apex:outputText value="{!$Label.kimbleone__numberofcloneslabel}" />
+                        <input type="text" id="clone-assignment-amount" style="width:50px"/>
+                    </apex:pageBlockSectionItem>
+                </apex:pageBlockSection>
+
+                <apex:pageBlockButtons location="bottom">
+                    <input class="btn" type="button" onclick="CloneAssignment()" id="save" value="{!$Label.Save}" />
+                    <input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}" />
+                </apex:pageBlockButtons>
+            </apex:pageBlock>
+            </div>
+        </div>
+        <div id="clone-assignment-jobs" style="display:none">
+
+        </div>
+
+        <script>
+        function initialiseClone(id)
+        {
+            jQuery('#clone-assignment-jobs').hide();
+
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.GetAssignmentById}',
+                    id,
+                        function(result, event){
+                            if (event.status)
+                            {
+                                if (result.CanEditAssignment) {
+                                    jQuery('#clone-no-access').hide();
+                                    jQuery('#clone-body').show();
+                                    jQuery('#clone-assignment-id').text(id);
+
+                                    jQuery('#clone-assignment-initials').val(unescapeHTML(result.Initials));
+                                    jQuery('#clone-assignment-seed').val('1');
+                                    jQuery('#clone-assignment-name').text(result.Name);
+                                    jQuery('#clone-assignment-amount').val('');
+                                    jQuery('#clone-assignment-entry').show();
+                                } else {
+                                    jQuery('#clone-no-access').show();
+                                    jQuery('#clone-body').hide();
+                                }
+
+                                showModalBoxy();
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                alert(event.message);
+                            }
+                            else
+                            {
+                                alert(event.message);
+                            }
+                    },
+                    {escape: true, timeout: 60000}
+                );
+        }
+
+        function CloneAssignment()
+        {
+            if (jQuery('#clone-assignment-amount').val() == '')
+            {
+                alert(kimble.labels['RequiredValue'].format('<apex:outputText value="{!$Label.kimbleone__numberofcloneslabel}"/>'));
+                return;
+            }
+
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.CloneAssignment}',
+                    jQuery('#clone-assignment-id').text(), jQuery('#clone-assignment-initials').val(), jQuery('#clone-assignment-seed').val(), jQuery('#clone-assignment-amount').val(),
+                        function(result, event){
+                            if (event.status)
+                            {
+                                jQuery('#clone-assignment-entry').hide();
+                                jQuery('#clone-assignment-jobs').show();
+                                loadJobsPopup(jQuery('#clone-assignment-jobs'), result, runCloneJobsComplete);
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                alert(event.message);
+                            }
+                            else
+                            {
+                                alert(event.message);
+                            }
+                    },
+                    {escape: true, timeout: 60000}
+                );
+        }
+
+        function runCloneJobsComplete()
+        {
+            hideModalBoxy();
+            jQuery.publish('kimble.assignmentsCloned');
+        }
+
+</script>
+    </div>
+
+</apex:page>

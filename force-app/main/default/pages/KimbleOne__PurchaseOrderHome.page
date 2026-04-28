@@ -1,0 +1,87 @@
+<apex:page standardController="KimbleOne__PurchaseOrder__c" extensions="KimbleOne.PurchaseOrderHomeController,KimbleOne.FilesAndAttachmentsController" showHeader="true" sidebar="false" standardStylesheets="true" >
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+       <c:Menu DefaultHelpPage="BudgetsPOs.html" MenuContextType="PurchaseOrder" MenuContextId="{!KimbleOne__PurchaseOrder__c.Id}" MenuContextName="{!KimbleOne__PurchaseOrder__c.Name}"/>
+    </apex:define>
+    
+    <apex:define name="Content">
+		<apex:pageBlock title="{!$ObjectType.KimbleOne__PurchaseOrder__c.Label}">
+			<apex:pageblockSection collapsible="false" showheader="false" columns="2">						
+				<apex:outputField value="{!KimbleOne__PurchaseOrder__c.KimbleOne__Account__c}" />
+				<apex:pageBlockSectionItem />
+				
+				<apex:outputField value="{!KimbleOne__PurchaseOrder__c.KimbleOne__OrderDate__c}" />
+				<apex:outputField value="{!KimbleOne__PurchaseOrder__c.KimbleOne__ExpiryDate__c}" />
+				
+				<apex:outputField value="{!KimbleOne__PurchaseOrder__c.KimbleOne__OrderValue__c}" />
+				<apex:outputField value="{!KimbleOne__PurchaseOrder__c.KimbleOne__Status__c}" />
+				
+				<apex:outputField value="{!KimbleOne__PurchaseOrder__c.KimbleOne__EarliestInvoiceItemDate__c}" />
+				<apex:outputField value="{!KimbleOne__PurchaseOrder__c.KimbleOne__LatestInvoiceItemDate__c}" />
+				
+				<apex:outputField value="{!KimbleOne__PurchaseOrder__c.KimbleOne__AllocatedValue__c}" />
+				<apex:outputField value="{!KimbleOne__PurchaseOrder__c.KimbleOne__UnallocatedValue__c}" />
+				
+				<apex:outputField value="{!KimbleOne__PurchaseOrder__c.KimbleOne__InvoicedValue__c}"/>
+				<apex:pageBlockSectionItem />
+				
+				<apex:repeat value="{!$ObjectType.KimbleOne__PurchaseOrder__c.FieldSets.KimbleOne__PurchaseOrderDetails}" var="f">
+     				<apex:outputField value="{!KimbleOne__PurchaseOrder__c[f]}"/>
+   				</apex:repeat>
+			</apex:pageblockSection>
+		</apex:pageBlock>
+		<apex:form >
+		<apex:pageBlock title="{!$ObjectType.KimbleOne__PurchaseOrderAllocation__c.LabelPlural}">
+			<apex:pageBlockButtons location="top" >
+				<apex:commandButton action="{!NewPurchaseOrderAllocation}" value="{!$Label.kimbleone__allocatepurchaseorderbutton}" rendered="{!KimbleOne__PurchaseOrder__c.Status__r.KimbleOne__Enum__c == 'Open' && KimbleOne__PurchaseOrder__c.KimbleOne__UnallocatedValue__c != 0 && CanCreateNewPOAllocation}"/>
+            </apex:pageBlockButtons>
+		<apex:pageblockSection columns="1" collapsible="false" showheader="false">
+			<apex:pageBlockTable var="allo" value="{!KimbleOne__PurchaseOrder__c.PurchaseOrderAllocations__r}" >
+				<apex:column headerValue="{!$ObjectType.KimbleOne__PurchaseOrderAllocation__c.Fields.KimbleOne__DeliveryGroup__c.Label}">
+					<apex:outputField value="{!allo.DeliveryElement__r.KimbleOne__DeliveryGroup__c}" rendered="{!!ISBLANK(allo.DeliveryElement__r.KimbleOne__DeliveryGroup__c)}"></apex:outputField>
+					<apex:outputField value="{!allo.KimbleOne__DeliveryGroup__c}" rendered="{!!ISBLANK(allo.KimbleOne__DeliveryGroup__c)}"></apex:outputField>
+				</apex:column>
+				<apex:column value="{!allo.DeliveryElement__r.Name}"  headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Label}"></apex:column>
+				<apex:column value="{!allo.KimbleOne__AllocatedValue__c}"  headerValue="{!$ObjectType.KimbleOne__PurchaseOrderAllocation__c.Fields.KimbleOne__AllocatedValue__c.Label}"></apex:column>
+				<apex:column value="{!allo.KimbleOne__InvoicedValue__c}"  headerValue="{!$ObjectType.KimbleOne__PurchaseOrderAllocation__c.Fields.KimbleOne__InvoicedValue__c.Label}"></apex:column>
+				<apex:column value="{!allo.KimbleOne__RemainingValue__c}"  headerValue="{!$ObjectType.KimbleOne__PurchaseOrderAllocation__c.Fields.KimbleOne__RemainingValue__c.Label}"></apex:column>
+		 	</apex:pageBlockTable>
+		 </apex:pageblockSection>
+		</apex:pageBlock>
+		</apex:form>
+		
+		<apex:pageBlock title="{!$ObjectType.KimbleOne__Invoice__c.LabelPlural}">
+			<apex:pageBlockButtons location="top" rendered="{!KimbleOne__PurchaseOrder__c.Status__r.KimbleOne__Enum__c == 'Open' && CanCreateNewInvoice}">
+			
+				<input class="btn" type="button"
+					onclick="safeNavigateToSForceURL('{!$Page.InvoiceNew}?poid={!KimbleOne__PurchaseOrder__c.Id}');"
+								value="{!$Label.New} {!$ObjectType.Invoice__c.label}" />
+			</apex:pageBlockButtons>	
+		
+			<apex:pageblockSection showheader="false"  columns="1" collapsible="false">
+		 	<apex:variable var="InvTab" value="{!$ObjectType.KimbleOne__Invoice__c.Fields}"/>
+			
+			<apex:pageBlockTable var="inv" value="{!invoices}" >
+				<apex:column headerValue="{!InvTab.KimbleOne__Reference__c.Label}">
+					<apex:outputLink value="{!$Page.KimbleOne__InvoiceHome}?id={!inv.Id}">{!inv.KimbleOne__Reference__c}</apex:outputLink>
+				</apex:column>
+				<apex:column value="{!inv.KimbleOne__InvoiceDate__c}"  headerValue="{!InvTab.KimbleOne__InvoiceDate__c.Label}"></apex:column>
+				<apex:column value="{!inv.KimbleOne__NetAmount__c}"  headerValue="{!InvTab.KimbleOne__NetAmount__c.Label}"></apex:column>
+				<apex:column value="{!inv.KimbleOne__TaxAmountSum__c}"  headerValue="{!InvTab.KimbleOne__TaxAmountSum__c.Label}"></apex:column>
+				<apex:column value="{!inv.KimbleOne__GrossAmount__c}"  headerValue="{!InvTab.KimbleOne__GrossAmount__c.Label}"></apex:column>
+		 	</apex:pageBlockTable>
+		</apex:pageblockSection>
+		
+		</apex:pageBlock>
+		<apex:relatedList list="CombinedAttachments" rendered="{!AttachmentsEnabled}" title="{!$Label.kimbleone__purchaseordernotesandattachments}"/>
+		<apex:relatedList subject="{!KimbleOne__PurchaseOrder__c}" list="AttachedContentDocuments" rendered="{!FilesEnabled}"/>
+    	<script>
+			jQuery(document).ready(function() {
+				if(isSFLightning()) jQuery('input[name="newNote"],input[name="attachFile"]').hide();
+			});
+		</script>
+    </apex:define>
+</apex:composition>
+
+</apex:page>

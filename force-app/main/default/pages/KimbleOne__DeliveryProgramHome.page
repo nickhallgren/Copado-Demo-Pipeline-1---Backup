@@ -1,0 +1,418 @@
+<apex:page standardcontroller="KimbleOne__DeliveryProgram__c" extensions="KimbleOne.DeliveryProgramHomeController" sidebar="false" >
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+	<c:Menu DefaultHelpPage="DeliveryPrograms1.html" MenuContextType="DeliveryProgram" MenuContextId="{!KimbleOne__DeliveryProgram__c.Id}"  MenuContextName="{!KimbleOne__DeliveryProgram__c.Name}"/>
+
+</apex:define>
+     
+<apex:define name="Content">
+    
+	<chatter:feedWithFollowers entityId="{!KimbleOne__DeliveryProgram__c.Id}"/>
+	
+	<!-- Ajax loaded pages don't load external resources so they have to be loaded in the parent page -->
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__jQueryBarGraph, 'jqBarGraph.1.1.min.js')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleJS, 'Charm.js')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'RiskStyle.css')}"/>
+ 
+	<div id="dashboard-layout" class="dashboardLayout">
+
+		<div id="dashboardContainer" class="dashboardContainer">
+			<div id="delivery-group-title">
+				<apex:outputPanel id="DeliveryGroupCard" layout="none">
+				<div class="title-card-container">
+				<div class="title-card">
+					<div class="title-card-heading" >
+						<div class="title-card-heading-text">
+							<apex:outputText title="{!KimbleOne__DeliveryProgram__c.Name}" value="{!KimbleOne__DeliveryProgram__c.Name}"/>
+							<apex:outputPanel layout="none" rendered="{!!ISBLANK(KimbleOne__DeliveryProgram__c.KimbleOne__DeliveryProgram__c)}">
+								<apex:outputLink styleClass="undecorated-link delivery-program-indicator fa fa-link" value="/{!KimbleOne__DeliveryProgram__c.KimbleOne__DeliveryProgram__c}" title="{!$ObjectType.KimbleOne__DeliveryProgram__c.Fields.KimbleOne__DeliveryProgram__c.Label}: {!JSENCODE(KimbleOne__DeliveryProgram__c.DeliveryProgram__r.Name)}"/>
+							</apex:outputPanel>
+						</div>
+					</div>
+					
+					<div class="title-card-body">
+			  			<div id="embeddedCharmsContainer" context-id="{!KimbleOne__DeliveryProgram__c.Id}" pageSource="DeliveryProgramCharmsCard"><i class="charm-loading fa fa-circle-o-notch fa-spin fa-3x fa-fw"/></div>
+					</div>
+				</div>
+				</div>
+	  			</apex:outputPanel>
+	  		</div>
+			<apex:pageMessages escape="false"/>
+
+			<div class="full-width-dashboard-container">
+				<div id="engagementStatusContainer" context-id="{!KimbleOne__DeliveryProgram__c.Id}" pageSource="StatusSummaryCard" class="cardContainer"></div>
+				<div id="revenueSummaryContainer" context-id="{!KimbleOne__DeliveryProgram__c.Id}" display-currency="{!JSENCODE(TheDisplayCurrencyIsoCode)}" pageSource="RevenueSummaryCard" class="cardContainer"></div>
+				<div id="marginSummaryContainer" context-id="{!KimbleOne__DeliveryProgram__c.Id}" display-currency="{!JSENCODE(TheDisplayCurrencyIsoCode)}" pageSource="MarginSummaryCard" class="cardContainer"></div>
+			</div>
+			
+			<div id="financialSummaryContainer" context-id="{!KimbleOne__DeliveryProgram__c.Id}" display-currency="{!JSENCODE(TheDisplayCurrencyIsoCode)}" pageSource="DeliveryProgramFinancialSummaryCard" class="cardContainer"></div>
+			<apex:outputPanel layout="none" rendered="{!isProgramRiskSummaryEnabled}">
+				<div id="riskDashboardSummaryContainer" context-id="{!KimbleOne__DeliveryProgram__c.Id}" pageSource="DeliveryProgramRiskSummaryCard" class="cardContainer"></div>
+			</apex:outputPanel>
+		</div>
+	</div>
+
+	<script>
+		var filterLabels = {};
+		filterLabels['services'] = '{!JSENCODE($Label.ServicesLabel)}';
+		filterLabels['expenses'] = '{!JSENCODE($Label.ExpensesLabel)}';
+		filterLabels['all'] = '{!JSENCODE($Label.All)}';
+		filterLabels['revsummary'] = '{!JSENCODE($Label.RevenueSummaryLabel)}';
+		filterLabels['marsummary'] = '{!JSENCODE($Label.MarginSummaryLabel)}';
+		filterLabels['apply'] = '{!JSENCODE($Label.ApplyFilter)}';
+
+		var showFilter = <apex:outputText value="{!ShowFilter}"/>;
+		var showRevFilter = <apex:outputText value="{!ShowRevFilter}"/>;
+		var showMarFilter = <apex:outputText value="{!ShowMarFilter}"/>;
+
+		var componentsToLoad = 0;
+		
+		jQuery(document).ready(function()
+		{
+			componentsToLoad = jQuery('.dashboardContainer div[pageSource]').length;
+			
+			jQuery.each( jQuery('.dashboardContainer'), function(i, dashboardContainer) {
+					jQuery('div[pageSource]', dashboardContainer).each(function() {
+						loadDashboardComponent(jQuery( this ));
+			   });
+			})			
+			
+		});
+		
+		function loadDashboardComponent(dashboardComponent)
+		{
+	   		var pageSourceName = dashboardComponent.attr('pageSource');
+	   		
+	   		// kick off the population of the page with an ajax call - always provide ID, only provide currency if on the source element
+	   		var displayCurrencyParam = '';
+	   		if(dashboardComponent.attr('display-currency') != '')
+	   		{
+	   			displayCurrencyParam = '&currencyISOCode=' + dashboardComponent.attr('display-currency');
+	   		}
+
+	   		var domainParam = '';
+	   		
+	   		if(dashboardComponent.attr('domain') != null)
+	   		{
+	   			domainParam = '&domain=' + dashboardComponent.attr('domain');
+	   		}
+	   			   		
+			jQuery.ajax({ url: kimble.pages[pageSourceName] + dashboardComponent.attr('context-id') + displayCurrencyParam + domainParam})
+				.done(function(html) {
+					dashboardComponent.empty();
+					
+					if(html != null && html != '')
+					{
+						jQuery(html).appendTo("#" + dashboardComponent.attr('id'));
+					}
+					else
+					{
+						// nothing to render in the component
+						// remove the container for this component to allow the page to re-flow
+						dashboardComponent.remove();
+					}
+					
+					componentLoadComplete();
+				})
+				.fail(function(xhr, status, error) {
+					if(error !=null && error !="") {
+						console.log('ajax component load error: ' + error);
+						// hide the container for this component
+						dashboardComponent.hide();
+					}
+
+					componentLoadComplete();									
+				})
+		}
+				
+		function componentLoadComplete()
+		{
+			componentsToLoad -= 1;
+			if(componentsToLoad <= 0) jQuery.publish('kimble.dashboard-load-complete');
+		}
+
+		jQuery.subscribe('kimble.dashboard-load-complete', function(event, data)
+		{
+			if(showFilter)
+			{
+				initialiseFilters();
+				setFilterTooltips();
+			}
+		});
+		
+		function initialiseFilters()
+		{
+			jQuery('.card-filter-icon').qtip('destroy', true);
+
+               jQuery('.card-filter-icon').qtip({
+				content: {
+					text: function(event, api) {							           
+						return generateCardFilterHtml();
+					},
+					button: 'Cancel'
+				},
+				position: {
+				   	my: 'center right',
+					at: 'center left'
+				},
+				show: {
+ 					event: 'click',
+ 					solo: true
+ 					},
+ 					hide: false,
+				style: {classes: 'qtip-light qtip-shadow qtip-rounded card-filter-qtip'}
+		    });
+		}
+
+		function generateCardFilterHtml()
+		{
+			var html = '';
+			
+			html += '<div class="group-card-filters">';
+
+			if (typeof revenueDomainFilter !== 'undefined' && showRevFilter)
+			{
+				html += '<div class="card inverted min-horizontal-padding revenue-summary-filters">';
+
+				html += '<div class="cardHeading inverted">';
+				html += '<h3 class="cardTitle">' + filterLabels['revsummary'] + '</h3>';
+				html += '</div>';
+				
+				html += '<div class="cardBody">';
+				html += '<label><input type="radio"' + (revenueDomainFilter == 'All' ? ' checked="checked"' : '') + ' name="rev-sum-filter" value="All">' + filterLabels['all'] + '</input></label>';
+				html += '<label><input type="radio"' + (revenueDomainFilter == 'Services' ? ' checked="checked"' : '') + ' name="rev-sum-filter" value="Services">' + filterLabels['services'] + '</input></label>';
+				html += '<label><input type="radio"' + (revenueDomainFilter == 'Expenses' ? ' checked="checked"' : '') + ' name="rev-sum-filter" value="Expenses">' + filterLabels['expenses'] + '</input></label>';
+				html += '</div>';
+
+				html += '</div>';
+			}
+
+			if (typeof marginDomainFilter !== 'undefined' && showMarFilter)
+			{
+				html += '<div class="card inverted min-horizontal-padding margin-summary-filters">';
+
+				html += '<div class="cardHeading inverted">';
+				html += '<h3 class="cardTitle">' + filterLabels['marsummary'] + '</h3>';
+				html += '</div>';
+
+				html += '<div class="cardBody">';
+				html += '<label><input type="radio"' + (marginDomainFilter == 'All' ? ' checked="checked"' : '') + ' name="mar-sum-filter" value="All">' + filterLabels['all'] + '</input></label>';
+				html += '<label><input type="radio"' + (marginDomainFilter == 'Services' ? ' checked="checked"' : '') + ' name="mar-sum-filter" value="Services">' + filterLabels['services'] + '</input></label>';
+				html += '<label><input type="radio"' + (marginDomainFilter == 'Expenses' ? ' checked="checked"' : '') + ' name="mar-sum-filter" value="Expenses">' + filterLabels['expenses'] + '</input></label>';
+				html += '</div>';
+
+				html += '</div>';
+			}
+
+			html += '<input class="btn" type="Button" onclick="applyDomainFilter();" name="apply-filter" value="' + filterLabels['apply'] + '"/>';
+
+			html += '</div>';
+			html += '</div>';
+
+			return html;
+		}
+		
+		function applyDomainFilter()
+		{
+			if (typeof revenueDomainFilter !== 'undefined' && showRevFilter)
+			{
+				var newRevenueDomainFilter = jQuery('.group-card-filters:visible .revenue-summary-filters input[name="rev-sum-filter"]:checked').val();
+				if(revenueDomainFilter != newRevenueDomainFilter) revenueSummaryDomainFilterChange(newRevenueDomainFilter);
+  	
+		    	var filterTooltip = filterLabels['all'];
+		    	if(revenueDomainFilter == 'Services') filterTooltip = filterLabels['services'];
+		    	else if(revenueDomainFilter == 'Expenses') filterTooltip = filterLabels['expenses'];
+		    	 
+		    	jQuery('.filter-rev-sum-icon').prop('title', filterTooltip);						
+			}
+
+			if (typeof marginDomainFilter !== 'undefined' && showMarFilter)
+			{
+				var newMarginDomainFilter = jQuery('.group-card-filters:visible .margin-summary-filters input[name="mar-sum-filter"]:checked').val();
+				if(marginDomainFilter != newMarginDomainFilter) marginSummaryDomainFilterChange(newMarginDomainFilter);
+			}
+
+			setFilterTooltips();
+			jQuery('.card-filter-icon').qtip("hide");
+		}
+		
+		function setFilterTooltips()
+		{
+			if (typeof revenueDomainFilter !== 'undefined' && showRevFilter)
+			{
+		    	var filterTooltip = filterLabels['all'];
+		    	if(revenueDomainFilter == 'Services') filterTooltip = filterLabels['services'];
+		    	else if(revenueDomainFilter == 'Expenses') filterTooltip = filterLabels['expenses'];
+		    	 
+		    	jQuery('.filter-rev-sum-icon').prop('title', filterTooltip);						
+			}
+
+			if (typeof marginDomainFilter !== 'undefined' && showMarFilter)
+			{
+		    	var filterTooltip = filterLabels['all'];
+		    	if(marginDomainFilter == 'Services') filterTooltip = filterLabels['services'];
+		    	else if(marginDomainFilter == 'Expenses') filterTooltip = filterLabels['expenses'];
+		    	 
+		    	jQuery('.filter-mar-sum-icon').prop('title', filterTooltip);						
+			}
+		}
+	</script>	
+			
+	<style>
+		
+		#engagementStatusContainer {
+			display: table-cell;
+			width: 100%;
+			height: 208px;
+			overflow:hidden;
+		}
+		
+		#revenueSummaryContainer {
+			display: table-cell;
+			min-width: 440px;
+			height: 208px;
+		}
+		
+		#marginSummaryContainer {
+			display: table-cell;
+			min-width: 160px;
+			height: 208px;
+		}
+
+		div#marginSummaryCardHeading {
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			max-width: 124px;
+		}
+
+		#riskSummaryContainer, #issueSummaryContainer {
+			display: table-cell;
+		}
+				
+		/* ensure that the financial summary spans the screen */
+		#financialSummaryContainer,
+		#riskDashboardSummaryContainer, 
+		#financialSummaryContainer .card,
+		.cardContainer .card
+		{
+			display: block;
+		}
+		
+		.full-width-dashboard-container {
+			display: table;
+			width: 100%;
+			margin-bottom: 5px;
+		}
+									
+		.cardBodyTable
+		{
+			width: 100%;
+		}
+
+		/* translations */
+		div[class^='graphLabeldivFor'] {
+			white-space: nowrap;
+			text-overflow: ellipsis;
+			overflow: hidden;
+		}
+
+		/* override SF .message to fit in with dashboard style */
+		.message
+		{
+			margin: 3px 2px;
+		}
+		.dashboard-footer {
+			text-align: center;
+			background-color: #F5F5F5;
+			border-radius: 4px;
+			-webkit-box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+			box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+			padding-top: 3px;
+			margin-left: 2px;
+			margin-right: 2px;
+		}
+		.delivery-group-print-icon {
+			font-size: 18px;
+			position: relative;
+			left: -26px;
+			top: -8px;
+			color: #6F6F6F;
+		}
+		.delivery-program-indicator {
+			margin-left: 10px;
+			color: #428BCA;
+			font-size: 16px;
+		}
+		.primary-element-container {
+		    display: inline-block;
+		    vertical-align: top;
+		    margin-right:8px;
+		}
+		
+		.rightAlignDataCell {
+		    text-align: right;
+		}
+		
+	    .DeliveryStatus
+	    {
+			font-size: 18px;
+			float: right;
+		  	color: #ddd;
+	    }
+	   	    
+		.DeliveryStatusRed {color: #E50000}
+		.DeliveryStatusAmber {color: #FFB732}
+		.DeliveryStatusGreen {color: #32b42a}
+		
+		.group-card-filters {
+		    background-color: white;
+		}				
+		.group-card-filters .card {
+		    min-width: unset;
+			display: block;
+			margin: 12px !important;
+		}
+		.group-card-filters .cardHeading {
+			width: 180px;
+		}
+		.card-filter-qtip .qtip-content {
+		    padding: 0px;
+		}
+		i.card-filter-icon {
+		    position: absolute;
+		    left: 2px;
+		    top: 41px;
+		    font-size: 15px;
+		    padding: 4px;
+		    cursor: pointer;
+		    border-radius: 4px;
+        	color: #c2c2c2;
+		}
+		i.card-filter-icon.f-active {
+		    color: #1A9EFF !important;
+		}
+		.group-card-filters input.btn {
+		    float: right;
+		    margin-right: 7px;
+		    margin-bottom: 7px;				    
+		}
+		.group-card-filters label {
+		    cursor: pointer;
+		    margin-right: 5px;
+		}
+		.cardIconWarn {
+			color: #E58E1A;
+		}
+	</style>
+
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

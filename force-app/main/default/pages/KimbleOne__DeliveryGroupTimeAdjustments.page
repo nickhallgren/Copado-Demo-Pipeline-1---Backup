@@ -1,0 +1,120 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.DeliveryGroupTimeAdjustmentsController" sidebar="false" readonly="true">
+
+	<apex:composition template="KimbleOne__SiteMaster">
+
+		<apex:define name="Menu">
+			<c:Menu DefaultHelpPage="DeliveryEngagements.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryGroup__c.Id}" MenuContextName="{!KimbleOne__DeliveryGroup__c.Name}" />
+		</apex:define>
+		     
+		<apex:define name="Content">
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+
+			<style>
+	    		td.dataCell, th.headerRow {
+	    			padding-left: 5px !important;
+	    			padding-right: 5px !important;
+    			}
+    			td.numeric-cell {
+    				text-align: right;
+    			}
+	    		.cardBody .bPageBlock {
+	    			border: none !important;
+	    		}
+	    		.cardBody .pbBody {
+				    margin-top: 12px !important;
+				    margin-left: 0px !important;
+				    margin-right: 0px !important;
+				    margin-bottom: 0px !important;    			
+	    		}
+	    		.cardBody {
+				    padding-left: 10px;
+				    padding-top: 0px;
+				    padding-right: 10px;
+				    padding-bottom: 0px;	    		
+	    		}
+	    		.card-heading-icon.PendingApproval {
+	    			color: #0F0F0F;
+	    		}
+	    		.card-heading-icon.Completed {
+	    			color: #008852;
+	    		}
+	    		.hidden-col {
+	    			display:none;
+	    		}
+				tr.Draft td {
+				    background-color: white;
+				}
+				tr.ReadyForApproval td, tr.ReadyForApproval td a {
+				    background-color: #E7E7E8;
+				    color: #0F0F0F !important;
+				}
+				tr.Approved td, tr.Approved td a {
+				    background-color: #DFEEE6;
+				    color: #008852 !important;
+				}
+				tr.Rejected td, tr.Rejected td a {
+				    background-color: #F6E4DE;
+				    color: #B42D34 !important;
+				}
+			</style>
+			 			
+            <div id="dashboard-layout" class="dashboardLayout">
+				<div id="dashboardContainer" class="dashboardContainer">
+					<apex:pageMessages escape="false"/>
+
+					<apex:repeat value="{!TheTimeAdjustments}" var="theAdjustment">
+					<div id="{!theAdjustment.Id}" class="cardContainer">
+						<div class="card inverted">
+							<div class="cardHeading inverted">
+								<div class="card-heading-icon {!JSENCODE(theAdjustment.Status__r.Enum__c)} fa fa-square" title="{!JSENCODE(theAdjustment.Status__r.Name)}"></div>
+								<h3 class="cardTitle">
+									<apex:outputlink styleClass="undecorated-link" value="{!IF(theAdjustment.Status__r.KimbleOne__Enum__c = 'PendingApproval', $Page.KimbleOne__TimesheetApprovalRequests + '?adjustmentId=' + theAdjustment.Id, URLFOR('/' + theAdjustment.Id))}">
+										<apex:outputText value="{!theAdjustment.Name}"/>
+									</apex:outputlink>
+								</h3>
+							</div>
+							<div class="cardBody">
+								<apex:pageBlock >
+									<apex:pageBlockTable value="{!TheTimeAdjustmentTimesheetMap[theAdjustment.Id]}" var="theTimesheet">
+										<apex:column headerValue="{!$ObjectType.KimbleOne__Timesheet__c.Fields.Name.Label}">
+							      	   		<apex:outputLink value="/{!theTimesheet.Id}">
+							      	   		<apex:outputText value="{!theTimesheet.Resource__r.Name} - " />
+							      			<apex:outputText value="{!theTimesheet.ResourcedActivity__r.Name}"/> 		
+							      	
+							      			<apex:variable var="Counter" value="{!1}"/>
+							      			<apex:repeat value="{!theTimesheet.TimeEntries__r}" var="entry">
+							      				<apex:outputText value=" ({!entry.TimePeriod__r.Name}" rendered="{!(Counter == 1)}"/>
+							      				<apex:outputText value="    --   {!entry.TimePeriod__r.Name} )"  rendered="{!(Counter == theTimesheet.TimeEntries__r.size)}"/>
+							      				<apex:variable var="Counter" value="{!Counter+1}"/>
+							      			</apex:repeat>
+							      			
+							      			</apex:outputLink>
+							      		</apex:column>
+							      		<apex:column value="{!theTimesheet.ApprovalStatus__c}" headerClass="hidden-col" styleClass="hidden-col" headerValue="{!$ObjectType.KimbleOne__Timesheet__c.Fields.KimbleOne__ApprovalStatus__c.Label}"/>
+							      		<apex:column value="{!theTimesheet.Resource__c}" headerValue="{!$ObjectType.KimbleOne__Resource__c.Fields.Name.Label}"/> 
+							      		<apex:column value="{!theTimesheet.ResourcedActivity__r.Name}"  headerValue="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.Name.Label}"/>
+							      		<apex:column value="{!theTimesheet.TotalEntryUnits__c}" styleClass="numeric-cell"/>
+							      		<apex:column value="{!theTimesheet.Approver1User__c}"/>
+							      		<apex:column value="{!theTimesheet.Approver2User__c}"/>										
+								    </apex:pageBlockTable>
+								</apex:pageBlock>
+							</div>
+						</div>
+					</div>
+					</apex:repeat>
+				</div>
+            </div>
+
+			<script>
+				jQuery(window).load(function(){
+				    initialise();
+				});
+				
+				function initialise() {
+					jQuery('td.hidden-col span').each(function() {jQuery(this).parent().parent().addClass((jQuery(this).text()));})
+					jQuery('.numeric-cell').each(function() {jQuery(this).text(jQuery.formatNumber(jQuery(this).text(), {format: "#,##0.##", locale:kimble.locale, isFullLocale:false}))});
+				}
+			</script>	
+		</apex:define>
+	</apex:composition>
+</apex:page>

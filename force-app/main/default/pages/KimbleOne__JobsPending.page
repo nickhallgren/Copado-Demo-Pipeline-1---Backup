@@ -1,0 +1,210 @@
+<apex:page sidebar="false" showheader="true" controller="KimbleOne.JobsPendingController" tabStyle="KimbleOne__ReferenceData__c" action="{!UpdateToProcessing}">
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+</apex:define>
+     
+<apex:define name="Content">
+	<style>
+		.overall-status
+		{
+			width: 90% !important;
+		}
+		.job-counter
+		{
+			width: 10%;
+			text-align: right;
+		}
+		.job
+		{
+			padding-left: 20px;
+			background-repeat: no-repeat;
+			padding-right: 12px;
+			height: 18px;
+			display: block;
+			line-height: 18px;
+		}
+		.Pending 
+		{
+			background-image: url('{!URLFOR($Resource.JobImages, 'pending16.gif')}');
+		}
+		.Processing 
+		{
+			background-image: url('{!URLFOR($Resource.JobImages, 'running16.gif')}');
+		}
+		.Completed 
+		{
+			background-image: url('{!URLFOR($Resource.JobImages, 'completed16.gif')}');
+		}
+		.Failed 
+		{
+			background-image: url('{!URLFOR($Resource.JobImages, 'failed16.gif')}');
+		}
+		
+	</style>
+	<script>
+
+	function RunAllJobs()
+	{
+		if ($('.job.Pending').length == 0 && $('.job.Processing').length == 0)
+		{
+			// refresh if the caller is using the auto-refresh feature
+			// where we refresh until there are no jobs found in the current refresh
+			// but only if there are no jobs in error
+			if($('.job').length > 0 && getQueryVariable('autoRefresh') == '1')
+			{
+				$('#jobStatus').text('Refreshing');
+				window.location.reload();
+			}
+			
+			$('#jobStatus').text('Completed');
+			
+			// auto refresh the page after desired number of seconds
+			// once there are no pending jobs
+			if(getQueryVariable('refreshInterval'))
+			{
+				var timerDelay = getQueryVariable('refreshInterval');
+				//setTimeout(function(){ window.location.reload(); }, timerDelay * 1000);
+				
+				(function countdown(remaining)
+				{
+				    var countdownUnit = 'seconds';
+				    if(remaining === 0)
+				        location.reload(true);
+				    
+				    if(remaining === 1)
+				    	countdownUnit = 'second';
+				    		
+				    $('#jobStatus').text('Refreshing in ' + remaining + ' ' + countdownUnit);
+				    setTimeout(function(){ countdown(remaining - 1); }, 1000);
+				})(timerDelay);
+			}
+			
+			return;
+		}	
+		
+		var obj = $('.job.Pending:first');
+		
+		if(obj.length)
+		{
+		$(obj).removeClass('Pending');
+   		$(obj).addClass('Processing');
+   		$(obj).text('Processing');
+   		
+   		executeJob($(obj).attr('id'), $(obj));
+	}
+	}
+	
+
+	
+	function updateJobTotals()
+	{
+		$("span[id='completed-job-count']").text($('.job.Completed').length);
+		$("span[id='pending-job-count']").text($('.job.Pending').length);
+		$("span[id='failed-job-count']").text($('.job.Failed').length);
+	}
+	
+	$(document).ready(function(){
+		if ($('#GenericPendingJobsRunningMessage').text() != '')
+			$('#GenericPendingJobsRunningMessage').show();
+		else
+			$('#PendingJobs').show();
+			
+		updateJobTotals();
+		
+		if($('.job.Pending').length)
+		{
+			var threads = getQueryVariable('threads') ? parseInt(getQueryVariable('threads')) : 1;
+			
+			for (var i=0;i<threads;i++) {
+				if($('.job.Pending').length)
+				{
+					setTimeout(function(){ RunAllJobs(); }, (i+1) * 1000);
+				}
+			}
+		}
+		else
+		{
+			// no jobs, so this will trigger autorefresh etc
+		RunAllJobs();
+		}
+	});
+	
+	function getQueryVariable(variable)
+	{
+	       var query = window.location.search.substring(1);
+	       var vars = query.split("&");
+	       for (var i=0;i<vars.length;i++) {
+	               var pair = vars[i].split("=");
+	               if(pair[0].toLowerCase() == variable.toLowerCase()){return pair[1];}
+	       }
+	       return(false);
+	}
+
+	function executeJob(jobId, obj)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JobsPendingController.RunJob}',
+	       		jobId,
+	      			function(result, event){          
+	             		 if (event.status) 
+			             {
+			             	var jobStatus = result[KimbleNamespaceWithUnderscores + 'Status__r'][KimbleNamespaceWithUnderscores + 'Enum__c']
+			             	$(".job[id='" + result.Id + "']").text(jobStatus);
+							$(".job[id='" + result.Id + "']").removeClass('Processing');
+							$(".job[id='" + result.Id + "']").addClass(jobStatus);
+							
+							updateJobTotals();
+		
+							if (jobStatus == 'Failed')
+								obj.attr('title', result[KimbleNamespaceWithUnderscores + 'Message__c']);
+							else if (jobStatus == 'Completed')
+								$(".job[id='" + result.Id + "']").closest('tr').fadeOut(2000);
+		
+							RunAllJobs();
+			         	 } 
+			         	 else if (event.type === 'exception') 
+			         	 {
+			             	alert(event.message);
+			         	 }
+			         	 else 
+			         	 {
+			             	alert(event.message);
+			         	 }
+	         	}, 
+	         	{escape: true, timeout: 60000}
+	     	);
+		}
+
+</script>
+<apex:pageBlock >
+	<div class="pbHeader">
+			<table border="0" cellpadding="0" cellspacing="0">
+					<tbody>
+						<tr>
+							<td class="pbTitle overall-status"><h2 id="jobStatus" class="mainTitle">{!$Label.ProcessingHeading}</h2></td>
+							<td class="job-counter"><span class="progress-counter">Pending:<span id="pending-job-count">0</span>&nbsp;Completed:<span id="completed-job-count">0</span>&nbsp;Failed:<span id="failed-job-count">0</span></span></td>
+						</tr>
+					</tbody>
+				</table>	
+			</div>
+	<input type="hidden" id="redirectUrl" value="{!JSENCODE(ReturnToUrl)}"/>
+	
+	<div id="PendingJobs" >
+	    <apex:pageBlockTable value="{!PendingJobs}" var="job">
+	   	<apex:column headervalue="{!$Label.kimbleone__processlabel}" value="{!job.KimbleOne__DisplayName__c}"/>
+	   	
+	   	<apex:column headervalue="{!$Label.kimbleone__statuslabel}">
+	   		<span id="{!JSENCODE(job.id)}" class="job {!JSENCODE(job.Status__r.Enum__c)}"><apex:outputText value="{!job.Status__r.Name}"/></span>
+	   	</apex:column>
+	   </apex:pageBlockTable>
+   </div>
+   
+   <div id="GenericPendingJobsRunningMessage" >
+   	<apex:outputText value="{!RunningMessage}"/>
+   </div>
+   	   
+</apex:pageBlock>
+</apex:define>
+</apex:composition>
+</apex:page>

@@ -1,0 +1,213 @@
+<apex:page standardController="KimbleOne__ResourcedActivity__c" extensions="KimbleOne.TimeAdjustmentsController" showHeader="true" sidebar="false">
+<apex:composition template="KimbleOne__SiteMaster">
+
+	<apex:define name="Menu">
+		<c:Menu DefaultHelpPage="ExpenseCategories.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__ResourcedActivity__c.KimbleOne__DeliveryGroup__c}" MenuContextName="{!KimbleOne__ResourcedActivity__c.Name}"/>
+	</apex:define> 
+	     
+	<apex:define name="Content">
+		<apex:form >
+			<apex:actionFunction action="{!NewExpenseItemTemplate}" name="newExpenseItemTemplate" rerender="ExpenseItemTemplatePopupPanel" oncomplete="newEditTemplateComplete();">
+			</apex:actionFunction>
+
+			<apex:actionFunction action="{!EditTheExpenseItemTemplate}" name="editExpenseItemTemplate" rerender="ExpenseItemTemplatePopupPanel" oncomplete="newEditTemplateComplete()">
+				<apex:param name="templateId" value="" />
+			</apex:actionFunction>
+
+			<apex:actionFunction action="{!DeleteExpenseItemTemplate}" name="deleteExpenseItemTemplate" rerender="TheForm">
+				<apex:param name="templateId" value="" />
+			</apex:actionFunction>
+		</apex:form>
+		<apex:form id="TheForm">
+		<apex:pageMessages escape="false"/>
+		<apex:pageBlock title="{!$ObjectType.KimbleOne__ExpenseItemTemplate__c.LabelPlural}" id="ExpenseItemsPanel">
+			<apex:pageblockbuttons location="top">
+				<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ExpenseItemTemplate__c.createable}">
+					<input id="newExpenseItemTemplateButton" class="btn" type="button" onclick="initialiseModalBoxy('#ExpenseItemTemplatePopup', '{!JSENCODE($Label.New)} {!$ObjectType.ExpenseItemTemplate__c.label}', jQuery('form[id$=\'TheForm\']'));newExpenseItemTemplate()" value="{!$Label.New} {!$ObjectType.ExpenseItemTemplate__c.label}" />
+				</apex:outputPanel>
+			</apex:pageblockbuttons>
+			<apex:pageBlockTable value="{!TheExpenseItemTemplates}" var="template">
+				<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+					<apex:outputPanel rendered="{!$ObjectType.KimbleOne__ExpenseItemTemplate__c.updateable}">
+	        			<apex:outputLink value="#" onclick="initialiseModalBoxy('#ExpenseItemTemplatePopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__ExpenseItemTemplate__c.label}', jQuery('form[id$=\'TheForm\']'));editExpenseItemTemplate('{!JSENCODE(template.Id)}')">{!$Label.kimbleone__edit}</apex:outputLink>
+     				</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ExpenseItemTemplate__c.deletable}">
+						&nbsp; | &nbsp;
+						<a href="javascript:void(0)" onclick="if (confirmDelete()) deleteExpenseItemTemplate('{!template.Id}');">{!$Label.Delete}</a>
+					</apex:outputPanel>
+				</apex:column>
+				<apex:column value="{!template.KimbleOne__ExpenseCategory__c}"/>
+				<apex:column value="{!template.KimbleOne__Resource__c}"/>
+				<apex:column value="{!template.KimbleOne__ExpenseItemType__c}"/>
+				<apex:column headerValue="{!$ObjectType.KimbleOne__ExpenseItemTemplate__c.Fields.KimbleOne__IncurredCurrencyGrossAmount__c.Label}">
+					<apex:outputText value="{!template.KimbleOne__IncurredCurrencyIsoCode__c} " rendered="{!template.KimbleOne__IncurredCurrencyGrossAmount__c != null}"/>
+					<apex:outputField value="{!template.IncurredCurrencyGrossAmount__c }" />
+				</apex:column>
+				<apex:column value="{!template.KimbleOne__ExpenseUnits__c}"/>
+								
+			</apex:pageBlockTable>
+			
+		</apex:pageBlock>
+
+
+		<script>
+			var additionalConfig = '{!JSENCODE(FilterCriteriaMapJson)}';
+
+			function newEditTemplateComplete() {
+
+				//initialise filters
+				initialiseFilterCriteriaConfig('{!JSENCODE(FilterContextId)}', JSON.parse(additionalConfig));
+
+				 var $crit = jQuery('[id$="templateCriteria"]');
+
+			   	var crit = $crit.val();
+
+				if (crit != '' && JSON.parse(crit).Criteria.length > 0) jQuery('#filter-button').addClass('active-toolbar-button');
+
+			    showModalBoxy();
+   			}
+
+   			function showFilterCriteria()
+			{
+			   var $crit = jQuery('[id$="templateCriteria"]');
+
+			   var crit = $crit.val();
+
+			   if (crit == '') {crit = '{"SearchObjectType":"{!$ObjectType.TimeEntry__c.Name}","Criteria":[]}';}
+
+			   initialiseStackedModalBoxy(jQuery("#FilterCriteriaPopup"), '{!$Label.Filter}');
+
+			   loadFilterCriteria(crit,
+						function(){
+							showStackedModalBoxy();
+						}
+					   ,function(newFilter){
+						   hideStackedModalBoxy();
+
+						   $crit.val(JSON.stringify(newFilter));
+						   jQuery('#filter-button').removeClass('active-toolbar-button');
+
+						   if (newFilter.Criteria.length > 0) jQuery('#filter-button').addClass('active-toolbar-button');
+					   },
+					   function(){
+						   hideStackedModalBoxy();
+						});
+			}
+
+		</script>
+
+		<div id="ExpenseItemTemplatePopup" style="display:none">
+			<apex:outputPanel id="ExpenseItemTemplatePopupPanel">
+	   	     	
+	   	     	<div id="ExpenseItemTemplateErrors">
+	           		<apex:pageMessages id="ExpenseItemTemplateMessages" escape="false"/>
+	           	</div>
+	   			
+	   			<apex:pageBlock >
+	            
+	           	<apex:pageBlockButtons location="bottom">
+					<apex:commandButton id="saveExpenseItemTemplateBtn" styleclass="DisableButtonWhileBusy saveExpenseItemTemplate" action="{!SaveTheExpenseItemTemplate}" value="{!$Label.kimbleone__save}" oncomplete="if($('#ExpenseItemTemplateErrors>span')[0].children.length == 0) hideModalBoxy();" reRender="ExpenseItemsPanel, ExpenseItemTemplatePopupPanel"/>
+	            	<input id="cancelExpenseItemTemplate" class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+	  			</apex:pageBlockButtons>
+	            
+	            <apex:pageBlockSection collapsible="false" showheader="false" columns="1" id="ExpenseItemTemplatePanel">
+                    
+                    <apex:inputField value="{!TheExpenseItemTemplate.Name}" required="true"/>
+
+					<apex:pageBlockSectionItem dataStyle="font-weight: bold;" labelStyle="width:43%" >
+						<apex:outputLabel styleClass="popup-heading-label" value="{!$ObjectType.KimbleOne__ExpenseItemTemplate__c.Fields.KimbleOne__Resource__c.Label}" />
+						<apex:outputPanel layout="block">
+							<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+							<apex:selectList value="{!TheExpenseItemTemplate.KimbleOne__Resource__c}"  size="1" >
+								<apex:selectOptions value="{!TheResources}" />
+							</apex:selectList>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+
+					<apex:pageBlockSectionItem >
+						<apex:outputLabel styleClass="popup-heading-label" value="{!$ObjectType.KimbleOne__ExpenseItemTemplate__c.Fields.KimbleOne__Criteria__c.Label}" />
+						<apex:outputPanel layout="none">
+							<div id="filter-button" class="toolbar-button toggle-btn filter-btn bigger-btn" onclick="showFilterCriteria();"><i class="fa fa-filter"></i></div>
+							<apex:inputHidden id="templateCriteria" value="{!TheExpenseItemTemplate.KimbleOne__Criteria__c}" />
+						</apex:outputPanel>
+
+					</apex:pageBlockSectionItem>
+					
+					<apex:pageBlockSectionItem dataStyle="font-weight: bold;">
+						<apex:outputLabel styleClass="popup-heading-label" value="{!$ObjectType.KimbleOne__ExpenseItemTemplate__c.Fields.KimbleOne__PeriodUnitType__c.Label}" />
+                        <apex:selectList value="{!TheExpenseItemTemplate.KimbleOne__PeriodUnitType__c}"  size="1">
+                            <apex:selectOptions value="{!ThePeriodUnitTypes}" />
+                        </apex:selectList>
+			     	</apex:pageBlockSectionItem>
+
+
+					<apex:pageBlockSectionItem dataStyle="font-weight: bold;">
+						<apex:outputLabel styleClass="popup-heading-label" value="{!$ObjectType.KimbleOne__ExpenseItemTemplate__c.Fields.KimbleOne__ExpenseCategory__c.Label}" />
+						<apex:selectList value="{!TheExpenseItemTemplate.KimbleOne__ExpenseCategory__c}"  size="1" required="true" onChange="setCategory(jQuery(this).val())" >
+                            <apex:selectOptions value="{!TheExpenseCategories}" />
+						</apex:selectList>
+			     	</apex:pageBlockSectionItem>
+					
+					<apex:pageBlockSectionItem dataStyle="font-weight: bold;">
+						<apex:outputLabel styleClass="popup-heading-label" value="{!$ObjectType.KimbleOne__ExpenseItemTemplate__c.Fields.KimbleOne__ExpenseItemType__c.Label}" />
+			     		<apex:selectList value="{!TheExpenseItemTemplate.KimbleOne__ExpenseItemType__c}"  size="1" required="true">
+							<apex:selectOptions value="{!TheExpenseItemTypes}" />
+						</apex:selectList>
+					</apex:pageBlockSectionItem>
+
+					<apex:pageBlockSectionItem dataStyle="font-weight: bold;" rendered="{! SelectedExpenseCategory.ExpenseType__c == ExpenseTypeEnumPerOccurrenceId}" >
+						<apex:outputLabel styleClass="popup-heading-label" value="{!$ObjectType.KimbleOne__ExpenseItemTemplate__c.Fields.KimbleOne__IncurredCurrencyIsoCode__c.Label}" />
+                        <apex:selectList value="{!TheExpenseItemTemplate.KimbleOne__IncurredCurrencyIsoCode__c}"  size="1" >
+                            <apex:selectOptions value="{!TheCurrencies}" />
+                        </apex:selectList>
+			     	</apex:pageBlockSectionItem>
+
+					<apex:inputField value="{!TheExpenseItemTemplate.KimbleOne__IncurredCurrencyGrossAmount__c}" required="true"
+						rendered="{!SelectedExpenseCategory.KimbleOne__ExpenseType__c == ExpenseTypeEnumPerOccurrenceId}"/>
+
+					<apex:inputField value="{!TheExpenseItemTemplate.KimbleOne__ExpenseUnits__c}" required="true"
+						rendered="{!SelectedExpenseCategory.KimbleOne__ExpenseType__c == ExpenseTypeEnumPerUnitId}"/>
+
+					<apex:inputField value="{!TheExpenseItemTemplate.KimbleOne__StartLocation__c}" required="true"
+						rendered="{!SelectedExpenseCategory.KimbleOne__HasStartLocation__c}"/>
+
+					<apex:inputField value="{!TheExpenseItemTemplate.KimbleOne__EndLocation__c}" required="true"
+						rendered="{!SelectedExpenseCategory.KimbleOne__HasEndLocation__c}"/>
+
+                    </apex:pageBlockSection>
+	            
+				</apex:pageBlock>
+					
+	        </apex:outputPanel>
+		</div>
+			<apex:actionFunction action="{!SetCategory}" name="setCategory" rerender="ExpenseItemTemplatePopupPanel" oncomplete="initialiseFilterCriteriaControl();" immediate="true">
+				<apex:param name="categoryId" value="" />
+			</apex:actionFunction>
+		</apex:form>
+
+		<div id="FilterCriteriaPopup" style="display:none;"><apex:include pageName="{!$Page.FilterCriteria}"/></div>
+		<style>
+		div.toolbar-button {
+			display: inline-block;
+			padding: 3px 6px;
+			background-color: white;
+			border: 1px solid #ccc;
+			border-radius: 1px;
+			cursor: pointer;
+		}
+		div.toolbar-button.active-toolbar-button {
+			color: white;
+			background-color: #888;
+		}
+		div.toolbar-button:hover {
+			text-decoration: none;
+			color: white;
+			background-color: #1A9EFF;
+		}
+		div.toolbar-button .fa {font-size: 14px;}
+		div.toolbar-button.disabled {background-color: #ccc;color: darkgray;}
+		div.toolbar-button.disabled:hover {background-color: #ccc;color: darkgray;}
+		</style>
+	</apex:define>
+</apex:composition>
+</apex:page>

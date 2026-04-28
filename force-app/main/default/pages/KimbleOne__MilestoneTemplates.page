@@ -1,0 +1,297 @@
+<apex:page standardController="KimbleOne__Product__c"
+	extensions="KimbleOne.MilestoneTemplatesController" sidebar="false">
+
+	<apex:composition template="KimbleOne__SiteMaster">
+
+		<apex:define name="Menu">
+
+			<c:Menu MenuContextType="ProductDefinition" MenuContextId="{!KimbleOne__Product__c.Id}" MenuContextName="{!KimbleOne__Product__c.Name}"/>
+
+		</apex:define>
+
+		<apex:define name="Content">
+
+
+			<!-- <apex:pageMessages escape="false" /> -->
+
+			<apex:outputPanel id="MilestoneTemplatesMainPanel">
+
+				<apex:form >
+					<apex:pageBlock id="MilestoneTemplatesDetailPanel">
+
+						<apex:pageBlockButtons >
+							<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__MilestoneTemplate__c.createable}">
+								<apex:outputPanel layout="none" rendered="{!aProductObject.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsMilestoneGenerated__c || aProductObject.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsMilestoneGenerated__c}">
+									<input class="btn" type="button"
+											onclick="initialiseModalBoxy('#MilestoneTemplatesPopup', '{!JSENCODE($Label.New)} {!$ObjectType.MilestoneTemplate__c.label}');newMilestoneTemplate('Milestone')"
+											value="{!$Label.New} {!$ObjectType.MilestoneTemplate__c.label}" />
+								</apex:outputPanel>	
+								<apex:outputPanel layout="none" rendered="{!OR(aProductObject.ProductDomain__r.RevenueRecognitionModel__r.Id == PerRevenueRecognitionId,
+																			   aProductObject.ProductDomain__r.CostRecognitionModel__r.Id == PerCostRecognitionId)}">
+									<input class="btn" type="button"
+											onclick="initialiseModalBoxy('#MilestoneTemplatesPopup', '{!JSENCODE($Label.New)} {!$Label.RecognitionMilestone}');newMilestoneTemplate('RecognitionMilestone')"
+											value="{!$Label.New} {!$Label.RecognitionMilestone}" />
+								</apex:outputPanel>
+							</apex:outputPanel>
+						</apex:pageBlockButtons>
+						<apex:outputPanel layout="none" rendered="{!OR(AND(OR(sumOfCostRecognitionPercentage != 100.00, sumOfRevenueRecognitionPercentage != 100.00), recognitionTemplates == 'RevenueAndCostRecognition'), AND(recognitionTemplates == 'CostRecognition', sumOfCostRecognitionPercentage != 100.00), AND(recognitionTemplates == 'RevenueRecognition', sumOfRevenueRecognitionPercentage != 100.00))}">
+								<span class="fa fa-exclamation-circle pct-total-ind"/><apex:outputText styleClass="pct-total-message" value="{!$Label.kimbleone__recogmilestonepctmusttotal100}"/>
+						</apex:outputPanel>
+						<apex:pageBlockTable value="{!theMilestoneTemplates}"
+							var="aMilestone">
+							<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+								<apex:outputPanel rendered="{!$ObjectType.KimbleOne__MilestoneTemplate__c.updateable}">
+									<apex:outputLink value="#" onclick="initialiseModalBoxy('#MilestoneTemplatesPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__MilestoneTemplate__c.label}');editMilestoneTemplate('{!JSINHTMLENCODE(aMilestone.id)}', '{!aMilestone.KimbleOne__MilestoneType__c}')">{!$Label.kimbleone__edit}</apex:outputLink>
+								</apex:outputPanel>
+	           					&nbsp; | &nbsp;
+								<apex:commandLink onclick="var d = confirmDelete();if(!d) return;"
+									action="{!deleteMilestoneTemplate}" rendered="{!$ObjectType.KimbleOne__MilestoneTemplate__c.deletable}"
+									reRender="MilestoneTemplatesMainPanel">{!$Label.kimbleone__delete}
+									<apex:param name="mtId" value="{!aMilestone.Id}" />
+								</apex:commandLink>
+								<apex:outputPanel layout="none" rendered="{!HasAssignmentTemplates && $ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__MilestoneTemplate__c.updateable}">
+	           					&nbsp; | &nbsp;
+								<apex:outputLink value="#" onclick="initialiseModalBoxy('#MilestoneTemplateAssignmentsPopup', '{!JSENCODE($Label.kimbleone__linklabel)} {!$ObjectType.KimbleOne__MilestoneTemplate__c.label}');linkMilestoneTemplate('{!JSINHTMLENCODE(aMilestone.id)}')">{!$Label.kimbleone__linklabel}</apex:outputLink>
+								</apex:outputPanel>
+							</apex:column>
+
+							<apex:column headerValue="{!$ObjectType.KimbleOne__MilestoneTemplate__c.Fields.Name.Label}"
+								value="{!aMilestone.Name}" />
+							<apex:column headerValue="{!$ObjectType.KimbleOne__MilestoneTemplate__c.Fields.KimbleOne__MilestoneType__c.Label}"
+								value="{!aMilestone.MilestoneType__r.Name}" />
+							<apex:column headerValue="{!$ObjectType.KimbleOne__MilestoneTemplate__c.Fields.KimbleOne__MilestonePercentage__c.Label}"
+								value="{!aMilestone.KimbleOne__MilestonePercentage__c}" />
+							<apex:column headerValue="{!$ObjectType.KimbleOne__MilestoneTemplate__c.Fields.KimbleOne__MilestoneValue__c.Label}"
+								value="{!aMilestone.KimbleOne__MilestoneValue__c}" />
+							<apex:column headerValue="{!$ObjectType.KimbleOne__MilestoneTemplate__c.Fields.KimbleOne__EventClass__c.Label}"
+								value="{!aMilestone.KimbleOne__EventClass__c}" />
+							<apex:column headerValue="{!$ObjectType.KimbleOne__MilestoneTemplate__c.Fields.KimbleOne__MilestoneDateOffsetType__c.Label}"
+								value="{!aMilestone.MilestoneDateOffsetType__r.Name}" />
+							<apex:column headerValue="{!$ObjectType.KimbleOne__MilestoneTemplate__c.Fields.KimbleOne__MilestoneDateOffset__c.Label}"
+								value="{!aMilestone.KimbleOne__MilestoneDateOffset__c}" />
+							<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.LabelPlural}"
+								value="{!aMilestone.ActivityAssignmentTemplates__r.size}" />
+
+						</apex:pageBlockTable>
+
+					</apex:pageBlock>
+					
+					<apex:actionFunction action="{!newMilestoneTemplate}"
+						name="newMilestoneTemplate"
+						rerender="MilestoneTemplatesPopupPanel"
+						oncomplete="showModalBoxy();" >
+						<apex:param name="TypeOfMilestone" assignTo="{!TypeOfMilestone}" value="" />
+					</apex:actionFunction>
+
+					<apex:actionFunction action="{!editMilestoneTemplate}"
+						name="editMilestoneTemplate"
+						rerender="MilestoneTemplatesPopupPanel"
+						oncomplete="showModalBoxy();">
+						<apex:param name="mtId" value="" />
+						<apex:param name="mtType" value="" />
+					</apex:actionFunction>
+
+					<apex:actionFunction action="{!linkMilestoneTemplate}"
+						name="linkMilestoneTemplate"
+						rerender="MilestoneTemplateAssignmentsPopupPanel"
+						oncomplete="showModalBoxy();">
+						<apex:param name="mtId" value="" />
+					</apex:actionFunction>
+
+				</apex:form>
+			</apex:outputPanel>
+
+
+
+			<div id="MilestoneTemplatesPopup" style="display: none"><apex:outputPanel id="MilestoneTemplatesPopupPanel">
+				<apex:form >
+					<apex:pageBlock >
+
+						<div id="MilestoneTemplatesPopupErrors"><apex:pageMessages escape="false"/>
+						</div>
+						<apex:pageBlockButtons location="bottom">
+							<apex:commandButton action="{!upsertMilestoneTemplate}"
+								value="{!$Label.kimbleone__save}"
+								oncomplete="hideModalBoxyWithErrorCheck('#MilestoneTemplatesPopupErrors')"
+								reRender="MilestoneTemplatesPopupPanel, MilestoneTemplatesMainPanel" />
+							<input class="btn" type="button" onclick="hideModalBoxy();"
+								value="{!$Label.Cancel}" />
+						</apex:pageBlockButtons>
+
+						<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+
+							<apex:inputfield value="{!aMilestoneTemplateObject.Name}"
+								required="true" />
+							
+							<!-- CurrencyIsoCode Field -->
+							<apex:pageBlockSectionItem rendered="{!TypeOfMilestone == 'Milestone'}">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__MilestoneTemplate__c.Fields.CurrencyIsoCode.Label}" />
+								<apex:inputText value="{!aMilestoneTemplateObject.CurrencyIsoCode}" required="true"
+									styleclass="kimblecustomlookup GetActiveCurrencyTypes null true false" />
+							</apex:pageBlockSectionItem> 											
+									
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__MilestoneTemplate__c.Fields.KimbleOne__MilestoneType__c.Label}" />
+								<apex:actionRegion >
+									<apex:selectList value="{!aMilestoneTemplateObject.KimbleOne__MilestoneType__c}" size="1">
+										<apex:selectOptions value="{!TheMilestoneTypes}" rendered="{!TypeOfMilestone == 'Milestone'}" />
+										<apex:selectOptions value="{!TheRecognitionMilestoneTypes}" rendered="{!TypeOfMilestone == 'RecognitionMilestone'}" />
+										<apex:actionSupport event="onchange" action="{!Refresh}" rerender="MilestoneValueSection"/>
+									</apex:selectList>
+								</apex:actionRegion>
+							</apex:pageBlockSectionItem>
+							</apex:pageblockSection>
+							
+							<apex:outputPanel layout="none" id="MilestoneValueSection">
+								<apex:pageblockSection collapsible="false" showheader="false" columns="1" >		
+									<apex:inputfield value="{!aMilestoneTemplateObject.KimbleOne__MilestonePercentage__c}" rendered="{!aMilestoneTemplateObject.KimbleOne__MilestoneType__c = CostId && CostMilestonePctRequired}" required="true"/>
+									<apex:inputfield value="{!aMilestoneTemplateObject.KimbleOne__MilestonePercentage__c}" rendered="{!aMilestoneTemplateObject.KimbleOne__MilestoneType__c = RevenueId && RevenueMilestonePctRequired}" required="true"/>
+									
+									<apex:inputfield value="{!aMilestoneTemplateObject.KimbleOne__MilestoneValue__c}" rendered="{!aMilestoneTemplateObject.KimbleOne__MilestoneType__c = CostId && !CostMilestonePctRequired}" required="true"/>
+									<apex:inputfield value="{!aMilestoneTemplateObject.KimbleOne__MilestoneValue__c}" rendered="{!aMilestoneTemplateObject.KimbleOne__MilestoneType__c = RevenueId && !RevenueMilestonePctRequired}" required="true"/>
+									
+									<apex:inputfield value="{!aMilestoneTemplateObject.KimbleOne__MilestonePercentage__c}" rendered="{!contains(TypeOfMilestone, 'RecognitionMilestone')}" required="true"/>
+									
+								</apex:pageBlockSection>
+							</apex:outputPanel>
+							
+							<apex:pageblockSection collapsible="false" showheader="false" columns="1" >		
+							<apex:pageBlockSectionItem >
+	            				<apex:outputLabel value="{!$ObjectType.KimbleOne__MilestoneTemplate__c.Fields.KimbleOne__EventClass__c.Label}" />            
+								<apex:actionRegion >
+									<apex:selectList value="{!aMilestoneTemplateObject.KimbleOne__EventClass__c}" size="1" style="max-width: 320px;" >
+										<apex:actionSupport event="onchange" action="{!Refresh}" rerender="OffsetSection"/>
+										<apex:selectOptions value="{!TheEventClasses}" />
+									
+									</apex:selectList>
+								</apex:actionRegion>
+							</apex:pageBlockSectionItem>
+							  	        
+						</apex:pageblockSection>
+						<apex:outputPanel layout="none" id="OffsetSection">
+						<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+							
+							<apex:inputField value="{!aMilestoneTemplateObject.KimbleOne__RequiresCompletionApproval__c}" rendered="{!!ISBLANK(aMilestoneTemplateObject.KimbleOne__EventClass__c)}"/>
+							
+							<apex:pageBlockSectionItem rendered="{!ISBLANK(aMilestoneTemplateObject.KimbleOne__EventClass__c)}">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__MilestoneTemplate__c.Fields.KimbleOne__MilestoneDateOffsetType__c.Label}" />
+								<apex:selectList value="{!aMilestoneTemplateObject.KimbleOne__MilestoneDateOffsetType__c}" size="1">
+										<apex:selectOptions value="{!TheOffsetTypes}" />
+									</apex:selectList>
+							</apex:pageBlockSectionItem>
+								
+							<apex:inputfield required="false" value="{!aMilestoneTemplateObject.KimbleOne__MilestoneDateOffset__c}" rendered="{!ISBLANK(aMilestoneTemplateObject.KimbleOne__EventClass__c)}"/>
+							
+							</apex:pageBlockSection>
+						</apex:outputPanel>
+					</apex:pageBlock>
+				</apex:form>
+
+			</apex:outputPanel></div>
+			
+			<div id="MilestoneTemplateAssignmentsPopup" style="display: none"><apex:outputPanel id="MilestoneTemplateAssignmentsPopupPanel">
+				<apex:form >
+					<apex:pageBlock >
+						<div id="MilestoneTemplateAssignmentsPopupPanel"><apex:pageMessages escape="false"/>
+						</div>
+						<apex:pageBlockButtons location="bottom">
+							<apex:commandButton action="{!upsertMilestoneTemplateAssignments}"
+								value="{!$Label.kimbleone__save}"
+								oncomplete="hideModalBoxyWithErrorCheck('#MilestoneTemplateAssignmentsPopupPanel')"
+								reRender="MilestoneTemplateAssignmentsPopupPanel, MilestoneTemplatesMainPanel" />
+							<input class="btn" type="button" onclick="hideModalBoxy();"
+								value="{!$Label.Cancel}" />
+						</apex:pageBlockButtons>
+
+		 				<table border="0" cellpadding="0" cellspacing="0" class="list assignment-table kimble-enhanced-table">
+						<thead>
+							<tr class="headerRow">
+								<th class="headerRow"><h2>{!$Label.kimbleone__actions}</h2></th>
+								<th class="headerRow"><h2>{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.Name.Label}</h2></th>
+								<th class="headerRow"><h2>{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__Resource__c.Label}</h2></th>
+								<th class="headerRow"><h2>{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__ActivityRole__c.Label}</h2></th>
+								<th class="headerRow"><h2>{!$ObjectType.KimbleOne__ActivityAssignmentTemplate__c.Fields.KimbleOne__MilestoneTemplate__c.Label}</h2></th>
+							</tr>
+						</thead>
+						<tbody>
+		 				<apex:repeat value="{!OrderedAssignmentIds}" var="thisAssignmentId">
+		 				<apex:variable value="{!TheAssignmentsMap[thisAssignmentId]}" var="theAssignment"/>
+		 				<tr class="assignment-row {!IF(!ISBLANK(theAssignment.MilestoneTemplate__c) && theAssignment.MilestoneTemplate__c != aMilestoneTemplateObject.Id, 'other-milestone', '')}" assignment-id="{!theAssignment.Id}">
+		 					<td>
+		 					<apex:outputPanel layout="none" rendered="{!ISBLANK(theAssignment.MilestoneTemplate__c) || theAssignment.MilestoneTemplate__c = aMilestoneTemplateObject.Id}">
+	     					<apex:commandLink action="{!linkAssignmentTemplateToMilestoneTemplate}" styleClass="link-unlink-action" reRender="MilestoneTemplateAssignmentsPopupPanel" onclick="showWorking('{!thisAssignmentId}');" rendered="{!ISBLANK(theAssignment.MilestoneTemplate__c)}"><apex:outputText value="{!$Label.kimbleone__linklabel}"/>
+								<apex:param name="atId" value="{!theAssignment.Id}" />
+								<apex:param name="mtId" value="{!aMilestoneTemplateObject.Id}" />
+							</apex:commandLink>
+	     					<apex:commandLink action="{!unlinkAssignmentTemplate}" styleClass="link-unlink-action" reRender="MilestoneTemplateAssignmentsPopupPanel" onclick="showWorking('{!thisAssignmentId}');" rendered="{!!ISBLANK(theAssignment.MilestoneTemplate__c)}"><apex:outputText value="{!$Label.kimbleone__unlinklabel}"/>
+								<apex:param name="atId" value="{!theAssignment.Id}" />
+							</apex:commandLink>
+							</apex:outputPanel>
+							<i class="fa fa-circle-o-notch fa-spin link-working hidden-item"></i>
+							</td>
+						    <td>	
+						    	<apex:outputField value="{!theAssignment.Name}" />
+						    </td>
+						    <td>	
+						    	<apex:outputField value="{!theAssignment.Resource__c}" />
+						    </td>
+						    <td>	
+						    	<apex:outputField value="{!theAssignment.ActivityRole__c}" />
+						    </td>	
+						    <td>	
+						    	<apex:outputField styleClass="assignment-milestone-template" value="{!theAssignment.MilestoneTemplate__c}" />
+						    </td>	
+		 				</tr>
+		 				</apex:repeat>
+		 				</tbody>
+						</table>
+		 			</apex:pageBlock>
+				</apex:form>
+
+			</apex:outputPanel></div>
+			
+
+
+		</apex:define>
+	</apex:composition>
+
+	<style>
+		div#MilestoneTemplatesPopup {
+		    width: 530px;
+		}
+		.detailList .labelCol {
+		    width: 30% !important;
+		}
+		tr.assignment-row:hover {
+			background-color: #e3feff;
+		}
+		tr.assignment-row.other-milestone {
+			background-color: #eee;
+		}
+		.link-unlink-action {
+			cursor: pointer;
+		}
+	    span.pct-total-invalid {
+	    	color: red;
+		}
+		span.pct-total-message {
+			font-weight: bold;
+			color: red;
+		}
+		span.pct-total-ind {
+		    color: #f00;
+		    font-size: 16px;
+		    padding-left: 10px;
+		    padding-right: 5px;
+		}
+	</style>
+	<script>
+		function showWorking(assignmentId)
+		{
+			var theRow = jQuery('tr.assignment-row[assignment-id="' + assignmentId + '"]');
+			
+			theRow.find('.link-working').removeClass('hidden-item');
+			theRow.find('.link-unlink-action').addClass('hidden-item');
+		}
+	</script>
+</apex:page>

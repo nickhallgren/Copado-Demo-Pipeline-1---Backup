@@ -1,0 +1,193 @@
+<apex:page standardController="KimbleOne__CreditAllocation__c" extensions="KimbleOne.CreditAllocationNewController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__ReferenceData__c">
+
+    <apex:composition template="KimbleOne__SiteMaster">
+        <apex:define name="Menu">
+            <c:Menu rendered="{!!ISBLANK(TheCreditAllocationCreationWizard.TheDeliveryGroupContext)}" DefaultHelpPage="BudgetsPOs.html" MenuContextType="DeliveryGroup" MenuContextId="{!TheCreditAllocationCreationWizard.TheDeliveryGroupContext.Id}" MenuContextName="{!TheCreditAllocationCreationWizard.TheDeliveryGroupContext.Name}" CurrentPage="{!$Page.KimbleOne__DeliveryGroupBudgets}"/>
+            <c:Menu rendered="{!ISBLANK(TheCreditAllocationCreationWizard.TheDeliveryGroupContext)}" DefaultHelpPage="BudgetsPOs.html" MenuContextType="Credit" MenuContextId="{!TheCreditAllocationCreationWizard.TheCreditContext.Id}" MenuContextName="{!TheCreditAllocationCreationWizard.TheCreditContext.Name}" CurrentPage="{!$Page.KimbleOne__CreditHome}"/>
+        </apex:define>
+
+        <apex:define name="Content">
+            <style>
+            span.calculatedAllocationValue {
+                white-space: nowrap;
+            }
+        </style>
+            <apex:form id="TheForm" enctype="multipart/form-data">
+                <div id="pageErrors">
+                    <apex:pageMessages escape="False" />
+                </div>
+                <apex:pageBlock title="{!$Label.kimbleone__allocatecredit}">
+                    <apex:pageBlockButtons location="bottom">
+                        <apex:commandButton action="{!Cancel}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__cancel}" rerender="TheForm" rendered="{!TheCreditAllocationCreationWizard.CanCancel && !TheCreditAllocationCreationWizard.HasFinished}"/>
+                        <apex:commandButton action="{!TheCreditAllocationCreationWizard.GoPrevious}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__previous}" reRender="TheForm" immediate="true" rendered="{!TheCreditAllocationCreationWizard.CanGoPrevious}"/>
+                        <apex:commandButton action="{!TheCreditAllocationCreationWizard.GoNext}" styleclass="DisableButtonWhileBusy" value="{!TheCreditAllocationCreationWizard.NextLabel}" reRender="TheForm" rendered="{!TheCreditAllocationCreationWizard.CanGoNext}"/>
+                    </apex:pageBlockButtons>
+
+                    <!-- SELECT DELIVERY ELEMENTS TO INCLUDE -->
+                    <apex:outputPanel layout="none" rendered="{!TheCreditAllocationCreationWizard.CurrentStep.StepName == 'SelectDeliveryElements'}">
+                        <apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__selectdeliveryelementsforpoallocationheading}" columns="1" >
+                        </apex:pageblockSection>
+                        <apex:pageBlockTable value="{!TheCreditAllocationCreationWizard.TheDeliveryElements}" var="element">
+                            <apex:column width="10%" style="text-align:center;" headerValue="{!$Label.kimbleone__selectlabel}">
+                                <apex:inputField value="{!TheCreditAllocationCreationWizard.TheDeliveryElementsForSelection[element].InputCheckbox__c}"/>
+                            </apex:column>
+                            <apex:column value="{!element.KimbleOne__DeliveryGroup__c}" rendered="{!ISBLANK(TheCreditAllocationCreationWizard.TheDeliveryGroupContext)}"/>
+                            <apex:column value="{!element.Name}" />
+                            <apex:column headervalue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ContractRevenue__c.Label}" >
+                                <apex:outputPanel layout="none">
+                                    <apex:outputText value="{!TheCreditAllocationCreationWizard.TheDeliveryElementsMap[element].InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+                                    <apex:outputField value="{!TheCreditAllocationCreationWizard.TheDeliveryElementsMap[element].InvoicingCurrencyContractRevenue__c}" />
+                                </apex:outputPanel>
+                            </apex:column>
+
+                            <apex:column headervalue="{!$ObjectType.KimbleOne__CreditAllocation__c.Fields.KimbleOne__AllocatedUnits__c.Label}">
+                                <apex:outputPanel layout="none">
+                                    <apex:outputField value="{!TheCreditAllocationCreationWizard.TheExistingAllocationValueMap[element].AllocatedUnits__c}" />
+                                </apex:outputPanel>
+                            </apex:column>
+                            <apex:column headervalue="{!$ObjectType.KimbleOne__CreditAllocation__c.Fields.KimbleOne__AllocatedValue__c.Label}">
+                                <apex:outputPanel layout="none">
+                                    <apex:outputField value="{!TheCreditAllocationCreationWizard.TheExistingAllocationValueMap[element].AllocatedValue__c}" />
+                                </apex:outputPanel>
+                            </apex:column>
+
+                        </apex:pageBlockTable>
+
+                    </apex:outputPanel>
+
+                    <!-- SELECT CREDIT -->
+                    <apex:outputPanel layout="none" rendered="{!TheCreditAllocationCreationWizard.CurrentStep.StepName == 'SelectCredit'}">
+
+                        <apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__selectunallocatedcreditheading}" columns="1">
+                        </apex:pageBlockSection>
+
+                        <div style="maxHeight:300px;overflow-y:auto;">
+                            <apex:inputText value="{!TheCreditAllocationCreationWizard.SelectedCreditId}" style="display:none" styleclass="selectedCreditId"/>
+                            <apex:pageBlockTable value="{!TheCreditAllocationCreationWizard.TheAvailableCredits}" var="credit" rendered="{!TheCreditAllocationCreationWizard.TheAvailableCredits.size != 0}">
+                                <apex:column headerValue="{!$Label.kimbleone__selectlabel}">
+                                    <input id="{!credit.Id}" type="radio" name="selectCredit" onclick="if(this.checked) $('.selectedCreditId').val('{!JSINHTMLENCODE(credit.Id)}');" />
+                                </apex:column>
+                                <apex:column value="{!credit.Name}" />
+                                <apex:column value="{!credit.KimbleOne__CreditDate__c}" />
+                                <apex:column value="{!credit.KimbleOne__ExpiryDate__c}" />
+                                <apex:column value="{!credit.KimbleOne__UnitValue__c}" />
+                                <apex:column value="{!credit.KimbleOne__CreditUnits__c}" />
+                                <apex:column value="{!credit.KimbleOne__CreditValue__c}" />
+                                <apex:column value="{!credit.KimbleOne__AllocatedUnits__c}" />
+                                <apex:column value="{!credit.KimbleOne__AllocatedValue__c}" />
+                                <apex:column value="{!credit.KimbleOne__UnallocatedValue__c}" />
+                            </apex:pageBlockTable>
+
+                            <apex:outputText value="{!$Label.kimbleone__nounallocatedpurchaseordersmessage}" rendered="{!TheCreditAllocationCreationWizard.TheAvailableCredits.size == 0}"/>
+                        </div>
+
+                        <script>
+                    $(function () {
+                            $('#' + $('.selectedCreditId').val()).attr('checked', true);
+                    });
+                </script>
+
+                    </apex:outputPanel>
+
+                    <!-- ALLOCATE CREDIT -->
+                    <apex:outputPanel layout="none" rendered="{!TheCreditAllocationCreationWizard.CurrentStep.StepName == 'AllocateCredit' && TheCreditAllocationCreationWizard.HasFinished == false}">
+                        <apex:pageBlockSection collapsible="false" showheader="false" columns="2">
+                            <apex:outputField value="{!TheCreditAllocationCreationWizard.TheSelectedCredit.Name}"/>
+                            <apex:pageBlockSectionItem >
+                                <apex:outputLabel >{!$ObjectType.KimbleOne__Credit__c.Fields.KimbleOne__UnallocatedValue__c.Label}</apex:outputLabel>
+                                <apex:outputField value="{!TheCreditAllocationCreationWizard.TheUnallocatedValue.KimbleOne__InputCurrency__c}" />
+                            </apex:pageBlockSectionItem>
+                        </apex:pageBlockSection>
+
+                        <apex:pageBlockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__allocate}"  columns="1">
+                        </apex:pageBlockSection>
+                        <apex:pageBlockTable value="{!TheCreditAllocationCreationWizard.TheDeliveryElementIdsToBeAllocated}" var="eleId">
+                            <apex:column value="{!TheCreditAllocationCreationWizard.TheDeliveryElementsMap[eleId].Name}"/>
+                            <apex:column headervalue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ServicesContractRevenue__c.Label}" >
+                                <apex:outputPanel layout="none">
+                                    <apex:outputText value="{!TheCreditAllocationCreationWizard.TheDeliveryElementsMap[eleId].InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+                                    <apex:outputField value="{!TheCreditAllocationCreationWizard.TheDeliveryElementsMap[eleId].InvoicingCurrencyServicesContractRevenue__c}" />
+                                </apex:outputPanel>
+                            </apex:column>
+                            <apex:column headervalue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ExpensesContractRevenue__c.Label}" >
+                                <apex:outputPanel layout="none">
+                                    <apex:outputText value="{!TheCreditAllocationCreationWizard.TheDeliveryElementsMap[eleId].InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+                                    <apex:outputField value="{!TheCreditAllocationCreationWizard.TheDeliveryElementsMap[eleId].InvoicingCurrencyExpensesContractRevenue__c}" />
+                                </apex:outputPanel>
+                            </apex:column>
+                            <apex:column value="{!TheCreditAllocationCreationWizard.TheSelectedCredit.KimbleOne__UnitValue__c}"/>
+                            <apex:column value="{!TheCreditAllocationCreationWizard.TheSelectedCredit.KimbleOne__CreditUnits__c}"/>
+                            <apex:column headervalue="{!$ObjectType.KimbleOne__CreditAllocationItem__c.Fields.KimbleOne__AllocatedUnits__c.Label}" rendered="{!!ISBLANK(TheCreditAllocationCreationWizard.TheSelectedCredit.KimbleOne__CreditUnits__c)}">
+                                <apex:outputPanel layout="none">
+                                    <apex:outputtext value="{0, number, integer}">
+                                        <apex:param value="{!TheCreditAllocationCreationWizard.TheExistingAllocationValueMap[eleId].AllocatedUnits__c}"></apex:param>
+                                    </apex:outputtext>
+                                </apex:outputPanel>
+                            </apex:column>
+                            <apex:column headervalue="{!$ObjectType.KimbleOne__CreditAllocationItem__c.Fields.KimbleOne__AllocatedValue__c.Label}" >
+                                <apex:outputPanel layout="none">
+                                    <apex:outputField value="{!TheCreditAllocationCreationWizard.TheExistingAllocationValueMap[eleId].AllocatedValue__c}" />
+                                </apex:outputPanel>
+                            </apex:column>
+                            <apex:column headerValue="{!$Label.kimbleone__allocationlabel} ">
+                                <table cellpadding="0" cellspacing="0" border="0">
+                                    <apex:repeat value="{!TheCreditAllocationCreationWizard.TheCreditAllocationItemsMap[eleId]}" var="itm">
+                                        <apex:outputPanel layout="none" rendered="{!!ISBLANK(TheCreditAllocationCreationWizard.TheSelectedCredit.KimbleOne__CreditUnits__c)}">
+                                            <tr>
+                                                <th class="labelCol" style="border:0px;width: 30px"><apex:outputLabel value="{!$ObjectType.KimbleOne__CreditAllocationItem__c.Fields.KimbleOne__AllocatedUnits__c.Label}"/></th>
+                                                <th class="labelCol" style="border:0px;width: 80px"><apex:outputLabel value="{!$ObjectType.KimbleOne__CreditAllocationItem__c.Fields.KimbleOne__AllocatedValue__c.Label}"/></th>
+                                            </tr>
+                                            <tr unit-val="{!TheCreditAllocationCreationWizard.TheSelectedCredit.KimbleOne__UnitValue__c}" itm-curr="{!itm.CurrencyIsoCode}">
+                                                <td style="border:0px">
+                                                    <apex:inputField styleClass="AllocationUnits" value="{!itm.AllocatedUnits__c}" onchange="calculateAllocationValue(this);" required="true"/>
+                                                </td>
+                                                <td style="border:0px">
+                                                <span class="calculatedAllocationValue">
+                                                <apex:outputField styleClass="AllocationValueText" value="{!itm.AllocatedValue__c}"/>
+                                                <apex:inputHidden id="AllocationValue" value="{!itm.AllocatedValue__c}"/>
+                                                </span>
+                                                </td>
+                                            </tr>
+                                        </apex:outputPanel>
+                                        <apex:outputPanel layout="none" rendered="{!ISBLANK(TheCreditAllocationCreationWizard.TheSelectedCredit.KimbleOne__CreditUnits__c)}">
+                                            <tr>
+                                                <th class="labelCol" style="border:0px;min-width: 80px"><apex:outputLabel value="{!$ObjectType.KimbleOne__CreditAllocationItem__c.Fields.KimbleOne__AllocatedValue__c.Label}"/></th>
+                                            </tr>
+                                            <tr>
+                                                <td style="border:0px"><apex:outputField value="{!TheCreditAllocationCreationWizard.TheSelectedCredit.CurrencyISOCode}" /><apex:inputField value="{!itm.AllocatedValue__c}"/></td>
+                                            </tr>
+                                        </apex:outputPanel>
+                                    </apex:repeat>
+                                </table>
+                            </apex:column>
+
+                        </apex:pageBlockTable>
+                        <script>
+                    function calculateAllocationValue(obj)
+					{
+       					var theAllocationUnitsField = jQuery(obj);
+      					var theUnitValue = jQuery(obj).closest('tr').attr('unit-val');
+     					var theUnitCurrency = jQuery(obj).closest('tr').attr('itm-curr');
+
+      					var theAllocationValueField = theAllocationUnitsField.closest('tr').find('span.calculatedAllocationValue');
+
+       					var allocationUnits = kimble.parseNumber(theAllocationUnitsField.val());
+       					var allocationValue = (allocationUnits != null ? allocationUnits : 0) * theUnitValue;
+       
+       					theAllocationValueField.find('span').text(theUnitCurrency + ' ' + (allocationValue > 0 ? kimble.formatNumber(allocationValue): 0));
+       					theAllocationValueField.find('[id$="AllocationValue"]').val((allocationValue > 0 ? allocationValue: 0)).change();
+					}
+                  </script>
+                    </apex:outputPanel>
+
+                    <apex:outputPanel rendered="{!TheCreditAllocationCreationWizard.HasFinished}">
+                        <script>
+                        safeNavigateToSForceURL('{!JSENCODE(RedirectDeliveryElementFinancials)}');
+                  </script>
+
+                    </apex:outputPanel>
+                </apex:pageBlock>
+            </apex:form>
+        </apex:define>
+    </apex:composition>
+</apex:page>

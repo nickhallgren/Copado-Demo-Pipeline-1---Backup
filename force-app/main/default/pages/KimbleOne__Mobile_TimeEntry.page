@@ -1,0 +1,580 @@
+<apex:page controller="KimbleOne.Mobile_TimeEntryController" showHeader="false" sidebar="false" standardStylesheets="false" tabStyle="KimbleOne__Resource__c" >
+	<apex:composition template="KimbleOne__Mobile_SiteMaster">
+	<apex:define name="Content">
+
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__MobileTime, 'css/TimeEntry.css')}"/>
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryTimePicker, 'jquery.timepicker.min.js')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQueryTimePicker, 'jquery.timepicker.css')}"/>
+
+	<style>
+		.ui-timepicker-wrapper {
+		    right: 15px;
+		    left: initial !important;
+		}
+	</style>
+	<apex:form id="TheForm">
+	<div data-role="page" id="edit-time-entry" class="edit-time-entry-page">
+	    <div data-theme="a" data-role="header" data-position="fixed">
+	    	<a href="{!URLFOR($Page.Mobile_Timesheet)}?periodId={!ThePeriodId}" data-ajax="false" class="back-to-timesheet ui-btn-left ui-btn ui-btn-inline ui-mini ui-corner-all ui-btn-icon-left ui-icon-back"></a>
+	        <h3><apex:outputText value="{!$Label.kimbleone__time}"/></h3>
+	    </div>
+	    <div data-role="content" id="page-content">
+
+	    	<apex:outputPanel id="TimeEntryDetailsPanel">
+	    	
+	    	<apex:outputPanel id="TimeMessagePanel">
+				<div id="editErrors"><apex:pageMessages escape="false" id="errormessages" /></div>
+			</apex:outputPanel>
+
+			<apex:outputPanel layout="none" rendered="{!!ISBLANK(TimeEntry.Timesheet__r.KimbleOne__ApprovalComments__c)}">
+				<div class="ui-grid-a">
+					<div class="ui-block-a approval-comment">
+						<div class="ui-bar approval-comments {!JSINHTMLENCODE(TimeEntry.Timesheet__r.KimbleOne__ApprovalStatus__c)}">
+							<apex:outputText value="{!TimeEntry.Timesheet__r.KimbleOne__ApprovalComments__c}" />
+						</div>
+					</div>
+					<div class="ui-block-b approval-comment-icon">
+						<div class="ui-bar">
+							<div class="approval-comments-icon {!JSINHTMLENCODE(TimeEntry.Timesheet__r.KimbleOne__ApprovalStatus__c)}"/>	
+						</div>
+					</div>					
+				</div>
+			</apex:outputPanel>
+					
+			<div class="ui-grid-b">
+				<apex:outputPanel layout="none" rendered="{!ISBLANK(TimeEntry.Id) && !IsForecastTimeEntry}">
+					<div class="ui-block-a mandatory-ind-col">
+						<div class="ui-bar">
+							<div class="mandatory-ind"/>
+						</div>
+					</div>
+					<div class="ui-block-b label-col">
+						<div class="ui-bar">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__Timesheet__c.Fields.KimbleOne__ResourcedActivity__c.Label}" />
+						</div>
+					</div>
+					<div class="ui-block-c value-col">
+						<div class="ui-bar dropdown-cell">
+							<apex:actionRegion >
+								<apex:selectList id="plannedActivitySelect" value="{!TimeEntry.KimbleOne__ActivityAssignment__c}" label="{!$ObjectType.KimbleOne__Timesheet__c.Fields.KimbleOne__ResourcedActivity__c.Label}" multiselect="false" size="1" required="true">
+									<apex:actionSupport event="onchange" action="{!SelectActivityAssignment}" rerender="TimeEntryDetailsSubPanel" onsubmit="showLoading()" oncomplete="loadComplete()"/>
+									<apex:selectOptions value="{!TheAvailableAssignmentOptions}" />
+								</apex:selectList>
+							</apex:actionRegion>
+						</div>
+					</div>
+
+					<div class="ui-block-a mandatory-ind-col">
+						<div class="ui-bar">
+							<div class="mandatory-ind"/>
+						</div>
+					</div>
+					<div class="ui-block-b label-col">
+						<div class="ui-bar">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__TimePeriod__c.Fields.KimbleOne__StartDate__c.Label}" />
+						</div>
+					</div>
+					<div class="ui-block-c value-col">
+						<div class="ui-bar dropdown-cell">
+							<apex:actionRegion >
+								<apex:selectList id="draftStartDate" value="{!DraftEntryStartDate}" label="{!$ObjectType.KimbleOne__TimePeriod__c.Fields.KimbleOne__StartDate__c.Label}" multiselect="false" size="1" required="true">
+									<apex:actionSupport event="onchange" action="{!SelectStartDate}" rerender="TimeEntryDetailsPanel" onsubmit="showLoading()" oncomplete="loadComplete()"/>
+									<apex:selectOptions value="{!TheAvailableStartDateOptions}" />
+								</apex:selectList>
+							</apex:actionRegion>
+						</div>
+					</div>
+					
+					<apex:outputPanel layout="none" rendered="{!!ISBLANK(DraftEntryEndDate)}">
+					<div class="ui-block-a mandatory-ind-col">
+						<div class="ui-bar">
+							<div class="mandatory-ind"/>
+						</div>
+					</div>
+					<div class="ui-block-b label-col">
+						<div class="ui-bar">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__TimePeriod__c.Fields.KimbleOne__EndDate__c.Label}" />
+						</div>
+					</div>
+					<div class="ui-block-c value-col">
+						<div class="ui-bar dropdown-cell">
+							<apex:actionRegion >
+								<apex:selectList id="draftEndDate" value="{!DraftEntryEndDate}" label="{!$ObjectType.KimbleOne__TimePeriod__c.Fields.KimbleOne__EndDate__c.Label}" multiselect="false" size="1" required="true">
+									<apex:actionSupport event="onchange" action="{!SelectEndDate}" rerender="TimeEntryDetailsPanel" onsubmit="showLoading()" oncomplete="loadComplete()"/>
+									<apex:selectOptions value="{!TheAvailableEndDateOptions}" />
+								</apex:selectList>
+							</apex:actionRegion>
+						</div>
+					</div>
+					</apex:outputPanel>
+				</apex:outputPanel>
+
+				<apex:outputPanel layout="none" rendered="{!!ISBLANK(TimeEntry.Id) || IsForecastTimeEntry}">
+					<div class="ui-block-a mandatory-ind-col">
+						<div class="ui-bar">
+							<div class="mandatory-ind"/>
+						</div>
+					</div>
+					<div class="ui-block-b label-col">
+						<div class="ui-bar">
+							<apex:outputLabel value="{!$Label.kimbleone__resourceactivityalternativelabel}" />
+						</div>
+					</div>
+					<div class="ui-block-c value-col">
+						<div class="ui-bar display-cell">
+							<apex:outputText value="{!TheSelectedAssignment.ResourcedActivity__r.Name}" />
+							<apex:outputText value=" ({!TheSelectedAssignment.ActivityRole__r.Name})" rendered="{!!ISBLANK(TheSelectedAssignment.ActivityRole__r.Name)}" />
+						</div>
+					</div>
+
+					<div class="ui-block-a mandatory-ind-col">
+						<div class="ui-bar">
+							<div class="mandatory-ind"/>
+						</div>
+					</div>
+					<div class="ui-block-b label-col">
+						<div class="ui-bar">
+							<apex:outputLabel value="{!$Label.kimbleone__day}" />
+						</div>
+					</div>
+					<div class="ui-block-c value-col">
+						<div class="ui-bar display-cell">
+							<apex:outputText value="{!DisplayEntryDate}"/>
+						</div>
+					</div>
+				</apex:outputPanel>
+
+				<apex:outputPanel id="TimeEntryDetailsSubPanel">
+					<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheSelectedAssignment)}">
+						<div class="ui-block-a mandatory-ind-col">
+							<div class="ui-bar">
+								<div class="mandatory-ind"/>
+							</div>
+						</div>
+						<div class="ui-block-b label-col">
+							<div class="ui-bar">
+								<apex:outputLabel for="rateBandSelect" value="{!$Label.kimbleone__periodratebandalternatenamelabel}" />
+							</div>
+						</div>
+						<apex:outputPanel layout="none" rendered="{!canEdit}">
+							<div class="ui-block-c dropdown-col">
+								<div class="ui-bar dropdown-cell">
+									<apex:selectList id="rateBandSelect" value="{!TimeEntry.KimbleOne__ActivityAssignmentRate__c}" label="{!$Label.kimbleone__periodratebandalternatenamelabel}" multiselect="false" size="1" required="true">
+										<apex:actionSupport event="onchange" action="{!SelectActivityAssignmentRateEdit}" rerender="TimeEntryDetailsSubPanel" onsubmit="showLoading();" oncomplete="loadComplete();" />
+										<apex:selectOptions value="{!TheActivityPeriodRateBandOptionsEdit}" />
+									</apex:selectList>
+								</div>
+							</div>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!!canEdit}">
+							<div class="ui-block-c value-col">
+								<div class="ui-bar display-cell">
+									<apex:outputText value="{!TimeEntry.ActivityAssignmentRate__r.ActivityPeriodRateBand__r.Name}"/>
+								</div>
+							</div>
+						</apex:outputPanel>
+					</apex:outputPanel>
+								
+					<apex:outputPanel layout="none" rendered="{!TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'Task' || TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'CategoryAndTask'}">
+						<div class="ui-block-a mandatory-ind-col">
+							<div class="ui-bar">
+								<div class="mandatory-ind"/>
+							</div>
+						</div>
+						<div class="ui-block-b label-col">
+							<div class="ui-bar">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__Task__c.Fields.Name.Label}" />
+							</div>
+						</div>
+						<apex:outputPanel layout="none" rendered="{!canEdit}">
+							<div class="ui-block-c dropdown-col">
+								<div class="ui-bar dropdown-cell">
+									<apex:selectList id="taskSelect" value="{!TimeEntry.KimbleOne__PlanTaskAssignment__c}" multiselect="false" size="1">
+										<apex:actionSupport event="onchange" action="{!SelectPlanTaskAssignmentEdit}" rerender="TimeEntryDetailsPanel" onsubmit="showLoading();" oncomplete="loadComplete();" />
+										<apex:selectOptions value="{!ThePlanTaskOptions}" />
+									</apex:selectList>							
+								</div>
+							</div>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!!canEdit}">
+							<div class="ui-block-c value-col">
+								<div class="ui-bar">
+									<apex:outputText value="{!TimeEntry.PlanTaskAssignment__r.PlanTask__r.Task__r.Name}"/>
+								</div>
+							</div>
+						</apex:outputPanel>
+					</apex:outputPanel>
+					
+					<apex:outputPanel layout="none" rendered="{!canEdit && !ISBLANK(ThePlanTaskAssignment.Id) && !ThePlanTaskAssignment.PlanTask__r.Task__r.KimbleOne__IsFixedEffort__c}">
+						<div class="ui-block-a mandatory-ind-col">
+							<div class="ui-bar">
+								<div class="mandatory-ind"/>
+							</div>
+						</div>
+						<div class="ui-block-b label-col">
+							<div class="ui-bar">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__PlanTaskAssignment__c.Fields.KimbleOne__DraftRemainingEffort__c.Label}" />
+							</div>
+						</div>
+						<div class="ui-block-c value-col">
+							<div class="ui-bar">
+								<apex:inputHidden id="draftRemainingEffortField" value="{!ThePlanTaskAssignment.KimbleOne__DraftRemainingEffort__c}" />
+								<input type="number" data-clear-btn="false" name="draftRemainingEffort" id="draftRemainingEffort" onchange="jQuery('[id$=draftRemainingEffortField]').val(jQuery('#draftRemainingEffort').val());"  value="{!ThePlanTaskAssignment.KimbleOne__DraftRemainingEffort__c}"/>
+							</div>
+						</div>
+					</apex:outputPanel>
+					
+					<apex:outputPanel layout="none" rendered="{!StartEndTimeRequired && !ISBLANK(TheSelectedAssignmentRate)}">
+						<div class="ui-block-a mandatory-ind-col">
+							<div class="ui-bar">
+								<div class="mandatory-ind"/>
+							</div>
+						</div>
+						<div class="ui-block-b label-col">
+							<div class="ui-bar">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__StartTime__c.Label}"/>
+							</div>
+						</div>
+						<div class="ui-block-c time-col">
+							<div class="ui-bar time-cell">
+								<apex:inputHidden id="startTimeField" value="{!TimeEntry.KimbleOne__StartTime__c}" />
+								<apex:outputPanel layout="none" rendered="{!canEdit}">
+									<input type="time" name="entryStartTime" id="entryStartTime" class="time-entry-input" onchange="jQuery('[id$=startTimeField]').val(jQuery('#entryStartTime').val());timeChange(this);" value="{!JSINHTMLENCODE(TimeEntry.StartTime__c)}"/>
+								</apex:outputPanel>
+								<apex:outputPanel layout="none" rendered="{!!canEdit}">
+									<input type="time" name="entryStartTime" id="entryStartTime" class="time-entry-output" readonly="readonly" value="{!JSINHTMLENCODE(TimeEntry.StartTime__c)}"/>
+								</apex:outputPanel>
+							</div>
+						</div>
+					</apex:outputPanel>
+					
+					<apex:outputPanel layout="none" rendered="{!StartEndTimeRequired && !ISBLANK(TheSelectedAssignmentRate)}">
+						<div class="ui-block-a mandatory-ind-col">
+							<div class="ui-bar">
+								<div class="mandatory-ind"/>
+							</div>
+						</div>
+						<div class="ui-block-b label-col">
+							<div class="ui-bar">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__EndTime__c.Label}"/>
+							</div>
+						</div>
+						<div class="ui-block-c time-col">
+							<div class="ui-bar time-cell">
+								<apex:inputHidden id="endTimeField" value="{!TimeEntry.KimbleOne__EndTime__c}" />
+								<apex:outputPanel layout="none" rendered="{!canEdit}">
+									<input type="time" name="entryEndTime" id="entryEndTime" onchange="jQuery('[id$=endTimeField]').val(jQuery('#entryEndTime').val());timeChange(this);" class="time-entry-input" value="{!JSINHTMLENCODE(TimeEntry.EndTime__c)}"/>
+								</apex:outputPanel>
+								<apex:outputPanel layout="none" rendered="{!!canEdit}">
+									<input type="time" name="entryEndTime" id="entryEndTime" class="time-entry-output" readonly="readonly" value="{!JSINHTMLENCODE(TimeEntry.EndTime__c)}"/>
+								</apex:outputPanel>
+							</div>
+						</div>
+					</apex:outputPanel>								
+					
+					<apex:variable var="Suffix" value="{!TheSelectedAssignment.ResourcedActivityOperatedWith__r.UsageUnitType__r.KimbleOne__Suffix__c}" />
+	
+					<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheSelectedAssignmentRate)}">
+						<div class="ui-block-a mandatory-ind-col">
+							<div class="ui-bar">
+								<div class="mandatory-ind"/>
+							</div>
+						</div>
+						<div class="ui-block-b label-col">
+							<div class="ui-bar">
+								<apex:outputLabel value="{!$Label.kimbleone__entrylabel} {!Suffix}"/>
+							</div>
+						</div>
+						<div class="ui-block-c number-col">
+							<div class="ui-bar number-cell">
+								<apex:inputHidden id="timeEntryField" value="{!TimeEntry.KimbleOne__EntryUnits__c}" />
+								<apex:outputPanel layout="none" rendered="{!canEdit}">
+									<input type="number" name="entryUnits" id="entryUnits" class="number-input" onchange="jQuery('[id$=timeEntryField]').val(jQuery('#entryUnits').val());timeChange(this);" value="{!TimeEntry.KimbleOne__EntryUnits__c}"/>
+								</apex:outputPanel>
+								<apex:outputPanel layout="none" rendered="{!!canEdit}">
+									<input type="number" name="entryUnits" id="entryUnits" class="number-input" readonly="readonly" value="{!TimeEntry.KimbleOne__EntryUnits__c}"/>
+								</apex:outputPanel>
+							</div>
+						</div>
+					</apex:outputPanel>
+	
+					<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheSelectedAssignmentRate) && TheSelectedAssignmentRate.ActivityPeriodRateBand__r.RevenueUnitsCalculationMethod__r.KimbleOne__Enum__c = 'Manual'}">
+						<div class="ui-block-a mandatory-ind-col">
+							<div class="ui-bar">
+								<div class="mandatory-ind"/>
+							</div>
+						</div>
+						<div class="ui-block-b label-col">
+							<div class="ui-bar">
+								<apex:outputLabel value="{!$Label.kimbleone__revenuelabel} {!Suffix}"/>
+							</div>
+						</div>
+						<div class="ui-block-c number-col">
+							<div class="ui-bar number-cell">
+								<apex:inputHidden id="revenueUnitsField" value="{!TimeEntry.KimbleOne__RevenueUnits__c}" />
+								<apex:outputPanel layout="none" rendered="{!canEdit}">
+									<input type="number" name="revenueUnits" id="revenueUnits" class="number-input" onchange="jQuery('[id$=revenueUnitsField]').val(jQuery('#revenueUnits').val());" value="{!TimeEntry.KimbleOne__RevenueUnits__c}"/>
+								</apex:outputPanel>
+								<apex:outputPanel layout="none" rendered="{!!canEdit}">
+									<input type="number" name="revenueUnits" id="revenueUnits" class="number-input" readonly="readonly" value="{!TimeEntry.KimbleOne__RevenueUnits__c}"/>
+								</apex:outputPanel>
+							</div>
+						</div>
+					</apex:outputPanel>
+	
+					<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheSelectedAssignmentRate) && TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'Reference'}">
+						<div class="ui-block-a mandatory-ind-col">
+							<div class="ui-bar"></div>
+						</div>
+						<div class="ui-block-b label-col">
+							<div class="ui-bar">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Reference__c.Label}"/>
+							</div>
+						</div>
+						<div class="ui-block-c text-col">
+							<div class="ui-bar text-cell">
+								<apex:outputPanel layout="none" rendered="{!canEdit}">
+									<input type="text" name="referenceText" id="referenceText" maxlength="80" value="{!JSINHTMLENCODE(TimeEntry.Reference__c)}"/>
+								</apex:outputPanel>
+								<apex:outputPanel layout="none" rendered="{!!canEdit}">
+									<input type="text" name="referenceText" id="referenceText" readonly="readonly" value="{!JSINHTMLENCODE(TimeEntry.Reference__c)}"/>
+								</apex:outputPanel>
+							</div>
+						</div>
+					</apex:outputPanel>
+	
+					<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheSelectedAssignmentRate) && (TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c = 'Category'  || TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'CategoryAndTask')}">
+						<apex:repeat value="{!NumberOfTimeCategories}" var="num">
+							<apex:outputPanel layout="none" rendered="{!TheActivityTimeCategories[num].Show}">
+	
+									<div class="ui-block-a mandatory-ind-col">
+										<div class="ui-bar">
+											<apex:outputPanel layout="none" rendered="{!TheActivityTimeCategories[num].TheCategory.IsMandatory__c}">
+												<div class="mandatory-ind"/>
+											</apex:outputPanel>
+										</div>
+									</div>
+									<div class="ui-block-b label-col">
+										<div class="ui-bar">
+											<apex:outputLabel value="{!TheActivityTimeCategories[num].TheCategory.Name}"/>
+										</div>
+									</div>
+	
+									<apex:outputPanel layout="none" rendered="{!canEdit && TheActivityTimeCategories[num].TheCategory.DisplayType__r.Enum__c = 'Text'}">
+										<div class="ui-block-c text-col">
+											<div class="ui-bar text-cell">
+												<input type="text" name="categoryText" maxlength="80" value="{!JSINHTMLENCODE(TimeEntry['Category' & TEXT(TheActivityTimeCategories[num].TheCategory.DisplaySequence__c) & '__c'])}"/>
+											</div>
+										</div>
+									</apex:outputPanel>
+									
+									<apex:outputPanel layout="none" rendered="{!canEdit && TheActivityTimeCategories[num].TheCategory.DisplayType__r.Enum__c = 'Dropdown'}">
+										<div class="ui-block-c dropdown-col">
+											<div class="ui-bar dropdown-cell">
+												<apex:selectList id="categorySelect" value="{!TimeEntry['Category' & TEXT(TheActivityTimeCategories[num].TheCategory.DisplaySequence__c) & '__c']}" multiselect="false" size="1">
+													<apex:selectOptions value="{!TheActivityTimeCategories[num].TheOptions}" />
+												</apex:selectList>	
+											</div>
+										</div>
+									</apex:outputPanel>
+									
+									<apex:outputPanel layout="none" rendered="{!!canEdit}">
+										<div class="ui-block-c value-col">
+											<div class="ui-bar display-cell">
+												<apex:outputText value="{!TimeEntry['Category' & TEXT(TheActivityTimeCategories[num].TheCategory.DisplaySequence__c) & '__c']}" />
+											</div>
+										</div>
+									</apex:outputPanel>	
+							</apex:outputPanel>
+						</apex:repeat>
+					</apex:outputPanel>
+
+					<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheSelectedAssignmentRate)}">
+						<div class="ui-block-a mandatory-ind-col">
+							<div class="ui-bar notes-header"></div>
+						</div>
+						<div class="ui-block-b label-col">
+							<div class="ui-bar notes-header">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Notes__c.Label}"/>
+							</div>
+						</div>
+						<div class="ui-block-c textarea-col">
+							<div class="ui-bar notes-header"></div>
+						</div>
+						<div class="ui-block-a textarea-fullwidth">
+							<div class="ui-bar textarea-cell">
+								<apex:inputTextarea value="{!TimeEntry.KimbleOne__Notes__c}" styleClass="timeNotes" html-maxlength="255" rendered="{!canEdit}"/>
+								<apex:outputField value="{!TimeEntry.KimbleOne__Notes__c}" rendered="{!!canEdit}"/>
+							</div>
+						</div>				
+					</apex:outputPanel>
+
+				</apex:outputPanel>
+			</div>	    
+    		</apex:outputPanel>
+    		
+			<apex:outputPanel >
+				
+			</apex:outputPanel>	
+			<script>
+				var thePeriodIdParam = '?periodId=' + '{!JSENCODE(ThePeriodId)}';
+		    </script>
+	    </div>
+		<div data-role="footer" data-position="fixed" style="overflow:hidden;">
+			<div data-role="navbar" id="navbar">
+				<ul>
+					<apex:outputPanel layout="none" rendered="{!canEdit}">
+						<li><a href="javascript:saveTimeEntryChanges();">{!$Label.kimbleone__mobilewebdone}</a></li>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!!canEdit}">
+						<li><a href="{!URLFOR($Page.Mobile_Timesheet)}?periodId={!ThePeriodId}" data-ajax="false">{!$Label.MobileWebBack}</a></li>
+					</apex:outputPanel>
+				</ul>
+			</div>
+		</div>
+	</div>
+	
+	<apex:actionFunction action="{!SaveTimeEntry}" name="saveTimeEntry" rerender="TimeEntryDetailsPanel" oncomplete="saveComplete();"></apex:actionFunction>
+	
+	</apex:form>
+	<script>
+	    var mobileTimesheetPageURL = '{!URLFOR($Page.Mobile_Timesheet)}';
+	    
+
+			
+        jQuery( document ).on( "pageinit", "[data-role='page'].edit-time-entry-page", function()
+        {
+			setupTimeEntyInputs();
+        });
+        
+        function setupTimeEntyInputs()
+        {
+  			// windows mobile phone browsers and FF desktop don't support the "time" html5 element
+			// so instead we render a js time picker plugin
+			if(!browserSupportsTimeType())
+			{
+				jQuery('.time-entry-input').timepicker({ 'timeFormat': 'H:i', 'show2400': 'true' });
+			}
+        }
+        
+        function browserSupportsTimeType()
+        {
+	        var i = document.createElement('input');
+			i.setAttribute('type', 'time');
+			return i.type !== 'text';
+		}
+  	    
+	    function showLoading()
+	    {
+	    	jQuery.mobile.loading('show');
+	    }
+	    
+	    function loadComplete()
+	    {
+	    	jQuery( "#page-content" ).enhanceWithin();
+	    	setupTimeEntyInputs();
+	    	jQuery.mobile.loading('hide');
+	    }
+	    
+	    function saveComplete()
+	    {
+	    	loadComplete();
+	    	
+	    	if(jQuery(".messageCell").length > 0)
+	    	{
+	    		jQuery.mobile.silentScroll(0);
+	    	}
+	    }
+	    
+	    function saveTimeEntryChanges()
+	    {
+	    	showLoading();
+	    	saveTimeEntry();
+	    }
+
+		function timeChange(theField)
+		{
+			var currentStartTime = jQuery('#entryStartTime:visible').val();
+			var currentEndTime = jQuery('#entryEndTime:visible').val();
+			var currentEntryUnits = jQuery('#entryUnits:visible').val();
+		
+			// given a end time and a start time work out the usage
+			if (jQuery(theField).is('#entryStartTime') && currentEndTime != undefined && currentEndTime != '') {
+				jQuery('#entryUnits').val(timeDiff(currentStartTime, currentEndTime));
+				jQuery('[id$=timeEntryField]').val(jQuery('#entryUnits').val());
+			} else if (jQuery(theField).is('#entryEndTime') && currentStartTime != undefined && currentStartTime != '') {
+				jQuery('#entryUnits').val(timeDiff(currentStartTime, currentEndTime).toFixed(3));
+				jQuery('[id$=timeEntryField]').val(jQuery('#entryUnits').val());
+			} else if (jQuery(theField).is('#entryUnits') && currentStartTime != undefined && currentStartTime != '') {
+				// we only update the end time if the value is blank or the calculated value is greater
+				// meaning that you can update the usage to less than the difference
+				var newEndTime = timeAddHours(currentStartTime, currentEntryUnits);
+				if(currentEndTime == '' || currentEndTime < newEndTime)
+				{
+					jQuery('#entryEndTime').val(newEndTime);
+					jQuery('[id$=endTimeField]').val(jQuery('#entryEndTime').val());
+				}
+			}
+		}
+		
+		function timeDiff(startTime, endTime)
+		{
+			// date is unimportant, using Date construct to do time maths
+			if(startTime == '' || endTime == '') return 0;
+			
+			return (new Date(2000, 0, 1, parseTime(endTime).hh, parseTime(endTime).mm) - new Date(2000, 0, 1, parseTime(startTime).hh, parseTime(startTime).mm)) / 1000 / 60 / 60;
+		}
+		
+		function timeAddHours(startTime, hours)
+		{
+			var newDateTime = addHours(new Date(2000, 0, 1, parseTime(startTime).hh, parseTime(startTime).mm), hours);
+		
+			var min = newDateTime.getMinutes();
+			if (min < 10) {
+				min = "0" + min;
+			}
+	
+			var hour = newDateTime.getHours();
+			if (hour < 10) {
+				hour = "0" + hour;
+			}
+		
+			var newTime = hour + ':' + min;
+			
+			// special case - if the result is 00:00 and we are adding >0 hours then this must be 24:00
+			newTime = (newTime == "00:00" && hours > 0 ? "24:00" : newTime);
+			
+			return newTime;
+		}
+		
+		function addHours(theDate, hours)
+		{
+			theDate.setTime(theDate.getTime() + (hours * 60 * 60 * 1000));
+			return theDate;
+		}
+		
+		function parseTime(s)
+		{
+			var part = s.match(/(\d+):(\d+)(?: )?(am|pm)?/i);
+			var hh = parseInt(part[1], 10);
+			var mm = parseInt(part[2], 10);
+			var ap = part[3] ? part[3].toUpperCase() : null;
+			if (ap === "AM") {
+				if (hh == 12) {
+					hh = 0;
+				}
+			}
+			if (ap === "PM") {
+				if (hh != 12) {
+					hh += 12;
+				}
+			}
+			return {
+				hh : hh,
+				mm : mm
+			};
+		}	    
+	</script>
+	</apex:define>
+	</apex:composition>
+</apex:page>

@@ -1,0 +1,253 @@
+<apex:page standardController="KimbleOne__Resource__c" extensions="KimbleOne.ResourceEditController2" sidebar="false" >
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+	<c:Menu DefaultHelpPage="Resourcing.html" MenuContextType="CandidateResource" MenuContextId="{!TheCandidate.Id}" MenuContextName="{!TheCandidate.Name}"/>
+
+</apex:define>
+    
+<apex:define name="Content">
+        
+	<apex:form id="TheForm">
+	<div id="resourceErrors">
+		<apex:pageMessages escape="false"/>
+	</div>
+	
+	<!-- Resource Edit / New section -->
+		<apex:inputHidden value="{!KimbleOne__Resource__c.KimbleOne__Contact__c}"/>
+		<apex:pageBlock >
+			<apex:pageBlockButtons styleclass="ResourceButtonPanel" location="bottom">
+				<input class="btn " type="button" onclick="DisableButtonPanel('ResourceButtonPanel','',[]);updateResourceFullName(); save();" value="{!$Label.Save}" />
+			</apex:pageBlockButtons>
+			
+			<apex:pageblockSection collapsible="false" showheader="false" columns="2">						
+				
+				<!-- Resource Name -->
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.Name.Label}" />
+					<apex:outputPanel layout="none">
+						<apex:outputLabel id="ResourceFullName" value="{!KimbleOne__Resource__c.Name}" />
+						<apex:inputHidden id="HiddenResourceFullName" value="{!KimbleOne__Resource__c.Name}" />
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+					
+				<!-- Allowable Resource Types -->
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__ResourceType__c.Label}" />
+						<apex:selectList value="{!KimbleOne__Resource__c.KimbleOne__ResourceType__c}" size="1" required="true">
+							<apex:actionSupport event="onchange" action="{!ResourceTypeChange}" rerender="ResourceBlock" />
+							<apex:selectOptions value="{!AllowableResourceTypes}" />
+						</apex:selectList>
+						
+				</apex:pageBlockSectionItem>
+				
+				<!-- FirstName field (required) -->
+				<apex:inputfield id="FirstName" styleclass="ResourceFirstName requiredField" value="{!KimbleOne__Resource__c.KimbleOne__FirstName__c}" required="false" onchange="updateResourceFullName();"  />
+					 
+				<!-- LastName field (required) -->	
+				<apex:inputfield id="LastName" styleclass="ResourceLastName requiredField" value="{!KimbleOne__Resource__c.KimbleOne__LastName__c}" required="false" onchange="updateResourceFullName();" />
+				
+				<!-- Business Unit Name field (required dropdown) -->
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__BusinessUnit__c.Fields.Name.Label}" />								  
+					<apex:inputText value="{!KimbleOne__Resource__c.KimbleOne__BusinessUnit__c}" styleclass="kimblecustomlookup GetPrimaryOrganisationalEntityList null true true"/>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__BusinessUnitSecondary__c.Label}" />								  
+					<apex:inputText value="{!KimbleOne__Resource__c.KimbleOne__BusinessUnitSecondary__c}" styleclass="kimblecustomlookup GetSecondaryOrganisationalEntityList null {!SecondaryBURequired} true"/>
+				</apex:pageBlockSectionItem>
+				 
+				<!-- Grade field (required dropdown) -->
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__Grade__c.Label}" />
+					<apex:inputText value="{!KimbleOne__Resource__c.KimbleOne__Grade__c}" styleclass="kimblecustomlookup GetGradesByResourceClass {!TheResourceType.KimbleOne__ResourceClass__c} {!GradeRequired} true" />
+				</apex:pageBlockSectionItem>
+				<!-- Location - use enhanced lookup if configured -->
+	    		<apex:pageBlockSectionItem rendered="{!!UseLocationEnhancedLookup}" >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__Location__c.Label}" />
+					<apex:inputText id="resourceLocationDropdown" value="{!KimbleOne__Resource__c.KimbleOne__Location__c}" styleclass="kimblecustomlookup getAllLocations null {!LocationRequired} true" />
+				</apex:pageBlockSectionItem>														
+				<apex:pageBlockSectionItem rendered="{!UseLocationEnhancedLookup}" >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__Location__c.Label}" />
+					<apex:inputField id="resourceLocationLookup" required="{!LocationRequired}" value="{!KimbleOne__Resource__c.KimbleOne__Location__c}" styleclass="kimbleSearch" />
+				</apex:pageBlockSectionItem>														
+							
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__Calendar__c.Label}" />
+					<apex:inputText id="resourceCalendar" value="{!KimbleOne__Resource__c.KimbleOne__Calendar__c}" styleclass="kimblecustomlookup GetCalendars null true true"/>
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__TimePatternVariant__c.Label}" />
+					<apex:selectList value="{!KimbleOne__Resource__c.KimbleOne__TimePatternVariant__c}" size="1" required="true">
+						<apex:selectOptions value="{!AllTimePatternVariants}" />
+					</apex:selectList>
+				</apex:pageBlockSectionItem>
+				
+				<!-- CurrencyIsoCode field -->
+	    		<apex:inputField id="resourceCurrency" value="{!KimbleOne__Resource__c.CurrencyIsoCode}" />	
+	    		<apex:inputField id="standardRevenueCurrency" value="{!KimbleOne__Resource__c.KimbleOne__StandardRevenueCurrencyISOCode__c}" styleclass="kimblecustomlookup GetActiveCurrencyTypes null true false" />
+
+				<!-- Show Expense Reimbursement Currency field -->		 							
+				<apex:inputField value="{!KimbleOne__Resource__c.KimbleOne__ExpenseReimbursementCurrencyIsoCode__c}" styleclass="kimblecustomlookup GetActiveCurrencyTypes null true false" />
+						
+				<!-- Actual Cost field -->
+				<apex:inputField value="{!KimbleOne__Resource__c.KimbleOne__ActualCost__c}" required="false" styleclass="{!IF(ActualCostRequired,'requiredField','')}" />
+			
+				<!-- Actual Cost Unit Type field (dropdown) -->
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__ActualCostUnitType__c.Label}" />
+					<apex:outputPanel layout="none">
+						<div class="requiredInput">
+							<apex:outputPanel layout="none" rendered="{!ActualCostRequired}"><div class="requiredBlock"></div></apex:outputPanel>
+								<apex:selectList id="actualCostUnitType" value="{!KimbleOne__Resource__c.KimbleOne__ActualCostUnitType__c}" size="1" required="{!ActualCostRequired}">
+									<apex:selectOptions value="{!TheTimeUnits}"/>
+								</apex:selectList>
+						</div>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+
+				<!-- Standard Cost only editable if can be maintained at Resource level -->
+				<apex:inputField id="standardCost" value="{!KimbleOne__Resource__c.KimbleOne__StandardCost__c}" required="true" rendered="{!StandardCostEditable}"/>
+			 	<apex:pageBlockSectionItem rendered="{!StandardCostEditable}">
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__StandardCostUnitType__c.Label}" />
+					<apex:outputPanel layout="none">
+						<div class="requiredInput">
+							<apex:outputPanel layout="none"><div class="requiredBlock"></div></apex:outputPanel>
+							<apex:selectList id="standardCostUnitType" value="{!KimbleOne__Resource__c.KimbleOne__StandardCostUnitType__c}" size="1" required="{!StandardCostEditable}">
+								<apex:selectOptions value="{!TheTimeUnits}"/>
+							</apex:selectList>
+						</div>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+
+				<apex:inputField id="standardRevenue" value="{!KimbleOne__Resource__c.KimbleOne__StandardRevenue__c}" required="{!StandardRevenueEditable}" styleclass="{!IF(StandardRevenueEditable,'requiredField','')}" rendered="{!StandardRevenueEditable}"/>
+				<apex:pageBlockSectionItem rendered="{!StandardRevenueEditable}">
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__StandardRevenueUnitType__c.Label}" />
+					<apex:outputPanel layout="none">
+						<div class="requiredInput">
+							<apex:outputPanel layout="none"><div class="requiredBlock"></div></apex:outputPanel>
+							<apex:selectList id="standardRevenueUnitType" value="{!KimbleOne__Resource__c.KimbleOne__StandardRevenueUnitType__c}" size="1" required="{!StandardRevenueEditable}">
+								<apex:selectOptions value="{!TheTimeUnits}"/>
+							</apex:selectList>
+						</div>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+
+				<!-- StartDate field (required Date dropdown) -->
+				<apex:inputfield styleclass="kimbleDatePicker requiredField" value="{!KimbleOne__Resource__c.KimbleOne__StartDate__c}" required="false" />
+
+				<!-- EndDate field (Date dropdown) -->
+				<apex:inputfield styleclass="kimbleDatePicker" value="{!KimbleOne__Resource__c.KimbleOne__EndDate__c}" required="false" />
+
+			</apex:pageBlockSection>
+
+			<apex:pageBlockSection columns="1">
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.KimbleOne__Notes__c.Label}" />
+						<apex:inputTextarea rows="4" cols="95" value="{!KimbleOne__Resource__c.KimbleOne__Notes__c}" style="margin-top: 2px; margin-bottom: 2px; height: 60px; margin-left: 2px; margin-right: 2px; width: 502px; "/>
+				</apex:pageBlockSectionItem>
+			</apex:pageBlockSection>
+			
+		</apex:pageBlock>
+		
+		<apex:actionFunction action="{!Save}" name="save" rerender="TheForm" onComplete="saveComplete(0); initialiseItems();" />
+		<apex:actionFunction action="{!PlatformUserActions}" name="platformUserActions" rerender="TheForm">
+			<apex:param name="redirectNew" value=""/>
+		</apex:actionFunction>
+		
+		<script>
+		jQuery(window).load(function()
+		{
+			initialiseItems();
+		});
+
+		$(document).ready(function(){
+			RefreshModalBoxy();
+			initialiseMandatoryFields();			 	
+		});
+		
+		</script>	
+</apex:form>
+
+<script>
+
+		function initialiseItems()
+		{
+		    SetupDatePicker();
+  		}
+		function SetupDatePicker()
+		{
+			//dateFormat: 'yy-mm-dd',
+			jQuery('.kimbleDatePicker').datepicker({
+					dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true,
+					selectOtherMonths: true,
+					changeMonth: true,
+					changeYear: true});
+		}
+
+	 function updateResourceFullName()
+	 {
+			$("[id*=':ResourceFullName']").text($('.ResourceFirstName').val()+' '+$('.ResourceLastName').val());
+			$("[id*=':HiddenResourceFullName']").val($('.ResourceFirstName').val()+' '+$('.ResourceLastName').val());
+	 }
+	 
+	 function initialiseMandatoryFields()
+	 {
+	 	jQuery.each($('INPUT.requiredField'), function (i, obj){
+	 		
+	 		var requiredBlock = $(obj);
+	 		
+	 		var parent = requiredBlock.parent();
+	 		
+	 		while (!parent.is('td'))
+	 		{
+	 			requiredBlock = parent;
+	 			parent = requiredBlock.parent();
+	 		}
+	 		
+			var requiredBlockCopy = requiredBlock.clone(true, true); //clean copy
+				
+			parent.children().each(function(){
+				$(this).remove();
+			});
+
+			var firstchild = $("<div></div>").attr("class","requiredInput");
+			firstchild.append ( $("<div></div>").attr("class","requiredBlock") );
+			firstchild.append (  requiredBlockCopy );
+				
+			parent.append(firstchild);
+	 	});
+	 }
+	 
+	function saveComplete(redirectNew)
+	{
+		if (!isThereError('#resourceErrors')) 
+		{
+			platformUserActions(redirectNew);
+		} 
+	}
+	 
+	function isThereError(errorSelector)
+	{
+		if($(errorSelector + ' > span')[0].children.length == 0) {
+			return false; //no errors
+		}
+		else
+		{   EnableButtonPanel('ResourceButtonPanel');
+			return true; //errors
+		}
+	}
+	 
+	 
+</script>
+   
+</apex:define>
+
+</apex:composition>
+
+
+</apex:page>

@@ -1,0 +1,259 @@
+<apex:page standardcontroller="KimbleOne__SalesOpportunityStage__c" extensions="KimbleOne.SalesOppDeliveryGrpsAndElemsController,KimbleOne.FilesAndAttachmentsController" sidebar="false">
+
+	<apex:composition template="KimbleOne__SiteMaster">
+
+		<apex:define name="Menu">
+
+			<c:Menu DefaultHelpPage="CreateSalesOpportunityDisconnect.html" MenuContextType="Proposal"
+				MenuContextId="{!KimbleOne__SalesOpportunityStage__c.SalesOpportunity__r.KimbleOne__Proposal__c}"
+				MenuContextName="{!KimbleOne__SalesOpportunityStage__c.SalesOpportunity__r.Proposal__r.Name}"
+				 />
+
+		</apex:define>
+
+		<apex:define name="Content">
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+						
+			<apex:form id="TheForm">
+			
+			<apex:pageMessages escape="false"/>
+
+			<div class="card variable-width min-horizontal-padding">
+				<div class="cardHeading">
+					<h3 class="cardTitle"><apex:outputText value="{!$Label.kimbleone__salesstagehistoryheading}"/></h3>
+				</div>
+				<div class="cardBody">
+					<apex:repeat value="{!AllStages}" var="thisSalesOppStage">
+					
+					<div class="inner-card" >
+						<apex:outputPanel layout="none" rendered="{!thisSalesOppStage.Id == KimbleOne__SalesOpportunityStage__c.Id}">
+							<span class="active-stage-indicator fa fa-play"></span>
+						</apex:outputPanel>
+						<div class="inner-card-header">
+							<div class="inner-card-title">
+								<a class="undecorated-link" href="/{!thisSalesOppStage.Id}">
+									<apex:outputText value="{!thisSalesOppStage.OpportunityStage__r.Name}"/>
+									<apex:outputPanel layout="none" rendered="{!thisSalesOppStage.OpportunityStage__r.KimbleOne__RequiresCompletionApproval__c}">
+										<span class="completion-approval-indicator fa fa-list-ol" title="{!$ObjectType.KimbleOne__OpportunityStage__c.Fields.KimbleOne__RequiresCompletionApproval__c.Label}"/>
+									</apex:outputPanel>
+								</a>
+							</div>
+							<apex:outputPanel layout="none" rendered="{!!ISBLANK(PreviousStage) && (thisSalesOppStage.Id == KimbleOne__SalesOpportunityStage__c.Id)}">
+							<div id="stage-menu" data-floating-dropdown="#{!thisSalesOppStage.Id}-menu-data" class="fa fa-bars burger-menu"></div>
+							<div class="processing Loading" style="display:none"></div>
+							<div id="{!thisSalesOppStage.Id}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+					   			 <ul class="floating-dropdown-menu">
+					        		<li><apex:commandLink rerender="TheForm" action="{!RevertStage}" onclick="setLoading()"><i class="fa fa-undo dropdown-icon"></i>{!$Label.RevertSalesOpportunityStageLabel}</apex:commandLink></li>
+							    </ul>
+							</div>
+			        		</apex:outputPanel>
+						</div>
+								
+						<div class="inner-card-body">
+							<apex:outputPanel layout="none" rendered="{!thisSalesOppStage.Id == KimbleOne__SalesOpportunityStage__c.Id}">
+								<apex:outputPanel styleClass="card-detail" layout="block" rendered="{!!ISBLANK(KimbleOne__SalesOpportunityStage__c.KimbleOne__ForecastStatus__c)}">
+									<apex:outputLabel styleClass="card-field-label" value="{!$ObjectType.KimbleOne__SalesOpportunity__c.Fields.KimbleOne__ForecastStatus__c.Label}" />
+									<span class="card-field-value">
+										<apex:outputField value="{!KimbleOne__SalesOpportunityStage__c.ForecastStatus__r.Name}"/>
+									</span>
+								</apex:outputPanel>
+								<apex:outputPanel styleClass="card-detail" layout="block" rendered="{!!ISBLANK(KimbleOne__SalesOpportunityStage__c.KimbleOne__ContractRevenue__c)}">
+									<apex:outputLabel styleClass="card-field-label" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__ContractRevenue__c.Label}" />
+									<span class="card-field-value">
+										<apex:outputField value="{!KimbleOne__SalesOpportunityStage__c.KimbleOne__ContractRevenue__c}"/>
+									</span>
+								</apex:outputPanel>
+	
+								<apex:outputPanel styleClass="card-detail" layout="block" rendered="{!!ISBLANK(KimbleOne__SalesOpportunityStage__c.KimbleOne__WeightedContractRevenue__c)}">
+									<apex:outputLabel styleClass="card-field-label" value="{!$ObjectType.KimbleOne__Proposal__c.Fields.KimbleOne__WeightedContractRevenue__c.Label}" />
+									<span class="card-field-value">
+										<apex:outputField styleClass="card-field-value" value="{!KimbleOne__SalesOpportunityStage__c.KimbleOne__WeightedContractRevenue__c}"/>
+									</span>
+								</apex:outputPanel>
+	
+								<apex:outputPanel layout="none" rendered="{!!ISBLANK(PreviousStage)}">
+								<div class="card-detail">
+									<apex:outputLabel styleClass="card-field-label" value="{!$Label.kimbleone__previous + ' ' + $ObjectType.KimbleOne__SalesOpportunityStage__c.Label}" />
+									<span class="card-field-value">
+										<apex:outputField value="{!PreviousStage.OpportunityStage__r.Name}"/>
+									</span>
+								</div>
+								</apex:outputPanel>
+							</apex:outputPanel>
+							
+							<apex:outputPanel layout="none" rendered="{!!ISBLANK(thisSalesOppStage.KimbleOne__Approver1User__c)}">
+								<div class="card-detail">
+									<apex:outputLabel styleClass="card-field-label" value="{!$ObjectType.KimbleOne__SalesOpportunityStage__c.Fields.KimbleOne__Approver1User__c.Label}" />
+									<span class="card-field-value">
+										<apex:outputField value="{!thisSalesOppStage.KimbleOne__Approver1User__c}"/>
+									</span>
+								</div>
+							</apex:outputPanel>
+																
+							<apex:outputPanel layout="none" rendered="{!!ISBLANK(thisSalesOppStage.KimbleOne__Approver2User__c)}">
+								<div class="card-detail">
+									<apex:outputLabel styleClass="card-field-label" value="{!$ObjectType.KimbleOne__SalesOpportunityStage__c.Fields.KimbleOne__Approver2User__c.Label}" />
+									<span class="card-field-value">
+										<apex:outputField value="{!thisSalesOppStage.KimbleOne__Approver2User__c}"/>
+									</span>
+								</div>
+							</apex:outputPanel>
+							
+							<apex:outputPanel layout="none" rendered="{!!ISBLANK(thisSalesOppStage.KimbleOne__ApprovalStatus__c)}">
+								<div class="card-detail">
+									<apex:outputLabel styleClass="card-field-label" value="{!$ObjectType.KimbleOne__SalesOpportunityStage__c.Fields.KimbleOne__ApprovalStatus__c.Label}" />
+									<span class="card-field-value">
+										<apex:outputField value="{!thisSalesOppStage.KimbleOne__ApprovalStatus__c}"/>
+									</span>
+								</div>
+							</apex:outputPanel>
+
+							<apex:outputPanel layout="none" rendered="{!!ISBLANK(thisSalesOppStage.KimbleOne__StartDate__c)}">
+								<div class="card-detail">
+									<apex:outputLabel styleClass="card-field-label" value="{!$ObjectType.KimbleOne__SalesOpportunityStage__c.Fields.KimbleOne__StartDate__c.Label}" />
+									<span class="card-field-value">
+										<apex:outputField value="{!thisSalesOppStage.KimbleOne__StartDate__c}"/>
+									</span>
+								</div>
+							</apex:outputPanel>
+							
+							<apex:outputPanel layout="none" rendered="{!!ISBLANK(thisSalesOppStage.KimbleOne__EndDate__c)}">
+								<div class="card-detail">
+									<apex:outputLabel styleClass="card-field-label" value="{!$ObjectType.KimbleOne__SalesOpportunityStage__c.Fields.KimbleOne__EndDate__c.Label}" />
+									<span class="card-field-value">
+										<apex:outputField value="{!thisSalesOppStage.KimbleOne__EndDate__c}"/>
+									</span>
+								</div>
+							</apex:outputPanel>
+							
+							<apex:outputPanel layout="none" rendered="{!!ISBLANK(thisSalesOppStage.KimbleOne__ApprovalComments__c)}">
+	<!-- DSC tmp fix start -->
+								<div class="card-detail">
+	<!-- DSC tmp fix end -->
+									<apex:outputLabel styleClass="card-field-label" value="{!$ObjectType.KimbleOne__SalesOpportunityStage__c.Fields.KimbleOne__ApprovalComments__c.Label}:" />
+									<span class="card-field-value">
+										<apex:outputField value="{!thisSalesOppStage.KimbleOne__ApprovalComments__c}"/>
+									</span>
+	<!-- DSC tmp fix start -->
+								</div>
+	<!-- DSC tmp fix end -->
+							</apex:outputPanel>
+
+							
+	<!-- DSC tmp fix start -->
+							<apex:repeat value="{!$ObjectType.KimbleOne__SalesOpportunityStage__c.FieldSets.KimbleOne__SalesOpportunityStageDetails}" var="f" rendered="{!thisSalesOppStage.Id == KimbleOne__SalesOpportunityStage__c.Id}">
+								<apex:outputPanel layout="none"  rendered="{!AND(!ISBLANK(KimbleOne__SalesOpportunityStage__c[f]), f.Type<>'textarea')}">
+									<div class="card-detail">
+										<apex:outputLabel styleClass="card-field-label" value="{!f.Label}"/>
+										<span class="card-field-value" style="height:12px">
+											<apex:outputField value="{!KimbleOne__SalesOpportunityStage__c[f]}"/>
+										</span>
+									</div>
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!AND(!ISBLANK(KimbleOne__SalesOpportunityStage__c[f]), f.Type='textarea')}">
+									<div class="card-detail" style="overflow: overlay;">
+										<apex:outputLabel styleClass="card-field-label" value="{!f.Label}"/>
+										<span class="card-field-value" style="height:42px">
+											<apex:outputField value="{!KimbleOne__SalesOpportunityStage__c[f]}"/>
+										</span>
+									</div>
+								</apex:outputPanel>
+
+	<!-- DSC tmp fix end -->
+	<!-- Kimble previous start 
+							<apex:repeat value="{!$ObjectType.KimbleOne__SalesOpportunityStage__c.FieldSets.KimbleOne__SalesOpportunityStageDetails}" var="f">
+								<apex:outputLabel styleClass="card-field-label" value="{!f.Label}"/>
+								<span class="card-field-value">
+									<apex:outputField value="{!KimbleOne__SalesOpportunityStage__c[f]}"/>
+								</span>
+	 Kimble previous end -->
+				    		</apex:repeat>
+						</div>
+							
+						<div class="inner-card-footer"></div>							
+					</div>
+					
+					</apex:repeat>
+				</div>
+			</div>
+			</apex:form>
+			<br/>
+			<!-- Show the Approval History for Sales Opportunity Stages that "RequiresCompletionAppproval" -->
+			<apex:relatedList list="ProcessSteps" rendered="{!theSalesOppStage.OpportunityStage__r.KimbleOne__RequiresCompletionApproval__c}"></apex:relatedList>
+
+			
+	   	  	<apex:relatedList list="CombinedAttachments" rendered="{!AttachmentsEnabled}"/>
+			<apex:relatedList subject="{!KimbleOne__SalesOpportunityStage__c}" list="AttachedContentDocuments" rendered="{!FilesEnabled}"/>
+			<apex:relatedList list="OpenActivities" />
+			
+			<script>
+				$(document).ready(function(){
+    				$(function() {
+    					$('input[name="piSubmit"]').remove();
+    					$('input[name="piRemove"]').remove();
+    				})
+    			});
+    			
+    			function setLoading() {
+    				jQuery('#stage-menu').removeClass('fa fa-bars').addClass('Loading').css('width', 18).css('height', 18);
+    			}
+			</script>
+			
+			<style>
+				.inner-card-body {
+				    display: table;
+				    width: 100%;
+				}
+   				.card-detail {
+					display: table-row;
+					margin-bottom: 2px;
+				}
+				.card-field-label {
+					display: table-cell;
+					white-space: nowrap;
+					padding-right: 10px;				
+				}
+				.card-field-value {
+					display: table-cell;
+					text-align: right;
+				    padding-bottom: 2px;
+				    max-width: 500px;
+					cursor: default;
+				}
+				.card-detail:hover {
+				    background-color: #e3feff;
+				}				
+				.cardBody {
+					margin-bottom: 6px;
+				}
+				.active-stage-indicator {
+					position: absolute;
+					left: -14px;
+					top: 14%;
+					color: #565656;				
+				}
+				.completion-approval-indicator {
+					padding-left: 5px;
+					color: #428BCA;
+					font-size: 16px;
+				}
+				
+				.Loading 
+				{
+					background-image: url('{!URLFOR($Resource.JobImages, 'running16.gif')}') !important;
+					background-repeat:no-repeat !important;
+					background-position: 50%, 50%;
+				}
+				
+			</style>
+			<script>
+				jQuery(document).ready(function() {
+					if(isSFLightning()) jQuery('input[name="newNote"],input[name="attachFile"]').hide();
+				});
+			</script>	
+		</apex:define>
+
+	</apex:composition>
+
+</apex:page>

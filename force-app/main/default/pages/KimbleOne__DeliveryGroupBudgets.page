@@ -1,0 +1,1862 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.DeliveryGroupBudgetsController,KimbleOne.TooltipsController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__DeliveryGroup__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+     <c:Menu MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryGroup__c.Id}" MenuContextName="{!KimbleOne__DeliveryGroup__c.Name}" DefaultHelpPage="BudgetsPOs.html"/>
+    </apex:define>
+    
+   	<apex:define name="Content">
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+		
+	<!-- Kimble Guidance -->
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+	<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/DeliveryGroupBudgetsNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+		<apex:outputPanel layout="none" rendered="{!DeliveryGroupBudgetsTipOverrideEnabled}">
+			<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+		</apex:outputPanel>
+	</apex:outputPanel>
+    	
+	<style>
+	
+		.Loading 
+		{
+			background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'running16.gif')}') !important;
+			background-repeat:no-repeat !important;
+			background-position: 50%, 50%;
+		}
+		
+		.Pending
+		{
+			background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'pending16.gif')}') !important;
+			background-repeat:no-repeat !important;
+			background-position: 50%, 50%;
+		}
+		
+		.Completed
+		{
+			background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'completed16.gif')}') !important;;
+			background-repeat:no-repeat !important;
+			background-position: 50%, 50%;
+		}
+
+		.draggable-item {
+			cursor: pointer;
+		}
+				
+		.draggable-item-target-hover, .draggable-item-create-new-element-target-hover {
+			background-color: #90EE90 !important;
+			border: 1px dashed #808080;
+		}
+			
+		.dynamic-drag-container {
+			width: 350px;
+			background-color: rgba(232, 232, 232, 0.5);
+			z-index: 9999;
+		}
+		
+		.dropzone-column {
+			padding: 10px;
+			margin: 1px 4px 1px 4px;
+			background-color: #DDD;
+			float: left;
+			width: 337px;
+			height: 28px;
+			text-align: center;
+			border: 1px dashed #808080;
+		}
+		
+		.delivery-element-group
+		{
+			margin-right: 7px !important;
+			background-color: #F5F5F5;
+		}
+			
+		.delivery-element-group-title
+		{
+			display: inline-block;
+			white-space: normal;
+		}
+		
+		.delivery-element-name {
+			width: 400px;
+		}
+
+		#delivery-element-groups-container {
+	/* scroll across */
+	/* 		overflow-x: hidden; */
+	/* 		white-space: nowrap; */
+	/* end scroll across */
+	    	padding: 7px;
+	    	border-radius: 4px;
+			/* ensures that the burger menu will not be cropped */
+	    	padding-bottom: 55px;
+		}
+		
+		.delivery-elements-container {
+			margin-left: 10px;
+			margin-right: 10px;
+			margin-bottom: 3px;
+			margin-top: 10px;
+		}
+		.delivery-element-header
+		{
+	 		height: 18px;
+	 	}
+	 	
+		.delivery-element-card {
+			position: relative;
+			margin-top: 3px;
+			padding: 15px;
+		    box-shadow: rgba(31, 31, 31, 0.16) 1px 2px 5px 1px;
+		    background-color: #FFF;
+			/* remove this to make the delivery element cards all the same width */
+		    display: inline-block;
+/* 		    TODO: need a better way of fixing this width */
+		    min-width: 416px;
+		    border-radius: 2px;
+		}	
+		
+		.delivery-element-invoicing-container-title
+		{
+			display: inline-block;
+			max-width: 320px;
+			font-size: 12px;
+			font-weight: bold;
+			font-style: italic;
+			white-space: normal;
+		}
+	
+		.element-porule-label
+		{
+			vertical-align: top;
+			display: inline-block;
+		}
+		
+		.element-porule-value
+		{
+			max-width: 377px;
+			vertical-align: top;
+			display: inline-block;
+			white-space: normal;
+		}
+		
+		.element-credit-label {
+    		vertical-align: top;
+		    display: inline-block;
+		    margin-top:16px;
+		}
+		
+		.credit-allocation-table {
+		    margin-top: 10px;
+		    width: 100%;
+		    border-top: 2px solid #EDEDED;
+		    padding-top: 6px;
+		}
+				
+		.delivery-element-group-details-footer
+		{
+			margin-left: 10px;
+	    	margin-right: 10px;
+	    	margin-bottom: 10px;
+	    	margin-top: 10px;
+	    	text-align: right;	
+		}
+		
+		span.amountLabel {
+		    font-weight: bold;
+		    padding-right: 10px;
+		}
+	
+		.element-po-details
+		{
+			margin-top: 12px;
+		}
+		
+		.delivery-element-footer
+		{
+			display: inline-block;
+		}
+
+		.card {
+			border: 1px solid rgba(0, 0, 0, 0);
+			border-radius: 4px;
+			-webkit-box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+			box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+			display: inline-block;
+			border-color: #DDD;
+			margin: 2px;
+			vertical-align: top;
+		}
+	
+		.disabled-link {
+		    cursor: default !important;    
+		    color: #ddd !important;
+		}
+		
+		td.amount-Label {
+		    font-weight: bold;
+		    padding-right: 5px;
+		    padding-left: 5px;
+		    text-align: right;
+		}
+
+		td.amount-value {
+		    min-width: 50px;
+		}
+
+		.element-budgets-table {
+			border-bottom: 2px solid #EDEDED;
+			padding-bottom: 6px;
+			width: 100%;
+		}
+		
+		.element-po-allocation-table {
+			margin-top: 10px;
+			width: 100%;
+		}
+
+		.deposit-allocation-table {
+		    margin-top: 10px;
+		    width: 100%;
+		    border-top: 2px solid #EDEDED;
+			padding-top: 6px;
+		}
+				
+		.element-assignment-table, .element-period-revenue-table, .element-revenue-milestone-table {
+		   width: 100%;		
+		}
+			
+		.numeric-value {
+			text-align: right;
+		}
+		
+		.inline-value-table {
+			display: block;
+			padding-bottom: 3px;
+		}
+		
+ 		.inline-indicator {
+			margin-right: 5px;
+		}
+		
+		.revenue-generation-items-tile, .period-revenues-tile, .revenue-milestones-tile {
+			width: 350px;
+			margin-left: 10px;
+			border-left: 2px solid #EDEDED;
+			padding-left: 6px;
+		}
+		
+		.element-with-detail-container {
+			margin-bottom: 12px;
+			margin-right: 10px;
+			
+			/* comment 2 display and float to make the elements flow down the left */ 
+/* 			display: inline-block;  */
+/* 			float: left;  */
+		}
+		
+		.primary-element-container {
+    		display: inline;
+		}
+		
+		.delivery-element-body-column {
+			float: left;
+		}
+		
+		.delivery-element-body-column-right {
+			float: right;
+		}
+		
+		.detail-mode-toggle-container {
+			float: right;
+			vertical-align: middle;
+			font-size: 13px;
+			cursor: pointer;
+			margin-bottom: 8px;
+		}
+		
+		.dropzone-targets-container {
+			padding-top: 10px;
+		}
+		
+		.delivery-group-container {
+			width: 100%
+		}
+		
+		.delivery-group {
+			width: 99%
+		}
+		
+		.delivery-group-header {
+			background-color: #F5F5F5;
+			border-color: #DDD;
+		}
+		
+		#detailMode {
+			font-size: 20px;
+			padding-left: 4px;
+			padding-right: 4px;
+		}
+		
+		.checkbox-col {
+			width: 20px;
+		}
+		
+		.empty-table {
+			display: none;
+		}
+		
+		.cap-error {
+			color: #428BCA;
+			font-size: 14px;
+			margin-right: 7px;
+		}
+		.po-hidden-item {
+			display: none;
+		}
+	</style>
+	
+	<apex:form id="TheForm">
+		<apex:outputPanel id="PageErrors" layout="none">
+			<apex:pageMessages escape="false" />
+		</apex:outputPanel>
+
+	<apex:outputPanel layout="block" id="ComponentContainer">
+
+	<div id="delivery-element-groups-container">
+			
+		<div id="{!TheDeliveryGroupId}" class="delivery-group-container cardContainer">
+			<div class="delivery-group card">
+				<div id="deliveryGroupHeader" class="delivery-group-header cardHeading">
+					<div class="delivery-element-group-title">
+						<div class="card-heading-icon kimble-probability {!TheDeliveryGroupForecastStatusStyle} fa fa-square" title="{!TheDeliveryGroupForecastStatusName}"></div>
+						<h3 class="cardTitle"><a class="undecorated-link" href="/{!TheDeliveryGroupId}"><apex:outputText value="{!TheDeliveryGroupShortName}"/></a></h3>
+					</div>
+					<div id="deliveryGroupBurgerMenu" data-floating-dropdown="#{!TheDeliveryGroupId}-menu-data" class="fa fa-bars delivery-group-po-menu burger-menu"></div>
+					<div id="{!TheDeliveryGroupId}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+						<ul class="floating-dropdown-menu">
+							<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__PurchaseOrderAllocation__c.createable && CanCreateNewPOAllocation == true}">
+								<li id="allocatePurchaseOrderEngagement"><apex:commandLink action="{!NewPurchaseOrderAllocation}"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.kimbleone__allocatepurchaseorderbutton}</apex:commandLink></li>
+							</apex:outputPanel>
+						</ul>
+					</div>
+					<div id="summaryToggle" class="detail-mode-toggle-container">
+						<span class="undecorated-link" onclick="summaryMode()">{!$Label.SummaryHeading}</span>
+						<span id="detailMode" onclick="toggleDetailMode()" class="k-tgl fa fa-toggle-on"></span>
+						<span class="undecorated-link" onclick="detailMode()">{!$Label.DetailsHeading}</span>
+					</div>		
+				</div>
+			</div>
+		</div>
+		
+		<apex:outputPanel id="scopingElementContainer">
+		<apex:repeat value="{!scopingElements}" var="scopingElement">
+			<apex:variable value="{!ScopingElementMap[scopingElement.Id]}" var="scopingElementElements"/>
+			<div id="{!scopingElement.Id}" class="group-container cardContainer">
+				<div id="deliveryElementGroupCard" class="delivery-element-group card">
+					<div class="delivery-element-group-header cardHeading">
+						<div class="card-heading-icon kimble-probability {!scopingElement.ForecastStatus__r.StyleClass__c} fa fa-square" title="{!scopingElement.ForecastStatus__r.Name}"></div>
+						<div id="deliveryElementGroupCardTitle" class="delivery-element-group-title">
+							<h3 class="cardTitle"><a class="undecorated-link" href="/{!scopingElement.Id}"><apex:outputText value="{!scopingElement.Name}"/></a></h3>
+						</div>
+					</div>
+	
+					<div class="primary-elements-container">						
+							<div class="delivery-elements-container">
+							<apex:repeat value="{!scopingElementElements}" var="element">
+								<apex:variable value="{!isResourcedMap[element.Id]}" var="hasBudget"/>
+								<apex:variable value="{!ActivityAssignmentMap[element.Id]}" var="elementAssignments"/>
+								<apex:variable value="{!AnnuityMap[element.Id]}" var="elementAnnuities"/>
+								<apex:variable value="{!RevenueMilestoneMap[element.Id]}" var="elementRevenueMilestones"/>
+								<apex:variable value="{!PurchaseOrderAllocationMap[element.Id]}" var="POAllocations"/>
+								<apex:variable value="{!DepositAllocationMap[element.Id]}" var="elementDeposits"/>
+								<apex:variable value="{!CreditAllocationMap[element.Id]}" var="elementCredits"/>
+
+								<apex:variable value="{!POAllocations.size > 0}" var="hasPOAllocations"/>
+								<apex:variable value="{!element.Product__r.ProductDomain__r.IsResourced__c && element.Product__r.ProductDomain__r.RevenueGenerationModel__r.IsUsageGenerated__c && !element.Product__r.ProductDomain__r.RevenueGenerationModel__r.IsUsageNotional__c}" var="elementSupportsAssignments"/>
+								<apex:variable value="{!element.Product__r.ProductDomain__r.RevenueGenerationModel__r.IsMilestoneGenerated__c}" var="elementSupportsMilestones"/>
+								<apex:variable value="{!element.Product__r.ProductDomain__r.RevenueGenerationModel__r.IsPeriodGenerated__c}" var="elementSupportsAnnuities"/>
+								
+								<div class="element-with-detail-container" scoping-element-id="{!scopingElement.Id}" delivery-element-id="{!element.Id}" revenue-generation-type="{!IF(elementSupportsAssignments, 'assignment' ,'')}{!IF(elementSupportsMilestones, 'milestone' ,'')}{!IF(elementSupportsAnnuities, 'period-revenue' ,'')}">
+									<div class="primary-element-container">
+										<div class="delivery-element-card{!IF(elementSupportsAssignments || elementSupportsMilestones || elementSupportsAnnuities, ' revenue-generation-item-drop-target' ,'')}">
+											<div class="delivery-element-header">
+												<div class="delivery-element-invoicing-container-title"><apex:outputText value="{!element.Name}" rendered="{!scopingElementElements.size > 1}"/></div>
+												<apex:outputPanel rendered="{!$ObjectType.KimbleOne__PurchaseOrderAllocation__c.createable || (HasAccountCredit && $ObjectType.KimbleOne__CreditAllocation__c.createable)}">
+												<div data-floating-dropdown="#{!element.Id}-menu-data" class="fa fa-bars burger-menu"></div>
+												
+												<div id="{!element.Id}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+										   			 <ul class="floating-dropdown-menu">
+														<apex:outputPanel layout="none" rendered="{!scopingElementElements.size > 1 && $ObjectType.KimbleOne__DeliveryElement__c.fields.name.updateable}">
+											        		<li><apex:outputLink styleClass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#DeliveryElementNamePopup', '{!JSENCODE($Label.kimbleone__edit)} {!$Label.kimbleone__name}');loadDeliveryElement('{!JSENCODE(element.Id)}');"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.kimbleone__edit} {!$Label.Name}</apex:outputLink></li>
+														</apex:outputPanel>
+														
+														<apex:outputPanel layout="none" rendered="{!hasBudget && $ObjectType.KimbleOne__DeliveryElement__c.updateable}">
+											        		<li><apex:outputLink styleClass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#DeliveryElementCapPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$Label.kimbleone__deliverygroupbudgetsheading}');loadDeliveryElement('{!JSENCODE(element.Id)}');"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.kimbleone__edit} {!$Label.DeliveryGroupBudgetsHeading}</apex:outputLink></li>
+														</apex:outputPanel>
+														<apex:outputPanel layout="none" rendered="{!!hasBudget || !$ObjectType.KimbleOne__DeliveryElement__c.updateable}">
+											        		<li><apex:outputLink styleClass="actionLink disabled-link" title="{!$Label.kimbleone__noelementbudgetsmessage}" value="javascript:void(0)"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.kimbleone__edit} {!$Label.DeliveryGroupBudgetsHeading}</apex:outputLink></li>
+														</apex:outputPanel>
+		
+														<apex:outputPanel layout="none" rendered="{!!hasPOAllocations && $ObjectType.KimbleOne__DeliveryElement__c.fields.KimbleOne__PurchaseOrderRule__c.updateable}">
+															<li><apex:outputLink styleClass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#PORulePopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__PurchaseOrderRule__c.label}');loadDeliveryElement('{!JSENCODE(element.Id)}')"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.kimbleone__edit} {!$ObjectType.PurchaseOrderRule__c.label}</apex:outputLink></li>
+														</apex:outputPanel>
+														<apex:outputPanel layout="none" rendered="{!hasPOAllocations || !$ObjectType.KimbleOne__DeliveryElement__c.fields.KimbleOne__PurchaseOrderRule__c.updateable}">
+															<li><apex:outputLink styleClass="actionLink disabled-link" title="{!$Label.kimbleone__poallocationsexistmessage}" value="javascript:void(0)"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.kimbleone__edit} {!$ObjectType.PurchaseOrderRule__c.label}</apex:outputLink></li>
+														</apex:outputPanel>
+														
+														<apex:outputPanel layout="none" rendered="{!(element.PurchaseOrderRule__r.IsServicesPOCoverRequired__c || element.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c) && $ObjectType.KimbleOne__PurchaseOrderAllocation__c.createable && CanCreateNewPOAllocation == true}">
+															<li id="allocatePurchaseOrderElement"><apex:outputLink styleClass="actionLink" value="javascript:void(0)" onclick="newPurchaseOrderAllocationForElement('{!JSENCODE(element.Id)}')">{!$Label.kimbleone__allocatepurchaseorderbutton}</apex:outputLink></li>
+														</apex:outputPanel>
+														<apex:outputPanel layout="none" rendered="{!(element.PurchaseOrderRule__r.IsServicesPOCoverRequired__c == false && element.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c == false) || $ObjectType.KimbleOne__PurchaseOrderAllocation__c.createable == false || CanCreateNewPOAllocation == false}">
+															<li><apex:outputLink styleClass="actionLink disabled-link" title="{!$Label.kimbleone__ponotapplicablemessage}" value="javascript:void(0)"><i class="fa fa-list-ul dropdown-icon"></i>{!$Label.kimbleone__allocatepurchaseorderbutton}</apex:outputLink></li>
+														</apex:outputPanel>
+														
+														<apex:outputPanel layout="none" rendered="{!HasAccountCredit && $ObjectType.KimbleOne__CreditAllocation__c.createable}">
+															<li><apex:outputLink styleClass="actionLink" value="javascript:void(0)" onclick="newCreditAllocationForElement('{!JSENCODE(element.Id)}')"><i class="fa fa-list-ul dropdown-icon"></i>{!$Label.AllocateCredit}</apex:outputLink></li>
+														</apex:outputPanel>
+														
+														<apex:outputPanel layout="none" rendered="{!(scopingElementElements.size == 1) && ((elementSupportsAssignments && (elementAssignments.size > 1)) || (elementSupportsMilestones && (elementRevenueMilestones.size > 1)) || (elementSupportsAnnuities && (elementAnnuities.size > 1)))}">
+															<li id="splitElementForPO"><apex:outputLink styleClass="actionLink" value="javascript:void(0)" onclick="splitDeliveryElementForPOAllocation('{!JSENCODE(element.Id)}')"><i class="fa fa-scissors dropdown-icon"></i>{!$Label.SplitDeliveryElementForPOAllocationLabel}</apex:outputLink></li>
+														</apex:outputPanel>
+																												
+														<apex:outputPanel layout="none" rendered="{!RenderDepositsPanel}">
+															<apex:outputPanel layout="none" rendered="{!(element.PurchaseOrderRule__r.IsServicesPOCoverRequired__c || element.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c) && $ObjectType.KimbleOne__Deposit__c.createable}">
+																<li><apex:outputLink styleClass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#DepositPopup', '{!JSENCODE($Label.kimbleone__new)} {!$ObjectType.KimbleOne__Deposit__c.label}');newDeposit('{!JSINHTMLENCODE(element.Id)}')"><i class="fa fa-plus-square dropdown-icon"></i>{!$Label.New} {!$ObjectType.Deposit__c.label}</apex:outputLink></li>
+															</apex:outputPanel>
+															<apex:outputPanel layout="none" rendered="{!(element.PurchaseOrderRule__r.IsServicesPOCoverRequired__c == false && element.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c == false) || $ObjectType.KimbleOne__Deposit__c.createable == false}">
+																<li><apex:outputLink styleClass="actionLink disabled-link" title="{!$Label.kimbleone__depositallocationnotapplicablemessage}" value="javascript:void(0)"><i class="fa fa-plus-square dropdown-icon"></i>{!$Label.New} {!$ObjectType.Deposit__c.label}</apex:outputLink></li>
+															</apex:outputPanel>												
+														</apex:outputPanel>
+														
+														<apex:outputPanel layout="none" rendered="{!((elementSupportsAssignments && (elementAssignments.size == 0)) || (elementSupportsMilestones && (elementRevenueMilestones.size == 0)) || (elementSupportsAnnuities && (elementAnnuities.size == 0))) && (scopingElement.Id != element.Id)}">
+															<li><apex:outputLink styleClass="actionLink" value="javascript:void(0)" onclick="deleteThisInvoicingContainer('{!JSENCODE(element.Id)}')"><i class="fa fa-trash dropdown-icon"></i>{!$Label.DeleteInvoicingContainerLink}</apex:outputLink></li>
+														</apex:outputPanel>
+												    </ul>
+												</div>
+												</apex:outputPanel>
+											</div>
+											
+											<div class="delivery-element-body">										
+												<apex:variable value="{!!ISBLANK(element.InvoicingCurrencyRevenueCap__c)}" var="revenueCapDefined"/>
+												<apex:variable value="{!!ISBLANK(element.ResourcedActivity__r.InvoicingCurrencyExpenseRevenueCap__c)}" var="expensesCapDefined"/>
+												<apex:variable value="{!!ISBLANK(element.ResourcedActivity__r.InvoicingCurrencyUsageRevenueCap__c)}" var="usageCapDefined"/>
+												<div class="delivery-element-body-column">
+													<apex:outputPanel layout="block" styleclass="element-financials" rendered="{!hasBudget && (revenueCapDefined || expensesCapDefined || usageCapDefined)}">
+														<table class="element-budgets-table">
+															<tr>
+																<td class="amount-Label">
+																	<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__RevenueCap__c.Label}"/>
+																</td>
+					
+																<td class="amount-value">
+																	<apex:outputPanel layout="none" rendered="{!!ISBLANK(element.RevenueCap__c) && element.Product__r.ProductDomain__r.RevenueGenerationModel__r.Enum__c = 'CappedBillableEffortExpended'}">
+																		<apex:outputText value="{!element.InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+																		<apex:outputField value="{!element.InvoicingCurrencyRevenueCap__c}" />
+																	</apex:outputPanel>
+																	<apex:outputText value="{!$Label.kimbleone__none}" rendered="{!ISBLANK(element.RevenueCap__c) && element.Product__r.ProductDomain__r.RevenueGenerationModel__r.Enum__c = 'CappedBillableEffortExpended'}"/>
+																	<apex:outputText value="{!$Label.kimbleone__notapplicableshort}" rendered="{!element.Product__r.ProductDomain__r.RevenueGenerationModel__r.Enum__c != 'CappedBillableEffortExpended'}"/>
+																</td>
+																
+																<td class="amount-Label">
+																	<apex:outputText value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__ExpenseRevenueCap__c.Label}"/>
+																</td>
+								
+																<td class="amount-value">
+																	<apex:outputPanel layout="none" rendered="{!!ISBLANK(element.ResourcedActivity__r.ExpenseRevenueCap__c) && element.Product__r.ProductDomain__r.RevenueGenerationModel__r.IsExpenseGenerated__c}">
+																		<apex:outputText value="{!element.InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+																		<apex:outputField value="{!element.ResourcedActivity__r.InvoicingCurrencyExpenseRevenueCap__c}" />
+																	</apex:outputPanel>
+																	<apex:outputText value="{!$Label.kimbleone__none}" rendered="{!ISBLANK(element.ResourcedActivity__r.ExpenseRevenueCap__c) && element.Product__r.ProductDomain__r.RevenueGenerationModel__r.IsExpenseGenerated__c}"/>
+																	<apex:outputText value="{!$Label.kimbleone__notapplicableshort}" rendered="{!!element.Product__r.ProductDomain__r.RevenueGenerationModel__r.IsExpenseGenerated__c}"/>
+																</td>
+															</tr>											
+				
+															<tr>
+																<td class="amount-Label">
+																	<apex:outputText value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__UsageRevenueCap__c.Label}"/>
+																</td>
+								
+																<td class="amount-value">
+																	<apex:outputPanel layout="none" rendered="{!!ISBLANK(element.ResourcedActivity__r.UsageRevenueCap__c) && element.Product__r.ProductDomain__r.RevenueGenerationModel__r.IsUsageGenerated__c}">
+																		<apex:outputPanel layout="inline" title="{!$Label.kimbleone__elementswithusagecaphigherthanrevenuecapmessage}" styleClass="fa fa-area-chart cap-error" rendered="{!!ISBLANK(element.RevenueCap__c) && element.Product__r.ProductDomain__r.RevenueGenerationModel__r.Enum__c="CappedBillableEffortExpended" && element.ResourcedActivity__r.InvoicingCurrencyUsageRevenueCap__c > element.InvoicingCurrencyRevenueCap__c}"/>																	
+																		<apex:outputText value="{!element.InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+																		<apex:outputField value="{!element.ResourcedActivity__r.InvoicingCurrencyUsageRevenueCap__c}" />
+																	</apex:outputPanel>		
+																	<apex:outputText value="{!$Label.kimbleone__none}" rendered="{!ISBLANK(element.ResourcedActivity__r.UsageRevenueCap__c) && element.Product__r.ProductDomain__r.RevenueGenerationModel__r.IsUsageGenerated__c}"/>
+																	<apex:outputText value="{!$Label.kimbleone__notapplicableshort}" rendered="{!!element.Product__r.ProductDomain__r.RevenueGenerationModel__r.IsUsageGenerated__c}"/>
+																</td>
+																
+																<td class="amount-Label">
+																	<apex:outputText value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__InvoicingCurrencyActualExpenseRevenue__c.Label}"/>
+																</td>
+								
+																<td class="amount-value">
+																	<apex:outputPanel layout="none" rendered="{!element.Product__r.ProductDomain__r.RevenueGenerationModel__r.IsExpenseGenerated__c}">
+																		<apex:outputText value="{!element.InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+																		<apex:outputField value="{!element.ResourcedActivity__r.InvoicingCurrencyActualExpenseRevenue__c}" />
+																	</apex:outputPanel>
+																	<apex:outputText value="{!$Label.kimbleone__notapplicableshort}" rendered="{!!element.Product__r.ProductDomain__r.RevenueGenerationModel__r.IsExpenseGenerated__c}"/>
+																</td>
+															</tr>											
+				
+															<tr>
+																<td class="amount-Label">
+																	<apex:outputText value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__InvoicingCurrencyActualUsageRevenue__c.Label}"/>
+																</td>
+								
+																<td class="amount-value">
+																	<apex:outputPanel layout="none" rendered="{!element.Product__r.ProductDomain__r.RevenueGenerationModel__r.IsUsageGenerated__c}">
+																		<apex:outputText value="{!element.InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+																		<apex:outputField value="{!element.ResourcedActivity__r.InvoicingCurrencyActualUsageRevenue__c}" />
+																	</apex:outputPanel>
+																	<apex:outputText value="{!$Label.kimbleone__notapplicableshort}" rendered="{!!element.Product__r.ProductDomain__r.RevenueGenerationModel__r.IsUsageGenerated__c}"/>
+																</td>
+																
+																<!-- padding to ensure table structure -->
+																<td class="amount-Label">&nbsp;</td>
+																<td class="amount-value">&nbsp;</td>
+															</tr>
+															
+														</table>
+													</apex:outputPanel>
+			
+													<apex:outputPanel layout="block" styleclass="element-po-details">
+													<div class="element-porule-label"><span class="amountLabel"><apex:outputText value="{!$ObjectType.KimbleOne__PurchaseOrderRule__c.Label}"/></span></div>
+													<div id="elementPORule" class="element-porule-value">
+														<span class="amountValue">
+															<apex:outputPanel layout="none" rendered="{!!ISBLANK(element.PurchaseOrderRule__r.Name)}">
+																<apex:outputText value="{!element.PurchaseOrderRule__r.Name}"/>
+															</apex:outputPanel>
+															<apex:outputPanel layout="none" rendered="{!ISBLANK(element.PurchaseOrderRule__r.Name)}">
+																<apex:outputText value="{!$Label.kimbleone__none}"/>
+															</apex:outputPanel>													
+														</span>
+													</div>
+													
+													<apex:outputPanel layout="none" rendered="{!element.PurchaseOrderRule__r.IsServicesPOCoverRequired__c || element.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c}">
+													
+														<apex:outputPanel layout="none" rendered="{!POAllocations.size > 0}">
+															<table class="list element-po-allocation-table" border="0" cellpadding="0" cellspacing="0">
+												            	<thead>
+																	<tr class="headerRow">
+																		<th class="headerRow"></th>
+																		<apex:outputPanel layout="none"  rendered="{!element.PurchaseOrderRule__r.CapPOAllocationByRevenueType__c || (element.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c && ! element.PurchaseOrderRule__r.IsServicesPOCoverRequired__c) || (!element.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c && element.PurchaseOrderRule__r.IsServicesPOCoverRequired__c)}">
+																			<th class="headerRow"></th>
+																		</apex:outputPanel>
+																		
+																		<th class="headerRow"><h2>{!$ObjectType.PurchaseOrderAllocation__c.Fields.PurchaseOrder__c.Label}</h2></th>
+																		<th class="headerRow"><h2>{!$ObjectType.PurchaseOrder__c.Fields.OrderDate__c.Label}</h2></th>
+																		<th class="headerRow"><h2>{!$ObjectType.PurchaseOrder__c.Fields.ExpiryDate__c.Label}</h2></th>
+																		<th class="headerRow"><h2>{!$ObjectType.PurchaseOrder__c.Fields.Status__c.Label}</h2></th>
+																		<th class="headerRow"><h2></h2></th>
+																	</tr>
+																</thead>
+																<tbody>
+																	<apex:repeat value="{!POAllocations}" var="alloc">
+																		<apex:variable value="{!1}" var="allocationItemCounter"/>
+																		<apex:repeat value="{!alloc.PurchaseOrderAllocationItems__r}" var="POItemAllocation">							
+																			<tr class="dataRow" allocation-id="{!alloc.Id}">
+																				<apex:outputPanel layout="none" rendered="{!allocationItemCounter == 1}">
+																					<td class="dataCell">
+																						<apex:outputLink styleClass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#POAllocationPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__PurchaseOrderAllocation__c.label}');loadAllocation('{!JSENCODE(alloc.Id)}')" title="{!$Label.kimbleone__edit}" rendered="{!CanCreateNewPOAllocation == true}"><span class="fa fa-pencil"></span></apex:outputLink>
+																						<apex:outputPanel layout="none" rendered="{!alloc.InvoicedValue__c == 0}">
+																							&nbsp;|&nbsp;
+																							<a href="javascript:void(0);" allocation-id="{!alloc.Id}" class="actionLink purchase-order-alloc-delete-button"  title="{!$Label.Delete}"><span class="fa fa-trash"></span></a>
+																						</apex:outputPanel>
+																					</td>
+																					<apex:outputPanel layout="none"  rendered="{!element.PurchaseOrderRule__r.CapPOAllocationByRevenueType__c || (element.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c && ! element.PurchaseOrderRule__r.IsServicesPOCoverRequired__c) || (!element.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c && element.PurchaseOrderRule__r.IsServicesPOCoverRequired__c)}">
+																					<td class="dataCell">
+																						<apex:outputText value="{!POItemAllocation.PurchaseOrderAllocationType__r.Name}" 
+																									 rendered="{!(alloc.DeliveryElement__r.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c && !alloc.DeliveryElement__r.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c) || (!alloc.DeliveryElement__r.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c && alloc.DeliveryElement__r.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c) || (alloc.DeliveryElement__r.PurchaseOrderRule__r.CapPOAllocationByRevenueType__c)}"/>
+																					</td>
+																					</apex:outputPanel>
+				
+																					<td class="dataCell"><apex:outputField value="{!alloc.PurchaseOrder__c}"/></td>
+																					<td class="dataCell"><apex:outputField value="{!alloc.PurchaseOrder__r.OrderDate__c}"/></td>
+																					<td class="dataCell"><apex:outputField value="{!alloc.PurchaseOrder__r.ExpiryDate__c}"/></td>
+																					<td class="dataCell"><apex:outputText value="{!alloc.PurchaseOrder__r.Status__r.Name}"/></td>
+																				</apex:outputPanel>
+																				<apex:outputPanel layout="none" rendered="{!allocationItemCounter > 1}">
+																					<td class="dataCell"></td>
+																					<apex:outputPanel layout="none"  rendered="{!element.PurchaseOrderRule__r.CapPOAllocationByRevenueType__c || (element.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c && ! element.PurchaseOrderRule__r.IsServicesPOCoverRequired__c) || (!element.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c && element.PurchaseOrderRule__r.IsServicesPOCoverRequired__c)}">
+																					<td class="dataCell">
+																						<apex:outputText value="{!POItemAllocation.PurchaseOrderAllocationType__r.Name}" 
+																									 rendered="{!(alloc.DeliveryElement__r.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c && !alloc.DeliveryElement__r.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c) || (!alloc.DeliveryElement__r.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c && alloc.DeliveryElement__r.PurchaseOrderRule__r.IsExpensesPOCoverRequired__c) || (alloc.DeliveryElement__r.PurchaseOrderRule__r.CapPOAllocationByRevenueType__c)}"/>
+																					</td>
+																					</apex:outputPanel>
+																					
+																					<td class="dataCell"></td>
+																					<td class="dataCell"></td>
+																					<td class="dataCell"></td>
+																					<td class="dataCell"></td>
+																				</apex:outputPanel>	
+																					<td class="dataCell numeric-value">
+																						<span class="inline-value-table"><apex:outputText value="{!$ObjectType.KimbleOne__PurchaseOrderAllocation__c.Fields.KimbleOne__AllocatedValue__c.Label}:"/>&nbsp;<apex:outputField value="{!POItemAllocation.AllocationCap__c}"/></span>
+																						<span class="inline-value-table"><apex:outputText value="{!$ObjectType.KimbleOne__PurchaseOrderAllocation__c.Fields.KimbleOne__InvoicedValue__c.Label}:"/>&nbsp;<apex:outputField value="{!POItemAllocation.InvoicedValue__c}"/></span>
+																						<span class="inline-value-table"><apex:outputText value="{!$ObjectType.KimbleOne__PurchaseOrderAllocation__c.Fields.KimbleOne__RemainingValue__c.Label}:"/>&nbsp;<apex:outputField value="{!POItemAllocation.RemainingValue__c}"/></span>
+																					</td>
+																			</tr>
+																			<apex:variable value="{!allocationItemCounter+1}" var="allocationItemCounter"/>
+																		</apex:repeat>
+																	</apex:repeat>
+																</tbody>
+												            
+												            </table>
+														</apex:outputPanel>
+														
+														<apex:outputPanel layout="none" rendered="{!elementDeposits.size > 0}">
+															<table class="list deposit-allocation-table" border="0" cellpadding="0" cellspacing="0">
+												            	<thead>
+																	<tr class="headerRow">
+																		<th class="headerRow"></th>
+																		<th id="depositReferenceColumn" class="headerRow"><h2>{!$ObjectType.PurchaseOrder__c.Fields.Name.Label}</h2></th>
+																		<th id="depositDateColumn" class="headerRow"><h2>{!$Label.kimbleone__depositdatelabel}</h2></th>
+																		<th class="headerRow"><h2>{!$ObjectType.Deposit__c.Fields.Status__c.Label}</h2></th>
+																		<th id="depositValueColumn" class="headerRow"><h2>{!$ObjectType.KimbleOne__Deposit__c.Fields.KimbleOne__DepositValue__c.Label}</h2></th>
+																	</tr>
+																</thead>
+																<tbody>
+																<apex:repeat value="{!elementDeposits}" var="deposit">
+																<tr deposit-id="{!JSENCODE(deposit.PurchaseOrderAllocation__r.PurchaseOrder__c)}">
+																	<td>
+																	<apex:outputPanel layout="none" rendered="{!deposit.PurchaseOrderAllocation__r.InvoicedValue__c == 0 && $ObjectType.KimbleOne__Deposit__c.updateable}">
+																		<apex:outputLink styleClass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#DepositPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__Deposit__c.label}');loadDeposit('{!JSENCODE(deposit.PurchaseOrderAllocation__r.PurchaseOrder__c)}')" title="{!$Label.kimbleone__edit}"><span class="fa fa-pencil"></span></apex:outputLink>
+																		&nbsp;|&nbsp;
+																		<a href="javascript:void(0);" deposit-id="{!JSENCODE(deposit.PurchaseOrderAllocation__r.PurchaseOrder__c)}" class="actionLink deposit-alloc-delete-button"  title="{!$Label.Delete}"><span class="fa fa-trash"></span></a>
+																	</apex:outputPanel>
+																	</td>
+								  									<td><apex:outputField value="{!deposit.PurchaseOrderAllocation__r.PurchaseOrder__r.Name}"/></td>
+								  									<td><apex:outputField value="{!deposit.PurchaseOrderAllocation__r.PurchaseOrder__r.OrderDate__c}"/></td>
+								  									<td><apex:outputField value="{!deposit.Status__r.Description__c}"/></td>
+								  									<td><apex:outputField value="{!deposit.DepositValue__c}"/></td>
+																</tr>
+																</apex:repeat>
+																</tbody>
+												            
+												            </table>
+														</apex:outputPanel>
+													</apex:outputPanel>
+												</apex:outputPanel>											
+												
+												<apex:outputPanel layout="none" rendered="{!elementCredits.size > 0}">
+													<div class="element-credit-label"><span class="amountLabel"><apex:outputText value="{!$ObjectType.KimbleOne__CreditAllocation__c.Label}"/></span></div>
+													
+													<table class="list credit-allocation-table" border="0" cellpadding="0" cellspacing="0">
+												       	<thead>
+															<tr class="headerRow">
+																<th class="headerRow"></th>
+																<th class="headerRow"><h2>{!$ObjectType.Credit__c.Fields.Name.Label}</h2></th>
+																<th class="headerRow"><h2>{!$ObjectType.Credit__c.Fields.CreditDate__c.Label}</h2></th>
+																<th class="headerRow"><h2>{!$ObjectType.Credit__c.Fields.AllocatedUnits__c.Label}</h2></th>
+																<th class="headerRow"><h2>{!$ObjectType.Credit__c.Fields.AllocatedValue__c.Label}</h2></th>
+															</tr>
+														</thead>
+														<tbody>
+															<apex:repeat value="{!elementCredits}" var="credit">
+																<tr credit-id="{!JSENCODE(credit.CreditAllocation.Id)}">
+																	<td>
+																	<apex:outputPanel layout="none" rendered="{!!credit.Locked && $ObjectType.KimbleOne__CreditAllocation__c.updateable}">
+																		<apex:outputLink styleClass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#CreditAllocationPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__Credit__c.label}');loadCreditAllocation('{!JSENCODE(credit.CreditAllocation.Id)}')" title="{!$Label.kimbleone__edit}"><span class="fa fa-pencil"></span></apex:outputLink>
+																		&nbsp;|&nbsp;
+																		<a href="javascript:void(0);" credit-id="{!JSENCODE(credit.CreditAllocation.Id)}" class="actionLink credit-alloc-delete-button"  title="{!$Label.Delete}"><span class="fa fa-trash"></span></a>
+																	</apex:outputPanel>
+																	</td>
+								  									<td><apex:outputField value="{!credit.CreditAllocation.Credit__r.Name}"/></td>
+								  									<td><apex:outputField value="{!credit.CreditAllocation.Credit__r.CreditDate__c}"/></td>
+																	<td><apex:outputField value="{!credit.CreditAllocation.AllocatedUnits__c}"/></td>
+																	<td><apex:outputField value="{!credit.CreditAllocation.AllocatedValue__c}"/></td>
+																</tr>
+															</apex:repeat>
+														</tbody>
+												            
+												   </table>
+												</apex:outputPanel>
+
+												</div>
+												<div class="delivery-element-body-column-right">
+													<apex:outputPanel layout="none" rendered="{!elementSupportsAssignments}">
+													<div class="revenue-generation-items-tile element-detail-item{!IF(elementAssignments.size > 0,'',' empty-table')}">
+														<div class="revenue-generation-items-container">
+															<table id="assignmentsTable" class="list element-assignment-table" border="0" cellpadding="0" cellspacing="0">
+												            	<thead>
+																	<tr class="headerRow">
+																		<th class="headerRow">
+																		<apex:outputPanel layout="none" rendered="{!elementAssignments.size > 1}">
+																			<input type="checkbox" class="{!IF(scopingElementElements.size > 1,'','po-hidden-item ')}po-item-checkbox" delivery-element-id="{!element.Id}" onclick="selectRevenueGenerationItems('{!JSINHTMLENCODE(element.Id)}')" name="select-all-revenue-generation-items"/>
+																		</apex:outputPanel>
+																		</th>
+																			
+																		<th class="headerRow"><h2>{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.Name.Label}</h2></th>
+																	</tr>
+																</thead>
+																<tbody>
+																<apex:repeat value="{!elementAssignments}" var="assignmentDetail">
+																<tr class="revenue-generation-item-container draggable-item" revenue-generation-item-label="{!HTMLENCODE(assignmentDetail.ActivityAssignment.Name)}">
+							  										<td class="checkbox-col">
+							  											<apex:outputPanel layout="none" rendered="{!!assignmentDetail.locked}">
+							  												<input type="checkbox" class="{!IF(scopingElementElements.size > 1,'','po-hidden-item ')}po-item-checkbox" revenue-generation-type="assignment" revenue-generation-item-id="{!assignmentDetail.ActivityAssignment.Id}" onclick="selectRevenueGenerationItem('{!JSINHTMLENCODE(assignmentDetail.ActivityAssignment.Id)}')" scoping-element-id="{!scopingElement.Id}" delivery-element-id="{!element.Id}" name="select-revenue-generation-item"/>
+							  											</apex:outputPanel>
+							  										</td>
+							  										<td>
+								  										<span class="inline-indicator fa fa-user"></span>
+																		<apex:outputText value="{!assignmentDetail.ActivityAssignment.Name}" />
+																	</td>
+																</tr>
+																</apex:repeat>
+																</tbody>
+												            </table>
+														</div>
+													</div>
+													</apex:outputPanel>
+													<apex:outputPanel layout="none" rendered="{!elementSupportsAnnuities}">
+													<div class="revenue-generation-items-tile element-detail-item{!IF(elementAnnuities.size > 0,'',' empty-table')}">
+														<div class="revenue-generation-items-container">
+															<table class="list element-period-revenue-table" border="0" cellpadding="0" cellspacing="0">
+												            	<thead>
+																	<tr class="headerRow">
+																		<th class="headerRow">
+																		<apex:outputPanel layout="none" rendered="{!elementAnnuities.size > 1}">
+																			<input type="checkbox" class="{!IF(scopingElementElements.size > 1,'','po-hidden-item ')}po-item-checkbox" delivery-element-id="{!element.Id}" onclick="selectRevenueGenerationItems('{!JSINHTMLENCODE(element.Id)}')" name="select-all-revenue-generation-items"/>
+																		</apex:outputPanel>
+																		</th>
+																			
+																		<th class="headerRow"><h2>{!$ObjectType.KimbleOne__Annuity__c.Label}</h2></th>
+																		
+																	</tr>
+																</thead>
+																<tbody>
+																<apex:repeat value="{!elementAnnuities}" var="annuityDetail">
+																<tr class="period-revenue-container draggable-item" revenue-generation-item-label="{!HTMLENCODE(annuityDetail.Annuity.Name)}">
+							  										<td class="checkbox-col">
+							  											<apex:outputPanel layout="none" rendered="{!!annuityDetail.locked}">
+							  												<input type="checkbox" class="{!IF(scopingElementElements.size > 1,'','po-hidden-item ')}po-item-checkbox" revenue-generation-type="period-revenue" revenue-generation-item-id="{!annuityDetail.Annuity.Id}" onclick="selectRevenueGenerationItem('{!JSINHTMLENCODE(annuityDetail.Annuity.Id)}')" scoping-element-id="{!scopingElement.Id}" delivery-element-id="{!element.Id}" name="select-revenue-generation-item"/>
+							  											</apex:outputPanel>
+							  										</td>
+							  										<td>
+								  										<span class="inline-indicator fa fa-clock-o"></span>
+																		<apex:outputField value="{!annuityDetail.Annuity.Name}" />
+																	</td>
+							  				
+																</tr>
+																</apex:repeat>
+																</tbody>
+												            </table>
+														</div>
+													</div>
+													</apex:outputPanel>
+													<apex:outputPanel layout="none" rendered="{!elementSupportsMilestones}">
+													<div class="revenue-generation-items-tile element-detail-item{!IF(elementRevenueMilestones.size > 0,'',' empty-table')}">
+														<div class="revenue-generation-items-container">
+															<table class="list element-revenue-milestone-table" border="0" cellpadding="0" cellspacing="0">
+												            	<thead>
+																	<tr class="headerRow">
+																		<th class="headerRow">
+																		<apex:outputPanel layout="none" rendered="{!elementRevenueMilestones.size > 1}">
+																			<input type="checkbox" class="{!IF(scopingElementElements.size > 1,'','po-hidden-item ')}po-item-checkbox" delivery-element-id="{!element.Id}" onclick="selectRevenueGenerationItems('{!JSINHTMLENCODE(element.Id)}')" name="select-all-revenue-generation-items"/>
+																		</apex:outputPanel>
+																		</th>
+																			
+																		<th class="headerRow"><h2>{!$ObjectType.KimbleOne__Milestone__c.Fields.Name.Label}</h2></th>
+																	</tr>
+																</thead>
+																<tbody>
+																<apex:repeat value="{!elementRevenueMilestones}" var="revenueMilestoneDetail">
+																<tr class="revenue-milestone-container draggable-item" revenue-generation-item-label="{!HTMLENCODE(revenueMilestoneDetail.Milestone.Name)}">
+							  										<td class="checkbox-col">
+							  											<apex:outputPanel layout="none" rendered="{!!revenueMilestoneDetail.locked}">
+							  												<input type="checkbox" class="{!IF(scopingElementElements.size > 1,'','po-hidden-item ')}po-item-checkbox" revenue-generation-type="milestone" revenue-generation-item-id="{!revenueMilestoneDetail.Milestone.Id}" onclick="selectRevenueGenerationItem('{!JSINHTMLENCODE(revenueMilestoneDetail.Milestone.Id)}')" scoping-element-id="{!scopingElement.Id}" delivery-element-id="{!element.Id}" name="select-revenue-generation-item"/>
+							  											</apex:outputPanel>
+							  										</td>
+							  										<td>
+								  										<span class="inline-indicator fa fa-money"></span>
+																		<apex:outputField value="{!revenueMilestoneDetail.Milestone.Name}" />
+																	</td>
+																</tr>
+																</apex:repeat>
+																</tbody>
+												            </table>
+														</div>
+													</div>
+													</apex:outputPanel>
+												</div>
+											</div>
+											
+											<div class="delivery-element-footer">
+												<div class="dropzone-targets-container po-hidden-item">
+													<div class="create-new-element-for-each-drop-target dropzone-column">{!$Label.DropForNewDelElemForEachLabel}</div>
+													<div class="create-new-element-drop-target dropzone-column">{!$Label.DropForNewDelElemForAllLabel}</div>
+												</div>
+											</div>
+										</div>
+									</div><!-- primary-element-container -->
+	
+								</div>
+							</apex:repeat>
+						</div> <!-- delivery-elements-container -->
+						
+						<div class="delivery-element-group-details-footer">
+						</div>
+	
+												
+					</div><!-- primary-elements-container -->
+				</div><!-- delivery group Card -->
+			</div><!-- group-container -->
+		</apex:repeat>
+	
+		</apex:outputPanel>
+	</div><!-- delivery-element-groups-container -->
+
+	</apex:outputPanel>
+
+	<apex:actionFunction action="{!LoadDeliveryElement}" name="loadDeliveryElement" reRender="DeliveryElementNameDetails, DeliveryElementCapDetails, PORuleDetails" oncomplete="showModalBoxy();initialisePageTips();">
+		<apex:param name="deliveryElementId" value=""/>
+	</apex:actionFunction>
+
+	<apex:actionFunction action="{!NewPurchaseOrderAllocationForElement}" name="newPurchaseOrderAllocationForElement" reRender="TheForm">
+		<apex:param name="deliveryElementId" value=""/>
+	</apex:actionFunction>
+
+	<apex:actionFunction action="{!NewCreditAllocationForElement}" name="newCreditAllocationForElement" reRender="TheForm">
+		<apex:param name="deliveryElementId" value=""/>
+	</apex:actionFunction>
+	  	
+	<apex:actionFunction action="{!LoadAllocation}" name="loadAllocation" reRender="POAllocationDetails" oncomplete="showModalBoxy()">
+		<apex:param name="allocationId" value=""/>
+	</apex:actionFunction>
+		  	
+   	<apex:actionFunction action="{!LoadCreditAllocation}" name="loadCreditAllocation" reRender="CreditAllocationDetails" oncomplete="showModalBoxy()">
+		<apex:param name="creditAllocId" value=""/>
+	</apex:actionFunction>
+		  	
+   	<apex:actionFunction action="{!NewDeposit}" name="newDeposit" reRender="DepositDetails" oncomplete="showModalBoxy(); initialiseItems();">
+   		<apex:param name="deliveryElementId" value=""/>
+   	</apex:actionFunction>
+
+	<apex:actionFunction action="{!EditDeposit}" name="loadDeposit" reRender="DepositDetails" oncomplete="showModalBoxy(); initialiseItems();">
+		<apex:param name="depositPOId" value=""/>
+	</apex:actionFunction>
+
+	<apex:actionFunction action="{!ReloadAll}" name="rerenderTheForm" rerender="TheForm" />
+
+	<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+	<div style="display:none;" kimble-tip="null"></div>
+
+	<script>
+
+
+	    function refreshDetailMode() {
+	    	// this function allows us to reset the
+	    	// detail view if the main elements panel has been rerendered
+	    	if((typeof detailModeSetting == 'undefined') || detailModeSetting == true)
+	    	{
+	    		detailMode();
+	    	}
+	    	else
+	    	{
+	    		summaryMode();
+	    	}
+	    }
+
+		function toggleDetailMode() {
+			jQuery("#detailMode").toggleClass('fa-toggle-off');
+			jQuery("#detailMode").toggleClass('fa-toggle-on');
+
+			jQuery(".element-detail-item").toggleClass('po-hidden-item');
+
+			detailModeSetting = jQuery("#detailMode").hasClass('fa-toggle-on');
+		}
+
+		function summaryMode() {
+			jQuery("#detailMode").addClass('fa-toggle-off');
+			jQuery("#detailMode").removeClass('fa-toggle-on');
+
+			jQuery(".element-detail-item").addClass('po-hidden-item');
+
+			// reset any override widths that were in place when in detail mode
+			jQuery(".delivery-element-card").css({"width":""});
+
+			detailModeSetting = false;
+		}
+
+		function detailMode() {
+			jQuery("#detailMode").removeClass('fa-toggle-off');
+			jQuery("#detailMode").addClass('fa-toggle-on');
+
+			jQuery(".element-detail-item").removeClass('po-hidden-item');
+
+			// adjust the element divs so that they are all the same width
+			var maxDivWidth = Math.max.apply(Math, jQuery(".delivery-element-card").map(function(){ return jQuery(this).width(); }).get());
+
+			jQuery(".delivery-element-card").width(maxDivWidth);
+
+			detailModeSetting = true;
+		}
+
+		function splitDeliveryElementForPOAllocation(elementId)
+		{
+			jQuery(".po-item-checkbox.po-hidden-item[delivery-element-id='" + elementId + "']").removeClass("po-hidden-item");
+		}
+
+		function deleteThisInvoicingContainer(elementId)
+		{
+	        var del = false;
+
+	        del = confirmDelete();
+
+	        if (del)
+	        {
+				updatesPending = 1;
+				jQuery("div[delivery-element-id='" + elementId + "']").find('.burger-menu').removeClass('fa fa-bars').addClass('Loading').css('width', 18).css('height', 18);
+				DeleteInvoicingContainer(elementId);
+			}
+		}
+
+		function initialiseDragAndDrops()
+		{
+			jQuery(".draggable-item").draggable({
+				  revert: "invalid"
+				  ,helper: function(){
+				  	// the dragged item is actually always the individual item that was clicked
+				  	// when dragging even if there is a collection, so get a handle on the item being dragged and then use this to derive the parent
+				  	// then get all the items for that parent that have checked checkboxes
+				  	var originalParentElementId = jQuery(this).closest(".element-with-detail-container").attr('delivery-element-id');
+				    var originalParentElementRevGenType = jQuery(this).closest(".element-with-detail-container").attr('delivery-element-id');
+
+				    var selectedItems = jQuery(".draggable-item input:checked[delivery-element-id='" + originalParentElementId + "']").parent().parent();
+
+				    // surround the rows with a drag container, find the delivery element containing these rows and attribute the
+				    // drag container with the id so that we can refuse drop on the same element
+				    var container = jQuery("<div class='draggable-item dynamic-drag-container' revenue-generation-type='" + originalParentElementRevGenType + "' parent-delivery-element-id='" + originalParentElementId + "'/>").attr('id', 'draggingContainer');
+
+				    container.append(selectedItems.clone());
+				    // remove all the checkboxes from the draggable clone
+				    container.find('input:checked').remove();
+
+				    return container;
+				  }
+			});
+
+			jQuery( ".revenue-generation-item-drop-target" ).droppable({
+					accept: function(ev, ui) {
+
+						var droppingOn = jQuery(this);
+						var targetParentElementId = jQuery(droppingOn).closest(".element-with-detail-container").attr('delivery-element-id');
+						var targetParentScopingElementId = jQuery(droppingOn).closest(".element-with-detail-container").attr('scoping-element-id');
+						var targetParentElementRevGenType = jQuery(droppingOn).closest(".element-with-detail-container").attr('revenue-generation-type');
+
+						var draggingParentElementId = jQuery(ev).find('input:checkbox').attr('delivery-element-id');
+						var draggingParentScopingElementId = jQuery(ev).find('input:checkbox').attr('scoping-element-id');
+						var draggingParentElementRevGenType = jQuery(ev).find('input:checkbox').attr('revenue-generation-type');
+						// determine if this element supports the type of revenue item being dragged and confirm that it's not the original
+						// also we must be within the scope of the same scoping container
+						return (targetParentElementId != draggingParentElementId)
+								&& (targetParentElementRevGenType == draggingParentElementRevGenType)
+								&& (targetParentScopingElementId == draggingParentScopingElementId)
+								&& (droppingOn.find('.revenue-generation-items-container tbody').length > 0);
+					},
+					//greedy: true,	// ensure the elements pick up the drop before the parent
+					activeClass: "active-draggable-item",
+				    hoverClass: "draggable-item-target-hover",
+				    tolerance: "pointer",
+				    drop: function(ev, ui) {
+				        // dropped item is a cloned version of the original rows wrapped in a container
+				        // get the delivery element Id from this clone then use it to look up which revenue elements in that container have their checkboxes checked
+				        var droppedDeliveryElementId = jQuery(ui.helper).attr('parent-delivery-element-id');
+				        var dropped = jQuery(".draggable-item input:checked[delivery-element-id='" + droppedDeliveryElementId + "']").parent().parent();
+						// get a list of all the revenue items being moved
+						var revenueGenerationItemsIds = jQuery(dropped).find('input').map(function(){return jQuery(this).attr('revenue-generation-item-id');}).get();
+						// get the type of the item for switch later to call the right service
+						var revenueGenerationType = jQuery(dropped).closest('.element-with-detail-container').attr('revenue-generation-type');
+
+						updatesPending = 1;
+
+				        var droppedOn = jQuery(this);
+						var targetDeliveryElementId = droppedOn.closest('.element-with-detail-container').attr('delivery-element-id');
+
+				        // find the revenue items table in this element
+				        var revenueItemTableTarget = droppedOn.find('.revenue-generation-items-container tbody');
+
+				        // ensure that the drop target is visible (it would be hidden if the table previously contained no items but supported items of this type)
+				        jQuery(droppedOn).find('.revenue-generation-items-container').parent().removeClass('empty-table');
+
+				        var existingCellWidth = jQuery(dropped).find('input[name="select-revenue-generation-item"]').parent().width();
+				        jQuery(dropped).find('input[name="select-revenue-generation-item"]').parent().empty().attr('width', existingCellWidth).addClass('Loading');
+
+				        jQuery(dropped).detach().appendTo(revenueItemTableTarget);
+
+						// clean up any lingering dragging containers
+						jQuery('.dynamic-drag-container').remove();
+
+						// remove the dropzone targets
+						jQuery('.dropzone-targets-container').hide('fade');
+
+						if(revenueGenerationType == "assignment")
+						{
+							UpdateAssignmentInvoicingContainer(revenueGenerationItemsIds, targetDeliveryElementId);
+						}
+						else if(revenueGenerationType == "milestone")
+						{
+							UpdateMilestoneInvoicingContainer(revenueGenerationItemsIds, targetDeliveryElementId);
+						}
+						else if(revenueGenerationType == "period-revenue")
+						{
+							UpdateAnnuityInvoicingContainer(revenueGenerationItemsIds, targetDeliveryElementId);
+						}
+				    }
+			});
+
+			jQuery( ".create-new-element-drop-target" ).droppable({
+					accept: ".draggable-item",
+					activeClass: "active-draggable-item",
+					greedy: true,
+				    hoverClass: "draggable-item-create-new-element-target-hover",
+				    tolerance: "pointer",
+				    drop: function(ev, ui) {
+				        // dropped item is a cloned version of the original rows wrapped in a container
+				        // get the delivery element Id from this clone then use it to look up which revenue elements in that container have their checkboxes checked
+				        var droppedDeliveryElementId = jQuery(ui.helper).attr('parent-delivery-element-id');
+				        // get a handle on the row being dropped
+				        var droppedRow = jQuery(".draggable-item input:checked[delivery-element-id='" + droppedDeliveryElementId + "']").parent().parent();
+						// get a list of all the revenue items being moved
+						var revenueGenerationItemsIds = jQuery(droppedRow).find('input').map(function(){return jQuery(this).attr('revenue-generation-item-id');}).get();
+						// get the type of the item for switch later to call the right service
+						var revenueGenerationType = jQuery(droppedRow).closest('.element-with-detail-container').attr('revenue-generation-type');
+
+						updatesPending = 1;
+
+						// remove the checkbox on the dropped row and replace with a loading indicator
+						// also disable and uncheck the boxes to ensure they can't be used whilst the save is happening
+						jQuery(droppedRow).find('input').parent().addClass('Pending');
+						jQuery(droppedRow).find('input').hide();
+						jQuery(droppedRow).find('input').attr('disabled', 'disabled');
+						jQuery(droppedRow).find('input').attr('checked', false);
+
+						// disable the menu on the element container and replace with a loading indicator
+						var elementContainer = droppedRow.closest('.element-with-detail-container');
+						jQuery(elementContainer).find('.burger-menu').removeClass('fa fa-bars').addClass('Loading').css('width', 18).css('height', 18);
+
+						// clean up any lingering dragging containers
+						jQuery('.dynamic-drag-container').remove();
+
+						// remove the dropzone targets
+						jQuery('.dropzone-targets-container').hide('fade');
+
+						// UI prep complete, call the service to do the work
+						if(revenueGenerationType == "assignment")
+						{
+							CreateNewInvoicingElementForAssignments(revenueGenerationItemsIds, droppedDeliveryElementId);
+						}
+						else if(revenueGenerationType == "milestone")
+						{
+							CreateNewInvoicingElementForMilestones(revenueGenerationItemsIds, droppedDeliveryElementId);
+						}
+						else if(revenueGenerationType == "period-revenue")
+						{
+							CreateNewInvoicingElementForAnnuities(revenueGenerationItemsIds, droppedDeliveryElementId);
+						}
+				    }
+			});
+
+			jQuery( ".create-new-element-for-each-drop-target" ).droppable({
+					accept: ".draggable-item",
+					activeClass: "active-draggable-item",
+					greedy: true,
+				    hoverClass: "draggable-item-create-new-element-target-hover",
+				    tolerance: "pointer",
+				    drop: function(ev, ui) {
+				        // dropped item is a cloned version of the original rows wrapped in a container
+				        // get the delivery element Id from this clone then use it to look up which revenue elements in that container have their checkboxes checked
+				        var droppedDeliveryElementId = jQuery(ui.helper).attr('parent-delivery-element-id');
+				        // get a handle on the row being dropped
+				        var droppedRow = jQuery(".draggable-item input:checked[delivery-element-id='" + droppedDeliveryElementId + "']").parent().parent();
+						// get a list of all the revenue items being moved
+						var revenueGenerationItemsIds = jQuery(droppedRow).find('input').map(function(){return jQuery(this).attr('revenue-generation-item-id');}).get();
+						// get the type of the item for switch later to call the right service
+						var revenueGenerationType = jQuery(droppedRow).closest('.element-with-detail-container').attr('revenue-generation-type');
+
+						updatesPending = revenueGenerationItemsIds.length;
+
+						// disable the menu on the element container and replace with a loading indicator
+						var elementContainer = droppedRow.closest('.element-with-detail-container');
+						jQuery(elementContainer).find('.burger-menu').removeClass('fa fa-bars').addClass('Loading').css('width', 18).css('height', 18);
+
+						// clean up any lingering dragging containers
+						jQuery('.dynamic-drag-container').remove();
+
+						// remove the dropzone targets
+						jQuery('.dropzone-targets-container').hide('fade');
+
+					    // for each assignment that requires update
+					    revenueGenerationItemsIds.forEach(function(revenueItemToUpdateId) {
+						    var targetRow = jQuery("input[revenue-generation-item-id='" + revenueItemToUpdateId + "']").parent().parent();
+				        	jQuery(targetRow).find('input').parent().addClass('Pending');
+							jQuery(targetRow).find('input').hide();
+							jQuery(targetRow).find('input').attr('disabled', 'disabled');
+							jQuery(targetRow).find('input').attr('checked', false);
+
+							var revenueItemsToUpdate = [revenueItemToUpdateId];
+
+							// UI prep complete, call the service to do the work
+							if(revenueGenerationType == "assignment")
+							{
+								CreateNewInvoicingElementForAssignments(revenueItemsToUpdate, droppedDeliveryElementId);
+							}
+							else if(revenueGenerationType == "milestone")
+							{
+								CreateNewInvoicingElementForMilestones(revenueItemsToUpdate, droppedDeliveryElementId);
+							}
+							else if(revenueGenerationType == "period-revenue")
+							{
+								CreateNewInvoicingElementForAnnuities(revenueItemsToUpdate, droppedDeliveryElementId);
+							}
+						});
+				    }
+			});
+		}
+
+		// these calls are made here to ensure they fire everytime this form panel is re-rendered
+		jQuery(document).ready(function()
+		{
+			refreshDetailMode();
+			initialiseDragAndDrops();
+			initialisePageTips();
+		});
+	</script>
+
+    </apex:form>
+
+     <div id="PORulePopup" style="display: none;">
+			<apex:outputPanel id="PORuleDetails">
+				<apex:form >
+				<div id="PORuleErrors">
+					<apex:pageMessages escape="false" />
+				</div>
+				<apex:pageBlock >
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton value="{!$Label.kimbleone__save}" styleclass="DisableButtonWhileBusy"  action="{!UpdateDeliveryElement}" oncomplete="hideModalBoxyWithErrorCheck('#PORuleErrors')" rerender="PORuleDetails, TheForm" />
+						<input type="button" onclick="hideModalBoxy()" class="btn" value="{!$Label.Cancel}" />
+					</apex:pageBlockButtons>
+
+					<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+
+						<apex:selectRadio layout="pageDirection" value="{!TheDeliveryElement.KimbleOne__PurchaseOrderRule__c}">
+				            <apex:selectOptions value="{!PurchaseOrderRules}"/>
+				        </apex:selectRadio>
+					</apex:pageblockSection>
+
+				</apex:pageBlock>
+				</apex:form>
+			</apex:outputPanel>
+		</div>
+
+	<div id="DeliveryElementNamePopup" style="display:none">
+		<apex:outputPanel id="DeliveryElementNameDetails" style="min-height:80px;">
+   	     	<apex:form >
+   	     	<div id="DeliveryElementNameErrors">
+           		<apex:pageMessages id="DeliveryElementMessages" escape="false"/>
+           	</div>
+
+   			<apex:pageBlock id="DeliveryElementPageBlock">
+
+           	<apex:pageBlockButtons location="bottom">
+				<apex:commandButton value="{!$Label.kimbleone__save}" styleclass="DisableButtonWhileBusy"  action="{!UpdateDeliveryElementName}" oncomplete="hideModalBoxyWithErrorCheck('#DeliveryElementNameErrors')" rerender="DeliveryElementNameDetails, TheForm" />
+				<input type="button" onclick="hideModalBoxy()" class="btn" value="{!$Label.Cancel}" />
+  			</apex:pageBlockButtons>
+
+            <apex:pageblockSection collapsible="false" showheader="false" columns="1">
+				<apex:inputfield id="elementName" required="true" value="{!TheDeliveryElement.KimbleOne__ShortName__c}" styleclass="delivery-element-name" />
+            </apex:pageBlockSection>
+
+			</apex:pageBlock>
+			</apex:form>
+        </apex:outputPanel> <!-- end DeliveryElementNamePopupPanel -->
+	</div>
+
+    <div id="DeliveryElementCapPopup" style="display: none;">
+			<apex:outputPanel id="DeliveryElementCapDetails">
+				<apex:form >
+				<div id="DeliveryElementCapErrors">
+					<apex:pageMessages escape="false" />
+				</div>
+				<apex:pageBlock >
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton value="{!$Label.kimbleone__save}" styleclass="DisableButtonWhileBusy"  action="{!UpdateDeliveryElement}" oncomplete="hideModalBoxyWithErrorCheck('#DeliveryElementCapErrors')" rerender="DeliveryElementCapDetails, TheForm" />
+						<input type="button" onclick="hideModalBoxy()" class="btn" value="{!$Label.Cancel}" />
+					</apex:pageBlockButtons>
+
+					<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+						<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__Enum__c = 'CappedBillableEffortExpended'}" >
+							<apex:outputLabel style="white-space: nowrap;" value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__RevenueCap__c.Label} ({!TheDeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c})"/>
+							<apex:inputField required="false" value="{!TheDeliveryElement.KimbleOne__InvoicingCurrencyRevenueCap__c}" />
+						</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUsageGenerated__c}">
+							<apex:outputLabel style="white-space: nowrap;" value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__UsageRevenueCap__c.Label} ({!TheDeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c})"/>
+							<apex:inputField id="usageCapInput" required="false" value="{!TheDeliveryElement.ResourcedActivity__r.KimbleOne__InvoicingCurrencyUsageRevenueCap__c}"/>
+						</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsExpenseGenerated__c}">
+							<apex:outputLabel style="white-space: nowrap;" value="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.KimbleOne__ExpenseRevenueCap__c.Label} ({!TheDeliveryElement.KimbleOne__InvoicingCurrencyIsoCode__c})"/>
+							<apex:inputField id="expensesCapInput" required="false" value="{!TheDeliveryElement.ResourcedActivity__r.KimbleOne__InvoicingCurrencyExpenseRevenueCap__c}"  />
+						</apex:pageBlockSectionItem>
+
+					</apex:pageblockSection>
+
+				</apex:pageBlock>
+				</apex:form>
+			</apex:outputPanel>
+		</div>
+
+	<div id="POAllocationPopup" style="display: none;">
+			<apex:outputPanel id="POAllocationDetails">
+				<apex:form >
+				<div id="poAllocationErrors">
+					<apex:pageMessages escape="false" />
+				</div>
+				<apex:pageBlock >
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton value="{!$Label.kimbleone__save}" styleclass="DisableButtonWhileBusy" action="{!SaveAllocation}" oncomplete="hideModalBoxyWithErrorCheck('#poAllocationErrors')" rerender="POAllocationDetails, TheForm" />
+						<input type="button" onclick="hideModalBoxy()" class="btn" value="{!$Label.Cancel}" />
+					</apex:pageBlockButtons>
+
+					<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+
+						<apex:outputField value="{!TheCurrentPOAllocation.PurchaseOrder__r.Name}"/>
+
+						<apex:outputField value="{!TheCurrentPOAllocation.PurchaseOrder__r.KimbleOne__UnallocatedValue__c}"/>
+
+						<apex:outputField value="{!TheCurrentPOAllocation.PurchaseOrder__r.KimbleOne__ExpiryDate__c}"/>
+
+						<apex:outputField value="{!TheCurrentPOAllocation.PurchaseOrder__r.KimbleOne__EarliestInvoiceItemDate__c}"/>
+
+						<apex:outputField value="{!TheCurrentPOAllocation.PurchaseOrder__r.KimbleOne__LatestInvoiceItemDate__c}"/>
+
+						<apex:outputField value="{!TheCurrentPOAllocation.KimbleOne__InvoicedValue__c}" rendered="{!TheCurrentPOAllocationItems.size == 1}"/>
+
+						<apex:inputField value="{!TheCurrentPOAllocation.PurchaseOrderAllocationItems__r[0].AllocationCap__c}" rendered="{!TheCurrentPOAllocationItems.size == 1}"/>
+
+						<apex:pageBlockTable value="{!TheCurrentPOAllocationItems}" var="itm" rendered="{!TheCurrentPOAllocationItems.size != 1}">
+							<apex:column headerValue="{!$ObjectType.KimbleOne__PurchaseOrderAllocationItem__c.Fields.KimbleOne__PurchaseOrderAllocationType__c.Label}" value="{!itm.PurchaseOrderAllocationType__r.Name}"/>
+							<apex:column value="{!itm.KimbleOne__InvoicedValue__c}"/>
+							<apex:column headerValue="{!$ObjectType.KimbleOne__PurchaseOrderAllocationItem__c.Fields.KimbleOne__AllocationCap__c.Label}">
+								<apex:inputField required="false" value="{!itm.KimbleOne__AllocationCap__c}"/>
+							</apex:column>
+						</apex:pageBlockTable>
+
+					</apex:pageblockSection>
+
+				</apex:pageBlock>
+				</apex:form>
+			</apex:outputPanel>
+		</div>
+
+		<div id="CreditAllocationPopup" style="display: none;">
+			<apex:outputPanel id="CreditAllocationDetails">
+				<apex:form >
+				<div id="creditAllocationErrors">
+					<apex:pageMessages escape="false" />
+				</div>
+				<apex:pageBlock >
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton value="{!$Label.kimbleone__save}" styleclass="DisableButtonWhileBusy" action="{!SaveCreditAllocation}" oncomplete="hideModalBoxyWithErrorCheck('#creditAllocationErrors')" rerender="CreditAllocationDetails, TheForm" />
+						<input type="button" onclick="hideModalBoxy()" class="btn" value="{!$Label.Cancel}" />
+					</apex:pageBlockButtons>
+
+					<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+
+						<apex:outputField value="{!TheCreditAllocation.Credit__r.Name}"/>
+
+						<apex:outputField value="{!TheCreditAllocation.Credit__r.KimbleOne__ExpiryDate__c}" rendered="(!!ISBLANK(TheCreditAllocation.Credit__r.ExpiryDate__c))"/>
+
+						<apex:outputField value="{!TheCreditAllocation.Credit__r.KimbleOne__UnallocatedUnits__c}" rendered="(!!ISBLANK(TheCreditAllocation.Credit__r.UnallocatedUnits__c))"/>
+
+						<apex:outputField value="{!TheCreditAllocation.Credit__r.KimbleOne__UnallocatedValue__c}"/>
+
+						<apex:inputField value="{!TheCreditAllocation.KimbleOne__AllocatedValue__c}" />
+
+					</apex:pageblockSection>
+				</apex:pageBlock>
+				</apex:form>
+			</apex:outputPanel>
+		</div>
+
+    <div id="DepositPopup" style="display: none;">
+			<apex:outputPanel id="DepositDetails">
+				<apex:form >
+				<div id="depositErrors">
+					<apex:pageMessages escape="false" />
+				</div>
+				<apex:pageBlock >
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton value="{!$Label.kimbleone__save}" 	styleclass="DisableButtonWhileBusy" action="{!SaveDeposit}" oncomplete="hideModalBoxyWithErrorCheck('#depositErrors');initialiseItems();" rerender="DepositDetails, TheForm" />
+						<input type="button" onclick="hideModalBoxy()" class="btn" value="{!$Label.Cancel}" />
+					</apex:pageBlockButtons>
+
+					<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+						<apex:pageBlockSectionItem rendered="{!ISBLANK(TheDepositPurchaseOrder.Id)}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryElement__c.Label}"/>
+							<apex:selectList value="{!TheDepositPurchaseOrderAllocation.KimbleOne__DeliveryElement__c}"  size="1" required="true">
+								<apex:selectOptions value="{!TheDeliveryElementsList}" />
+							</apex:selectList>
+						</apex:pageBlockSectionItem>
+						<apex:outputField value="{!TheDepositPurchaseOrderAllocation.DeliveryElement__r.Name}" rendered="{!!ISBLANK(TheDepositPurchaseOrder.Id)}"/>
+						<apex:inputField required="true" value="{!TheDepositPurchaseOrder.Name}" />
+						<apex:pageBlockSectionItem >
+							<apex:outputText value="{!$Label.kimbleone__depositdatelabel}"/>
+							<apex:inputField required="true" value="{!TheDepositPurchaseOrder.KimbleOne__OrderDate__c}" styleClass="kimbleDatePicker" />
+						</apex:pageBlockSectionItem>
+						<apex:pageBlockSectionItem >
+							<apex:outputText value="{!$ObjectType.KimbleOne__Deposit__c.Fields.KimbleOne__DepositValue__c.Label}"/>
+							<apex:inputField required="true" value="{!TheDepositPurchaseOrder.KimbleOne__OrderValue__c}" />
+						</apex:pageBlockSectionItem>
+
+					</apex:pageblockSection>
+
+				</apex:pageBlock>
+				</apex:form>
+			</apex:outputPanel>
+		</div>
+
+	<script>
+
+		function initialiseItems()
+		{
+		    SetupDatePicker();
+  		}
+		function SetupDatePicker()
+		{
+			//dateFormat: 'yy-mm-dd',
+			jQuery('.kimbleDatePicker').datepicker({
+					dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true,
+					selectOtherMonths: true,
+					changeMonth: true,
+					changeYear: true});
+		}
+
+		var updatesPending = 0;
+	    var detailModeSetting = true;
+		
+		function refreshAfterDragAndDrop()
+		{
+			// track how many updates we have to perform before we actually do the refresh
+			// this ensures that the scenario where multiple elements are being created completes
+			// before the screen can refresh
+			updatesPending-=1;
+			
+			if(updatesPending == 0)
+			{
+				rerenderTheForm();
+			}
+		}
+		        		
+		var POdeleteRunning = false;
+		
+		jQuery('.purchase-order-alloc-delete-button').click(function(){
+			deletePurchaseOrderAllocation(jQuery(this).attr('allocation-id'), this);
+		});
+		    
+	    function deletePurchaseOrderAllocation(id, obj)
+	    {
+	        if (POdeleteRunning) return;
+	        
+	        POdeleteRunning = true;
+	        
+	        var del = false;
+	    
+	        del = confirmDelete();
+	     
+	        if (del)
+	        {
+				// replace the edit and trash icons with a loading indicator
+				// get the width of the td to minimise the shudder effect when removing and replace the contents
+				var existingCellWidth = jQuery('a[allocation-id="' + id + '"]').parent().width();       
+	            jQuery('a[allocation-id="' + id + '"]').parent().empty().attr('width', existingCellWidth).addClass('Loading');
+	        
+	            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupBudgetsController.DeleteAllocation}',
+	                id,
+	                    function(result, event){          
+	                        if (event.status) 
+	                        {
+	                        	// get a handle on the PO table before we start removing the rows
+	                        	var POAllocationTable = jQuery('tr[allocation-id="' + id + '"]').parent().parent();
+	                        	
+	                            // remove the PO allocation rows relating to this Id
+	                            jQuery('tr[allocation-id="' + id + '"]').remove();
+	                            
+	                            // if the PO allocation table is now empty, remove that too
+	                            // (signified by there being only 1 TR representing the header line)
+	                            if(POAllocationTable.find('tr').length == 1)
+	                                 POAllocationTable.remove();                                        
+	                        } 
+	                        else if (event.type === 'exception') 
+	                        {
+	                            alert(event.message);
+	                        } 
+	                        else 
+	                        {
+	                            alert(event.message);
+	                        }
+	                        
+	                        POdeleteRunning = false;
+	                }, 
+	                {escape: true, timeout: 60000}
+	            );
+	        
+	        }
+	    }	
+
+		var depositdeleteRunning = false;
+		
+		jQuery('.deposit-alloc-delete-button').click(function(){
+			deleteDepositAllocation(jQuery(this).attr('deposit-id'), this);
+		});
+		    
+	    function deleteDepositAllocation(id, obj)
+	    {
+	        if (depositdeleteRunning) return;
+	        
+	        depositdeleteRunning = true;
+	        
+	        var del = false;
+	    
+	        del = confirmDelete();
+	     
+	        if (del)
+	        {
+				// replace the edit and trash icons with a loading indicator
+				var existingCellWidth = jQuery('a[deposit-id="' + id + '"]').parent().width();        
+	            jQuery('a[deposit-id="' + id + '"]').parent().empty().attr('width', existingCellWidth).addClass('Loading');
+	        
+	            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupBudgetsController.DeleteDeposit}',
+	                id,
+	                    function(result, event){          
+	                        if (event.status) 
+	                        {
+	                        	// get a handle on the PO table before we start removing the rows
+	                        	var DepositAllocationTable = jQuery('tr[deposit-id="' + id + '"]').parent().parent();
+	                        	
+	                            // remove the deposit allocation rows relating to this Id
+	                            jQuery('tr[deposit-id="' + id + '"]').remove();
+	                            
+	                            // if the deposit allocation table is now empty, remove that too
+	                            // (signified by there being only 1 TR representing the header line)
+	                            if(DepositAllocationTable.find('tr').length == 1)
+	                                 DepositAllocationTable.remove();                                        
+	                        } 
+	                        else if (event.type === 'exception') 
+	                        {
+	                            alert(event.message);
+	                        } 
+	                        else 
+	                        {
+	                            alert(event.message);
+	                        }
+	                        
+	                        depositdeleteRunning = false;
+	                }, 
+	                {escape: true, timeout: 60000}
+	            );
+	        
+	        }
+	    }
+
+		var creditdeleteRunning = false;
+		
+		jQuery('.credit-alloc-delete-button').click(function(){
+			deleteCreditAllocation(jQuery(this).attr('credit-id'), this);
+		});
+		    
+	    function deleteCreditAllocation(id, obj)
+	    {
+	        if (creditdeleteRunning) return;
+	        
+	        creditdeleteRunning = true;
+	        
+	        var del = false;
+	    
+	        del = confirmDelete();
+	     
+	        if (del)
+	        {
+				// replace the edit and trash icons with a loading indicator
+				var existingCellWidth = jQuery('a[credit-id="' + id + '"]').parent().width();        
+	            jQuery('a[credit-id="' + id + '"]').parent().empty().attr('width', existingCellWidth).addClass('Loading');
+	        
+	            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupBudgetsController.DeleteCreditAllocation}',
+	                id,
+	                    function(result, event){          
+	                        if (event.status) 
+	                        {
+	                        	// get a handle on the PO table before we start removing the rows
+	                        	var CreditAllocationTable = jQuery('tr[credit-id="' + id + '"]').parent().parent();
+	                        	
+	                            // remove the credit allocation rows relating to this Id
+	                            jQuery('tr[credit-id="' + id + '"]').remove();
+	                            
+	                            // if the credit allocation table is now empty, remove that too
+	                            // (signified by there being only 1 TR representing the header line)
+	                            if(CreditAllocationTable.find('tr').length == 1)
+	                                 CreditAllocationTable.remove();                                        
+	                        } 
+	                        else if (event.type === 'exception') 
+	                        {
+	                            alert(event.message);
+	                        } 
+	                        else 
+	                        {
+	                            alert(event.message);
+	                        }
+	                        
+	                        creditdeleteRunning = false;
+	                }, 
+	                {escape: true, timeout: 60000}
+	            );
+	        
+	        }
+	    }
+	    
+	    function CreateNewInvoicingElementForAssignments(activityAssignmentIds, scopingElementId)
+	    {
+	    	var newDeliveryElementName = "";
+	        activityAssignmentIds.forEach(function(assignmentToUpdateId) {
+	        	// default the name of the new delivery element based on the first revenue item
+			    var targetRow = jQuery("input[revenue-generation-item-id='" + assignmentToUpdateId + "']").parent().parent();
+
+	        	if(newDeliveryElementName == "")
+	        	{
+	        		// based on the assignment type we'll take the values from the table
+	        		newDeliveryElementName = targetRow.attr('revenue-generation-item-label');
+	        	}
+	        	
+	        	jQuery(targetRow).find('input').parent().removeClass('Pending');
+	        	jQuery(targetRow).find('input').parent().addClass('Loading');
+			});
+	        
+			
+	                
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupBudgetsController.CreateInvoicingContainerForAssignments}',
+                activityAssignmentIds, scopingElementId, newDeliveryElementName, 
+                    function(result, event){          
+                        if (event.status) 
+                        {
+					        activityAssignmentIds.forEach(function(assignmentToUpdateId) {
+							    var targetRow = jQuery("input[revenue-generation-item-id='" + assignmentToUpdateId + "']").parent().parent();
+					        	jQuery(targetRow).find('input').parent().removeClass('Loading');
+					        	jQuery(targetRow).find('input').parent().addClass('Completed');
+							});
+                        	
+                        	// do a blanket refresh
+                        	refreshAfterDragAndDrop();
+                        } 
+                        else if (event.type === 'exception') 
+                        {
+                            alert(event.message);
+                        } 
+                        else 
+                        {
+                            alert(event.message);
+                        }
+                }, 
+                {escape: true, timeout: 60000}
+            );
+	    }
+
+	    function CreateNewInvoicingElementForMilestones(milestoneIds, scopingElementId)
+	    {
+	    	var newDeliveryElementName = "";
+	        milestoneIds.forEach(function(milestoneToUpdateId) {
+	        	// default the name of the new delivery element based on the first revenue item
+			    var targetRow = jQuery("input[revenue-generation-item-id='" + milestoneToUpdateId + "']").parent().parent();
+
+	        	if(newDeliveryElementName == "")
+	        	{
+	        		// based on the assignment type we'll take the values from the table
+	        		newDeliveryElementName = targetRow.attr('revenue-generation-item-label');
+	        	}
+	        	
+	        	jQuery(targetRow).find('input').parent().removeClass('Pending');
+	        	jQuery(targetRow).find('input').parent().addClass('Loading');
+			});
+	        
+			
+	                
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupBudgetsController.CreateInvoicingContainerForMilestones}',
+                milestoneIds, scopingElementId, newDeliveryElementName, 
+                    function(result, event){          
+                        if (event.status) 
+                        {
+					        milestoneIds.forEach(function(milestoneToUpdateId) {
+							    var targetRow = jQuery("input[revenue-generation-item-id='" + milestoneToUpdateId + "']").parent().parent();
+					        	jQuery(targetRow).find('input').parent().removeClass('Loading');
+					        	jQuery(targetRow).find('input').parent().addClass('Completed');
+							});
+                        	
+                        	// do a blanket refresh
+                        	refreshAfterDragAndDrop();
+                        } 
+                        else if (event.type === 'exception') 
+                        {
+                            alert(event.message);
+                        } 
+                        else 
+                        {
+                            alert(event.message);
+                        }
+                }, 
+                {escape: true, timeout: 60000}
+            );
+	    }
+
+	    function CreateNewInvoicingElementForAnnuities(annuityIds, scopingElementId)
+	    {
+	    	var newDeliveryElementName = "";
+	        annuityIds.forEach(function(annuityIdToUpdate) {
+	        	// default the name of the new delivery element based on the first revenue item
+			    var targetRow = jQuery("input[revenue-generation-item-id='" + annuityIdToUpdate + "']").parent().parent();
+
+	        	if(newDeliveryElementName == "")
+	        	{
+	        		// based on the assignment type we'll take the values from the table
+	        		newDeliveryElementName = targetRow.attr('revenue-generation-item-label');
+	        	}
+	        	
+	        	jQuery(targetRow).find('input').parent().removeClass('Pending');
+	        	jQuery(targetRow).find('input').parent().addClass('Loading');
+			});
+	        
+			
+	                
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupBudgetsController.CreateInvoicingContainerForAnnuities}',
+                annuityIds, scopingElementId, newDeliveryElementName, 
+                    function(result, event){          
+                        if (event.status) 
+                        {
+					        annuityIds.forEach(function(annuityToUpdateId) {
+							    var targetRow = jQuery("input[revenue-generation-item-id='" + annuityToUpdateId + "']").parent().parent();
+					        	jQuery(targetRow).find('input').parent().removeClass('Loading');
+					        	jQuery(targetRow).find('input').parent().addClass('Completed');
+							});
+                        	
+                        	// do a blanket refresh
+                        	refreshAfterDragAndDrop();
+                        } 
+                        else if (event.type === 'exception') 
+                        {
+                            alert(event.message);
+                        } 
+                        else 
+                        {
+                            alert(event.message);
+                        }
+                }, 
+                {escape: true, timeout: 60000}
+            );
+	    }
+
+	    function UpdateAnnuityInvoicingContainer(annuityIds, invoicedWithDeliveryElementId)
+	    {	                
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupBudgetsController.UpdateAnnuityInvoicingContainer}',
+                annuityIds, invoicedWithDeliveryElementId,
+                    function(result, event){          
+                        if (event.status) 
+                        {
+                        	// do a blanket refresh
+                        	refreshAfterDragAndDrop();
+                        } 
+                        else if (event.type === 'exception') 
+                        {
+                            alert(event.message);
+                        } 
+                        else 
+                        {
+                            alert(event.message);
+                        }
+                }, 
+                {escape: true, timeout: 60000}
+            );
+	    }
+	    
+	    function UpdateMilestoneInvoicingContainer(milestoneIds, invoicedWithDeliveryElementId)
+	    {	                
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupBudgetsController.UpdateRevenueMilestoneInvoicingContainer}',
+                milestoneIds, invoicedWithDeliveryElementId,
+                    function(result, event){          
+                        if (event.status) 
+                        {
+                        	// do a blanket refresh
+                        	refreshAfterDragAndDrop();
+                        } 
+                        else if (event.type === 'exception') 
+                        {
+                            alert(event.message);
+                        } 
+                        else 
+                        {
+                            alert(event.message);
+                        }
+                }, 
+                {escape: true, timeout: 60000}
+            );
+	    }
+	    	    
+	    function UpdateAssignmentInvoicingContainer(activityAssignmentIds, invoicedWithDeliveryElementId)
+	    {	                
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupBudgetsController.UpdateAssignmentInvoicingContainer}',
+                activityAssignmentIds, invoicedWithDeliveryElementId,
+                    function(result, event){          
+                        if (event.status) 
+                        {
+                        	// do a blanket refresh
+                        	refreshAfterDragAndDrop();
+                        } 
+                        else if (event.type === 'exception') 
+                        {
+                            alert(event.message);
+                        } 
+                        else 
+                        {
+                            alert(event.message);
+                        }
+                }, 
+                {escape: true, timeout: 60000}
+            );
+	    }
+	    
+	    function DeleteInvoicingContainer(elementId)
+	    {	                
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupBudgetsController.DeleteInvoicingContainer}',
+                elementId,
+                    function(result, event){          
+                        if (event.status) 
+                        {
+                        	// do a blanket refresh
+                        	refreshAfterDragAndDrop();
+                        } 
+                        else if (event.type === 'exception') 
+                        {
+                            alert(event.message);
+                            refreshAfterDragAndDrop();
+                        } 
+                        else 
+                        {
+                            alert(event.message);
+                            refreshAfterDragAndDrop();
+                        }
+                }, 
+                {escape: true, timeout: 60000}
+            );
+	    }
+	    
+		function selectRevenueGenerationItems(deliveryElementId)
+		{
+			// first get the value of the checked checkbox, then use this to check or uncheck the child checkboxes - ignore any disabled checkboxes
+			jQuery("[delivery-element-id='" + deliveryElementId + "'][name='select-revenue-generation-item']").not(":disabled").prop('checked', jQuery("[delivery-element-id='" + deliveryElementId + "'][name='select-all-revenue-generation-items']").prop('checked'));
+			
+			var theParentElement = jQuery("[delivery-element-id='" + deliveryElementId + "'][name='select-revenue-generation-item']").closest('.element-with-detail-container');
+			var theDropZone = jQuery(theParentElement).find('.dropzone-targets-container');
+			
+			if(jQuery(theParentElement).find("input:checkbox:checked").length == 0)
+			{
+				jQuery(theDropZone).hide('fade');
+			}
+			else
+			{
+				jQuery(theDropZone).show('fade');
+			}		
+		}
+
+		function selectRevenueGenerationItem(itemId)
+		{
+			// first get the value of the checked checkbox then if checked reveal the dropzones on this element
+			var theCheckbox = jQuery("[revenue-generation-item-id='" + itemId + "'][name='select-revenue-generation-item']");
+			var checkstate = jQuery(theCheckbox).prop('checked');
+			var theParentElement = jQuery(theCheckbox).closest('.element-with-detail-container');
+			var theDropZone = jQuery(theParentElement).find('.dropzone-targets-container');
+			
+			if(checkstate == true)
+			{
+				jQuery(theDropZone).show('fade');
+			}
+			else
+			{
+				// if all checkboxes on this item are unchecked then hide the dropzone (ignore the select all checkbox)
+				if(jQuery(theParentElement).find("input:checkbox:checked[revenue-generation-item-id]").length == 0)
+				{
+					jQuery(theDropZone).hide('fade');
+				}
+			}		
+		}
+		
+		function unselectAllRevenueGenerationItems()
+		{
+			jQuery("[name='select-revenue-generation-item']").prop('checked', '');
+			jQuery("[name='select-all-revenue-generation-items']").prop('checked', '');
+		}
+		
+		/* Tooltips */
+		var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+		var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+		var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+		var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+		var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+		var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+	
+		function initialisePageTips()
+		{
+			ApplyTipAttributes();
+			initialiseTips();
+		}
+		
+		// add tip attributes to elements
+		function ApplyTipAttributes()
+		{
+			if(enableTips)
+			{
+				jQuery('[id$="allocatePurchaseOrderEngagement"]').attr('kimble-tip','AllocatePurchaseOrder');
+				jQuery('[id$="allocatePurchaseOrderElement"]').attr('kimble-tip','AllocatePurchaseOrder').addClass('tip-right');
+				jQuery('[id$="splitElementForPO"]').attr('kimble-tip','SplitElement').addClass('tip-right');
+				jQuery('[id$="expensesCapInput"]').attr('kimble-tip','ExpensesCap').attr('kimble-tip-extended-text','ExpensesCapExtendedText').attr('kimble-tip-help-link','BudgetsPOsHelpLink');
+				jQuery('[id$="usageCapInput"]').attr('kimble-tip','UsageCap').attr('kimble-tip-extended-text','UsageCapExtendedText').attr('kimble-tip-help-link','BudgetsPOsHelpLink');
+				jQuery('[id$="deliveryElementGroupCard"]').attr('kimble-tip','DeliveryElement');
+				jQuery('[id$="depositDateColumn"]').attr('kimble-tip','DepositDate');
+				jQuery('[id$="depositValueColumn"]').attr('kimble-tip','DepositValue');
+				jQuery('[id$="depositReferenceColumn"]').attr('kimble-tip','Reference');
+				jQuery('[id$="assignmentsTable"]').attr('kimble-tip','AssignmentName');
+				jQuery('[id$="deliveryElementGroupCardTitle"]').attr('kimble-tip','ElementName');
+				jQuery('[id$="deliveryGroupBurgerMenu"]').attr('kimble-tip','EngagementBurgerMenu');
+				jQuery('[id$="deliveryGroupHeader"]').attr('kimble-tip','EngagementName');
+				jQuery('[id$="elementPORule"]').attr('kimble-tip','PORule').attr('kimble-tip-extended-text','PORuleExtendedText').attr('kimble-tip-help-link','BudgetsPOsHelpLink');
+				jQuery('[id$="summaryToggle"]').attr('kimble-tip','SummaryToggle');
+			}
+		}
+		
+		function updateTipsConfigSetting(newTipSetting)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+				newTipSetting,
+					function(result, event){
+						if (event.status)
+						{
+							var data = {};
+							data.results = result;
+							loadGuidance();
+						}
+						else
+						{
+							alert(event.message);
+						}
+				},
+				{escape: false, timeout: 60000}
+			);
+		}
+		
+	</script>
+    </apex:define>
+</apex:composition>
+
+</apex:page>

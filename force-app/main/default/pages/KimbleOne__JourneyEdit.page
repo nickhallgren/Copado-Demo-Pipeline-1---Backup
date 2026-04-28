@@ -1,0 +1,1818 @@
+<apex:page standardcontroller="KimbleOne__Journey__c" extensions="KimbleOne.JourneyEditController" sidebar="false" >
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+	<c:Menu DefaultHelpPage="WhatcanIdoinKimble.html" MenuContextType="Journey" MenuContextId="{!TheJourney.Id}" MenuContextName="{!TheJourney.Resource__r.Name} - {!TheJourney.Name}" rendered="{!!ISBLANK(TheJourney.Id)}"/>
+
+</apex:define>
+    
+<apex:define name="Content">
+
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryTimePicker, 'jquery.timepicker.min.js')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQueryTimePicker, 'jquery.timepicker.css')}"/>
+
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+	<style>
+		#journey-layout {
+		    min-height: 360px;
+		}
+		.cardContainer {
+			display: block;
+		}
+		.card.allowance-periods {
+		    display: block;
+		}
+		.title-card {
+			display: table;
+		    width: 100%;
+		    height: 33px;
+    		margin-bottom: 6px;		    
+		}
+		.kimble-format-currency {
+			display: none;
+		}
+		.title-card-body {
+			min-width: 250px;
+		    vertical-align: middle;
+		}
+		.title-card-body-field {
+			width: 100px;
+		}
+		.journey-card  {
+			/*min-width: 50%;
+			width: auto;*/
+	    	width: 98%;
+		}
+		.card.min-horizontal-padding {
+		  	margin-bottom: 10px;
+		}
+		.right-align-cell {
+			text-align: right;
+		}
+		.journey-header-title {
+		}
+		.journey-name {
+	    	width: 340px;
+		}
+		.inner-card {
+			margin: 10px;
+		}
+		.padding-cell i {
+			font-size: 18px;
+		}
+		.action-cell i.fa {
+		    margin-left: 5px;
+		    cursor: pointer;
+		    font-size: 16px;
+		}		
+		.action-cell i.fa-plus-square {
+		    font-size: 20px;
+		}
+		i.fa-plus-square-o {
+		    font-size: 20px;
+		    cursor: pointer;
+		}
+		.new-journey-leg {
+			display: none;
+		}
+		.rolling-period {
+			display: block;
+			white-space: nowrap;
+    		margin-bottom: 2px;
+		}
+		.kimbleDatePicker, .kimbleTimePicker {
+		    width: 80px;
+		    margin-right: 5px;
+	        text-align: center;
+		}
+		.allowance-period-time {
+			display: block;
+		}
+		tr[allowance-period-id] {
+		    height: 40px;
+		}
+		.journey-legs.card, .allowance-periods.card {
+		    min-width: 740px;
+		    margin-bottom: 8px;
+		}
+		table.list.journey-leg-table {
+		    width: 100%;
+		}
+		table.list.allowance-period-table {
+		    width: 100%;
+		}
+		th.action-cell {
+		    width: 65px;
+		}
+		td.action-cell {
+		    min-width: 19px;
+		}
+		.calculate-btn {
+		    position: absolute;
+		    right: 10px;
+		    bottom: 3px;
+		}
+		td.allowance-adjustment-cell {
+		    text-align: center;
+	        width: 50px;
+		}
+		tr[journey-leg-id]:hover, tr[allowance-period-id]:hover {
+		    background-color: #e3f3ff;
+		}
+		.allowance-periods-title {
+			display: inline;
+		}
+		.footer-action-btn-container {
+			display: inline;
+		    min-width: 18px;
+		    min-height: 18px;
+		}
+		.find-journey-leg-location {
+		    width: 130px;
+		}
+		.journey-legs-heading, .allowance-period-heading {
+			position: relative;
+		}
+		.leg-date {
+			min-width: 115px;
+		}
+		.allowance-date {
+			width: 65px;
+		}
+		.add-allocation-cell, .add-allocation-header {
+		    width: 169px;
+		}
+		.add-allocation-header {
+			text-align: center;
+		}
+		.location-name, .location-region {
+			width: 120px;
+		}
+		.footer-action-btn-container .fa {
+			cursor: pointer;
+		    padding: 4px;
+		}
+		span.add-non-forecast-activity-button {
+		    cursor: pointer;
+		    font-size: 18px;
+		}
+		.add-allocation-cell {
+		    text-align: center;
+    		font-size: 16px;
+		}
+		.add-allocation-header {
+			padding-right: 16px !important;
+		}
+		span.allocation-all-btn.fa.fa-plus-square {
+		    font-size: 20px;
+		    position: absolute;
+		    margin-left: 5px;
+		    cursor: pointer;
+		}
+		.add-allocation-btn {
+			cursor: pointer;
+		    font-size: 20px;
+		}
+		.allocation-wrapper {
+			position: relative;
+	    	display: inline;
+		}
+		.allocation-amount {
+			width: 80px;
+		    text-align: right;
+		}
+		.allocation-column {
+	    	width: 100px;
+    	    white-space: normal;
+		}
+	    i.allocate-allowance-btn.fa.fa-angle-double-right, i.clear-allowance-allocation-btn.fa.fa-times-circle {
+		    font-size: 18px;
+		    cursor: pointer;
+		    position: absolute;
+		    right: 64px;
+		    bottom: -2px;
+   		}
+	    i.allocate-allowance-btn.fa.fa-angle-double-right {
+		    margin-right: 5px;
+		}
+	    i.clear-allowance-allocation-btn.fa.fa-times-circle {
+	        margin-right: 2px;
+            color: #808080;
+		}
+		.expense-claim-submit-icon {
+			cursor: pointer;
+		}
+		i.allocated-allowance-btn.fa.fa-info-circle {
+		    font-size: 16px;
+		    margin-right: 5px;
+		}
+		i.allocated-allowance-btn.Draft {
+			color: #949599;
+		}
+		i.allocated-allowance-btn.Approved {
+			color: #008852;
+		}
+		i.allocated-allowance-btn.Rejected {
+			color:#B42D34;
+		}
+		i.allocated-allowance-btn.ReadyForApproval {
+			color: #0F0F0F;
+		}
+		td.allocation-cell.Approved {
+			background-color: #DFEEE6;
+		}
+		td.allocation-cell.Rejected {
+			background-color: #F6E4DE;
+		}
+		td.allocation-cell.ReadyForApproval {
+			background-color: #E7E7E8;
+		}
+		th.adjustment-header, th.adjustments-header, th.allocations-header {
+		    text-align: center;
+		}
+		th.adjustment-header {
+		    font-style: italic;
+	        white-space: normal;
+		}
+		td.allocation-cell {
+		    text-align: right;
+		    min-width: 105px;
+		}
+		
+		th.allocation-column {
+		    text-align: center;
+		}
+		.allowance-amount-header-cell {
+			white-space: normal;
+			width: 110px;
+		}
+		.journey-leg-error-ind {
+			color: red !important;
+			font-size: 18px;
+		    text-align: center;
+		}
+		.journey-leg-error-message {
+			color: red !important;
+			font-weight: bold;
+		}
+		.Loading {
+			background-image: url('{!URLFOR($Resource.JobImages, 'running16.gif')}') !important;
+			background-repeat:no-repeat !important;
+			background-position: 50%, 50%;
+		}
+		/* Make select2 dropdowns look like conventional dropdowns */
+		a.select2-choice {
+		    height: 18px !important;
+		    line-height: 18px !important;
+		    background-image: none !important;
+		    border-radius: 0px !important;
+		    color: black !important;
+		    padding-left: 4px !important;
+		}
+		.select2-choice div {
+		    border-left: none !important;
+		}
+		
+		/* SF Pageblock overrides */
+		.pbBody, .bPageBlock {
+		    border: none !important;
+		    background-color: initial !important;
+		    margin: 0px !important;
+		    padding: 0px !important;
+		}
+		.action-footer {
+			text-align: right;
+		    margin-top: 10px;
+		    margin-bottom: 4px;
+		}
+		.footer-btn-ind {
+	        font-size: 18px;
+		    position: absolute;
+		    right: 1px;
+		    top: 0px;
+		}
+		.footer-action-btn-container {
+		    margin-top: 5px;
+		}
+		.action-footer-btn {
+		    display: inline;
+		    cursor: pointer;
+		    padding: 6px 30px 8px 9px !important;
+		    position: relative;
+		}
+		div#add-section {
+			position: absolute;
+			left: 0px;
+			top: 4px;
+		}
+		.cardFooter.journey-legs-footer {
+			background-color: #FFF;
+			border-color: #DDD;
+			padding: 10px 15px;
+			border-top: 1px solid #DDD;
+			border-bottom-right-radius: 3px;
+			border-bottom-left-radius: 3px;
+			position: relative;
+		}
+		td.leg-notes {
+		    text-align: center;
+		}
+		td.leg-notes.for-print {
+		    text-align: left !important;
+		}
+		.allocation-note-ind {
+			margin-right: 5px;
+		}
+		textarea.note
+		{
+			font-family: 'Arial','Helvetica',sans-serif;
+  			font-size: 100%;
+  			color: #666;
+		}
+		.hidden-item {
+			display: none !important;
+		}
+		.fieldset-display-value, .fieldset-heading {
+		    text-overflow: ellipsis;
+		    white-space: nowrap;
+		    overflow: hidden;
+		    width: 125px !important;
+		    display: block;
+		}
+		.journey-fieldset-edit .journey-fieldset-label {
+		    font-weight: bold;
+		    font-size: 12px;
+		    margin-right: 10px;
+		    vertical-align: top;
+		    width: 160px;
+		    display: inline-block;
+		    text-align: right;
+	        padding-top: 2px;
+		}
+		.journey-fieldset-edit-field {
+		    margin-top: 10px;
+		    margin-bottom: 5px;
+		}
+		.text-area-field[rows] {
+		    font-size: 12px;
+		    width: 260px;
+		    height: 50px;
+		}
+		.requiredInput .requiredBlock {
+			background-color: #c00;
+			position: absolute;
+			left: -4px;
+			width: 3px;
+			top: 1px;
+			bottom: 1px;
+		}
+		.requiredInput {
+		    display: inline-block;
+		    position: relative;
+		}
+		.journey-fieldset-edit-field .dateInput {
+		    font-size: 12px;
+		}
+		.allocation-msg {
+			font-size: 16px;
+		    margin-right: 5px;
+		}
+		.allocation-warning {
+			color: #E58E1A;
+		}
+		.allocation-info {
+			color: #428BCA;
+		}
+		
+		/* Toolbar */
+		a.toolbar-button {
+			display: inline-block;
+			padding: 6px 10px 6px 10px;
+			background-color: white;
+			margin-right: 4px;
+			border: 1px solid #ccc;
+			border-radius: 2px;
+		}
+		a.toolbar-button.active-toolbar-button {
+			color: white;
+			background-color: #888;
+		}
+		.toolbar-container {
+			position: relative;
+		    display: table-cell;
+		    min-width: 70px;
+		    padding: 6px;
+		    margin-bottom: 5px;
+		}
+		.toolbar {
+			display: table;
+			width: 100%;
+		}
+		div#toolbar-buttons {
+			display: table-cell;
+			position: relative;
+		}
+		span.gantt-display-mode {
+		    position: absolute;
+		    right: 10px;
+		}
+		a.toolbar-button:hover {
+			text-decoration: none;
+			color: white;
+			background-color: #1A9EFF;
+		}
+		a.toolbar-button.button-left {
+			border-top-right-radius: 0px;
+			border-bottom-right-radius: 0px;
+			margin-right: 0px;
+		}
+		a.toolbar-button.button-middle {
+			border-radius: 0px;
+			border-left: 0;
+			margin-right: 0px;
+		}
+		a.toolbar-button.button-right {
+			border-top-left-radius: 0px;
+			border-left: 0;
+			border-bottom-left-radius: 0px;
+		}
+		a.toolbar-button .fa {
+			font-size: 14px;
+		}
+		a.toolbar-button.disabled {
+			background-color: #ccc;
+			color: darkgray;
+		}
+		a.toolbar-button.disabled:hover {
+			background-color: #ccc;
+			color: darkgray;
+		}		
+ 	</style>
+
+	<!-- Print Styling -->
+	<style media="print">
+		/* salesforce elements */
+		div#AppBodyHeader,
+		div#side-bar-container,
+		div.bPageFooter.noTableFooter,
+		div.links,
+		div#footer {
+			display: none;
+		}
+		body {
+			background: 0 !important;
+		}
+		table#bodyTable {
+			border: 0 !important;
+		}
+		div.bodyDiv.brdPalette.brandPrimaryBrd {
+			border: 0 !important;
+			box-shadow: none;
+		}
+		.bPageBlock {
+			background: 0 !important;
+			border: 0 !important;
+		}
+		div.pbBody {
+			margin: 0 !important;
+		}
+		/* kimble specific */
+		#kimble-page-header-container {
+			display: none;
+		}
+		/* page specific */
+		.fa,
+		.action-cell,
+		.action-footer {
+			display: none;
+		}
+		#print-button-floating-dropdown,
+		.toolbar-container{
+			display:none !important;
+		}
+		.card {
+			width: 100%;
+		}
+	</style>
+
+	<apex:pageMessages id="page-messages" escape="false"/>
+
+ 	<apex:form id="TheForm">
+
+	<div id="journey-layout" class="journey-layout">
+		<div class="journey-card title-card-container">
+			<apex:outputPanel id="journey-edit" layout="none">
+			<div class="title-card">
+				<div class="title-card-heading" >
+					<div class="title-card-heading-text">
+						<apex:inputField id="name" html-placeholder="{!$Label.kimbleone__journeynameplaceholder}" styleClass="journey-name" value="{!TheJourney.Name}" required="true" rendered="{!(EditMode || ISBLANK(TheJourney.Id)) && ($ObjectType.KimbleOne__Journey__c.Updateable || $ObjectType.KimbleOne__Journey__c.Createable)}"/>
+						<apex:outputText value="{!TheJourney.Name}" rendered="{!!EditMode && !ISBLANK(TheJourney.Id) && ($ObjectType.KimbleOne__Journey__c.Updateable || $ObjectType.KimbleOne__Journey__c.Createable)}"/>
+					</div>
+					
+					<apex:outputPanel layout="block" styleClass="journey-fieldset-edit" rendered="{!$ObjectType.KimbleOne__Journey__c.FieldSets.KimbleOne__JourneyDetails.size > 0 && (EditMode || ISBLANK(TheJourney.Id)) && ($ObjectType.KimbleOne__Journey__c.Updateable || $ObjectType.KimbleOne__Journey__c.Createable)}">
+						<apex:repeat value="{!$ObjectType.KimbleOne__Journey__c.FieldSets.KimbleOne__JourneyDetails}" var="r">
+							<div class="journey-fieldset-edit-field">
+								<apex:outputLabel styleClass="journey-fieldset-label" value="{!r.Label}" />
+			   					<apex:inputField styleClass="{!CASE(r.Type, 'textarea', 'text-area-field', 'string', 'text-area-field','date',IF($ObjectType.KimbleOne__Journey__c.Fields[r].updateable,'kimbleDatePicker',''),'')}" required="{!r.Required}" value="{!TheJourney[r]}" rendered="{!!CONTAINS(r.FieldPath,'.')}"/>
+								<apex:outputField value="{!TheJourney[r]}" rendered="{!CONTAINS(r.FieldPath,'.')}"/>
+		   					</div>
+		 				</apex:repeat>
+	 				</apex:outputPanel>
+				</div>
+
+				<apex:outputPanel layout="none" rendered="{!!EditMode && !ISBLANK(TheJourney.Id)}">
+				<div class="toolbar-container">
+					<div class="toolbar">
+						<div id="toolbar-buttons">
+							<a class="toolbar-button button-left printJourneyLegsButton" title="{!$Label.Print} {!$ObjectType.KimbleOne__JourneyLeg__c.LabelPlural}" href="#"><i class="fa fa-print"></i></a><a data-floating-dropdown="#print-button-floating-dropdown" class="toolbar-button button-right addButton" title="{!$Label.Print}" href="#"><i class="fa fa-caret-down"></i></a>
+						</div>
+					</div>
+					
+					<div id="print-button-floating-dropdown" class="floating-dropdown floating-dropdown-relative" style="margin-top:1px">
+						<ul class="floating-dropdown-menu">
+							<li><a href="#" class="printJourneyLegsButton">{!$ObjectType.KimbleOne__JourneyLeg__c.LabelPlural}</a></li>
+							<li><a href="#" id="printJourneyButton">{!$Label.All}</a></li>
+						</ul>
+					</div>
+				</div>
+				</apex:outputPanel>
+
+				<div class="title-card-body">
+					<apex:outputPanel layout="none" rendered="{!$ObjectType.Journey__c.FieldSets.JourneyDetails.size > 0 && !EditMode && !ISBLANK(TheJourney.Id) }">
+						<apex:repeat value="{!$ObjectType.KimbleOne__Journey__c.FieldSets.KimbleOne__JourneyDetails}" var="r">
+							<div class="title-card-body-field">
+								<apex:outputLabel styleClass="center-aligned-block label-heading fieldset-heading" value="{!r.Label}" title="{!JSENCODE(r.Label)}"/>
+			   					<span class="fieldset-display-value" title="{!r.Type}"><apex:outputField styleClass="center-aligned-block" value="{!TheJourney[r]}"/></span>
+							</div>
+		 				</apex:repeat>
+	 				</apex:outputPanel>
+
+		  			<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheJourney.Id)}">
+ 					<div class="title-card-body-field">
+ 						<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Journey__c.Fields.KimbleOne__EarliestLegDepartureTime__c.Label}" />
+ 						<span ><apex:outputText styleClass="center-aligned-block kimble-format-date-time" value="{!TheEarliestDate}"/></span>
+ 					</div>
+					<div class="title-card-body-field">
+						<apex:outputLabel styleClass="center-aligned-block label-heading" value="{!$ObjectType.KimbleOne__Journey__c.Fields.KimbleOne__LatestLegArrivalTime__c.Label}" />
+						<span ><apex:outputText styleClass="center-aligned-block kimble-format-date-time" value="{!TheLatestDate}"/></span>
+					</div>
+					</apex:outputPanel>
+				</div>
+	
+				<div class="title-card-menu">
+					<apex:commandLink id="edit-journey" action="{!EditJourney}" title="{!$Label.kimbleone__edit} {!$ObjectType.KimbleOne__Journey__c.Label}" rendered="{!!EditMode && !ISBLANK(TheJourney.Id) && $ObjectType.KimbleOne__Journey__c.Updateable}">
+						<div class="title-card-menu fa fa-pencil burger-menu"></div>
+					</apex:commandLink>
+					<apex:commandLink id="save-journey" action="{!SaveJourney}" title="{!$Label.kimbleone__save}" rendered="{!(EditMode || ISBLANK(TheJourney.Id)) && ($ObjectType.KimbleOne__Journey__c.Updateable || $ObjectType.KimbleOne__Journey__c.Createable)}">
+						<div class="title-card-menu fa fa-save burger-menu"></div>
+					</apex:commandLink>
+				</div>	
+			</div>
+			</apex:outputPanel>
+
+			<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheJourney.Id) && !EditMode}">
+
+			<div class="card journey-legs">
+				<div class="cardHeading journey-legs-heading">
+					<div class="journey-legs-title">
+						<h3 class="cardTitle"><apex:outputText value="{!$ObjectType.KimbleOne__JourneyLeg__c.LabelPlural}"/></h3>
+					</div>
+				</div>
+				<apex:repeat value="{!TheOrderedJourneySectionKeys}" var="sectionKey">
+				<div class="inner-card journey-section-container" section-key="{!sectionKey}" journey-section-id="{!TheSectionKeyToIdMap[sectionKey]}">
+					<apex:outputPanel layout="block" styleClass="inner-card-body journey-legs">
+						<table class="list journey-leg-table">
+			    			<thead>
+			    				<apex:outputPanel layout="none" rendered="{!!HasExpenseItems}">
+			    				<th class="action-cell">
+                                    <apex:variable value="{!TheJourneySectionLegs[sectionKey]}" var="legs"/>
+				    				<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__JourneyLeg__c.createable}">
+			    						<i class="fa fa-plus-square add-new-journey-leg journey-btn" onclick="addNewJourneyLeg('{!sectionKey}');" title="{!$Label.kimbleone__add} {!$ObjectType.KimbleOne__JourneyLeg__c.Label}"/>
+									</apex:outputPanel>
+                                    <apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__JourneyLeg__c.createable && $ObjectType.KimbleOne__JourneySection__c.createable && AllowSections && TheSectionKeyToIdMap[sectionKey] != 'null' && legs.size = 0}">
+                                        <i class="fa fa-trash delete-journey-section journey-btn" onclick="deleteJourneySection('{!sectionKey}');" title="{!$Label.kimbleone__deletebutton} {!$ObjectType.KimbleOne__JourneySection__c.Label}"/>
+                                    </apex:outputPanel>
+			    				</th>
+			    				</apex:outputPanel>
+			    				<th><apex:outputText value="{!$ObjectType.KimbleOne__JourneyLeg__c.Fields.KimbleOne__JourneyLocationDeparture__c.Label}"/></th>
+			    				<th><apex:outputText value="{!$ObjectType.KimbleOne__JourneyLeg__c.Fields.KimbleOne__DepartureTime__c.Label}"/></th>
+			    				<th></th>
+			    				<th><apex:outputText value="{!$ObjectType.KimbleOne__JourneyLeg__c.Fields.KimbleOne__JourneyLocationArrival__c.Label}"/></th>
+			    				<th><apex:outputText value="{!$ObjectType.KimbleOne__JourneyLeg__c.Fields.KimbleOne__ArrivalTime__c.Label}"/></th>
+			    				<th><apex:outputText value="{!$ObjectType.KimbleOne__JourneyLeg__c.Fields.KimbleOne__Notes__c.Label}"/></th>
+			    				<th></th>
+			    			</thead>
+			    			<tbody>
+								<apex:repeat value="{!TheJourneySectionLegs[sectionKey]}" var="journeyLeg" >
+	    							<tr journey-leg-id="{!journeyLeg.JourneyLegId}">
+					    				<apex:outputPanel layout="none" rendered="{!!HasExpenseItems}">
+	    								<td class="action-cell">
+						    				<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__JourneyLeg__c.updateable}">
+		    									<i class="fa fa-pencil" onclick="editJourneyLeg(this);" title="{!$Label.kimbleone__edit} {!$ObjectType.KimbleOne__JourneyLeg__c.Label}"/>
+		    								</apex:outputPanel>
+						    				<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__JourneyLeg__c.deletable}">
+		    									<i class="fa fa-trash" onclick="deleteJourneyLeg(this);" title="{!$Label.kimbleone__deletebutton} {!$ObjectType.KimbleOne__JourneyLeg__c.Label}"/>
+		    								</apex:outputPanel>
+						    				<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__JourneyLeg__c.Updateable || $ObjectType.KimbleOne__JourneyLeg__c.Createable}">
+		    									<i class="fa fa-save hidden-item" onclick="saveJourneyLeg(this);" title="{!$Label.kimbleone__save} {!$ObjectType.KimbleOne__JourneyLeg__c.Label}"/>
+		    								</apex:outputPanel>
+	    								</td>
+	    								</apex:outputPanel>
+	    								<td class="location-name">
+	    									<apex:outputText styleClass="departure-location" html-journey-location-id="{!journeyLeg.DepartingFromId}" value="{!journeyLeg.DepartingFromName}"/>
+	    								</td>
+										<td class="leg-date">
+											<apex:outputText styleClass="kimble-format-date-time leg-departure" value="{!journeyLeg.DepartureTime}"/>
+										</td>
+										<td class="padding-cell">
+											<i class="fa fa-arrow-circle-right"/>
+										</td>
+										<td class="location-name">
+											<apex:outputText styleClass="arrival-location" html-journey-location-id="{!journeyLeg.ArrivingAtId}" value="{!journeyLeg.ArrivingAtName}"/>
+										</td>
+										<td class="leg-date">
+											<apex:outputText styleClass="kimble-format-date-time leg-arrival" value="{!journeyLeg.ArrivalTime}"/>
+										</td>
+										<td class="leg-notes">
+											<apex:outputPanel layout="none" rendered="{!!ISBLANK(journeyLeg.Notes)}">
+												<span class="fa fa-sticky-note-o" title="{!JSENCODE(journeyLeg.Notes)}"/>
+											</apex:outputPanel>
+											<apex:outputText styleClass="leg-note hidden-item" value="{!journeyLeg.Notes}"/>
+										</td>
+					    				<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__JourneyLeg__c.Updateable || $ObjectType.KimbleOne__JourneyLeg__c.Createable}">
+										<td class="action-cell">
+											<i class="fa fa-save hidden-item" onclick="saveJourneyLeg(this);" title="{!$Label.kimbleone__save} {!$ObjectType.KimbleOne__JourneyLeg__c.Label}"/>
+										</td>
+										</apex:outputPanel>
+									</tr>
+								</apex:repeat>
+								<tr journeyState="NEW" class="new-journey-leg">
+								</tr>
+							</tbody>
+						</table>
+					</apex:outputPanel>
+					<div class="inner-card-footer action-footer">
+						<div class="footer-action-btn-container">
+							<apex:outputPanel layout="none" rendered="{!HasJourneyLegs && !HasExpenseItems && $ObjectType.KimbleOne__AllowancePeriod__c.createable && $ObjectType.KimbleOne__AllowancePeriod__c.updateable && $ObjectType.KimbleOne__AllowancePeriod__c.deletable && NOT($ObjectType.KimbleOne__JourneySection__c.createable && AllowSections)}">
+								<div class="action-footer-btn undecorated-link working-btn" id="calculate-allowances" onclick="calculateAllowancePeriods();">
+									<apex:outputText styleClass="action-footer-link" value="{!$Label.kimbleone__calculateallowanceslink}"/>
+									<i class="fa fa-calculator footer-btn-ind"  title="{!$Label.CalculateAllowances}"/>
+								</div>
+							</apex:outputPanel>
+						</div>
+					</div>
+				</div>
+				</apex:repeat>
+				<apex:outputPanel layout="none" rendered="{!HasJourneyLegs && !HasExpenseItems && $ObjectType.KimbleOne__AllowancePeriod__c.createable && $ObjectType.KimbleOne__AllowancePeriod__c.updateable && $ObjectType.KimbleOne__AllowancePeriod__c.deletable && $ObjectType.KimbleOne__JourneySection__c.createable && AllowSections}">
+				<div class="cardFooter journey-legs-footer">
+					<div class="footer-action-btn-container">
+						<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__JourneySection__c.createable && AllowSections}">
+							<div class="action-footer-btn undecorated-link working-btn" id="add-section" onclick="AddJourneySection();">
+								<i class="fa fa-plus-square-o footer-btn-ind" title="{!$Label.kimbleone__add} {!$ObjectType.KimbleOne__JourneySection__c.Label}"/>
+								<apex:outputText styleClass="action-footer-link" value="{!$Label.kimbleone__add} {!$ObjectType.KimbleOne__JourneySection__c.Label}"/>
+							</div>
+						</apex:outputPanel>
+						<div class="action-footer-btn undecorated-link working-btn" id="calculate-allowances" onclick="calculateAllowancePeriods();">
+							<apex:outputText styleClass="action-footer-link" value="{!$Label.kimbleone__calculateallowanceslink}"/>
+							<i class="fa fa-calculator footer-btn-ind" title="{!$Label.kimbleone__calculateallowances}"/>
+						</div>
+					</div>
+				</div>
+				</apex:outputPanel>
+			</div>
+
+			<div class="cardContainer">
+				
+				<apex:outputPanel layout="none" rendered="{!HasAllowancePeriods}">
+				<div class="card allowance-periods">
+					<div class="cardHeading allowance-period-heading">
+						<div class="allowance-periods-title">
+							<h3 class="cardTitle"><apex:outputText value="{!$Label.kimbleone__allowancesandadjustmentsheading}"/></h3>
+						</div>
+					</div>
+					<div class="inner-card">
+						<apex:outputPanel layout="block" styleClass="inner-card-body">				
+						<table class="list allowance-period-table">
+						
+						<apex:variable var="headerCount" value="{!1}"/>
+						<apex:repeat value="{!TheAllowancePeriodsMap}" var="key">
+							<apex:variable var="allowancePeriods" value="{!TheAllowancePeriodsMap[key]}"/>
+
+				    			<thead>
+				    				<apex:outputPanel layout="none" rendered="{!headerCount == 1}">
+				    				<tr>
+					    				<th></th>
+					    				<th></th>
+					    				<th></th>
+					    				<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheAllowanceTypes) && TheAllowanceTypes.size > 0}">
+				    					<th class="adjustments-header" colspan="{!NumOfAllowanceTypeAdjustmentTypes}"><apex:outputText value="{!$Label.kimbleone__allowanceadjustmentsheading}"/></th>
+				    					</apex:outputPanel>
+					    				<th></th>
+					    				<th class="hidden-item"></th>
+					    				<apex:variable value="{!IF(HasRemainingAmounts && NumberOfActivities > 0, 1, 0)}" var="additionalColumns"/>
+				    					<th class="allocations-header" colspan="{!TheActivityAllocations.size + additionalColumns}">
+				    						<apex:outputText value="{!$Label.kimbleone__allocationslabel}"/>
+		    							</th>
+			    					</tr>
+			    					
+			    					<tr>
+					    				<th>
+					    					<apex:outputText value="{!$Label.kimbleone__periodlabel}"/>
+					    				</th>
+					    				<th><apex:outputText value="{!$ObjectType.KimbleOne__AllowancePeriod__c.Fields.KimbleOne__JourneyLocation__c.Label}"/></th>
+					    				<th><apex:outputText value="{!$ObjectType.KimbleOne__AllowancePeriod__c.Fields.KimbleOne__AllowanceRegion__c.Label}"/></th>
+				    					<apex:repeat var="allowanceType" value="{!TheAllowanceTypes}">
+				    						<apex:repeat var="adjustmentType" value="{!TheAdjustmentTypesMap[allowanceType.AllowanceTypeId]}">
+				    							<th class="adjustment-header"><apex:outputText value="{!adjustmentType.Name}"/></th>
+				    						</apex:repeat>
+				    					</apex:repeat>
+				    					<th class="allowance-amount-header-cell"><apex:outputText value="{!$ObjectType.KimbleOne__AllowancePeriod__c.Fields.KimbleOne__AllowanceAmount__c.Label}"/></th>
+				    					<th class="hidden-item"><apex:outputText value="{!$ObjectType.KimbleOne__AllowancePeriod__c.Fields.KimbleOne__AllocationAmount__c.Label}"/></th>
+				    					<apex:repeat value="{!TheActivityAllocations}" var="activityAllocation">
+				    						<th class="allocation-column" activity-id="{!JSINHTMLENCODE(activityAllocation.ResourcedActivity__r.Id)}">
+				    							<apex:outputText value="{!activityAllocation.ResourcedActivity__r.KimbleOne__FullName__c}"/>
+				    						</th>
+				    					</apex:repeat>
+				    					<apex:outputPanel layout="none" rendered="{!HasRemainingAmounts && NumberOfActivities > 0}">
+					    					<th class="add-allocation-header">
+				    							<apex:outputPanel layout="none" rendered="{!headerCount == 1}">
+				    							
+				    								<apex:outputPanel layout="none" rendered="{!NumberOfActivities > 0 && NumberOfActivities <= AllowanceActivitySearchThreshold}">
+												    	<select class="find-activity">
+												    		<option class="activity-option" value=""></option>
+												    	<apex:repeat value="{!AvailableActivities}" var="activityOption">
+												    		<option class="activity-option" value="{!JSINHTMLENCODE(activityOption.id)}"><apex:outputText value="{!activityOption.text}"/></option>;
+												    	</apex:repeat>
+												    	</select>
+				    								</apex:outputPanel>
+				    							
+				    								<apex:outputPanel layout="none" rendered="{!NumberOfActivities > 0 && NumberOfActivities > AllowanceActivitySearchThreshold}">
+					    								<input type="text" class="find-activity"/>
+					    							</apex:outputPanel>
+				    								<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__AllowancePeriodAllocation__c.createable}">
+						    							<span class="allocation-all-btn fa fa-plus-square" title="{!$Label.AllocateAllLabel}" onclick="newAllowanceAllocationAllocateAll(this);"></span>
+					    							</apex:outputPanel>
+				    							</apex:outputPanel>
+					    					</th>
+		    							</apex:outputPanel>
+			    					</tr>
+			    					</apex:outputPanel>
+				    			</thead>
+				    			<tbody>
+									<apex:repeat value="{!allowancePeriods}" var="allowancePeriod" >
+		    							<tr allowance-period-id="{!JSINHTMLENCODE(allowancePeriod.AllowancePeriodId)}">
+											<td class="allowance-date" raw-date="{!JSINHTMLENCODE(allowancePeriod.StartDate)}">
+												<apex:outputText styleClass="kimble-format-date" value="{!allowancePeriod.StartDate}" rendered="{!!allowancePeriod.IsRolling}"/>
+												<apex:outputText styleClass="kimble-format-date-time rolling-period" value="{!allowancePeriod.StartTime}" rendered="{!allowancePeriod.IsRolling}"/>
+												<apex:outputText styleClass="kimble-format-date-time rolling-period" value="{!allowancePeriod.EndTime}" rendered="{!allowancePeriod.IsRolling}"/>
+											</td>
+											<td class="location-name">
+												<apex:outputText value="{!allowancePeriod.LocationName}"/>
+											</td>
+											<td class="location-region">
+												<apex:outputText value="{!allowancePeriod.RegionName}"/>
+											</td>
+											<apex:variable var="theAllowancePeriodAllowances" value="{!TheAllowancePeriodAllowanceAdjustmentMap[allowancePeriod.AllowancePeriodId]}"/>
+											<apex:variable var="theAllowancePeriodAllowanceTypes" value="{!TheAllowancePeriodAllowanceTypesMap[allowancePeriod.AllowancePeriodId]}"/>
+				    						<apex:repeat var="allowanceType" value="{!TheAllowanceTypes}">
+				    							<apex:outputPanel layout="none" rendered="{!IF(CONTAINS(theAllowancePeriodAllowanceTypes, allowanceType.AllowanceTypeId), true, false)}">
+				    							<apex:variable var="theAllowancePeriodAllowanceAdjustments" value="{!theAllowancePeriodAllowances[allowanceType.AllowanceTypeId]}"/>
+				    							<apex:repeat var="adjustmentType" value="{!TheAdjustmentTypesMap[allowanceType.AllowanceTypeId]}">
+					    							<apex:outputPanel layout="none" rendered="{!IF(CONTAINS(AllowanceTypeAdjustmentTypes, adjustmentType.AdjustmentTypeId), true, false)}">
+				    								<apex:variable var="theAllowancePeriodAllowanceAdjustmentType" value="{!theAllowancePeriodAllowanceAdjustments[adjustmentType.AdjustmentTypeId]}"/>
+							    					<td class="allowance-adjustment-cell">
+							    						<apex:outputPanel layout="none" rendered="{!theAllowancePeriodAllowanceAdjustmentType.IsApplicable}">
+							    							<apex:outputPanel layout="none" rendered="{!allowancePeriod.AnyAllocated}">
+							    								<input allowance-adjustment-id="{!theAllowancePeriodAllowanceAdjustmentType.Id}" type="checkbox" disabled="disabled" checked="checked"/>
+							    							</apex:outputPanel>
+							    							<apex:outputPanel layout="none" rendered="{!!allowancePeriod.AnyAllocated}">
+								    							<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__AllowancePeriodAllocation__c.createable}">
+								    								<input allowance-adjustment-id="{!theAllowancePeriodAllowanceAdjustmentType.Id}" type="checkbox" checked="checked"/>
+								    							</apex:outputPanel>
+								    							<apex:outputPanel layout="none" rendered="{!!$ObjectType.KimbleOne__AllowancePeriodAllocation__c.createable}">
+								    								<input allowance-adjustment-id="{!theAllowancePeriodAllowanceAdjustmentType.Id}" type="checkbox" checked="checked" disabled="disabled" />
+								    							</apex:outputPanel>
+							    							</apex:outputPanel>
+							    						</apex:outputPanel>
+							    						<apex:outputPanel layout="none" rendered="{!!theAllowancePeriodAllowanceAdjustmentType.IsApplicable}">
+							    							<apex:outputPanel layout="none" rendered="{!allowancePeriod.AnyAllocated}">
+							    								<input allowance-adjustment-id="{!theAllowancePeriodAllowanceAdjustmentType.Id}" type="checkbox" disabled="disabled"/>
+							    							</apex:outputPanel>
+							    							<apex:outputPanel layout="none" rendered="{!!allowancePeriod.AnyAllocated}">
+								    							<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__AllowancePeriodAllocation__c.createable}">
+							    									<input allowance-adjustment-id="{!theAllowancePeriodAllowanceAdjustmentType.Id}" type="checkbox"/>
+								    							</apex:outputPanel>
+								    							<apex:outputPanel layout="none" rendered="{!!$ObjectType.KimbleOne__AllowancePeriodAllocation__c.createable}">
+							    									<input allowance-adjustment-id="{!theAllowancePeriodAllowanceAdjustmentType.Id}" type="checkbox" disabled="disabled"/>
+								    							</apex:outputPanel>
+							    							</apex:outputPanel>
+							    						</apex:outputPanel>
+							    					</td>
+							    					</apex:outputPanel>
+							    					<apex:outputPanel layout="none" rendered="{!IF(CONTAINS(AllowanceTypeAdjustmentTypes, adjustmentType.AdjustmentTypeId), false, true)}">
+								    					<td class="allowance-adjustment-cell">
+							    						</td>
+							    					</apex:outputPanel>
+						    					</apex:repeat>
+						    					</apex:outputPanel>
+						    					<apex:outputPanel layout="none" rendered="{!IF(CONTAINS(theAllowancePeriodAllowanceTypes, allowanceType.AllowanceTypeId), false, true)}">
+												<!-- Dummy cell that represents the each adjustment type for this allowance type -->
+					    						<apex:repeat var="adjustmentType" value="{!TheAdjustmentTypesMap[allowanceType.AllowanceTypeId]}">
+							    					<td class="dummy-allowance-adjustment-cell"></td>
+					    						</apex:repeat>
+						    					</apex:outputPanel>
+					    					</apex:repeat>
+											<td class="right-align-cell allowance-amount-cell">
+												<apex:outputText styleclass="kimble-format-currency total-amt" html-data-remaining-numeric-amt="{!allowancePeriod.RemainingAmount}" html-data-numeric-amt="{!allowancePeriod.AllowanceAmount}" html-data-currency="{!allowancePeriod.CurrencyIsoCode}" value="{!allowancePeriod.AllowanceAmount}"/>
+											</td>
+											<td class="right-align-cell hidden-item">
+												<apex:outputText styleclass="kimble-format-currency remaining-amt" html-data-numeric-amt="{!allowancePeriod.RemainingAmount}" html-data-currency="{!allowancePeriod.CurrencyIsoCode}" value="{!allowancePeriod.RemainingAmount}"/>
+											</td>
+											<apex:repeat value="{!TheActivityAllocations}" var="activityAllocation">
+											<apex:repeat value="{!AllowancePeriodAllocationMap[allowancePeriod.AllowancePeriodId][activityAllocation.KimbleOne__ResourcedActivity__c]}" var="theAllocation">
+												<apex:variable value="{!ValidDatesForActivitiesMap[activityAllocation.KimbleOne__ResourcedActivity__c][allowancePeriod.StartDate]}" var="activityIsValidForDate"/>
+												<apex:outputPanel layout="none" rendered="{!ISBLANK(theAllocation.ExpenseItem__c) && activityIsValidForDate}">
+												<td class="allocation-cell">
+													<div class="allocation-wrapper">
+														<apex:outputPanel layout="none" rendered="{!!ISBLANK(theAllocation.Notes__c)}">
+															<span class="allocation-note-ind fa fa-sticky-note-o" title="{!JSINHTMLENCODE(theAllocation.Notes__c)}"/>
+														</apex:outputPanel>
+														<apex:inputField styleClass="allocation-amount" html-allocation-notes="{!JSINHTMLENCODE(theAllocation.Notes__c)}" html-allowance-period-id="{!JSINHTMLENCODE(allowancePeriod.AllowancePeriodId)}" html-activity-id="{!JSINHTMLENCODE(activityAllocation.KimbleOne__ResourcedActivity__c)}" html-allocation-id="{!JSINHTMLENCODE(theAllocation.Id)}" value="{!theAllocation.AllocationAmount__c}" rendered="{!allowancePeriod.AllowanceAmount > 0 && !(ISBLANK(theAllocation.AllocationAmount__c) && allowancePeriod.AllAllocated)}"/>
+														<apex:outputPanel layout="none" rendered="{!!allowancePeriod.AllAllocated}">
+															<i class="allocate-allowance-btn fa fa-angle-double-right" onclick="copyBalance(this);" title="{!$Label.kimbleone__allocateallowancebalancelabel}"/>
+														</apex:outputPanel>
+														<apex:outputPanel layout="none" rendered="{!allowancePeriod.AllAllocated && !ISBLANK(theAllocation.AllocationAmount__c)}">
+															<i class="clear-allowance-allocation-btn fa fa-times-circle" onclick="clearAllocation(this);" title="{!$Label.kimbleone__removeallowanceallocationlabel}"/>
+														</apex:outputPanel>
+													</div>
+												</td>
+												</apex:outputPanel>
+												<apex:outputPanel layout="none" rendered="{!!ISBLANK(theAllocation.ExpenseItem__c) && activityIsValidForDate}">
+												<apex:variable value="{!IF(ISBLANK(theAllocation.ExpenseItem__r.ExpenseClaim__r.ApprovalStatus__c),'Draft',theAllocation.ExpenseItem__r.ExpenseClaim__r.ApprovalStatus__c)}" var="approvalStatus"/>
+												<td class="allocation-cell {!JSINHTMLENCODE(approvalStatus)}">
+													<a href="javascript:safeNavigateToSObject('{!JSINHTMLENCODE(theAllocation.ExpenseItem__r.ExpenseClaim__c)}');"><i class="allocated-allowance-btn fa fa-info-circle {!JSINHTMLENCODE(approvalStatus)}" title="{!$Label.kimbleone__allocateditemmessage} ({!JSINHTMLENCODE(approvalStatus)})"/></a>
+													<apex:outputText styleclass="kimble-format-currency allocation-amount" html-data-numeric-amt="{!theAllocation.AllocationAmount__c}" html-data-currency="{!JSINHTMLENCODE(theAllocation.CurrencyIsoCode)}" value="{!theAllocation.AllocationAmount__c}"/>
+												</td>
+												</apex:outputPanel>
+												<apex:outputPanel layout="none" rendered="{!!activityIsValidForDate}">
+												<td class="allocation-cell" title="{!$Label.kimbleone__notassignedmessage}"/>
+												</apex:outputPanel>
+											</apex:repeat>
+											</apex:repeat>
+											<apex:outputPanel layout="none" rendered="{!HasRemainingAmounts && NumberOfActivities > 0}"> 
+											<td class="add-allocation-cell" raw-date="{!allowancePeriod.StartDate}">
+												<apex:outputPanel layout="none" rendered="{!!allowancePeriod.AllAllocated && $ObjectType.KimbleOne__AllowancePeriodAllocation__c.createable}">
+													<span class="add-allocation-btn fa fa-plus-square-o" title="{!$Label.Allocate}" onclick="newAllowanceAllocation(this);"></span>
+												</apex:outputPanel>
+											</td>
+											</apex:outputPanel>
+										</tr>
+									</apex:repeat>
+								</tbody>
+								<apex:variable var="headerCount" value="{!headerCount + 1}"/>
+						</apex:repeat>
+						</table>
+					</apex:outputPanel>
+					<div class="inner-card-footer action-footer">
+						<div class="footer-action-btn-container">
+							<apex:outputPanel layout="none" rendered="{!TheActivityAllocations.size > 0 && ($ObjectType.KimbleOne__ExpenseItem__c.Createable || $ObjectType.KimbleOne__ExpenseClaim__c.Createable)}">
+								<div class="action-footer-btn undecorated-link" id="submit-allowance-allocations" onclick="submitAllowanceAllocations();">
+									<apex:outputText styleClass="action-footer-link" value="{!$Label.kimbleone__createexpenseitems}"/>
+									<i class="fa fa-money footer-btn-ind expense-claim-submit-icon footer-btn-ind"/>
+								</div>
+							</apex:outputPanel>
+						</div>
+					</div>
+					</div>
+				</div>
+				</apex:outputPanel>
+			</div>
+			
+			</apex:outputPanel>	
+		</div>
+	</div>
+
+   	<apex:actionFunction action="{!EditJourney}" name="EditJourney" rerender="journey-edit" oncomplete="initialiseFormattedFields();initialiseDynamicElements();"/>
+   	<apex:actionFunction action="{!SaveJourney}" name="SaveJourney" rerender="journey-edit" oncomplete="initialiseFormattedFields();initialiseDynamicElements();"/>
+   	<apex:actionFunction action="{!ReloadAll}" name="rerenderTheForm" rerender="TheForm, page-messages" oncomplete="initialiseFormattedFields();initialiseDynamicElements();"/>
+    <apex:actionFunction action="{!DeleteJourneyLeg}" name="DeleteJourneyLeg" reRender="TheForm, page-messages" oncomplete="initialiseFormattedFields();initialiseDynamicElements();">
+        <apex:param name="journeyLegId" value=""/>
+    </apex:actionFunction>
+    <apex:actionFunction action="{!DeleteJourneySection}" name="deleteJourneySection" reRender="TheForm, page-messages" oncomplete="initialiseFormattedFields();initialiseDynamicElements();">
+        <apex:param name="sectionKey" value=""/>
+    </apex:actionFunction>
+    <apex:actionFunction action="{!AddJourneySection}" name="AddJourneySection" reRender="TheForm, page-messages" oncomplete="initialiseFormattedFields();initialiseDynamicElements();"/>
+	<apex:actionFunction action="{!CalculateAllowancePeriods}" name="CalculateTheAllowancePeriods" reRender="TheForm, page-messages" oncomplete="initialiseFormattedFields();initialiseDynamicElements();"/>
+	<apex:actionFunction action="{!SubmitAllowanceAllocations}" name="SubmitAllowanceAllocations" reRender="TheForm, page-messages" oncomplete="initialiseFormattedFields();initialiseDynamicElements();"/>
+	   	
+   	<script>
+   		// only run when the form is first rendered
+		jQuery(window).load(function()
+		{
+			initialiseFormattedFields();
+		});
+	</script>
+   	
+	</apex:form>
+ 
+	<script>
+	
+		var viewerOffsetMinutes = <apex:outputText value="{!viewerOffsetMinutes}"/>;
+
+		jQuery(window).load(function()
+		{
+			initialiseDynamicElements();
+		});
+		
+		function initialiseDynamicElements()
+		{
+			jQuery('.find-journey-leg-location').select2();
+			
+			jQuery('.kimbleDatePicker').datepicker({
+		   		dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true,
+					selectOtherMonths: true
+			});
+			
+			jQuery('.kimbleTimePicker').timepicker({ 'timeFormat': 'H:i' });
+			
+			
+			if(jQuery('.activity-option').length > 0)
+			{
+				jQuery('.find-activity').select2();
+			}
+			else
+			{
+				jQuery('.find-activity').select2({
+	            		minimumInputLength: 2,
+	            		multiple: false,
+	            		query: function (params) {
+	            			var find = function() {findMatchingActivities(params);};        		
+	        				find();
+	            		},
+	            		initSelection : function (element, callback) {
+					        var data = {id: element.val(), text: element.attr('data-name')};
+					        callback(data);
+					    }
+			    });
+		    }
+		    
+		    jQuery('.find-activity').on("change", function(e) { 
+			   getValidDatesForActivity(this);
+			});
+		    
+		    jQuery('.fa-sticky-note-o').qtip();
+		    
+		    if(jQuery('input.allocation-amount').length == 0)
+		    {
+		    	jQuery('#submit-allowance-allocations').hide();
+		    }
+		    else
+		    {
+		    	jQuery('#submit-allowance-allocations').show();
+		    }
+		    
+		    // if any amounts are allocated then check whether there are remaining
+		    // amounts to allocate (only do this once allocations start so that
+		    // we don't show needless warnings before the user has even started allocating amounts
+		    if(jQuery('.allocation-amount').length > 0)
+		    {
+			    jQuery('span[data-remaining-numeric-amt]').each(function() {
+					var remainingAllowanceAmount = jQuery(this).attr('data-remaining-numeric-amt');
+					var remainingAllowanceAmountRounded = Number(remainingAllowanceAmount).toFixed(2);
+	
+					var totalAllowanceAmount = jQuery(this).attr('data-numeric-amt');
+					var totalAllowanceAmountRounded = Number(totalAllowanceAmount).toFixed(2);
+					
+					if(remainingAllowanceAmountRounded == totalAllowanceAmountRounded && remainingAllowanceAmountRounded > 0)
+					{
+						var warningTitle = '{!JSENCODE($Label.AllowanceAmountNotAllocatedMessage)}'; 
+						warningTitle = warningTitle.format(remainingAllowanceAmountRounded);
+						jQuery(this).parent().prepend('<i class="fa fa-info-circle allocation-msg allocation-info" title="' + warningTitle + '"/>');
+					}
+					else if(remainingAllowanceAmountRounded > 0 && remainingAllowanceAmountRounded != totalAllowanceAmountRounded)
+					{
+						var warningTitle = '{!JSENCODE($Label.AllowanceAmountPartiallyAllocatedMessage)}'; 
+						warningTitle = warningTitle.format(remainingAllowanceAmountRounded);
+						jQuery(this).parent().prepend('<i class="fa fa-warning allocation-msg allocation-warning" title="' + warningTitle + '"/>');
+					}
+					else
+					{
+						jQuery(this).parent().remove('.allocation-msg');
+					}
+				});
+			}
+			
+			jQuery(document).off('click', '.printJourneyLegsButton').on('click', '.printJourneyLegsButton', printJourneyLegs);
+			jQuery(document).off('click', '#printJourneyButton').on('click', '#printJourneyButton', printJourney);			
+		}
+		
+		function printJourneyLegs()
+		{
+			jQuery('.allowance-periods').hide();
+			showNotesForPrint();
+			
+			window.print();
+
+			jQuery('.allowance-periods').show();
+			hideNotesAfterPrint();
+		}
+		
+		function printJourney()
+		{
+			showNotesForPrint();
+
+			window.print();
+
+			hideNotesAfterPrint();
+		}
+		
+		function showNotesForPrint()
+		{
+			jQuery('.leg-note').removeClass('hidden-item');
+			jQuery('.leg-notes').addClass('for-print');
+		}
+		
+		function hideNotesAfterPrint()
+		{
+			jQuery('.leg-note').addClass('hidden-item');
+			jQuery('.leg-notes').removeClass('for-print');
+		}
+		
+		function getValidDatesForActivity(theActivitySelect2)
+		{
+			if(jQuery(theActivitySelect2).val() != undefined && jQuery(theActivitySelect2).val() != '') 
+			{
+				renderForActivity(jQuery(theActivitySelect2).val());
+			}
+		}
+		
+		jQuery(document).on('focus', 'input.allocation-amount', function (event) {
+						
+		        var j = jQuery(this);
+				
+				var notes = jDecode(j.attr('allocation-notes'));
+				
+				var popupHtml = '<textarea class="note" placeholder="--{!$ObjectType.AllowancePeriodAllocation__c.Fields.Notes__c.Label}--">' + notes + '</textarea>';
+		
+				j.qtip('destroy', true);
+		
+				j.qtip({
+		            overwrite: true,
+					show: {
+		                solo:true,
+		 			    event: 'focus', // Use the same event type as above
+		                ready: true // Show immediately - important!
+		            },
+					hide: {
+						event: 'unfocus'
+					},
+					style: {
+						classes: 'qtip-light qtip-shadow'
+			        },
+					content: { 
+						text: popupHtml
+					},
+			        position: { adjust: { method: 'flip flip'
+						},
+						viewport: $(window)
+					}
+		        });
+		    });
+
+		jQuery(document).on('change', '.note', function() {
+			var j = jQuery(this);
+
+			var theQtip = j.closest('.qtip');
+
+			var theAllocation = jQuery('input.allocation-amount[aria-describedby=' + theQtip.attr('id') + ']');
+			var theAllocationId = theAllocation.attr('allocation-id');
+			// find the associated input and update the notes attr
+			theAllocation.attr('allocation-notes', j.val());
+			
+			var theNoteInd = jQuery('.allocation-amount[allocation-id="' + theAllocationId + '"]').prev('.allocation-note-ind');
+			// find/inject a notes icon
+			if(jQuery('.allocation-amount[allocation-id="' + theAllocationId + '"]').prev('.allocation-note-ind').length > 0)
+			{
+				if(j.val() == '')
+				{
+					jQuery(theNoteInd).remove();
+					return;
+				}
+				else
+				{
+					theNoteInd.attr('oldtitle', j.val());
+				}
+			}
+			else
+			{
+				var noteIndHtml = '<span class="allocation-note-ind fa fa-sticky-note-o" title="' + j.val() + '"/>'
+				jQuery('.allocation-amount[allocation-id="' + theAllocationId + '"]').before(noteIndHtml);
+				theNoteInd = jQuery('.allocation-amount[allocation-id="' + theAllocationId + '"]').prev('.allocation-note-ind');
+			}
+			
+			theNoteInd.qtip('destroy', true);
+			theNoteInd.qtip();
+			
+			setAllowanceAllocationNotes(theAllocationId, j.val());
+		});
+				    
+		// Called by select2 to dynamically populate selects with large lists 
+		function findMatchingActivities(params)
+		{
+			var activityIds = [];
+			
+			jQuery('.allocation-column').each(function() {activityIds.push(jQuery(this).attr('activity-id'));})
+		
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JourneyEditController.FindMatchingActivities}',
+		      		'{!JSENCODE(TheJourney.Id)}', params.term, activityIds, viewerOffsetMinutes,
+		     			function(result, event){          
+		            		if (event.status) 
+			            {
+			             	var data = {};
+			             	data.results = result;
+			             	params.callback(data);
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+		        	}, 
+		        	{escape: false, timeout: 60000}
+		    	);
+		}
+
+		function renderForActivity(activityId)
+		{
+			var theActivities = [];
+			var theJourneyDates = [];
+			
+			jQuery('.allowance-date').each(function() {theJourneyDates.push(jQuery(this).attr('raw-date'));})
+			theActivities.push(activityId);
+			
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JourneyEditController.GetValidDatesForActivities}',
+		      		theActivities, '{!JSENCODE(TheResource.Id)}', theJourneyDates,
+		     			function(result, event){          
+		            		if (event.status) 
+			            {
+			             	var theDateMap = {};
+			             	theDateMap = result;
+			             	
+							jQuery.each( theDateMap, function( key, value )
+							{
+								var resourcedActivityId = key;
+								
+								jQuery.each( value, function( key, value )
+								{
+									if(value)
+									{
+										jQuery('td.add-allocation-cell[raw-date="' + key + '"]').find('.add-allocation-btn').show()
+									}
+									else
+									{
+										jQuery('td.add-allocation-cell[raw-date="' + key + '"]').find('.add-allocation-btn').hide()
+									}
+								});
+							});
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+		        	}, 
+		        	{escape: false, timeout: 60000}
+		    	);
+		}
+		
+		function allowDayOverlay(date) 
+		{
+	  		if(jQuery(this).attr('minDate') == null || jQuery(this).attr('minDate') == "")
+	  			return [true, null];
+
+			if(kimble.parseDate(jQuery(this).attr('minDate')).toDate() > date)
+				return [false, null];
+	  		
+	  		return [true, null];
+  		}
+  		
+		function initialiseFormattedFields()
+		{	
+			kimble.formatDates();
+			kimble.formatDateTimes();
+			kimble.formatCurrencies();
+	    }
+
+		function addNewJourneyLeg(sectionKey)
+		{
+			// first check if any existing periods have any configuration that will be lost
+			if(jQuery('input.allocation-amount').filter(function () {return !!this.value;}).length > 0 || jQuery('input[allowance-adjustment-id]:checked').length > 0)
+			{
+				if (confirm("{!$Label.AddJourneyLegWarning}") != true)
+					return;
+			}
+			
+			findMatchingJourneyLocations(buildNewJourneyLegHtml, sectionKey);
+			
+			jQuery(".journey-btn").addClass('hidden-item');
+			jQuery(".working-btn").addClass('hidden-item');
+		}
+
+		function editJourneyLeg(editRow)
+		{
+			// first check if any existing periods have any configuration that will be lost
+			if(jQuery('input.allocation-amount').filter(function () {return !!this.value;}).length > 0 || jQuery('input[allowance-adjustment-id]:checked').length > 0)
+			{
+				if (confirm("{!$Label.EditingWillDiscardChangesWarning}") != true)
+					return;
+			}
+			
+			jQuery(editRow).parent().find('.fa').addClass('hidden-item');
+			jQuery(editRow).parent().addClass('Loading');
+			
+			jQuery(".journey-btn").addClass('hidden-item');
+			jQuery(".working-btn").addClass('hidden-item');
+			
+			findMatchingJourneyLocations(buildEditJourneyLegHtml);
+		}
+		
+		function cancelNewJourneyLeg()
+		{
+			jQuery('.new-journey-leg').hide();
+			
+			jQuery(".journey-btn").removeClass('hidden-item');
+			jQuery(".working-btn").removeClass('hidden-item');
+			jQuery('.action-cell > .fa-pencil').removeClass('hidden-item');
+			jQuery('.action-cell > .fa-trash').removeClass('hidden-item');
+			
+			jQuery('.journey-leg-error-row').remove();		
+		}
+		
+		function cancelEditJourneyLeg()
+		{
+			rerenderTheForm();
+		}
+		
+		function buildNewJourneyLegHtml(journeyLegLocations, sectionKey)
+		{
+			var defaultDate = '';
+			var defaultTime = '';
+			var defaultDepartureLocationId = jQuery('div.journey-section-container[section-key="' + sectionKey + '"] span[journey-location-id]').last().attr('journey-location-id');
+			
+			var maxDatetimeParts = jQuery('div.journey-section-container[section-key="' + sectionKey + '"] .leg-arrival').last().text().split(' ');
+			if(maxDatetimeParts.length == 2)
+			{
+				var defaultDate = maxDatetimeParts[0];
+				var defaultTime = maxDatetimeParts[1];
+			}
+			
+	    	var html = '<td class="action-cell">';
+			html += '<i class="fa fa-save" onclick="saveJourneyLeg(this)" title="{!$Label.kimbleone__save} {!$ObjectType.JourneyLeg__c.Label}"/>';
+			html += '<i class="fa fa-rotate-left" onclick="cancelNewJourneyLeg()" title="{!$Label.Cancel}"/>';
+			html += '</td>';
+			
+			html += '<td>';
+	    	
+	    	html += '<select class="find-journey-leg-location new-journey-leg-location departing-from">';
+	    	html += '<option value=""></option>';
+			jQuery.each(journeyLegLocations, function (i, journeyLocation) {			
+				html += '<option value="' + journeyLocation.JourneyLegLocationId + '"' + (journeyLocation.JourneyLegLocationId == defaultDepartureLocationId ? ' selected ' : '') + '>' + journeyLocation.Name + '</option>';
+			});
+			
+			html += '</select>';
+
+	    	html += '</td>';
+			html += '<td class="right-align-cell">';
+			html += '<input type="text" class="new-jr departing-from-date kimbleDatePicker" minDate="' + defaultDate + '" value="' + defaultDate + '"/>';
+			html += '<input type="text" class="new-jr departing-from-time kimbleTimePicker" value="' + defaultTime + '"/>';
+			html += '</td>';
+			html += '<td class="padding-cell">';
+			html += '<i class="fa fa-arrow-circle-right"/>';
+			html += '</td>';
+			html += '<td>';
+
+	    	html += '<select class="find-journey-leg-location new-journey-leg-location arriving-at">';
+	    	html += '<option value=""></option>';
+			jQuery.each(journeyLegLocations, function (i, journeyLocation) {			
+				html += '<option value="' + journeyLocation.JourneyLegLocationId + '">' + journeyLocation.Name + '</option>';
+			});
+			
+			html += '</select>';
+
+			html += '</td>';
+			html += '<td class="right-align-cell">';
+			html += '<input type="text" class="new-jr arriving-at-date kimbleDatePicker" minDate="' + defaultDate + '"/>';
+			html += '<input type="text" class="new-jr arriving-at-time kimbleTimePicker"/>';
+			html += '</td>';
+			
+			html += '<td>';
+			html += '<textarea rows="3" cols="50" class="leg-note"/>';
+			html += '</td>';
+			
+			html += '<td class="action-cell">';
+			html += '<i class="fa fa-save" onclick="saveJourneyLeg(this)" title="{!$Label.kimbleone__save} {!$ObjectType.JourneyLeg__c.Label}"/>';
+			html += '</td>';
+
+			jQuery('div.journey-section-container[section-key="' + sectionKey + '"] tr.new-journey-leg').html(html);
+			jQuery('div.journey-section-container[section-key="' + sectionKey + '"] tr.new-journey-leg').show();
+			
+			jQuery('.action-cell > .fa-pencil').addClass('hidden-item');
+			jQuery('.action-cell > .fa-trash').addClass('hidden-item');
+			         	
+		    initialiseDynamicElements();
+		}
+		
+		function buildEditJourneyLegHtml(journeyLegLocations)
+		{
+			// get the details of the row being edited - this will be the one that has a .Loading action cell
+			var theRow = jQuery('.action-cell.Loading').parent();
+			
+			var departureDateParts = jQuery(theRow).find('span.leg-departure').text().split(' ');
+			var departureDate = departureDateParts[0];
+			var departureTime = departureDateParts[1];
+			var departureLocationId = jQuery(theRow).find('span.departure-location').attr('journey-location-id');
+			
+			var arrivalDateParts = jQuery(theRow).find('span.leg-arrival').text().split(' ');
+			var arrivalDate = arrivalDateParts[0];
+			var arrivalTime = arrivalDateParts[1];
+			var arrivalLocationId = jQuery(theRow).find('span.arrival-location').attr('journey-location-id');
+			
+			var html = '<tr journey-leg-id="' + jQuery(theRow).attr('journey-leg-id') + '">';
+
+	    	html += '<td class="action-cell">';
+			html += '<i class="fa fa-save" onclick="saveJourneyLeg(this);" title="{!$Label.kimbleone__save} {!$ObjectType.JourneyLeg__c.Label}"/>';
+			html += '<i class="fa fa-rotate-left" onclick="cancelEditJourneyLeg();" title="{!$Label.Cancel}"/>';
+			html += '</td>';
+			
+			html += '<td>';
+	    	
+	    	html += '<select class="find-journey-leg-location new-journey-leg-location departing-from">';
+	    	html += '<option value=""></option>';
+			jQuery.each(journeyLegLocations, function (i, journeyLocation) {			
+				html += '<option value="' + journeyLocation.JourneyLegLocationId + '"' + (journeyLocation.JourneyLegLocationId == departureLocationId ? ' selected ' : '') + '>' + journeyLocation.Name + '</option>';
+			});
+			
+			html += '</select>';
+
+	    	html += '</td>';
+			html += '<td class="right-align-cell">';
+			html += '<input type="text" class="departing-from-date kimbleDatePicker" value="' + departureDate + '"/>';
+			html += '<input type="text" class="departing-from-time kimbleTimePicker" value="' + departureTime + '"/>';
+			html += '</td>';
+			html += '<td class="padding-cell">';
+			html += '<i class="fa fa-arrow-circle-right"/>';
+			html += '</td>';
+			html += '<td>';
+
+	    	html += '<select class="find-journey-leg-location new-journey-leg-location arriving-at">';
+	    	html += '<option value=""></option>';
+			jQuery.each(journeyLegLocations, function (i, journeyLocation) {			
+				html += '<option value="' + journeyLocation.JourneyLegLocationId + '"' + (journeyLocation.JourneyLegLocationId == arrivalLocationId ? ' selected ' : '') + '>' + journeyLocation.Name + '</option>';
+			});
+			
+			html += '</select>';
+
+			html += '</td>';
+			html += '<td class="right-align-cell">';
+			html += '<input type="text" class="arriving-at-date kimbleDatePicker" value="' + arrivalDate + '"/>';
+			html += '<input type="text" class="arriving-at-time kimbleTimePicker" value="' + arrivalTime + '"/>';
+			html += '</td>';
+			
+			html += '<td>';
+			html += '<textarea rows="3" cols="50" class="leg-note">' + jQuery(theRow).find('span.leg-note').text() + '</textarea>';
+			html += '</td>';
+			
+			html += '<td class="action-cell">';
+			html += '<i class="fa fa-save" onclick="saveJourneyLeg(this)" title="{!$Label.kimbleone__save} {!$ObjectType.JourneyLeg__c.Label}"/>';
+			html += '</td>';
+			html += '</tr>';
+
+			jQuery(theRow).replaceWith(html);
+
+			jQuery('.action-cell > .fa-pencil').addClass('hidden-item');
+			jQuery('.action-cell > .fa-trash').addClass('hidden-item');
+						          	
+		    initialiseDynamicElements();
+		}
+
+		function calculateAllowancePeriods()
+		{
+			// first check if any existing periods have any configuration that will be lost
+			if(jQuery('input.allocation-amount').filter(function () {return !!this.value;}).length > 0 || jQuery('input[allowance-adjustment-id]:checked').length > 0)
+			{
+				if (confirm("{!$Label.RecalculatingWillDiscardChangesWarning}") != true)
+					return;
+			}
+			
+			jQuery('.footer-action-btn-container').find('.fa').addClass('hidden-item');
+			jQuery('.footer-action-btn-container').find('.action-footer-link').addClass('hidden-item');
+			jQuery('.footer-action-btn-container').addClass('Loading');
+			CalculateTheAllowancePeriods();
+		}
+
+		function submitAllowanceAllocations()
+		{
+			// first check if any allowance amounts remain unallocated
+			if(jQuery('i.allocation-msg').length > 0)
+			{
+				if (confirm("{!$Label.NotAllAllowancesAllocatedWarning}") != true)
+					return;
+			}
+			
+			jQuery('.footer-action-btn-container').find('.fa').addClass('hidden-item');
+			jQuery('.footer-action-btn-container').find('.action-footer-link').addClass('hidden-item');
+			jQuery('.footer-action-btn-container').addClass('Loading');
+			SubmitAllowanceAllocations();
+		}
+						
+		function deleteJourneyLeg(journeyLegRow)
+		{
+			// first check if any existing periods have any configuration that will be lost
+			if(jQuery('input.allocation-amount').filter(function () {return !!this.value;}).length > 0 || jQuery('input[allowance-adjustment-id]:checked').length > 0)
+			{
+				if (confirm("{!$Label.DeletingWillDiscardAllocationsWarning}") != true)
+					return;
+			}
+			else if(!confirmDelete()) return;
+			
+			jQuery(journeyLegRow).parent().find('.fa').addClass('hidden-item');
+			jQuery(journeyLegRow).parent().addClass('Loading');
+			DeleteJourneyLeg(jQuery(journeyLegRow).parent().parent().attr('journey-leg-id'));
+		}
+		
+		function UpdateTheAllowancePeriods()
+		{
+			jQuery('.footer-action-btn-container').find('.fa').addClass('hidden-item');
+			jQuery('.footer-action-btn-container').find('.action-footer-link').addClass('hidden-item');
+			jQuery('.footer-action-btn-container').addClass('Loading');
+			
+			var theApplicableAllowanceAdjustments = [];
+			jQuery('input[allowance-adjustment-id]:checked').each(function() {
+				theApplicableAllowanceAdjustments.push(jQuery(this).attr('allowance-adjustment-id'));
+			});
+			
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JourneyEditController.UpdateAllowancePeriods}', 
+				'{!JSENCODE(TheJourney.Id)}', theApplicableAllowanceAdjustments,
+	     			function(result, event){          
+	            		if (event.status) 
+			            {
+			             	rerenderTheForm();
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			             	
+			             	jQuery('.footer-action-btn-container').find('.fa').removeClass('hidden-item');
+							jQuery('.footer-action-btn-container').find('.action-footer-link').removeClass('hidden-item');
+							jQuery('.footer-action-btn-container').removeClass('Loading');	             	
+			         	} 
+		        	}, 
+		        	{escape: false, timeout: 60000}
+		    	);
+		}
+		
+		jQuery(document).on('click', 'input[allowance-adjustment-id]', function ()
+		{
+			// changes should show and highlight the save button - TODO commented, use instead to highlight save required during allowance distribution
+			// if (!jQuery('#save-allowance-periods-btn').is(':animated')) jQuery('#save-allowance-periods-btn').effect('highlight', {color: '#ff7819'}, 3000);
+			
+			jQuery(this).parent().addClass('Loading');
+			jQuery(this).hide();
+			
+			UpdateTheAllowancePeriods();
+		});
+		
+		jQuery(document).on('change', '.new-jr.departing-from-date', function ()
+		{
+			jQuery('.arriving-at-date').val(jQuery(this).val());
+			jQuery('.arriving-at-date').attr('minDate', jQuery(this).val());
+		});
+
+		jQuery(document).on('change', '.new-jr.departing-from-time', function ()
+		{
+			jQuery('.arriving-at-time').val(jQuery(this).val());
+		});
+
+		jQuery(document).on('change', '.allocation-amount', function ()
+		{
+			setAllowanceAllocation(this);
+		});
+		
+		jQuery(document).on('change', '.find-activity', function ()
+		{
+			jQuery('.find-activity').val(jQuery(this).val());
+		});
+					
+		// Called by select2 to dynamically populate journey locations
+		function findMatchingJourneyLocations(callback, sectionKey)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JourneyEditController.FindMatchingJourneyLocations}', 
+				'{!JSENCODE(TheJourney.AllowanceScheme__c)}', '{!JSENCODE(TheResource.Id)}', '{!JSENCODE(TheResource.BusinessUnit__c)}',
+	     			function(result, event){          
+	            		if (event.status) 
+		            {
+		             	callback(result, sectionKey);
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		             	var theRow = jQuery(journeyLegRow).closest('tr');
+						jQuery(theRow).find('.fa').removeClass('hidden-item');
+						jQuery(theRow).find('.action-cell').removeClass('Loading');	
+		         	}
+	        	}, 
+	        	{escape: false, timeout: 60000}
+	    	);
+		}
+		
+		function getFieldValue(row, selector)
+		{
+			if(jQuery(row).find(selector).val() != null && jQuery(row).find(selector).val() != "")
+			{
+				return jQuery(row).find(selector).val();
+			}
+			else
+			{
+				return null;
+			}
+		}
+		
+		function saveJourneyLeg(journeyLegRow)
+		{
+			var theRow = jQuery(journeyLegRow).closest('tr');
+			jQuery(theRow).find('.fa').addClass('hidden-item');
+			jQuery(theRow).find('.action-cell').addClass('Loading');
+
+			jQuery(".journey-leg-error-row").remove();
+			
+			var theJourneyLeg = {};
+			
+			theJourneyLeg.JourneyId = '{!JSENCODE(TheJourney.Id)}';
+			theJourneyLeg.DepartingFromId = getFieldValue(theRow, 'select.departing-from');
+			
+			if(jQuery(theRow).attr('journey-leg-id') != "")
+			{
+				theJourneyLeg.JourneyLegId = jQuery(theRow).attr('journey-leg-id');
+			}
+			
+			if(jQuery(theRow).closest('.journey-section-container').attr('journey-section-id') != "" && jQuery(theRow).closest('.journey-section-container').attr('journey-section-id') != "null")
+			{
+				theJourneyLeg.JourneySectionId = jQuery(theRow).closest('.journey-section-container').attr('journey-section-id');
+			}
+
+			var fromDate = kimble.parseDate(getFieldValue(theRow, '.departing-from-date'));
+			if(getFieldValue(theRow, '.departing-from-time') != null)
+			{
+				fromDate += 'T' + getFieldValue(theRow, '.departing-from-time');
+			}			
+			theJourneyLeg.DepartureTime = fromDate;
+						
+			theJourneyLeg.ArrivingAtId = getFieldValue(theRow, 'select.arriving-at');
+
+			var toDate = kimble.parseDate(getFieldValue(theRow, '.arriving-at-date'));
+			if(getFieldValue(theRow, '.arriving-at-time') != null)
+			{
+				toDate += 'T' + getFieldValue(theRow, '.arriving-at-time');
+			}			
+			theJourneyLeg.ArrivalTime = toDate;
+			theJourneyLeg.ResourceId = '{!JSENCODE(TheResource.Id)}'; 
+			
+			theJourneyLeg.Notes = getFieldValue(theRow, '.leg-note');
+			if(theJourneyLeg.Notes == null) theJourneyLeg.Notes = '';
+			
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JourneyEditController.SaveJourneyLeg}', 
+				theJourneyLeg, viewerOffsetMinutes, 
+	     			function(result, event){          
+	            		if (event.status) 
+		            {
+		            	newJourneyLeg = {};
+		             	rerenderTheForm();
+		         	} 
+		         	else 
+		         	{
+		             	var theRow = jQuery(journeyLegRow).closest('tr');
+		             	jQuery(theRow).before("<tr class='journey-leg-error-row'><td class='journey-leg-error-ind'><span class='fa fa-exclamation-circle'></td><td class='journey-leg-error-message' colspan='6'>" + event.message + "</td></tr>");
+						jQuery(theRow).find('.fa').removeClass('hidden-item');
+						jQuery(theRow).find('.action-cell').removeClass('Loading');
+		         	} 
+	        	}, 
+	        	{escape: false, timeout: 60000}
+	    	);
+		}
+
+		function copyBalance(copyAllocationBtn)
+		{
+			var allowancePeriodRow = jQuery(copyAllocationBtn).closest('tr');
+			var remainingAllowanceAmount = jQuery(allowancePeriodRow).find('span.remaining-amt[data-numeric-amt]').attr('data-numeric-amt');
+			jQuery(copyAllocationBtn).prev('input.allocation-amount').val(Number(remainingAllowanceAmount).toFixed(2)).change();
+		}
+		
+		function clearAllocation(clearAllocationBtn)
+		{
+			jQuery(clearAllocationBtn).prev().prev('input.allocation-amount').val('').change();
+		}
+
+		function newAllowanceAllocationAllocateAll(newAllocationBtn)
+		{			
+			// get the activity currently selected
+			var activityId = jQuery(newAllocationBtn).closest('table').find('.find-activity').val();
+
+			if(activityId == null || activityId == '')
+			{
+				alert('{!JSENCODE($Label.ActivityRequiredMessage)}');
+			}
+			else
+			{
+				var allowancePeriodId = jQuery(newAllocationBtn).closest('tr').attr('allowance-period-id');
+				
+				jQuery(newAllocationBtn).parent().addClass('Loading');
+				jQuery(newAllocationBtn).parent().find('.find-activity').hide();
+				jQuery(newAllocationBtn).hide();
+	
+				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JourneyEditController.AllowanceAllocationAllocateAll}', 
+					'{!JSENCODE(TheJourney.Id)}', '{!JSENCODE(TheResource.Id)}', activityId, viewerOffsetMinutes, 
+		     			function(result, event){          
+		            		if (event.status) 
+			            {
+			             	rerenderTheForm();
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+							jQuery(newAllocationBtn).parent().removeClass('Loading');
+							jQuery(newAllocationBtn).parent().find('.find-activity').show();
+							jQuery(newAllocationBtn).show();
+			         	} 
+		        	}, 
+		        	{escape: false, timeout: 60000}
+		    	);
+	    	}
+		}
+				
+		function newAllowanceAllocation(newAllocationBtn)
+		{			
+			// get the activity currently selected
+			var activityId = jQuery(newAllocationBtn).closest('table').find('.find-activity').val();
+			
+			if(activityId == null || activityId == '')
+			{
+				alert('{!JSENCODE($Label.ActivityRequiredMessage)}');
+			}
+			else
+			{
+				var allowancePeriodId = jQuery(newAllocationBtn).closest('tr').attr('allowance-period-id');
+				var allowancePeriodRow = jQuery(newAllocationBtn).closest('tr');
+				var allowanceAmount = jQuery(allowancePeriodRow).find('span.remaining-amt[data-numeric-amt]').attr('data-numeric-amt');
+				var allowanceCurrency = jQuery(allowancePeriodRow).find('span[data-currency]').attr('data-currency');
+
+				jQuery(newAllocationBtn).parent().addClass('Loading');
+				jQuery(newAllocationBtn).hide();
+
+				if(allowanceAmount > 0)
+				{
+					saveNewAllowanceAllocation(allowancePeriodId, '{!JSENCODE(TheResource.Id)}', activityId, allowanceAmount, allowanceCurrency);
+		    	}
+		    	else
+		    	{
+		    		alert('{!JSENCODE($Label.NothingToAllocateMessage)}');
+					jQuery(newAllocationBtn).parent().removeClass('Loading');
+	    		}
+	    	}
+		}
+		
+		function setAllowanceAllocationNotes(allocationId, notes)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JourneyEditController.UpdateAllowanceAllocationNotes}', 
+				allocationId, notes,
+	     			function(result, event){          
+	            		if (!event.status) 
+			            {
+			             	alert(event.message);
+			             	rerenderTheForm();
+			         	} 
+	        	}, 
+	        	{escape: false, timeout: 60000}
+	    	);
+		}
+				
+		function setAllowanceAllocation(allocationField)
+		{			
+			// this is either an update to an existing allocation or a new allocation
+			// check the attributes on the field
+			var allowancePeriodRow = jQuery(allocationField).closest('tr');
+						
+			var allocationId = jQuery(allocationField).attr('allocation-id');
+			var activityId = jQuery(allocationField).attr('activity-id');
+			var allowancePeriodId = jQuery(allocationField).attr('allowance-period-id');
+			
+			jQuery(allocationField).parent().parent().addClass('Loading');
+			jQuery(allocationField).parent().hide();
+			
+			if(allocationId != null && allocationId !='')
+			{
+				// this is an update to an existing allocation
+				
+				// a null value means we should delete, otherwise update
+				if(jQuery(allocationField).val() == null || jQuery(allocationField).val() == '')
+				{
+					deleteAllowanceAllocation(allocationId);
+				}
+				else
+				{
+					var allowanceAmount = jQuery(allowancePeriodRow).find('span.total-amt[data-numeric-amt]').attr('data-numeric-amt');
+					
+					var newValue = (Number(jQuery(allocationField).val()) < Number(allowanceAmount)) ? jQuery(allocationField).val() : allowanceAmount;
+					updateAllowanceAllocation(allocationId, newValue);
+				}
+			}
+			else
+			{
+				if(jQuery(allocationField).val() != null && jQuery(allocationField).val() != '')
+				{
+					var allowanceCurrency = jQuery(allowancePeriodRow).find('span[data-currency]').attr('data-currency');
+					var allowanceAmount = jQuery(allowancePeriodRow).find('span.total-amt[data-numeric-amt]').attr('data-numeric-amt');
+					var newValue = (Number(jQuery(allocationField).val()) < Number(allowanceAmount)) ? jQuery(allocationField).val() : allowanceAmount;
+					saveNewAllowanceAllocation(allowancePeriodId, '{!JSENCODE(TheResource.Id)}', activityId, newValue, allowanceCurrency);
+				}
+			}
+		}
+
+		function deleteAllowanceAllocation(allowancePeriodAllocationId)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JourneyEditController.DeleteAllowanceAllocation}', 
+				allowancePeriodAllocationId, 
+	     			function(result, event){          
+	            		if (event.status) 
+		            {
+		             	rerenderTheForm();
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		             	rerenderTheForm();
+		         	} 
+	        	}, 
+	        	{escape: false, timeout: 60000}
+	    	);
+		}
+				
+		function updateAllowanceAllocation(allowancePeriodAllocationId, allowanceAmount)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JourneyEditController.UpdateAllowanceAllocation}', 
+				allowancePeriodAllocationId, allowanceAmount,
+	     			function(result, event){          
+	            		if (event.status) 
+		            {
+		             	rerenderTheForm();
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		             	rerenderTheForm();
+		         	} 
+	        	}, 
+	        	{escape: false, timeout: 60000}
+	    	);
+		}	
+		
+		function saveNewAllowanceAllocation(allowancePeriodId, resourceId, activityId, allowanceAmount, allowanceCurrency)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JourneyEditController.NewAllowanceAllocation}', 
+				allowancePeriodId, resourceId, activityId, allowanceAmount, allowanceCurrency,
+	     			function(result, event){          
+	            		if (event.status) 
+		            {
+		             	rerenderTheForm();
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		             	rerenderTheForm();
+		         	} 
+	        	}, 
+	        	{escape: false, timeout: 60000}
+	    	);
+		}
+
+		function jDecode(str) {
+		    return jQuery("<div/>").html(str).text();
+		}
+				
+	</script>
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

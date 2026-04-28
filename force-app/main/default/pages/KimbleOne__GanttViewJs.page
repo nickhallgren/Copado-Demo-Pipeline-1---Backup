@@ -1,0 +1,88 @@
+<apex:page controller="KimbleOne.ActivityAssignmentRemoteActions" cache="true" contentType="text/javascript" showHeader="false" sidebar="false" standardStylesheets="false" showChat="false">
+
+function refreshResource(resourceId)
+{
+	//refreshes resource and assignments
+	jQuery('tr#' + resourceId + '>td:first>a, tr#' + resourceId + '>td:first>span').hide().parent().addClass('Loading');
+	
+	Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.GetResourceAndAssignments}',
+ 		resourceId, ganttViewStartDate, ganttViewEndDate,
+     			function(result, event){          
+            		
+            		jQuery('tr#' + resourceId + '>td:first>a, tr#' + resourceId + '>td:first>span').show().parent().removeClass('Loading');
+            		
+            		if (event.status) 
+	            	{
+	             		if (matchingResources[resourceId] == null) return;
+	             		
+	             		redrawResource(result);	             		
+	         		} 
+		         	else if (event.type === 'exception') 
+		         	{
+		             	alert(event.message);
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		         	}
+        		}, 
+        		{escape: true, timeout: 60000}
+      );
+}
+
+function getAssignmentTasks(assignmentId, resourceId)
+{
+	//refreshes resource and assignments
+	jQuery('#' + assignmentId).closest('tr').find('.indent').replaceWith(jQuery('<span class="fa fa-circle-o-notch fa-spin tasks-loading"/>'));
+		
+	Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.GetAssignmentTasks}',
+ 		assignmentId,
+     			function(result, event){          
+            		
+            		jQuery('#' + assignmentId).closest('tr').find('.tasks-loading').replaceWith(jQuery('<span class="indent has-tasks"/>'));
+            		
+            		if (event.status) 
+	            	{
+	             		var taskNameColspan = jQuery('#matching-resources-table-head').find('tr')[0].cells.length - 1;
+	             		
+	             		jQuery.each(result, function(i, taskAssignment) {
+	             		
+	             			var tr = '<tr class="task-assignment" parent-id="' + assignmentId + '" parent-resource-id="' + resourceId + '"><td></td><td task-id="' + taskAssignment.Id + '" class="task-assignment-name undecorated-link" colspan="' + taskNameColspan + '"><span class="task-indent"></span>' + taskAssignment.Name + '</td></tr>';
+	             			
+	             			jQuery('#' + assignmentId).closest('tr').after(jQuery(tr).data('taskAssignment', taskAssignment));
+	             			
+	             			var taskGanttHtml = getTaskGanttHtml(assignmentId, resourceId, taskAssignment);
+	             			
+	             			jQuery('[node-id="' + assignmentId + '"]').after(jQuery(taskGanttHtml));
+	             		
+	             		});
+	             		
+	             		jQuery('#' + assignmentId).closest('tr').addClass('expanded');
+	             		jQuery.publish('kimble.ganttViewUpdated');
+	         		} 
+		         	else if (event.type === 'exception') 
+		         	{
+		             	alert(event.message);
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		         	}
+        		}, 
+        		{escape: true, timeout: 60000}
+      );
+}
+
+function initialiseActivityAssignmentForEdit(assignmentId)
+{
+	var ele = jQuery('form[id$=\'TheForm\']');
+	if (ele.length == 0) ele = null;
+	
+	initialiseModalBoxy('#ActivityAssignmentNewEdit', '{!JSENCODE($Label.Edit)} {!$ObjectType.ActivityAssignment__c.label}', ele);
+	ActivityAssignmentNewEdit.getAssignmentToEdit(assignmentId);
+}
+	
+	
+
+
+</apex:page>

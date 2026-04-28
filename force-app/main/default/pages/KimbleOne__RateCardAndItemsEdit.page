@@ -1,0 +1,438 @@
+<apex:page controller="KimbleOne.RateCardAndItemsEditController" showHeader="false" sidebar="false" >
+	<style>
+		.read-only-currency {
+			text-align: right;
+		}
+	</style>
+	<apex:form id="RateCardItemsUploadForm" enctype="multipart/form-data">
+		<apex:actionRegion >
+		<div id="RateCardItemsPopup" style="display:none">
+			<apex:outputPanel id="RateCardItems" >
+				<apex:pageMessage summary="{!$Label.kimbleone__replacingallratecarditems}" severity="warning" strength="2" rendered="{!!AppendItems}"/>
+   	  				<apex:pageBlock title="{!$ObjectType.KimbleOne__RateCard__c.Label}">           				
+        					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton id="uploadRateCardBtn" action="{!UploadItems}" value="{!$Label.kimbleone__upload}" />
+						<input class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+						
+					</apex:pageBlockButtons>
+		
+					<apex:pageBlockSection columns="1" title="{!$Label.kimbleone__upload} {!$ObjectType.KimbleOne__RateCardItem__c.LabelPlural}" collapsible="false" >
+					
+					<apex:pageBlockSectionItem >
+						<apex:outputText value="{!$Label.kimbleone__file}" />
+							<apex:inputFile value="{!TheFileToUpload.body}" filename="{!TheFileToUpload.name}" contentType="{!TheFileToUpload.contentType}"/>
+						</apex:pageBlockSectionItem>
+					
+				</apex:pageBlockSection>
+			</apex:pageBlock>
+		</apex:outputPanel>
+		</div>
+		</apex:actionRegion>
+	</apex:form>
+			
+	<apex:form id="RateCardEditForm">
+		<apex:actionRegion >
+			<apex:actionFunction action="{!NewRateCard}" name="newRateCard" rerender="RateCardEdit" oncomplete="showModalBoxy()">
+				<apex:param name="parentId" value=""/>
+				<apex:param name="rateCardType" value=""/>
+				<apex:param name="combinationDefinitionId" value=""/>		
+			</apex:actionFunction>
+			
+			<apex:actionFunction action="{!ActivateRateCard}" name="activateRateCard" rerender="RateCardEdit, ResourceTypeContainer" >
+				<apex:param name="parentId" value=""/>
+				<apex:param name="rateCardId" value=""/>
+				<apex:param name="combinationDefinitionId" value=""/>
+			</apex:actionFunction>
+			
+			<apex:actionFunction action="{!EditRateCard}" name="editRateCard" rerender="RateCardEdit" oncomplete="showModalBoxy()" >
+				<apex:param name="parentId" value=""/>
+				<apex:param name="rateCardId" value=""/>
+				<apex:param name="combinationDefinitionId" value=""/>
+			</apex:actionFunction>
+	   
+	   		<apex:actionFunction action="{!SelectRateCardForUpload}" name="selectRateCardForUpload" rerender="RateCardItems" oncomplete="showModalBoxy()" >
+				<apex:param name="parentId" value=""/>
+				<apex:param name="rateCardId" value=""/>
+				<apex:param name="combinationDefinitionId" value=""/>
+				<apex:param name="appendItems" value=""/>
+			</apex:actionFunction>
+	   
+	   		<div id="RateCardPopup" style="display:none">
+			<apex:outputPanel id="RateCardEdit" >
+   	  				<div id="RateCardEditErrors">
+	           		<apex:pageMessages escape="false"/>
+	           	</div>
+         				<apex:pageBlock title="{!$ObjectType.KimbleOne__RateCard__c.Label}" rendered="{!!ISBLANK(TheRateCardType)}">           				
+        					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton rendered="{!!IsActive}" id="saveRateCardBtn" styleClass="DisableButtonWhileBusy" action="{!SaveRateCard}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#RateCardEditErrors');initialiseTooltips();" reRender="RateCardEdit, BehaviourRuleContainer"/>
+						<apex:commandButton rendered="{!!IsActive && !ISBLANK(TheRateCardType.Id)}" id="deleteRateCardBtn" styleClass="DisableButtonWhileBusy" action="{!DeleteRateCard}" value="{!$Label.kimbleone__delete}" oncomplete="hideModalBoxyWithErrorCheck('#RateCardEditErrors');initialiseTooltips();" reRender="RateCardEdit, BehaviourRuleContainer"/>
+						<input class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+						
+					</apex:pageBlockButtons>
+		
+					<apex:pageBlockSection columns="1" collapsible="false">
+						<apex:pageBlockSectionItem rendered="{!!IsActive}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__RateCard__c.Fields.Name.Label}"/>
+							<apex:inputText value="{!RateCardName}" />
+						</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem rendered="{!IsActive}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__RateCard__c.Fields.Name.Label}"/>
+							<apex:outputText value="{!RateCardName}" rendered="{!IsActive}"/>
+						</apex:pageBlockSectionItem>
+					
+					<apex:inputField value="{!TheRateCardType[EffectiveDateField]}" rendered="{!!IsActive}"/>
+					<apex:outputField value="{!TheRateCardType[EffectiveDateField]}" rendered="{!IsActive}"/>
+					
+					<apex:outputField value="{!TheRateCardType['Status__c']}" rendered="{!IsActive}"/>
+												
+				</apex:pageBlockSection>
+				
+			</apex:pageBlock>
+			</apex:outputPanel>
+		</div>
+		</apex:actionRegion>
+	</apex:form>
+			
+	<apex:form id="RateCardItemsForm">
+		<apex:actionRegion >
+			<div id="ItemsPopup" style="display:none">
+			<apex:outputPanel id="RateCardItemsEdit" >
+   	  				<div id="RateCardItemsEditErrors">
+	           		<apex:pageMessages escape="false"/>
+	           	</div>
+         				<apex:pageBlock title="{!$ObjectType.KimbleOne__RateCardItem__c.LabelPlural}">
+        					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton styleClass="DisableButtonWhileBusy" action="{!SaveItems}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#RateCardItemsEditErrors');initialiseTooltips();" reRender="RateCardItemsEdit, BehaviourRuleContainer" rendered="{!EditMode}"/>
+						<input class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+					</apex:pageBlockButtons>	
+					
+					<div class="rate-card-items-container" style="min-width: 500px; height: 377px; overflow-y: auto;">
+						<apex:outputPanel id="RateCardItemsTable">
+
+						<table border="0" class="list" cellpadding="0" cellspacing="0">
+						<thead>
+						<tr class="headerRow">
+							<apex:outputPanel layout="none" rendered="{!EditMode}"><th class="headerRow"></th></apex:outputPanel>
+							<apex:repeat value="{!RateCardItemParts}" var="p" rendered="{!!ISBLANK(RateCardItemParts)}">
+								<th class="headerRow"><apex:outputText value="{!PartsObjectLabelMap[p.ObjectName] + ": " + p.FieldLabel}"/></th>
+							</apex:repeat>
+							<apex:outputPanel layout="none" rendered="{!ISBLANK(RateCardItemParts)}"><th class="headerRow"><apex:outputText value="{!$ObjectType.KimbleOne__RateCardItem__c.Fields.KimbleOne__CombinationKey__c.Label}"/></th></apex:outputPanel>
+
+							<th class="headerRow">
+								<apex:outputText value="{!$ObjectType.KimbleOne__RateCardItem__c.Fields.KimbleOne__Rate__c.Label} {!IF(!ISBLANK(TheCombinationDefinition.KimbleOne__UnitType__c), '/ ' + TheCombinationDefinition.UnitType__r.Name, '')}" rendered="{!!IsFactoredRateCard}"/>
+								<apex:outputText value="{!$ObjectType.KimbleOne__RateCardItem__c.Fields.KimbleOne__RateFactor__c.Label}" rendered="{!IsFactoredRateCard}"/>
+							</th>
+							<apex:outputPanel layout="none" rendered="{!!IsFactoredRateCard}">
+							<th class="headerRow">
+								<apex:outputText value="{!$Label.kimbleone__currency}"/>
+							</th>
+							</apex:outputPanel>
+							<th class="headerRow">
+								<apex:outputText value="{!$ObjectType.KimbleOne__RateCardItem__c.Fields.Name.Label}"/>
+							</th>
+						</tr>
+						</thead>
+						<apex:variable value="{!0}" var="rowNum"/>
+						<apex:repeat value="{!TheRateCardItems}" var="itm">
+							<tr>
+								<apex:outputPanel layout="none" rendered="{!EditMode}">
+								<td>
+									<span class="fa fa-trash-o inline-btn" onclick="var d = confirmDelete();if(!d) return;removeRateCardItem({!ROUND(rowNum,0)})"></span>
+									<apex:variable value="{!rowNum+1}" var="rowNum"/>
+								</td>
+								</apex:outputPanel>
+								<apex:repeat value="{!itm.ObjectParts}" var="itmpart" rendered="{!!ISBLANK(RateCardItemParts)}">
+									<td>
+										<apex:inputField styleclass="item-part" required="false" value="{!itmpart.TheObject[itmpart.FieldName]}" onchange="updateItemName(this)" rendered="{!EditMode}"/>
+										<apex:outputField styleclass="item-part" value="{!itmpart.TheObject[itmpart.FieldName]}" rendered="{!!EditMode}"/>
+									</td>
+								</apex:repeat>
+								<apex:outputPanel layout="none" rendered="{!ISBLANK(RateCardItemParts)}">
+									<td class="item-part">
+										<apex:inputText styleclass="item-part" required="false" value="{!itm.CombinationValue}" onchange="updateItemName(this)" rendered="{!EditMode}"/>
+									</td>
+								</apex:outputPanel>
+								<td class="item-value">
+									<apex:inputField styleclass="item-value" value="{!itm.Value.KimbleOne__InputCurrency__c}" rendered="{!!IsFactoredRateCard && EditMode}"/>
+									<apex:inputField styleclass="item-value rate-factor-input" value="{!itm.Value.KimbleOne__InputDecimal__c}" html-data-decimalvalue="{!itm.IsFactoredValue}" rendered="{!IsFactoredRateCard && EditMode}" onBlur="updateRateFactorInputValue(this);"/>
+									<apex:inputHidden id="rate-factor-hidden-input" value="{!itm.IsFactoredValue}" />
+
+									<apex:outputText styleclass="item-value kimble-format-currency" value="{!itm.Value.KimbleOne__InputCurrency__c}" rendered="{!!IsFactoredRateCard && !EditMode}"/>
+									<apex:outputText styleclass="item-value" value="{!itm.IsFactoredValue}" rendered="{!IsFactoredRateCard && !EditMode}"/>
+								</td>
+								<apex:outputPanel layout="none" rendered="{!!IsFactoredRateCard}">
+								<td>
+									<apex:inputField styleclass="item-value" value="{!itm.Value.CurrencyIsoCode}" rendered="{!EditMode}"/>
+									<apex:outputField styleclass="item-value" value="{!itm.Value.CurrencyIsoCode}" rendered="{!!EditMode}"/>
+								</td>
+								</apex:outputPanel>
+								<td>
+									<apex:inputText html-data-delimiter="{!TheCombinationDefinition.KimbleOne__Delimiter__c}" styleclass="item-name" html-readonly="readonly" value="{!itm.Name}"/>
+								</td>
+							</tr>
+						</apex:repeat>
+						<apex:outputPanel layout="none" rendered="{!EditMode}">
+							<tr>
+								<td colspan="3">
+									<span class="fa fa-plus-square"></span><a href="javascript:addRateCardItem()" class="add-link undecorated-link" style="padding-left: 4px;">{!$Label.Add}</a>
+								</td>
+							</tr>
+						</apex:outputPanel>
+						</table>	
+						</apex:outputPanel>							
+					</div>
+			</apex:pageBlock>
+			</apex:outputPanel>
+		</div>
+		<apex:actionFunction action="{!EditRateCardItems}" name="editRateCardItems" rerender="RateCardItemsEdit" oncomplete="showModalBoxy();initialiseItems();" >
+				<apex:param name="parentId" value=""/>
+				<apex:param name="rateCardId" value=""/>
+				<apex:param name="combinationDefinitionId" value=""/>
+		</apex:actionFunction>
+
+		<apex:actionFunction action="{!ViewRateCardItems}" name="viewRateCardItems" rerender="RateCardItemsEdit" oncomplete="showModalBoxy();kimble.formatCurrencies();" >
+				<apex:param name="parentId" value=""/>
+				<apex:param name="rateCardId" value=""/>
+				<apex:param name="combinationDefinitionId" value=""/>
+		</apex:actionFunction>
+		
+		<apex:actionFunction action="{!AddRateCardItems}" name="addRateCardItems" rerender="RateCardItemsEdit" oncomplete="showModalBoxy();" >
+				<apex:param name="parentId" value=""/>
+				<apex:param name="rateCardId" value=""/>
+				<apex:param name="combinationDefinitionId" value=""/>
+		</apex:actionFunction>
+		
+		<apex:actionFunction action="{!AddRateCardItem}" name="addRateCardItem" rerender="RateCardItemsTable" onComplete="initialiseItems();" />
+		<apex:actionFunction action="{!RemoveRateCardItem}" name="removeRateCardItem" rerender="RateCardItemsTable" onComplete="initialiseItems();">
+			<apex:param name="pos" value=""/>
+		</apex:actionFunction>
+		</apex:actionRegion>
+	</apex:form>
+	
+	<script>
+		function newRateCardClick(parentId, rateCardType, combinationId)
+		{
+			initialiseModalBoxy('#RateCardPopup', '{!JSENCODE($Label.New)}  {!$ObjectType.RevenueBehaviourRuleRateCard__c.label}', jQuery('form[id$=\'RateCardEditForm\']'));
+			newRateCard(parentId, rateCardType, combinationId);
+		}
+		
+		function editRateCardClick(parentId, id, combinationId)
+		{
+			initialiseModalBoxy('#RateCardPopup', '{!JSENCODE($Label.Edit)}  {!$ObjectType.RevenueBehaviourRuleRateCard__c.label}', jQuery('form[id$=\'RateCardEditForm\']'));
+			editRateCard(parentId, id, combinationId);
+		}
+		
+		function viewRateCardItemsClick(parentId, id, combinationId)
+		{
+			initialiseModalBoxy('#ItemsPopup', '{!JSENCODE($Label.View)}  {!$ObjectType.RateCardItem__c.labelPlural}', jQuery('form[id$=\'RateCardItemsForm\']'));
+			viewRateCardItems(parentId, id, combinationId);
+		}
+
+		function editRateCardItemsClick(parentId, id, combinationId)
+		{
+			initialiseModalBoxy('#ItemsPopup', '{!JSENCODE($Label.Edit)}  {!$ObjectType.RateCardItem__c.labelPlural}', jQuery('form[id$=\'RateCardItemsForm\']'));
+			editRateCardItems(parentId, id, combinationId);
+		}
+		
+		function addRateCardItemsClick(parentId, id, combinationId)
+		{
+			initialiseModalBoxy('#ItemsPopup', '{!JSENCODE($Label.Add)}  {!$ObjectType.RateCardItem__c.labelPlural}', jQuery('form[id$=\'RateCardItemsForm\']'));
+			addRateCardItems(parentId, id, combinationId);
+		}
+		
+		function activateRateCardClick(parentId, id, combinationId)
+		{
+			// show spinning thing
+			jQuery('#ratecard-' + id).prev().prev().hide();
+			jQuery('#ratecard-' + id).prev().show();
+			
+			activateRateCard(parentId, id, combinationId);
+		}
+		
+		function uploadItemsClick(parentId, id, combinationId, appendItems)
+		{
+			initialiseModalBoxy('#RateCardItemsPopup', '{!JSENCODE($Label.Upload)}  {!$ObjectType.RateCardItem__c.labelplural}', jQuery('form[id$=\'RateCardItemsUploadForm\']'));
+			appendItems = appendItems || false;
+			
+			selectRateCardForUpload(parentId, id, combinationId, appendItems);
+		}
+
+		function initialiseItems()
+		{
+		    jQuery('.rate-factor-input').each(function(){
+		        jQuery(this).val(jQuery(this).data('decimalvalue'));
+      		});
+  		}
+
+  		function updateRateFactorInputValue(input)
+  		{
+			jQuery(input).siblings('[id$="rate-factor-hidden-input"]').val(jQuery(input).val());
+    	}
+
+		function updateItemName(obj)
+		{
+			var tr = jQuery(obj).closest('tr');
+			
+			var name = '';
+			
+			jQuery.each(tr.find('.item-part'), function (i, part) {
+				
+				if (jQuery(part).val() != '')
+				{
+					if (i > 0) name += tr.find('.item-name').attr('data-delimiter');
+					name += jQuery(part).val();
+				}
+			});
+			
+			tr.find('.item-name').val(name);
+		}
+		
+		function exportToCsv(filename, rows, isFactored) {
+	        var processRow = function (row) {
+	            var finalVal = formatCsvValue(row['Name']);
+				finalVal += ',';
+				if (isFactored)
+				{
+				    finalVal += row[KimbleNamespaceWithUnderscores + 'RateFactor__c'];
+					finalVal += ',';
+    			}
+    			else
+    			{
+					finalVal += row[KimbleNamespaceWithUnderscores + 'Rate__c'];
+					finalVal += ',';
+
+					finalVal += formatCsvValue(row['CurrencyIsoCode']);
+					finalVal += ',';
+				}
+				finalVal += formatCsvValue(row[KimbleNamespaceWithUnderscores + 'CombinationKey__c']);
+	
+				return finalVal + '\r\n';
+	        };
+	
+	        var csvFile = '';
+	        for (var i = 0; i < rows.length; i++) {
+	            csvFile += processRow(rows[i]);
+	        }
+			
+			var hiddenElement = document.createElement('a');
+	          hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvFile);
+	          hiddenElement.target = '_self'; // 
+	          hiddenElement.download = 'ExportData.csv'; 
+	          document.body.appendChild(hiddenElement); 
+	    	  hiddenElement.click(); 
+	    }
+				
+		function formatCsvValue(val)
+		{
+			var innerValue = val === null ? '' : val.toString();
+		                
+		    var result = innerValue.replace(/"/g, '""');
+		
+		    result = '"' + result + '"';
+		
+			return result;
+		}
+		
+		function downloadRateCardItemsToCsv(id, isFactored)
+		{
+			var result = sforce.connection.query("SELECT Id, " + KimbleNamespaceWithUnderscores + "Rate__c,  " + KimbleNamespaceWithUnderscores + "RateFactor__c, CurrencyIsoCode, Name, " + KimbleNamespaceWithUnderscores + "CombinationKey__c FROM " + KimbleNamespaceWithUnderscores + "RateCardItem__c WHERE " + KimbleNamespaceWithUnderscores + "RateCard__c='" + id + "' AND " + KimbleNamespaceWithUnderscores + "ContextId__c = NULL");
+			var it = new sforce.QueryResultIterator(result);
+			var items = [];
+			
+			while (it.hasNext()) {
+			    var item = it.next();
+			    items.push(item);
+			}
+			exportToCsv('download.csv', items, isFactored);
+		}
+
+		function downloadAllPossibleRateCardItemsToCsv(rateCardCombinationDefinitionId)
+		{
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.RateCardAndItemsEditController.GetRateCardObjectCombinationAndDelimiter}',
+            		rateCardCombinationDefinitionId,
+           			function(result, event){
+		                if (event.status)
+		                {
+		                    if(result.Message != null){
+		                        alert(result.Message);
+                      		}
+		                    else
+		                    	continueDownloadAllPossibleRateCardItemsToCsv(result.KeyDefinition, result.Delimiter);
+		                }
+		            	else if (event.type === 'exception')
+		            	{
+		                	alert(event.message);
+		            	}
+		            	else
+		            	{
+		                	alert(event.message);
+		            	}
+		            },
+		            {escape: true, timeout: 60000}
+		        );
+		}
+
+		function continueDownloadAllPossibleRateCardItemsToCsv(keyDefinition,delimiter)
+		{
+			var items = {};
+			var level = 0;
+		    var objects = keyDefinition.split(delimiter);
+
+			objects.forEach(function(name){
+			    console.log(name);
+				var result = sforce.connection.query("SELECT Id, Name FROM " + name);
+				console.log(result);
+				if(result.size > 0){
+					var it = new sforce.QueryResultIterator(result);
+
+					while (it.hasNext()) {
+						var item = it.next();
+							if(items[level] == undefined)
+								items[level] = {name:name,items:[]};
+							items[level].items.push({id:item["Id"],name:item["Name"]});
+					}
+					level++;
+				}
+			});
+
+			var uniqueLinesData = recussiveLineGenerator(0,[],'','',items,delimiter);
+
+			var fullCSVText = '';
+
+			jQuery.each( uniqueLinesData, function( key, line ){
+				fullCSVText =  fullCSVText+line.name+',,,'+line.id+ '\r\n';
+			})
+
+			var hiddenElement = document.createElement('a');
+	          hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(fullCSVText);
+	          hiddenElement.target = '_self'; //
+	          hiddenElement.download = 'ExportData.csv';
+	          document.body.appendChild(hiddenElement);
+	    	  hiddenElement.click();
+		}
+
+
+
+		function recussiveLineGenerator(level,ids,previousid,previousname,allitems,delimiter){
+			var nextLevelDeep = level+1;
+			jQuery.each( allitems[level].items, function( key, item ){
+			    var newId = previousid+delimiter+item.id;
+			    var newName = previousname+delimiter+item.name;
+			    if(previousid == ''){
+			    	newId = item.id;
+			    	newName = item.name;
+			    }
+			    if(newId.split(delimiter).length == Object.keys(allitems).length)
+					ids[ids.length] = {id:newId,name:newName};
+				if(allitems[nextLevelDeep] != undefined)
+			   		recussiveLineGenerator(nextLevelDeep,ids,newId,newName,allitems,delimiter) +'\n';
+		    });
+
+	 		return ids;
+  		}
+	
+	</script>
+	
+</apex:page>

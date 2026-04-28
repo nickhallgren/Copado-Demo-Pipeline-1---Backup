@@ -1,0 +1,117 @@
+<apex:page standardController="KimbleOne__Resource__c" extensions="KimbleOne.ResourceSecureGroupEditController" sidebar="false" >
+	<apex:composition template="KimbleOne__SiteMaster">
+
+		<apex:define name="Menu"></apex:define>
+
+		<apex:define name="Content">
+			<c:PageHeader PageTitle="{!$ObjectType.KimbleOne__Resource__c.Label}" PageSubtitle="{!IF(ISBLANK(KimbleOne__Resource__c.Id),$Label.kimbleone__new, KimbleOne__Resource__c.Name)}" />
+			<apex:form id="TheForm">
+			
+				<div id="CriterionsErrors">
+					<apex:pageMessages escape="false" />
+				</div>
+		
+				<apex:actionFunction action="{!EditCriterion}" name="editResourceGroupMembershipCriterion" rerender="ResourceGroupMembershipCriterion,TheForm" oncomplete="initialise();">
+       				<apex:param name="cId" value="" />
+				</apex:actionFunction>
+				<apex:actionFunction action="{!NewCriterion}" name="NewCriterion" rerender="ResourceGroupMembershipCriterion" oncomplete="initialise();" immediate="true">
+       			</apex:actionFunction>
+				<apex:pageBlock >
+					<apex:pageblockSection collapsible="false" showheader="false" columns="1">	
+						<apex:inputField value="{!KimbleOne__Resource__c.Name}" required="true"/>
+						
+						<apex:repeat value="{!ManagedPermissionsMap}" var="key">
+							<apex:pageBlockSectionItem >
+								<apex:outputText value="{!PermissionsMap[key].Name}"/>
+								<apex:inputField value="{!ManagedPermissionsMap[key].InputCheckbox__c}"/>
+							</apex:pageBlockSectionItem>
+						</apex:repeat>
+						
+						<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$Label.kimbleone__matchingresourcescount}"/>
+								<apex:outputText value="{!MatchingResourcesCount}"/>
+							</apex:pageBlockSectionItem>
+						
+					</apex:pageblockSection>
+					
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton id="save" action="{!SaveResource}" value="{!$Label.kimbleone__save}" rerender="TheForm"  styleclass="DisableButtonWhileBusy" />
+					</apex:pageBlockButtons>		
+				</apex:pageBlock>
+				<apex:pageBlock title="{!$ObjectType.KimbleOne__ResourceGroupMembershipCriterion__c.labelPlural}" rendered="{!!ISBLANK(KimbleOne__Resource__c.Id)}">
+				 <apex:pageBlockButtons location="top" >
+            		 	<apex:outputPanel layout="none">
+            				<input type="button" class="btn" value="{!$Label.New} {!$ObjectType.ResourceGroupMembershipCriterion__c.label}" onclick="initialiseModalBoxy('#CriterionPopup', '{!JSENCODE($Label.New)} {!$ObjectType.ResourceGroupMembershipCriterion__c.label}');NewCriterion();"></input>
+           				</apex:outputPanel>
+           			 </apex:pageBlockButtons>
+      			
+				<apex:pageBlockTable value="{!Criterions}" var="cat" >
+ 
+            	<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+        		
+        			<apex:outputLink value="#" onclick="initialiseModalBoxy('#CriterionPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__ResourceGroupMembershipCriterion__c.label}');editResourceGroupMembershipCriterion('{!JSENCODE(cat.Id)}')">{!$Label.kimbleone__edit}</apex:outputLink>&nbsp;|&nbsp;
+     				<apex:commandLink onclick="var d = confirmDelete();if(!d) return;" action="{!DeleteCriterion}" reRender="TheForm" >{!$Label.kimbleone__delete}
+						<apex:param name="cId" value="{!cat.Id}" />
+					</apex:commandLink>
+			  	</apex:column>
+ 	
+    			<apex:column value="{!cat.KimbleOne__FieldName__c}">
+    	 	    	<apex:facet name="header">{!$ObjectType.KimbleOne__ResourceGroupMembershipCriterion__c.Fields.KimbleOne__FieldName__c.Label}</apex:facet>
+            	</apex:column>            
+            
+            	<apex:column value="{!cat.KimbleOne__Operator__c}">
+    	 	    	<apex:facet name="header">{!$ObjectType.KimbleOne__ResourceGroupMembershipCriterion__c.Fields.KimbleOne__Operator__c.Label}</apex:facet>
+            	</apex:column>        
+            	
+            	<apex:column value="{!cat.KimbleOne__Value__c}">
+    	 	    	<apex:facet name="header">{!$ObjectType.KimbleOne__ResourceGroupMembershipCriterion__c.Fields.KimbleOne__Value__c.Label}</apex:facet>
+            	</apex:column>        
+    
+			</apex:pageBlockTable>
+				
+				</apex:pageBlock>
+			
+			</apex:form>
+			
+			<script>
+			
+				function initialise()
+				{
+					jQuery('[id$="field-name"]').fieldSelector({rootObject:'{!$ObjectType.Resource__c.Name}'});
+					showModalBoxy();
+				
+				}
+			
+			</script>
+			
+				
+			<div id="CriterionPopup" style="display:none">
+				<apex:outputPanel id="ResourceGroupMembershipCriterion" >
+				<apex:form >
+					<div id="CriterionErrors">
+						<apex:pageMessages escape="false" />
+					</div>
+						<apex:pageBlock >
+						
+						
+							<apex:pageblockSection collapsible="false" showheader="false" columns="2">	
+								<apex:inputField id="field-name" value="{!criterion.KimbleOne__FieldName__c}"  style="width:200px;height:50px;" />
+								<apex:inputField value="{!criterion.KimbleOne__Operator__c}" required="true"/>
+								<apex:inputField value="{!criterion.KimbleOne__Value__c}" style="width:200px;height:50px;"/>
+							</apex:pageblockSection>
+				
+							<apex:pageBlockButtons location="bottom">
+								<apex:commandButton id="save" action="{!SaveCriterion}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#CriterionErrors')" rerender="ResourceGroupMembershipCriterion,TheForm"  styleclass="DisableButtonWhileBusy" />
+								<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+            				</apex:pageBlockButtons>	
+				
+						</apex:pageBlock>
+						</apex:form>
+					</apex:outputPanel>
+				</div>
+				
+		<!-- FIELD SELECTOR COMPONENT, to build field selector drop down in Modal pop-ups -->
+    	<c:JQueryFieldSelectorAddIn />
+		</apex:define>
+	</apex:composition>
+</apex:page>

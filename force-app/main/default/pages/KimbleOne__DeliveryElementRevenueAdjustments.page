@@ -1,0 +1,327 @@
+<apex:page standardController="KimbleOne__DeliveryElement__c" extensions="KimbleOne.DeliveryElementRevenueAdjustmentsCntrl"  sidebar="false" >
+ 
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+	<c:Menu DefaultHelpPage="RevenueAdjustments.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryElement__c.KimbleOne__DeliveryGroup__c}" MenuContextName="{!KimbleOne__DeliveryElement__c.DeliveryGroup__r.Name}"/>
+
+</apex:define>
+    
+<apex:define name="Content">
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+
+ 	<style>
+		.boxy-content {display:none;}
+
+		.elementAdjustmentResource {
+			max-width: 700px;
+		}
+		a.select2-choice span {
+		    white-space: normal !important;
+		}
+		/* Make select2 dropdowns look like conventional dropdowns */
+		a.select2-choice {
+		    height: 36px !important;
+		    line-height: 18px !important;
+		    background-image: none !important;
+		    border-radius: 0px !important;
+		    color: black !important;
+		    padding-left: 4px !important;
+		}
+		.select2-choice div {
+		    border-left: none !important;
+		}		
+	</style>
+	        
+	<apex:outputPanel id="RevenueAdjustments">
+        <apex:includeScript value="{!URLFOR($Resource.KimbleOne__InvoiceManagement)}" />
+    	<apex:form id="TheForm"> 
+          	
+          	<apex:inputHidden value="{!KimbleOne__DeliveryElement__c.Name}"/>
+          	
+			<apex:pageMessages escape="False" />    
+          
+			<apex:pageBlock id="revenueAdjustments__c" title="{!$ObjectType.KimbleOne__RevenueAdjustment__c.LabelPlural}">
+          
+            	<apex:pageBlockButtons location="top"  >
+            		<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__RevenueAdjustment__c.createable && KimbleOne__DeliveryElement__c.KimbleOne__AllowNewRevenueAdjustments__c}">
+						<input type="button" class="btn" value="{!$Label.New} {!$Label.DeliveryElementRevenueAdjustmentLabel}" onclick="initialiseModalBoxy('#DeliveryElementRevenueAdjustmentPopup', '{!JSENCODE($Label.New)} {!$Label.DeliveryElementRevenueAdjustmentLabel}');newDeliveryElementRevenueAdjustment()"></input>
+						<input type="button" class="btn" value="{!$Label.New} {!$Label.RevenueItemRevenueAdjustmentLabel}" onclick="initialiseModalBoxy('#RevenueItemsAdjustmentPopup', '{!JSENCODE($Label.New)} {!$Label.RevenueItemRevenueAdjustmentLabel}');newRevenueItemAdjustment()"></input>
+					</apex:outputPanel>
+            	</apex:pageBlockButtons>
+
+            	<apex:pageBlockTable value="{!revenueAdjustments}" var="ra" >
+					<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+						<apex:outputLink styleClass="actionLink" value="/{!ra.Id}" >{!$Label.kimbleone__view}</apex:outputLink>
+						<apex:outputPanel layout="none" rendered="{!ra.Status__r.KimbleOne__Enum__c == 'Draft'}">
+							&nbsp;|&nbsp;<apex:outputLink styleClass="actionLink" value="#" onclick="sendForApproval('{!JSINHTMLENCODE(ra.Id)}')" rendered="{!$ObjectType.KimbleOne__RevenueAdjustment__c.updateable && KimbleOne__DeliveryElement__c.KimbleOne__AllowNewRevenueAdjustments__c}">{!$Label.kimbleone__submitforapprovallink}</apex:outputLink>
+							&nbsp;|&nbsp;<apex:outputLink styleClass="actionLink" value="{!$Page.KimbleOne__RevenueAdjustmentEdit}?id={!ra.Id}" rendered="{!$ObjectType.KimbleOne__RevenueAdjustment__c.updateable && KimbleOne__DeliveryElement__c.KimbleOne__AllowNewRevenueAdjustments__c}" >{!$Label.kimbleone__edit}</apex:outputLink>
+							&nbsp;|&nbsp;<apex:outputLink styleClass="actionLink" value="#" onclick="deleteRevenueAdjustment('{!JSINHTMLENCODE(ra.Id)}')" rendered="{!$ObjectType.KimbleOne__RevenueAdjustment__c.deletable && KimbleOne__DeliveryElement__c.KimbleOne__AllowNewRevenueAdjustments__c}">{!$Label.kimbleone__delete}</apex:outputLink>
+						</apex:outputPanel>
+		            </apex:column>
+		            <apex:column value="{!ra.Name}" />	
+              		<apex:column value="{!ra.RevenueAdjustmentReason__r.Name}" headerValue="{!$ObjectType.KimbleOne__RevenueAdjustment__c.Fields.KimbleOne__RevenueAdjustmentReason__c.Label}"/>
+              		<apex:column value="{!ra.RevenueAdjustmentReason__r.KimbleOne__Scope__c}"/>
+              		<apex:column value="{!ra.KimbleOne__AdjustmentDate__c}" />
+              		<apex:column headerValue="{!$ObjectType.KimbleOne__RevenueAdjustment__c.Fields.KimbleOne__AdjustmentRevenue__c.Label}">
+              			<apex:outputPanel layout="none" rendered="{!NOT(ra.RevenueAdjustmentReason__r.KimbleOne__IsInvoiceable__c)}">
+              			<apex:outputField value="{!ra.KimbleOne__AdjustmentRevenue__c}"/>
+              			</apex:outputPanel>
+              			<apex:outputPanel layout="none" rendered="{!ra.RevenueAdjustmentReason__r.KimbleOne__IsInvoiceable__c}">
+              			<apex:outputText value="{!ra.KimbleOne__InvoicingCurrencyIsoCode__c}"/>&nbsp;<apex:outputField value="{!ra.KimbleOne__InvoicingCurrencyAdjustmentRevenue__c}"/>
+              			</apex:outputPanel>
+              		</apex:column>
+              		<apex:column value="{!ra.KimbleOne__Status__c}" />		
+              		<apex:column value="{!ra.KimbleOne__Description__c}" />		
+              		<apex:column value="{!ra.KimbleOne__ApprovedDate__c}" />		
+              		<apex:column value="{!ra.KimbleOne__Approver1User__c}" />		
+			  		<apex:column value="{!ra.KimbleOne__Approver2User__c}" />		
+			
+    	        </apex:pageBlockTable> 
+
+        	</apex:pageBlock> 
+			<apex:actionFunction action="{!newDeliveryElementRevenueAdjustment}" name="newDeliveryElementRevenueAdjustment" rerender="DeliveryElementRevenueAdjustmentDetails" oncomplete="initialiseAdjustmentPopup();">
+			</apex:actionFunction>
+			
+			<apex:actionFunction action="{!newRevenueItemAdjustment}" name="newRevenueItemAdjustment" rerender="RevenueItemsAdjustmentDetails" oncomplete="showModalBoxy()">
+			</apex:actionFunction>
+			
+			<apex:actionFunction action="{!SendForApproval}" name="sendForApproval" rerender="RevenueAdjustments">
+				<apex:param name="raId" value="" />
+			</apex:actionFunction>
+ 
+			<apex:actionFunction action="{!viewRevenueAdjustment}" name="viewRevenueAdjustment" rerender="DeliveryElementRevenueAdjustmentDetails" oncomplete="showModalBoxy()">
+				<apex:param name="raId" value="" />
+			</apex:actionFunction>
+			
+			<apex:actionFunction action="{!viewRevenueAdjustmentItems}" name="viewRevenueAdjustmentItems" rerender="RevenueItemsAdjustmentDetails" oncomplete="showModalBoxy()">
+				<apex:param name="raId" value="" />
+			</apex:actionFunction>
+          
+			<apex:actionFunction action="{!deleteRevenueAdjustment}" name="deleteRevenueAdjustment" rerender="RevenueAdjustments">
+       			<apex:param name="raId" value="" />
+          	</apex:actionFunction>
+          
+		</apex:form>
+		
+		<script>
+		function initialiseAdjustmentPopup()
+		{
+		    initialiseItems();
+			jQuery('.elementAdjustmentResource').select2();
+			showModalBoxy();
+		}
+		
+		function closeAdjustmentPopup()
+		{
+			hideModalBoxyWithErrorCheck('#DeliveryElementRevenueAdjustmentErrors');
+			
+			if(jQuery('#DeliveryElementRevenueAdjustmentErrors:empty').length == 0) initialiseItems(); jQuery('.elementAdjustmentResource').select2();
+		}
+		</script>
+        
+	</apex:outputPanel>
+    
+    <div id="RevenueItemsAdjustmentPopup" style="display: none;">
+			<apex:outputPanel id="RevenueItemsAdjustmentDetails">
+				<apex:form >
+				<div id="RevenueItemsAdjustmentErrors">
+					<apex:pageMessages escape="false" />
+				</div>
+				<apex:pageBlock >
+					<apex:pageBlockButtons location="bottom" >
+						<apex:commandButton id="saveRevenueItemsAdjustmentBtn" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__save}" action="{!SaveRevenueItemsAdjustment}" oncomplete="hideModalBoxyWithErrorCheck('#RevenueItemsAdjustmentErrors')" rerender="RevenueItemsAdjustmentDetails, RevenueAdjustments" rendered="{!ISBLANK(TheRevenueAdjustment.Id)}"/>
+						<input type="button" onclick="hideModalBoxy()" class="btn" value="{!$Label.Cancel}" />
+					</apex:pageBlockButtons>
+						<apex:outputPanel layout="none"  rendered="{!ISBLANK(TheRevenueAdjustment.Id)}">
+							<apex:pageblockSection collapsible="false" showheader="false" columns="2">
+		           		
+		           				<apex:pageBlockSectionItem >
+									<apex:outputText value="{!$ObjectType.KimbleOne__RevenueAdjustment__c.Fields.KimbleOne__RevenueAdjustmentReason__c.Label}" />
+									<apex:selectList id="revenueItemAdjustmentReason" value="{!TheRevenueAdjustment.KimbleOne__RevenueAdjustmentReason__c}" size="1" required="true">
+										<apex:selectOptions value="{!RevenueItemAdjustmentReasons}" />
+									</apex:selectList>
+								</apex:pageBlockSectionItem>
+								
+								<apex:inputField id="revenueItemAdjustmentDescription" value="{!TheRevenueAdjustment.KimbleOne__Description__c}" required="false"/> 
+		           
+		           			</apex:pageblockSection>
+						</apex:outputPanel>
+					
+						<apex:outputPanel layout="none"  rendered="{!!ISBLANK(TheRevenueAdjustment.Id)}">
+							<apex:pageblockSection collapsible="false" showheader="false" columns="3">
+		           				
+		           				<apex:pageBlockSectionItem >
+									<apex:outputText value="{!$ObjectType.KimbleOne__RevenueAdjustment__c.Fields.KimbleOne__InvoicingCurrencyAdjustmentRevenue__c.Label} ({!TheRevenueAdjustment.KimbleOne__InvoicingCurrencyIsoCode__c})" />
+									<apex:outputField value="{!TheRevenueAdjustment.KimbleOne__InvoicingCurrencyAdjustmentRevenue__c}" />
+								</apex:pageBlockSectionItem> 	
+		           				
+		           				<apex:outputField value="{!TheRevenueAdjustment.KimbleOne__RevenueAdjustmentReason__c}" /> 
+								<apex:outputField value="{!TheRevenueAdjustment.KimbleOne__Description__c}"/> 
+		           
+		           			</apex:pageblockSection>
+						</apex:outputPanel>
+					
+						<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__selectitemstoincludeheading}" columns="1"></apex:pageblockSection>
+					
+						<div id="jsTreeContainer" style="height:300px;overflow-y:scroll;min-width:490px;">
+							<div id="selectRevenueItems" ></div>
+						</div>
+						<style>
+							
+							
+						</style>
+				
+						<apex:inputText styleClass="TheInvoiceableItemsJson" style="display:none" value="{!TheRevenueAdjustmentItemsJson}"/>
+					
+						<script type="text/javascript">
+					
+						var theData;
+						var theDataSource;
+						
+						var theCurrencyCode = '<apex:outputText value="{!KimbleOne__DeliveryElement__c.KimbleOne__InvoicingCurrencyIsoCode__c}"/>';
+						var showCheckBoxes = {!ISBLANK(TheRevenueAdjustment.Id)};
+						
+						$(function () {
+						
+							// Prior to jQuery 1.9, $.parseJSON returned null instead of throwing an error if it was passed an empty string, null, or undefined, 
+							// So instead we should now check that the source is not null before continuing to process it
+							// see http://api.jquery.com/jQuery.parseJSON/
+							
+							theDataSource = $('.TheInvoiceableItemsJson').val();
+							
+							if(theDataSource != null && theDataSource != "")
+							{
+								theData = jQuery.parseJSON(theDataSource);
+								
+								if (theData != null)
+								{
+									jQuery.each(theData, function(i, obj){
+										updateFormattedAmount(obj);
+									});
+								
+									buildAdjustmentItemsTree(showCheckBoxes);
+								}
+							}
+						});	
+						
+					</script>
+					
+					
+					<style>
+						.remainingAmount{position:relative; top:-16px; text-align: center; width:100%; font-weight:bold; font-size:0.8em;}
+						.Services{background-color:#729BC7}
+						.Expenses{background-color:#E68F1A}
+						.Deposit {background-color:#B42B33}
+						.All {background-color:#028753}
+						#jsonTree a:hover {text-decoration:none; color:black; cursor:default;}
+						.jstree-grid-header-regular{background: white url('/img/alohaSkin/grid_headerbg.gif') 0 bottom repeat-x; color:black;font-weight: bold;font-size: 11px;}
+						.jstree-grid-separator{padding-top: 7px;}
+						.jstree-kimble-invoice.jstree-focused{background: #FFF;height: 275px;}
+						#jsTreeContainer{background: #FFF;border: 1px solid #D4DADC;}
+					</style>
+				</apex:pageBlock>
+				</apex:form>
+			</apex:outputPanel>
+		</div>
+    
+    <div id="DeliveryElementRevenueAdjustmentPopup" style="display: none;">
+			<apex:outputPanel id="DeliveryElementRevenueAdjustmentDetails">
+				<apex:form >
+				<div id="DeliveryElementRevenueAdjustmentErrors">
+					<apex:pageMessages escape="false" />
+				</div>
+				<apex:pageBlock >
+					<apex:pageBlockButtons location="bottom" >
+						<apex:commandButton id="saveElementAdjustmentBtn" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__save}" action="{!SaveDeliveryElementRevenueAdjustment}" oncomplete="closeAdjustmentPopup();" rendered="{!ISBLANK(TheRevenueAdjustment.Id)}" rerender="DeliveryElementRevenueAdjustmentDetails, RevenueAdjustments" />
+						<input type="button" onclick="hideModalBoxy()" class="btn" value="{!$Label.Cancel}" />
+					</apex:pageBlockButtons>
+					
+					<apex:outputPanel layout="none"  rendered="{!ISBLANK(TheRevenueAdjustment.Id)}">
+					
+					<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+					
+						<apex:pageBlockSectionItem >
+							<apex:outputText value="{!$ObjectType.KimbleOne__RevenueAdjustment__c.Fields.KimbleOne__RevenueAdjustmentReason__c.Label}" />
+							<apex:selectList id="elementAdjustmentReason" value="{!TheRevenueAdjustment.KimbleOne__RevenueAdjustmentReason__c}" size="1" required="true">
+								<apex:actionSupport event="onchange" action="{!RevenueAdjustmentChange}" rerender="DeliveryElementRevenueAdjustmentDetails" />
+								<apex:selectOptions value="{!RevenueAdjustmentReasons}" />
+							</apex:selectList>
+							
+						</apex:pageBlockSectionItem> 
+						
+						<apex:pageBlockSectionItem rendered="{!isRevGenModelBillableEffortExpended && !isRevAdjReasonDomainExpense}">
+							<apex:outputText value="{!$ObjectType.KimbleOne__RevenueAdjustmentItem__c.Fields.KimbleOne__ActivityAssignment__c.Label}" />
+							<apex:selectList id="elementAdjustmentResource" styleClass="elementAdjustmentResource" value="{!TheRevenueAdjustmentItem.KimbleOne__ActivityAssignment__c}" size="1">
+								<apex:selectOptions value="{!Assignments}" />
+							</apex:selectList>
+						</apex:pageBlockSectionItem>					
+						
+						<apex:inputField id="elemtAdjustmentDate"  value="{!TheRevenueAdjustment.KimbleOne__AdjustmentDate__c}" styleClass="kimbleDatePicker" required="true"/>
+						
+						<apex:pageBlockSectionItem rendered="{!IsInvoiceable}">
+							<apex:outputText value="{!$ObjectType.KimbleOne__RevenueAdjustment__c.Fields.KimbleOne__InvoicingCurrencyAdjustmentRevenue__c.Label} ({!TheRevenueAdjustment.KimbleOne__InvoicingCurrencyIsoCode__c})" />
+							<apex:inputField id="elementInvoicingCurrencyAdjustmentRevenue" value="{!TheRevenueAdjustment.KimbleOne__InvoicingCurrencyAdjustmentRevenue__c}" required="false"/>
+						</apex:pageBlockSectionItem> 	
+						
+						<apex:pageBlockSectionItem rendered="{!!IsInvoiceable}">
+							<apex:outputText value="{!$ObjectType.KimbleOne__RevenueAdjustment__c.Fields.KimbleOne__AdjustmentRevenue__c.Label} ({!TheRevenueAdjustment.CurrencyISOCode})" />
+							<apex:inputField id="elementAdjustmentRevenue" value="{!TheRevenueAdjustment.KimbleOne__AdjustmentRevenue__c}" required="false"/>
+						</apex:pageBlockSectionItem> 	
+						
+						<apex:inputField id="elementDescription" style="width:300px" value="{!TheRevenueAdjustment.KimbleOne__Description__c}" required="false"/>
+						
+					</apex:pageblockSection>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none"  rendered="{!!ISBLANK(TheRevenueAdjustment.Id)}">
+					<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+					
+						<apex:outputField value="{!TheRevenueAdjustment.KimbleOne__RevenueAdjustmentReason__c}"/>
+						<apex:pageBlockSectionItem rendered="{!IsInvoiceable}">
+							<apex:outputText value="{!$ObjectType.KimbleOne__RevenueAdjustment__c.Fields.KimbleOne__InvoicingCurrencyAdjustmentRevenue__c.Label} ({!TheRevenueAdjustment.KimbleOne__InvoicingCurrencyIsoCode__c})" />
+							<apex:outputField value="{!TheRevenueAdjustment.KimbleOne__InvoicingCurrencyAdjustmentRevenue__c}" />
+						</apex:pageBlockSectionItem> 	
+						
+						<apex:pageBlockSectionItem rendered="{!!IsInvoiceable}">
+							<apex:outputText value="{!$ObjectType.KimbleOne__RevenueAdjustment__c.Fields.KimbleOne__AdjustmentRevenue__c.Label} ({!TheRevenueAdjustment.CurrencyISOCode})" />
+							<apex:outputField value="{!TheRevenueAdjustment.KimbleOne__AdjustmentRevenue__c}" />
+						</apex:pageBlockSectionItem> 	
+						<apex:outputField value="{!TheRevenueAdjustment.KimbleOne__Description__c}"/>
+						
+					</apex:pageblockSection>
+					
+					</apex:outputPanel>
+				</apex:pageBlock>
+				</apex:form>
+			</apex:outputPanel>
+		</div>
+
+	<script>
+
+		jQuery(window).load(function(){
+			initialiseItems();
+		});
+		function initialiseItems()
+		{
+		    SetupDatePicker();
+  		}
+		function SetupDatePicker()
+		{
+			//dateFormat: 'yy-mm-dd',
+			jQuery('.kimbleDatePicker').datepicker({
+					dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true,
+					selectOtherMonths: true,
+					changeMonth: true,
+					changeYear: true});
+		}
+
+	</script>
+    
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

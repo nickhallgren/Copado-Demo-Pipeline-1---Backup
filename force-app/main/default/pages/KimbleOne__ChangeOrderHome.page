@@ -1,0 +1,78 @@
+<apex:page standardController="KimbleOne__ChangeOrder__c" extensions="KimbleOne.ChangeOrderHomeController,KimbleOne.FilesAndAttachmentsController" showHeader="true" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+    	<c:Menu DefaultHelpPage="ChangeManagement.html" MenuContextType="{!IF(KimbleOne__ChangeOrder__c.ChangeOrderBehaviourRule__r.ProposalAcceptanceType__r.KimbleOne__Enum__c = 'OpportunityClose', 'Proposal', 'ChangeOrder')}"  MenuContextId="{!IF(KimbleOne__ChangeOrder__c.ChangeOrderBehaviourRule__r.ProposalAcceptanceType__r.KimbleOne__Enum__c = 'OpportunityClose', KimbleOne__ChangeOrder__c.KimbleOne__Proposal__c, KimbleOne__ChangeOrder__c.Id)}" MenuContextName="{!KimbleOne__ChangeOrder__c.Name}" />
+    </apex:define>	
+    <apex:define name="Content">
+    	<apex:variable value="{!KimbleOne__ChangeOrder__c.ChangeOrderBehaviourRule__r}" var="SelectedRule"/>
+	 	
+    	<apex:form id="ChangeOrderForm">
+    		<apex:pageMessages escape="false"/>
+			
+			<apex:pageBlock title="{!$ObjectType.KimbleOne__ChangeOrder__c.Label}">
+				
+				<apex:pageBlockButtons location="top">
+					<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ChangeOrder__c.updateable}">
+						<apex:commandButton id="editButton" action="{!EditRedirect}" value="{!$Label.kimbleone__edit}" rendered="{!CanEdit}" />
+						<apex:commandButton id="closeButton" styleclass="DisableButtonWhileBusy" action="{!CloseChangeOrder}" value="{!$Label.kimbleone__close}" reRender="ChangeOrderForm" rendered="{!ISBLANK(KimbleOne__ChangeOrder__c.KimbleOne__Proposal__c) && KimbleOne__ChangeOrder__c.Status__r.KimbleOne__Enum__c = 'Open'}"/>
+						<apex:commandButton id="reOpenButton" styleclass="DisableButtonWhileBusy" action="{!ReOpenChangeOrder}" value="{!$Label.kimbleone__reopenbutton}" reRender="ChangeOrderForm" rendered="{!ISBLANK(KimbleOne__ChangeOrder__c.KimbleOne__Proposal__c) && KimbleOne__ChangeOrder__c.Status__r.KimbleOne__Enum__c = 'Closed'}"/>
+						<apex:commandButton id="sendForApprovalBtn" action="{!SendForApproval}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__sendforapprovalbutton}" rerender="ChangeOrderForm" rendered="{!SelectedRule.ProposalAcceptanceType__r.KimbleOne__Enum__c = 'Approval' && KimbleOne__ChangeOrder__c.Status__r.KimbleOne__Enum__c = 'Open'}"/>
+						<apex:commandButton id="rejectBtn" action="{!RejectChangeOrder}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__rejectlabel}" rerender="ChangeOrderForm" rendered="{!SelectedRule.ProposalAcceptanceType__r.KimbleOne__Enum__c = 'Approval' && KimbleOne__ChangeOrder__c.Status__r.KimbleOne__Enum__c = 'Open'}"/>
+					</apex:outputPanel>
+				</apex:pageBlockButtons>
+				
+				<apex:pageblockSection collapsible="false" showheader="false" columns="2">
+					
+					<apex:outputField value="{!KimbleOne__ChangeOrder__c.Name}" />
+					
+					<apex:outputField value="{!KimbleOne__ChangeOrder__c.KimbleOne__Reference__c}" />
+					
+					<apex:pageBlockSectionItem >
+						<apex:outputLabel value="{!$ObjectType.KimbleOne__ChangeOrder__c.Fields.KimbleOne__Status__c.Label}"/>
+						<apex:outputField value="{!KimbleOne__ChangeOrder__c.KimbleOne__Status__c}"/>
+					
+					</apex:pageBlockSectionItem>
+					
+					<apex:outputField value="{!KimbleOne__ChangeOrder__c.KimbleOne__ChangeOrderBehaviourRule__c}"/>
+					
+					<apex:repeat value="{!$ObjectType.KimbleOne__ChangeOrder__c.FieldSets.KimbleOne__ChangeOrderDetails}" var="field">
+						<apex:outputField value="{!KimbleOne__ChangeOrder__c[field]}"/>
+					</apex:repeat>
+					
+				</apex:pageBlockSection>
+									
+			</apex:pageBlock>
+			
+		</apex:form>
+		
+		<apex:relatedList list="CombinedAttachments" title="{!$Label.kimbleone__notesandattachmentsheading}" rendered="{!AttachmentsEnabled}"/>
+		<apex:relatedList subject="{!KimbleOne__ChangeOrder__c}" list="AttachedContentDocuments" rendered="{!FilesEnabled}"/>
+		    					
+		<script>
+				jQuery(document).ready(function() {
+					if(isSFLightning()) jQuery('input[name="newNote"],input[name="attachFile"]').hide();
+				});
+		</script>
+		
+		<apex:outputPanel layout="none" id="ApprovalHistoryPanel"  rendered="{!SelectedRule.ProposalAcceptanceType__r.KimbleOne__Enum__c = 'Approval'}">
+			<apex:relatedList list="ProcessSteps" id="InvoiceApprovalHistory"></apex:relatedList>
+			<script>
+						$(document).ready(function(){
+    						$(function() {
+    							hideSalesForceApprovalProcessButtons();
+    						})
+    					});
+    					function hideSalesForceApprovalProcessButtons()
+    					{
+    							$('input[name="piSubmit"]').remove();
+    							$('input[name="piRemove"]').remove();
+    					}
+				</script>
+			</apex:outputPanel>
+		
+    </apex:define>
+    
+</apex:composition>
+
+</apex:page>

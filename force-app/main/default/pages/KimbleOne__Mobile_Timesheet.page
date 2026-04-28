@@ -1,0 +1,577 @@
+<apex:page standardController="KimbleOne__Resource__c" extensions="KimbleOne.Mobile_TimesheetController" showHeader="false" sidebar="false" standardStylesheets="false" tabStyle="KimbleOne__Resource__c" >
+    <apex:composition template="KimbleOne__Mobile_SiteMaster">
+    <apex:define name="Content">
+
+    <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__MobileTime, 'css/Timesheet.css')}"/>
+
+	<apex:outputPanel rendered="{!!EnableMobileWebTimesheet}">
+		<apex:outputText value="Support for this page has been deprecated in KimbleOne Release 1.29. Please refer to your Kimble Administrator if access is required to this view."/>
+	</apex:outputPanel>
+
+	<apex:outputPanel rendered="{!EnableMobileWebTimesheet}">
+    <div data-role="page" id="timesheet" class="timesheet-page">
+        <div data-theme="a" data-role="header" data-position="fixed">
+            <a href="javascript:resetMode();" id="header-cancel-btn" class="ui-btn-left ui-btn ui-btn-inline ui-mini ui-corner-all ui-btn-icon-left ui-icon-back"></a>
+            <a href="#headerMenu" id="header-menu-btn" data-rel="popup" data-transition="none" class="ui-btn ui-btn-right ui-corner-all ui-btn-inline ui-icon-gear ui-btn-icon-right ui-btn-a"></a>
+            <div data-role="popup" id="headerMenu" data-theme="a">
+                    <ul data-role="listview" data-inset="true" style="min-width:210px;">
+                        <apex:outputPanel layout="none" rendered="{!CanAddTime}">
+                        <li data-icon="false"><a href="javascript:selectMode();">{!$Label.kimbleone__selectlabel}</a></li>
+                        <li data-icon="false"><a href="javascript:selectAllMode();">{!$Label.kimbleone__selectalllabel}</a></li>
+                        </apex:outputPanel>
+                        <li data-icon="false"><a href="javascript:deleteMode();">{!$Label.DeleteButton}</a></li>
+                    </ul>
+            </div>      
+            <h3>{!$Label.MobileWebTimeView}</h3>
+            <div id="period-header">
+                <a id="navigate-previous" href="{!URLFOR($Page.Mobile_Timesheet)}?periodId={!previousPeriodId}" data-ajax="false" class="period-navigator ui-btn ui-btn-icon-left ui-icon-back"></a>
+                <span class="period-date kimble-format-date">{!TheTimesheet.PeriodStartDate}</span> - <span class="period-date kimble-format-date">{!TheTimesheet.PeriodEndDate}</span>
+                <a id="navigate-next" href="{!URLFOR($Page.Mobile_Timesheet)}?periodId={!nextPeriodId}" data-ajax="false" class="period-navigator ui-btn ui-btn-icon-right ui-icon-forward"></a>
+            </div>  
+        </div>
+        <div data-role="content">
+            <apex:repeat value="{!TheTimesheet.TheDays}" var="periodDayId">
+            <apex:variable value="{!TheTimesheet.TheDayAttributesMap[periodDayId]}" var="periodDay"/>
+            <div data-role="collapsible" class="group-header" data-theme="a" data-inset="false" data-collapsed-icon="carat-d" data-expanded-icon="carat-u">
+                <h2>
+                    <div class="day-heading"><apex:outputText value="{!periodDay.DayName}"/></div>
+                    <div class="day-date" ><apex:outputText styleClass="kimble-format-date" value="{!periodDay.TheDate}"/></div>
+                    <div class="projects-heading"><apex:outputText value="{!periodDay.NumActivities} {!$Label.kimbleone__projectslabel}"/></div>
+                    <div class="hours-heading" ><apex:outputText value="{!periodDay.FormattedNumHours} {!periodDay.UsageUnitType}"/></div>
+                    <div class="day-status {!JSENCODE(periodDay.Status)}"></div>            
+                </h2>
+        
+                <ul data-role="listview">
+                <apex:outputPanel layout="none" rendered="{!CanAddTime}">
+                <li>
+                    <a href="javascript:showLoading();window.location = '{!URLFOR($Page.Mobile_TimeEntry)}?dayPeriodid={!periodDay.Id}'" data-ajax="false" class="new-time-entry"/>
+                </li>
+                </apex:outputPanel>
+                <apex:repeat value="{!TheTimesheet.TheTimeEntries[periodDay.Id]}" var="periodTimeEntry">
+                    <li>
+                        <a href="{!URLFOR($Page.Mobile_TimeEntry)}?id={!periodTimeEntry.Id}" data-ajax="false" class="time-entry {!JSINHTMLENCODE(periodTimeEntry.TimesheetStatus)}">
+                            <div class="time-entry-labels">
+                                <div class="time-entry-name"><apex:outputText value="{!periodTimeEntry.Name}"/></div>
+                                
+                                <apex:outputPanel layout="none" rendered="{!ISBLANK(periodTimeEntry.StartTime)}">
+                                <div class="time-entry-units"><apex:outputText value="{!periodTimeEntry.FormattedEntryUnits} {!periodTimeEntry.FormattedUnitType}"/></div>
+                                </apex:outputPanel>
+                                
+                                <apex:outputPanel layout="none" rendered="{!!ISBLANK(periodTimeEntry.StartTime)}">
+                                <div class="time-entry-units-with-time"><apex:outputText value="{!periodTimeEntry.FormattedEntryUnits} {!periodTimeEntry.FormattedUnitType}"/></div>
+                                <div class="time-entry-times">
+                                    <apex:outputText value="{!periodTimeEntry.StartTime}"/> - <apex:outputText value="{!periodTimeEntry.EndTime}"/>
+                                </div>
+                                </apex:outputPanel>                             
+                            </div>
+                        </a>
+                        <apex:outputPanel layout="none" rendered="{!periodTimeEntry.TimesheetStatus = 'Draft'}">
+                            <div class="time-selection-container {!JSINHTMLENCODE(periodTimeEntry.TimesheetStatus)}" time-entry-id="{!JSINHTMLENCODE(periodTimeEntry.Id)}">
+                                <input class="time-entry-select" type="checkbox" checked="checked"/>
+                            </div>
+                        </apex:outputPanel>
+                    </li>
+                </apex:repeat>
+                <apex:repeat value="{!TheTimesheet.TheForecastTimeEntries[periodDay.Id]}" var="periodForecastTimeEntry">
+                    <li>
+                        <a href="{!URLFOR($Page.Mobile_TimeEntry)}?forecastTimeEntryId={!periodForecastTimeEntry.Id}" data-ajax="false" class="time-entry Forecast">
+                            <div class="time-entry-labels">
+                                <div class="time-entry-name"><apex:outputText value="{!periodForecastTimeEntry.Name}"/></div>
+                                
+                                <apex:outputPanel layout="none" rendered="{!ISBLANK(periodForecastTimeEntry.StartTime)}">
+                                <div class="time-entry-units"><apex:outputText value="{!periodForecastTimeEntry.FormattedEntryUnits} {!periodForecastTimeEntry.FormattedUnitType}"/></div>
+                                </apex:outputPanel>
+                                
+                                <apex:outputPanel layout="none" rendered="{!!ISBLANK(periodForecastTimeEntry.StartTime)}">
+                                <div class="time-entry-units-with-time"><apex:outputText value="{!periodForecastTimeEntry.FormattedEntryUnits} {!periodForecastTimeEntry.FormattedUnitType}"/></div>
+                                <div class="time-entry-times">
+                                    <apex:outputText value="{!periodForecastTimeEntry.StartTime}"/> - <apex:outputText value="{!periodForecastTimeEntry.EndTime}"/>
+                                </div>
+                                </apex:outputPanel>
+                            </div>
+                        </a>
+                        <div class="time-selection-container Forecast" forecast-time-entry-id="{!periodForecastTimeEntry.Id}">
+                            <input class="time-entry-select" type="checkbox" checked="checked"/>
+                        </div>
+                    </li>
+                </apex:repeat>
+                <apex:repeat value="{!TheTimesheet.TheActualisableForecastTimeEntries[periodDay.Id]}" var="periodActualisableForecastTimeEntry">
+                    <li>
+                        <a href="{!URLFOR($Page.Mobile_TimeEntry)}?dayPeriodid={!periodDay.Id}&assignmentId={!periodActualisableForecastTimeEntry.AssignmentId}" data-ajax="false" class="time-entry Forecast">
+                            <div class="time-entry-labels">
+                                <div class="time-entry-name"><apex:outputText value="{!periodActualisableForecastTimeEntry.Name}"/></div>
+                                
+                                <apex:outputPanel layout="none" rendered="{!ISBLANK(periodActualisableForecastTimeEntry.StartTime)}">
+                                <div class="time-entry-units"><apex:outputText value="{!periodActualisableForecastTimeEntry.FormattedEntryUnits} {!periodActualisableForecastTimeEntry.FormattedUnitType}"/></div>
+                                </apex:outputPanel>
+                                
+                                <apex:outputPanel layout="none" rendered="{!!ISBLANK(periodActualisableForecastTimeEntry.StartTime)}">
+                                <div class="time-entry-units-with-time"><apex:outputText value="{!periodActualisableForecastTimeEntry.FormattedEntryUnits} {!periodActualisableForecastTimeEntry.FormattedUnitType}"/></div>
+                                <div class="time-entry-times">
+                                    <apex:outputText value="{!periodActualisableForecastTimeEntry.StartTime}"/> - <apex:outputText value="{!periodActualisableForecastTimeEntry.EndTime}"/>
+                                </div>
+                                </apex:outputPanel>
+                            </div>
+                        </a>
+                        <div class="time-selection-container Forecast" day-period-id="{!periodDay.Id}" assignment-id="{!periodActualisableForecastTimeEntry.AssignmentId}">
+                            <input class="time-entry-select" type="checkbox" checked="checked"/>
+                        </div>
+                    </li>
+                </apex:repeat>              
+                </ul>
+            </div>
+            </apex:repeat>
+            <script>
+                var nextPeriodIdParam = '?periodId=' + '{!JSENCODE(nextPeriodId)}';
+                var previousPeriodIdParam = '?periodId=' + '{!JSENCODE(previousPeriodId)}';
+            </script>
+        </div>
+        <div data-role="footer" data-position="fixed" style="overflow:hidden;">
+            <apex:outputPanel layout="none" rendered="{!CanAddTime}">
+            <div data-role="navbar" id="submit-navbar">
+                <ul>
+                    <li class="submit-selected-btn"><a href="javascript:submitSelected();"><apex:outputText value="{!$Label.kimbleone__mobilewebsubmitselected}"/></a></li>
+                    <li class="submit-all-btn"><a href="javascript:submitAll();">{!$Label.kimbleone__mobilewebsubmitall}</a></li>
+                </ul>
+            </div>
+            <div data-role="navbar" id="actualise-navbar">
+                <ul>
+                    <li class="actualise-selected-btn"><a href="javascript:actualiseSelected();"><apex:outputText value="{!$Label.kimbleone__mobilewebactualiseselected}"/></a></li>
+                    <li class="submit-all-btn"><a href="javascript:submitAll();">{!$Label.kimbleone__mobilewebsubmitall}</a></li>
+                </ul>
+            </div>
+            </apex:outputPanel>
+            <div data-role="navbar" id="delete-navbar">
+                <ul>
+                    <li class="delete-selected-btn"><a href="javascript:deleteSelected();">{!$Label.kimbleone__mobilewebdeleteselected}</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+	</apex:outputPanel>
+	
+    <script>
+        var mobileTimesheetPageURL = '{!URLFOR($Page.KimbleOne__Mobile_Timesheet)}';
+
+        function showLoading()
+        {
+            jQuery.mobile.loading('show');
+        }
+        
+        jQuery( document ).on( "pageinit", "[data-role='page'].timesheet-page", function()
+        {
+            destroyPeriodNavigation();
+            initialisePeriodNavigation();
+        });
+
+        // Read http://www.gajotres.net/page-events-order-in-jquery-mobile-version-1-4-update/2/
+        // to understand mobile page events
+        
+        jQuery(document).on("pagecontainershow", function (e, ui) {
+            localiseOutput();
+        });
+
+        function initialisePeriodNavigation()
+        {
+            // Navigate period on swipe left/right
+            jQuery( document ).on( "swipeleft", ".timesheet-page", function() {
+                jQuery.mobile.loading('show');
+                jQuery('#navigate-next')[0].click();
+                //jQuery.mobile.changePage( mobileTimesheetPageURL + nextPeriodIdParam, { reloadPage: true, transition: "slide" });
+            });
+            jQuery( document ).on( "swiperight", ".timesheet-page", function() {
+                jQuery.mobile.loading('show');
+                jQuery('#navigate-previous')[0].click();
+                //jQuery.mobile.changePage( mobileTimesheetPageURL + previousPeriodIdParam, { reloadPage: true, transition: "slide", reverse: true } );
+            });
+            
+            jQuery('.period-navigator').show();
+        }
+        
+        function destroyPeriodNavigation()
+        {
+            jQuery( document ).off( "swipeleft", ".timesheet-page");
+            jQuery( document ).off( "swiperight", ".timesheet-page");
+            
+            jQuery('.period-navigator').hide();
+        }
+        
+        function localiseOutput()
+        {
+            kimble.formatDates();
+        }
+        
+        function refreshSelectedIndicator()
+        {
+            var selectedTotal = jQuery('.time-entry-select:visible:checked').length;
+            var totalAvailable = jQuery('.time-entry-select:visible').length;
+            
+            if(jQuery('#delete-navbar:visible').length == 0)
+            {
+                jQuery('#timesheet .ui-title').text('{!JSENCODE($Label.kimbleone__mobilewebselecting)} ' + selectedTotal + ' {!$Label.kimbleone__oflabel} ' + totalAvailable);
+            }
+            else
+            {
+                jQuery('#timesheet .ui-title').text('{!JSENCODE($Label.kimbleone__mobilewebdeleting)} ' + selectedTotal + ' {!$Label.kimbleone__oflabel} ' + totalAvailable);
+            }
+        }
+                
+        function expandAllAndDisable()
+        {
+            jQuery('.new-time-entry').hide();
+
+            jQuery('a.time-entry').on("click", function (e) {
+                // override click to check/uncheck the checkbox
+                jQuery(this).next('.time-entry-selector').find('.time-entry-select').click();
+                e.preventDefault();
+            });
+
+            jQuery('.time-entry-select').on("click", function (e) {
+                if(jQuery('#delete-navbar:visible').length == 0)
+                {
+                    showSelectionButtons();
+                }
+                
+                refreshSelectedIndicator();
+            });
+            
+            jQuery('.group-header').collapsible('expand');
+            
+            // prevent collapse of the headers
+            jQuery('.group-header').collapsible('option', { disabled: true } );
+
+            jQuery('a#header-cancel-btn').show();
+            jQuery('a#header-menu-btn').hide();
+            
+            destroyPeriodNavigation();
+        }
+
+        function collapseAllAndEnable()
+        {
+            jQuery('.group-header').collapsible('option', { disabled: false } );
+            jQuery('.group-header').collapsible('collapse');
+            jQuery('.new-time-entry').show();
+            $('a.time-entry').off("click");
+
+            jQuery('a#header-cancel-btn').hide();
+            jQuery('a#header-delete-btn').hide();
+            jQuery('a#header-menu-btn').show();
+
+            initialisePeriodNavigation();
+        }
+
+        function selectAllMode()
+        {
+            jQuery('.time-entry-select').prop('checked','checked')
+            initialiseSelect();
+        }
+        
+        function selectMode()
+        {
+            jQuery('.time-entry-select').prop('checked','')
+            initialiseSelect();
+        }
+        
+        function initialiseSelect()
+        {
+            expandAllAndDisable();
+            jQuery( "#headerMenu" ).popup( "close" );
+            
+            jQuery('#timesheet .ui-header').addClass('Selecting');
+            jQuery('#timesheet .ui-title').text('{!JSENCODE($Label.kimbleone__mobilewebselecting)}');
+            jQuery('a.time-entry.Draft').addClass('entry-selectable');
+            jQuery('a.time-entry.Forecast').addClass('entry-selectable');
+            jQuery('.time-selection-container').addClass('time-entry-selector');
+            
+            jQuery('.time-entry:not(.Draft, .Forecast)').hide();
+            
+            refreshSelectedIndicator();
+            showSelectionButtons();
+        }
+        
+        function showSelectionButtons()
+        {
+            // if there are any forecast items selected then show the actualise toolbar
+            if(jQuery('.time-entry-selector.Forecast').find('.time-entry-select:checked').length > 0)
+            {
+                jQuery('#actualise-navbar').show();
+                jQuery('#submit-navbar').hide();
+            }
+            else
+            {
+                jQuery('#actualise-navbar').hide();
+                jQuery('#submit-navbar').show();
+            }
+        }
+        
+        function deleteMode()
+        {
+            expandAllAndDisable();
+            jQuery( "#headerMenu" ).popup( "close" );
+            
+            jQuery('#timesheet .ui-header').addClass('Deleting');
+            jQuery('#timesheet .ui-title').text('{!JSENCODE($Label.kimbleone__mobilewebdeleting)}');
+            jQuery('.time-entry-select').prop('checked','')
+            jQuery('a.time-entry.Draft').addClass('entry-selectable');
+            jQuery('.time-selection-container.Draft').addClass('time-entry-selector');
+            
+            jQuery('a#header-delete-btn').show();
+            jQuery('#delete-navbar').show();
+            jQuery('#submit-navbar').hide();
+            jQuery('#actualise-navbar').hide();
+            
+            refreshSelectedIndicator();
+            jQuery('.time-entry:not(.Draft)').hide();
+        }
+                
+        function resetMode()
+        {
+            collapseAllAndEnable();
+
+            jQuery('#timesheet .ui-header').removeClass('Selecting');
+            jQuery('#timesheet .ui-header').removeClass('Deleting');
+            jQuery('#timesheet .ui-title').text('{!JSENCODE($Label.kimbleone__mobilewebtimeview)}');
+            jQuery('a.time-entry.Draft').removeClass('entry-selectable');
+            jQuery('a.time-entry.Forecast').removeClass('entry-selectable');
+            jQuery('.time-selection-container').removeClass('time-entry-selector');
+            jQuery('.time-selection-container').hide();
+            jQuery('#delete-navbar').hide();
+            jQuery('#submit-navbar').show();
+            jQuery('#actualise-navbar').hide();
+            
+            jQuery('.time-entry').show();
+        }
+        
+        function submitAll()
+        {
+            selectAllMode();
+            submitSelected();
+        }
+
+        function actualiseSelected()
+        {
+            var theForecastTimeEntries = [];
+            var theForecastedTimeEntries = [];
+            
+            jQuery('.time-entry-select:checked').closest('.time-entry-selector').each( function()
+            {
+                // concatenate day and assignment ids together
+                if(jQuery(this).attr('forecast-time-entry-id') != null && jQuery(this).attr('forecast-time-entry-id') != '')
+                {
+                    theForecastTimeEntries.push(jQuery(this).attr('forecast-time-entry-id'));
+                }
+                
+                if(jQuery(this).attr('day-period-id') != null && jQuery(this).attr('day-period-id') != '')
+                {
+                    theForecastedTimeEntries.push(jQuery(this).attr('day-period-id') + ':' + jQuery(this).attr('assignment-id'));
+                }
+            });
+            
+            if(theForecastTimeEntries.length > 0 || theForecastedTimeEntries.length > 0)
+            {
+                jQuery.mobile.loading('show');
+                
+                jQuery('#timesheet .ui-header').removeClass('Selecting');
+                jQuery('#timesheet .ui-header').addClass('Submitting');
+                jQuery('#timesheet .ui-title').text('{!JSENCODE($Label.kimbleone__mobilewebactualising)}');
+                jQuery('a#header-cancel-btn').hide();
+                
+                actualiseForecastTimeEntries(theForecastTimeEntries, theForecastedTimeEntries, actualiseForecastedTime);
+            }
+        }
+        
+        function actualiseForecastTimeEntries(theForecastTimeEntries, theForecastedTimeEntries, actualiseForecastedTimeCallback)
+        {
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.Mobile_TimesheetController.ActualiseForecastTimeEntries}', 
+                    theForecastTimeEntries, '{!TheResource.Id}',
+                        function(result, event){          
+                            if (event.status) 
+                        {
+                            if(result != null && result.length > 0)
+                            {
+                                jQuery.mobile.loading('hide');
+                                
+                                displayResult(result);
+                                refreshPage();
+                            }
+                            else
+                            {
+                                // success, call the callback (which actualises forecast time) if required
+                                if(theForecastedTimeEntries.length > 0)
+                                {
+                                    actualiseForecastedTimeCallback(theForecastedTimeEntries, '{!TheResource.Id}');
+                                }
+                                else
+                                {
+                                    refreshPage();
+                                }
+                            }
+                        } 
+                        else 
+                        {
+                            jQuery.mobile.loading('hide');
+                            displayMessage('{!JSENCODE($Label.kimbleone__failed)}\n\n' + event.message);
+                            //debugger;
+                            refreshPage();
+                        }
+                    }, 
+                    {escape: false, timeout: 60000}
+                );
+        }
+        
+        function actualiseForecastedTime(theForecastedTimeEntries, resourceId)
+        {
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.Mobile_TimesheetController.ActualiseForecastedTime}', 
+                    theForecastedTimeEntries, '{!TheResource.Id}',
+                        function(result, event){          
+                            if (event.status) 
+                        {
+                            if(result != null && result.length > 0)
+                            {
+                                jQuery.mobile.loading('hide');
+                                
+                                displayResult(result);
+                                refreshPage();
+                            }
+                            else
+                            {
+                                // success!
+                                refreshPage();
+                            }
+                        } 
+                        else 
+                        {
+                            jQuery.mobile.loading('hide');
+                            displayMessage('{!JSENCODE($Label.kimbleone__failed)}\n\n' + event.message);
+                            //debugger;
+                            refreshPage();
+                        }
+                    }, 
+                    {escape: false, timeout: 60000}
+                );
+        }
+                
+        function submitSelected()
+        {
+            var theTimeEntries = [];
+            
+            jQuery('.time-entry-select:checked').closest('.time-entry-selector').each( function()
+            {
+                theTimeEntries.push(jQuery(this).attr('time-entry-id'));
+            });
+            
+            if(theTimeEntries.length > 0)
+            {
+                jQuery.mobile.loading('show');
+                
+                jQuery('#timesheet .ui-header').removeClass('Selecting');
+                jQuery('#timesheet .ui-header').addClass('Submitting');
+                jQuery('#timesheet .ui-title').text('{!JSENCODE($Label.kimbleone__mobilewebsubmitting)}');
+                jQuery('a#header-cancel-btn').hide();
+                
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.Mobile_TimesheetController.SubmitTimeEntries}', 
+                    theTimeEntries, '{!TheResource.Id}',
+                        function(result, event){          
+                            if (event.status) 
+                        {
+                            jQuery.mobile.loading('hide');
+                            if(result != null && result.length > 0)
+                            {
+                                displayResult(result);
+                                refreshPage();
+                            }
+                            else
+                            {
+                                displayMessage('{!JSENCODE($Label.kimbleone__mobilewebsubmitted)}');
+                                refreshPage();
+                            }
+                        } 
+                        else 
+                        {
+                            jQuery.mobile.loading('hide');
+                            displayMessage('{!JSENCODE($Label.kimbleone__failed)}\n\n' + event.message);
+                            //debugger;
+                            refreshPage();
+                        }
+                    }, 
+                    {escape: false, timeout: 60000}
+                );
+            }
+        }
+        
+        function displayResult(result)
+        {
+            var outputMessage = '';
+                for (i = 0; i < result.length; i++) { 
+                outputMessage += result[i].Message + "\n";
+            }
+            
+            displayMessage(outputMessage);
+        }
+        
+        function displayMessage(message)
+        {
+            // TODO don't use alert use something more jquerymobiley
+            alert(message);
+        }
+
+        function deleteSelected()
+        {
+            var theTimeEntries = [];
+            
+            jQuery('.time-entry-select:checked').closest('.time-entry-selector').each( function()
+            {
+                theTimeEntries.push(jQuery(this).attr('time-entry-id'));
+            });
+            
+            if(theTimeEntries.length > 0)
+            {
+                jQuery.mobile.loading('show');
+                
+                jQuery('a#header-cancel-btn').hide();
+                
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.Mobile_TimesheetController.DeleteTimeEntries}', 
+                    theTimeEntries,
+                        function(result, event){          
+                            if (event.status) 
+                        {
+                            jQuery.mobile.loading('hide');
+                            if(result != null && result.length > 0)
+                            {
+                                displayResult(result);
+                                refreshPage();
+                            }
+                            else
+                            {
+                                displayMessage('{!JSENCODE($Label.kimbleone__mobilewebdeleted)}');
+                                refreshPage();
+                            }
+                        } 
+                        else 
+                        {
+                            jQuery.mobile.loading('hide');
+                            displayMessage('{!JSENCODE($Label.kimbleone__failed)}\n\n' + event.message);
+                            refreshPage();
+                        }
+                    }, 
+                    {escape: false, timeout: 60000}
+                );
+            }
+        }
+        
+        function refreshPage()
+        {
+            // change page doesn't reinitialise the popup so using conventional javascript reload for now
+            location.reload();
+            
+            /*jQuery.mobile.changePage(window.location.href, {
+                allowSamePageTransition: true,
+                transition: 'none',
+                reloadPage: true
+            });*/
+        }       
+        
+    </script>
+    </apex:define>
+    </apex:composition>
+</apex:page>

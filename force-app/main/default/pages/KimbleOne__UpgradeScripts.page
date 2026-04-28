@@ -1,0 +1,377 @@
+<apex:page controller="KimbleOne.UpgradeScriptsController" tabStyle="KimbleOne__ReferenceData__c" action="{!initialise}" showHeader="true" sidebar="false">
+<apex:composition template="KimbleOne__SiteMaster">
+	 
+<apex:define name="Menu">
+	<c:Menu HelpSource="CfgGuide" DefaultHelpPage="WhatcanIdoinKimble.html" MenuContextName="Upgrade data to {!CurrentVersion} package schema" />
+</apex:define>
+	
+<apex:define name="Content">
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__CustomObjects)}"/>
+
+<apex:form >
+	
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+	
+	<div class="cardContainer">
+		
+		<div class="card">
+			<div class="cardHeadingContainer">
+				<div style="display:table-row">
+					<div class="cardHeadingCell">
+						<div class="card-heading-icon fa fa-circle-o-notch" ></div>
+						<div class="card-title-container"><h3 class="cardTitle"><apex:outputLink value="/{!$ObjectType.KimbleOne__UpgradeScript__c.KeyPrefix}"><apex:outputText value="{!$Organization.Name} - {!OrgType}"/></apex:outputLink></h3></div>
+					</div>
+					<div class="cardProperties cardHeadingCell cardHeadingCellFixed">
+						<div class="title-card-body-field">
+ 							<span id="status" class="center-aligned-block label-heading"></span>
+ 							<input id="start-upgrade-button" style="display:none;" type="button" value="Start" onclick="startUpgrade()"/>  								
+  						</div>					  					
+					</div>
+				</div>
+			</div>
+			<div class="cardBody">					
+				<div class="upgrade-body">
+				   <div class="donut-chart less-fifty-pct" >
+				    <div class="slice one"></div>
+				    <div id="less-fifty" class="slice two"></div>
+				    <div class="chart-center">
+				       <span>
+				    		<div class="pct-value"></div>
+				   			<div class="failures" style="display:none">
+				    			<i class="fa fa-warning" style="font-size: 18px;color: #B42E34;"></i>
+							</div>
+						</span>
+				    </div>
+				    
+				   </div>
+							  
+				  <div class="donut-chart more-fifty-pct" style="display:none;">
+				    <div class="slice one"></div>
+				    <div id="more-fifty" class="slice two"></div>
+				    <div class="chart-center">
+				      <span>
+				    		<div class="pct-value"></div>
+				   			<div class="failures" style="display:none">
+				    			<i class="fa fa-warning" style="font-size: 18px;color: #B42E34;"></i>
+							</div>
+						</span>
+				    </div>
+				  </div>
+				  
+				  <div id="current-script-container">
+					  <table id="current-script">
+					    	<tr>
+					    		<td>Name</td>
+					          	<td id="script-name"></td>
+					    	</tr>
+					    	<tr>
+					    		<td>AsyncId</td>
+					    		<td id="script-asyncid"></td>
+					    	</tr>
+					  		<tr>
+					  			<td>Status</td>
+					  			<td id="script-status">Processing</td>
+					  		</tr>
+					  </table>
+				</div> 
+			</div>
+			<div id="script-failures-container" style="display:none" class="inner-card">
+				<div class="inner-card-header"><div class="inner-card-title">Failures</div></div>
+				<div id="script-failures" class="inner-card-body">
+				
+				</div>
+			</div>
+		</div>
+	</div><!-- card -->	
+	</div>
+	
+	<script>
+		jQuery(window).load(function(){getProgress();});
+			
+		function startUpgrade()
+		{
+			jQuery('#start-upgrade-button').hide();
+			jQuery('.fa-circle-o-notch').addClass('fa-spin');
+			
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.UpgradeScriptsController.StartUpgrade}',
+        			function(result, event){          
+		             		if (event.status) 
+				            {
+								getProgress();
+				         	} 
+				         	else if (event.type === 'exception') 
+				         	{
+				             	alert(event.message);
+				         	} 
+				         	else 
+				         	{
+				             	alert(event.message);
+				         	}
+		         }, 
+		         {escape: true, timeout: 60000});
+		}
+		
+		function getProgress()
+        {
+        	Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.UpgradeScriptsController.GetStatus}',
+        			function(result, event){          
+		             		if (event.status) 
+				            {
+								updateProgress(result);
+				         	} 
+				         	else if (event.type === 'exception') 
+				         	{
+				             	alert(event.message);
+				         	} 
+				         	else 
+				         	{
+				             	alert(event.message);
+				         	}
+		         }, 
+		         {escape: true, timeout: 60000});
+        }
+        
+        function updateProgress(progress)
+        {
+        	if (progress.PercentComplete <= 50)
+			{
+				var deg = 180 + (progress.PercentComplete * 3.6);
+				jQuery('#less-fifty').css({transform: 'rotate(' + deg + 'deg)'}).parent().show();
+				jQuery('#more-fifty').parent().hide();
+				
+				if (progress.FailedScripts)
+					jQuery('.less-fifty-pct').addClass('failed');
+				else
+					jQuery('.less-fifty-pct').removeClass('failed');
+			}
+			else
+			{
+				var deg = progress.PercentComplete * 3.6;
+				jQuery('#more-fifty').css({transform: 'rotate(' + deg + 'deg)'}).parent().show();
+				jQuery('#less-fifty').parent().hide();
+				
+				if (progress.FailedScripts)
+					jQuery('.more-fifty-pct .slice').addClass('failed');
+				else
+					jQuery('.more-fifty-pct .slice').removeClass('failed');
+			}
+			
+			if (!progress.IsComplete)
+			{
+				if (progress.CurrentScript != null)
+				{
+					jQuery('#current-script').show();
+					jQuery('#script-name').empty().append(jQuery('<a href="/' + progress.CurrentScript.Id + '">' + progress.CurrentScript.Name + '</a>'));
+					jQuery('#script-asyncid').empty().append(jQuery('<a href="{!$Page.AsyncJobMonitor}?title=&redirecturl=&batchId=' + progress.CurrentScript.AsyncId + '">' + progress.CurrentScript.AsyncId + '</a>'));
+					jQuery('#status').text('Processing');
+				}
+				else
+				{
+					jQuery('#current-script').hide();
+					jQuery('#status').text('');
+					jQuery('#start-upgrade-button').show();
+				}
+			}
+			else
+			{
+				jQuery('#current-script').hide();
+				jQuery('#status').text('Complete');
+				jQuery('.fa-circle-o-notch').removeClass('fa-spin');
+			}
+			
+			if (progress.FailedScripts)
+			{
+				jQuery('#script-failures-container').show();
+				jQuery('#script-failures').empty();
+				
+				jQuery.each(progress.FailedScripts, function (i, script) {
+					
+					jQuery('#script-failures').append(jQuery('<div class="script-failure"><a href="/' + script.Id + '">' + script.Name + '</a><div>' + script.Message + '</div></div>'));
+					
+				});
+			}
+			else
+			{
+				jQuery('#script-failures-container').hide();
+			}
+			jQuery('.pct-value').text(progress.PercentComplete + '%');
+			
+			if (progress.PercentComplete != 100 && progress.CurrentScript != null)
+			{
+				// Wait 10 seconds to getProgress again
+   				setTimeout(getProgress, 2000);
+   			}
+        }
+        
+	</script>
+	<style>
+				.upgrade-body {
+				    margin: 0 20px 0 0;		
+				}
+				.cardTitle a {text-decoration: none;}
+				.donut-chart.more-fifty-pct {
+				    width: 200px;
+				    height: 200px;
+				    background: #e1e1e1;
+				}
+				.donut-chart.less-fifty-pct {
+				    width: 200px;
+				    height: 200px;
+				    background: #48b2c1;
+				}
+				.donut-chart {
+				    position: relative;
+				    border-radius: 50%;
+				    overflow: hidden;
+				}
+				.donut-chart.more-fifty-pct .slice.one {
+				    clip: rect(0 200px 100px 0);
+				    -webkit-transform: rotate(90deg);
+				    transform: rotate(90deg);
+				    background: #48b2c1;
+				}
+
+				.donut-chart.more-fifty-pct .slice.two {
+				    clip: rect(0 100px 200px 0);
+				    -webkit-transform: rotate(327.6deg);
+				    transform: rotate(180deg); /*180 -> 360*/
+				    background: #48b2c1;
+				}
+				
+				.donut-chart.less-fifty-pct .slice.one {
+				    clip: rect(0 200px 100px 0);
+				    -webkit-transform: rotate(90deg);
+				    transform: rotate(270deg);
+				    background: #e1e1e1;
+				}
+				
+				.donut-chart.less-fifty-pct .slice.two {
+				    clip: rect(0 100px 200px 0);
+				    -webkit-transform: rotate(180deg);
+				    transform: rotate(180deg); /*180 -> 360*/
+				    background: #e1e1e1;
+				}
+				
+				.donut-chart .slice {
+				    position: absolute;
+				    top: 0;
+				    left: 0;
+				    width: 100%;
+				    height: 100%;
+				}
+				.chart-center {
+				    top: 25px;
+				    left: 25px;
+				    width: 150px;
+				    height: 150px;
+				    background: #fff;
+				}
+				.donut-chart .chart-center {
+				    position: absolute;
+				    border-radius: 50%;
+				    display: inline-block;
+				}
+				
+				.chart-center>span {
+				    font-size: 40px;
+				    color: #48b2c1;
+				    width: 140px;
+				    height: 140px;
+				    display: table-cell;
+				    vertical-align: middle;
+				    padding-left: 10px;
+				    text-align: center;
+				    padding-top: 4px;
+				}
+				
+				.failed
+				{
+					background: #B42E34 !important;
+				}
+				.failed-text
+				{
+					color:#353535; !important;
+				}
+				.failures
+				{
+					height:10px;
+				}
+				
+				
+				/*
+					CARD STYLE
+				*/
+				.cardHeadingContainer
+		    {
+		    	display: table;
+				width: 100%;
+				background-color: #FFF;
+				border-color: #DDD;
+				color: #333;
+				background-color: #FFF;
+				border-color: #DDD;
+				border-bottom: 1px solid #DDD;
+				border-top-right-radius: 3px;
+				border-top-left-radius: 3px;
+				font-size: 18px;
+		    }
+		    .cardHeadingCell
+		    {
+		    	display: table-cell;
+			   vertical-align: middle;
+			   padding: 4px 15px;
+			   border-right: 1px solid #DDD;
+		    }
+		    .cardHeadingCellFixed
+		    {
+		    	width:1px;
+		    	white-space:nowrap;
+		    }
+		     .cardProperties {
+			  font-size: 12px;
+			}
+			.title-card-body-field
+			{
+				margin:0px;
+				padding-right:4px;
+				padding-left:0px;
+				padding-top:0px;
+				padding-bottom:0px;
+				vertical-align: middle;
+			}
+			.upgrade-body>div{
+				display: inline-block;
+			}
+			#current-script-container
+			{
+				height: 150px;
+			    margin-left: 32px;
+			    padding-top: 50px;
+			    min-width: 500px;
+			}
+			#current-script {
+				display:none;
+			}
+			#current-script td:first-child {
+			    font-weight: bold;
+			    text-align: right;
+			}
+			.script-failure {
+			    font-weight: bold;
+			    padding-bottom: 12px;
+			}
+			
+			.script-failure>div {
+			    font-weight: normal;
+			    color: darkgray;
+			    margin-top: 4px;
+			}
+			</style>
+      
+   </apex:form>
+   
+   </apex:define>
+   
+   </apex:composition>
+   
+</apex:page>

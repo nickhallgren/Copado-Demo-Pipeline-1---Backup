@@ -1,0 +1,321 @@
+<apex:page standardController="KimbleOne__CreditNote__c" extensions="KimbleOne.CreditNoteNewController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__CreditNote__c">
+	<apex:composition template="KimbleOne__SiteMaster">
+	 
+	<apex:define name="Menu"/>
+	
+	<apex:define name="Content">
+    	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__CreditNoteManagement)}" />
+    	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+    	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+
+    	<apex:form id="TheForm">
+    	
+    	<div id="pageErrors">
+    		<apex:pageMessages escape="False" />
+		</div>
+		
+		<apex:pageBlock title="{!$Label.kimbleone__createnewcreditnoteheading}">
+           	<apex:pageBlockButtons location="bottom">
+           		<apex:commandButton action="{!Cancel}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__cancel}" rerender="TheForm" rendered="{!TheCreditNoteCreationWizard.CanCancel}"/>
+           		<apex:commandButton id="goPreviousBtn" action="{!TheCreditNoteCreationWizard.GoPrevious}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__previous}" reRender="TheForm" rendered="{!TheCreditNoteCreationWizard.CanGoPrevious && TheCreditNoteCreationWizard.CurrentStep.StepName != 'SelectDeliveryElements'}" onComplete="initialiseItems();"/>
+            	<apex:commandButton id="goNextBtn" action="{!TheCreditNoteCreationWizard.GoNext}" styleclass="DisableButtonWhileBusy theNextButton" value="{!TheCreditNoteCreationWizard.NextLabel}" reRender="TheForm" rendered="{!TheCreditNoteCreationWizard.CanGoNext}" onComplete="initialiseItems();"/>
+            </apex:pageBlockButtons>
+
+			<!-- SELECT INVOICE ITEMS TO INCLUDE -->
+			<apex:outputPanel rendered="{!TheCreditNoteCreationWizard.CurrentStep.StepName == 'SelectItemsToCredit'}">
+
+				<apex:inputText styleClass="TheCreditNoteItemsJson" style="display:none" value="{!TheCreditNoteCreationWizard.TheCreditNoteItemsJson}"/>
+				<apex:inputText styleClass="TheCreditNoteCurrencyIsoCode" style="display:none" value="{!TheCreditNoteCreationWizard.TheCurrencyCode}"/>
+				
+			
+				<apex:outputPanel id="NetAmountPanel">
+					<apex:pageblockSection collapsible="false" showheader="false" columns="3">
+		           		
+		           		<apex:pageBlockSectionItem dataStyle="width:15%">
+		           			<apex:outputText value="{!$ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__Account__c.Label}" />
+		           			<apex:outputField value="{!TheCreditNoteCreationWizard.TheCreditNote.KimbleOne__Account__c}"/>
+		           		</apex:pageBlockSectionItem>
+		           		<apex:pageBlockSectionItem dataStyle="width:15%">
+		           			<apex:outputText value="{!$ObjectType.KimbleOne__Invoice__c.Label}" />
+		           			<apex:outputField value="{!TheCreditNoteCreationWizard.TheInvoice.KimbleOne__ReferenceLink__c}"/>
+		           		</apex:pageBlockSectionItem>
+		           		<apex:pageBlockSectionItem dataStyle="width:15%">
+		           			<apex:outputText value="{!$ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__NetAmount__c.Label}" />
+		           			<span id="CreditNoteSelectedItemsTotal"></span>	           			
+		           		</apex:pageBlockSectionItem>
+		           		
+		           	</apex:pageblockSection>
+	           	</apex:outputPanel>
+
+				<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__selectitemstoincludeoncreditnoteheading}" columns="1">
+						
+					<table cellpadding="0" cellspacing="2" border="0" width="100%">
+						<tr>
+							<td width="100%">
+								<div id="jsTreeContainer" style="height:100%;overflow-y:auto">
+									<div id="selectCreditNoteItems" ></div>
+								</div>
+							</td>
+ 						</tr>
+					</table>
+					
+					<script type="text/javascript">
+				
+						var theData;
+						var theCurrencyCode = $('.TheCreditNoteCurrencyIsoCode').val();
+						
+						$(function () {
+							
+							theData = jQuery.parseJSON($('.TheCreditNoteItemsJson').val());
+							jQuery.each(theData, function(i, obj){
+								updateFormattedAmount(obj);
+							});
+							
+							buildCreditNoteItemsTree();
+						});	
+					
+					</script>
+					
+					<style>
+						#jsonTree a:hover {text-decoration:none; color:black; cursor:default;}
+						.jstree-grid-wrapper{border: 1px solid #D4DADC;}
+						.jstree-grid-header-regular{background: white url('/img/alohaSkin/grid_headerbg.gif') 0 bottom repeat-x; color:black;font-weight: bold;font-size: 11px;}
+						.jstree-grid-container {border-bottom: 1px solid #CCC;}
+						.jstree-grid-separator{padding-top: 7px;}
+						.jstree-kimble-invoice.jstree-focused{background: #FFF;height: 275px;}
+					</style>
+					
+				</apex:pageblockSection>
+				
+				<script type="text/javascript">
+					$(function () {
+						getReferenceData();
+					});
+				</script>
+
+           	</apex:outputPanel>
+
+			<!-- INCLUDE CREDIT NOTE ADJUSTMENT -->
+			<apex:outputPanel layout="none" rendered="{!TheCreditNoteCreationWizard.CurrentStep.StepName == 'IncludeCreditNoteAdjustment'}">
+           	<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__confirmdetailsheading}" columns="3" >
+				<apex:pageBlockSectionItem dataStyle="width:15%">
+           			<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__BillingAccount__c.Label}" />
+           			<apex:outputField value="{!TheCreditNoteCreationWizard.TheCreditNote.KimbleOne__Account__c}"/>
+           		</apex:pageBlockSectionItem>
+           		<apex:pageBlockSectionItem dataStyle="width:15%">
+           			<apex:outputText value="{!$ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__CreditNoteDate__c.Label}" />
+           			<apex:outputField value="{!TheCreditNoteCreationWizard.TheCreditNote.KimbleOne__CreditNoteDate__c}"/>
+           		</apex:pageBlockSectionItem>
+           		<apex:pageBlockSectionItem dataStyle="width:15%">
+           			<apex:outputText value="{!$ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__NetAmount__c.Label} {!TheCreditNoteCreationWizard.TheCreditNote.CurrencyISOCode}" />
+           			<apex:outputField label="{!$Label.kimbleone__runningnettotallabel}" value="{!TheCreditNoteCreationWizard.CreditNoteRunningTotal.KimbleOne__InputCurrency__c}"/>
+           		</apex:pageBlockSectionItem>
+			</apex:pageblockSection>
+			
+			<apex:outputPanel id="AdjustmentsMainPanel">
+						
+			<apex:pageBlock id="AdjustmentsDetailPanel">
+
+						<apex:pageBlockButtons location="top">
+							<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__CreditNoteAdjustment__c.createable}">
+								<input class="btn" type="button"
+										onclick="initialiseModalBoxy('#AdjustmentsPopup', '{!JSENCODE($Label.AddCreditNoteAdjustmentHeading)}');addAdjustment()"
+										value="{!$Label.AddCreditNoteAdjustmentHeading}" />
+							</apex:outputPanel>
+						</apex:pageBlockButtons>
+			
+				<apex:pageBlockTable value="{!TheCreditNoteCreationWizard.TheCreditNoteAdjustments}"
+							var="anAdjustment"  title="{!$Label.kimbleone__confirmdetailsheading}">
+							<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+								
+								<apex:commandLink action="{!TheCreditNoteCreationWizard.RemoveCreditNoteAdjustment}" 
+									reRender="AdjustmentsDetailPanel, AdjustmentsMainPanel">{!$Label.kimbleone__remove}
+									<apex:param name="aId" value="{!anAdjustment.TempId}" />
+								</apex:commandLink>
+							</apex:column>
+
+							<apex:column headerValue="{!$ObjectType.KimbleOne__CreditNoteAdjustment__c.Fields.KimbleOne__CreditNoteAdjustmentReason__c.Label}"
+								value="{!anAdjustment.ThisObject.KimbleOne__CreditNoteAdjustmentReason__c}" />
+							<apex:column headerValue="{!$ObjectType.KimbleOne__CreditNoteAdjustment__c.Fields.KimbleOne__DeliveryGroup__c.Label}"
+								value="{!anAdjustment.ThisObject.KimbleOne__DeliveryGroup__c}" />
+							<apex:column headerValue="{!$ObjectType.KimbleOne__CreditNoteAdjustment__c.Fields.KimbleOne__DeliveryElement__c.Label}"
+								value="{!anAdjustment.ThisObject.KimbleOne__DeliveryElement__c}" />
+							<apex:column headerValue="{!$ObjectType.KimbleOne__CreditNoteAdjustment__c.Fields.KimbleOne__Description__c.Label}"
+								value="{!anAdjustment.ThisObject.KimbleOne__Description__c}" />
+							<apex:column headerClass="sortable">
+       	 		    			<apex:facet name="header">{!$ObjectType.KimbleOne__CreditNoteAdjustment__c.Fields.KimbleOne__AdjustmentValue__c.Label}</apex:facet>
+       	 		    			<apex:outputText value="{0, number, {!TheCreditNoteCreationWizard.TheCreditNote.CurrencyISOCode} #,###.00}">
+									<apex:param value="{!anAdjustment.ThisObject.KimbleOne__AdjustmentValue__c}"></apex:param>
+								</apex:outputText>
+       	 		    		</apex:column>
+					
+						</apex:pageBlockTable>
+				</apex:pageBlock>		
+			</apex:outputPanel>
+			
+			
+			
+			<script type="text/javascript">
+				$(function () {
+					getReferenceData();
+				});
+			</script>
+			
+			</apex:outputPanel>		
+
+			<!-- CONFIRM INVOICE DETAILS -->
+			<apex:outputPanel layout="none" rendered="{!TheCreditNoteCreationWizard.CurrentStep.StepName == 'ConfirmCreditNoteDetails'}">
+           	<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__confirmdetailsheading}" columns="2" >
+				
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__BillingAccount__c.Label}" />
+					<apex:outputField value="{!TheCreditNoteCreationWizard.TheCreditNote.KimbleOne__Account__c}"/>
+				</apex:pageBlockSectionItem>
+				
+				<apex:inputField value="{!TheCreditNoteCreationWizard.TheCreditNote.KimbleOne__CreditNoteDate__c}" styleClass="kimbleDatePicker" />
+				
+           		<apex:pageBlockSectionItem dataStyle="width:15%">
+           			<apex:outputText value="{!$ObjectType.KimbleOne__Invoice__c.Label}" />
+           			<apex:outputField value="{!TheCreditNoteCreationWizard.TheInvoice.KimbleOne__ReferenceLink__c}"/>
+           		</apex:pageBlockSectionItem>
+
+				<apex:outputField value="{!TheCreditNoteCreationWizard.TheCreditNote.KimbleOne__BusinessUnitTradingEntity__c}" />
+
+				<apex:outputField label="{!$ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__NetAmount__c.Label} {!TheCreditNoteCreationWizard.TheCreditNote.CurrencyISOCode}" value="{!TheCreditNoteCreationWizard.CreditNoteRunningTotal.KimbleOne__InputCurrency__c}"/>
+				
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel for="reasonCode" value="{!$ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__ReasonCode__c.Label}" />
+					<apex:selectList id="reasonCode" value="{!TheCreditNoteCreationWizard.TheCreditNote.KimbleOne__ReasonCode__c}" size="1">
+						<apex:selectOptions value="{!TheCreditNoteReasonCodes}"/>
+					</apex:selectList> 
+				</apex:pageBlockSectionItem>
+
+				<apex:inputField value="{!TheCreditNoteCreationWizard.TheCreditNote.KimbleOne__Notes__c}"/>
+
+				<apex:inputField required="true" value="{!TheCreditNoteCreationWizard.TheCreditNote.KimbleOne__ReasonDescription__c}" />
+
+			</apex:pageblockSection>
+			
+			<apex:pageBlockSection columns="1" title="{!$Label.kimbleone__presentationdetailsheading}">
+				
+				<apex:pageBlockSectionItem >
+						<apex:outputText value="{!$ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__CreditNoteTemplate__c.Label}" />
+						<apex:inputText value="{!TheCreditNoteCreationWizard.TheCreditNote.KimbleOne__CreditNoteTemplate__c}" styleclass="kimblecustomlookup GetCommercialDocumentTemplateList CreditNote true false"/> 
+				</apex:pageBlockSectionItem>
+				
+				<apex:inputField value="{!TheCreditNoteCreationWizard.TheCreditNote.KimbleOne__CreditNoteContextDescription__c}" style="width:400px" rendered="{!TheCreditNoteCreationWizard.InvoiceFormat.KimbleOne__ShowContext__c}" />
+			
+			</apex:pageblockSection>
+			
+			<script type="text/javascript">
+				$(function () {
+					getReferenceData();
+				});
+			</script>
+			
+			</apex:outputPanel>
+
+			<apex:outputPanel rendered="{!TheCreditNoteCreationWizard.HasFinished}">
+                 <script>
+		                safeNavigateToSForceURL('{!JSENCODE(RedirectCreditNotePreview)}');
+		          </script>
+	               	   
+           	</apex:outputPanel>
+		</apex:pageBlock>
+		<apex:actionFunction action="{!TheCreditNoteCreationWizard.AddCreditNoteAdjustment}"
+						name="addAdjustment"
+						rerender="AdjustmentsPopupPanel"
+						oncomplete="showModalBoxy();" />
+		</apex:form>
+		
+		
+		<div id="AdjustmentsPopup" style="display: none">
+			<apex:outputPanel id="AdjustmentsPopupPanel">
+			  	<apex:form >
+					<apex:pageBlock >
+					
+						<div id="AdjustmentsPopupErrors">
+							<apex:pageMessages escape="false"/>
+						</div>
+						<apex:pageBlockButtons location="bottom">
+							<apex:commandButton action="{!TheCreditNoteCreationWizard.SaveCreditNoteAdjustment}"
+								rendered="{!$ObjectType.KimbleOne__CreditNoteAdjustment__c.createable}"
+								value="{!$Label.kimbleone__add}"
+								oncomplete="hideModalBoxyWithErrorCheck('#AdjustmentsPopupErrors')"
+								styleclass="DisableButtonWhileBusy"
+								reRender="AdjustmentsPopupPanel, AdjustmentsMainPanel " />
+							<input class="btn" type="button" onclick="hideModalBoxy();"
+								value="{!$Label.kimbleone__cancel}" />
+						</apex:pageBlockButtons>
+					
+						<apex:pageBlockSection id="AdjustmentProperties" collapsible="false" columns="1">
+							
+							<apex:pageBlockSectionItem >
+									<apex:outputText value="{!$ObjectType.KimbleOne__CreditNoteAdjustment__c.Fields.KimbleOne__CreditNoteAdjustmentReason__c.Label}" />
+										<apex:selectList id="CreditNoteAdjustmentReasonSelect" value="{!TheCreditNoteCreationWizard.TheCreditNoteAdjustment.ThisObject.KimbleOne__CreditNoteAdjustmentReason__c}" size="1">
+											<apex:selectOptions value="{!TheCreditNoteCreationWizard.TheCreditNoteAdjustmentReasons}"/>
+									    		<apex:actionSupport event="onchange" action="{!TheCreditNoteCreationWizard.CreditNoteAdjustmentReasonChange}" rerender="AdjustmentProperties"/>			
+										</apex:selectList> 
+							</apex:pageBlockSectionItem>
+							
+						    <apex:pageBlockSectionItem rendered="{!TheCreditNoteCreationWizard.DeliveryElementsThatCanBeAdjusted != null && TheCreditNoteCreationWizard.DeliveryElementsThatCanBeAdjusted.size > 0 && TheCreditNoteCreationWizard.ShowDeliveryElementTypeList}">
+								<apex:outputText value="{!$Label.kimbleone__selectdeliveryelementforcreditnoteadjustment}" />
+								<apex:selectList id="AdjustmentDeliveryElement" value="{!TheCreditNoteCreationWizard.TheCreditNoteAdjustment.ThisObject.KimbleOne__DeliveryElement__c}" size="1">
+									<apex:selectOptions value="{!TheCreditNoteCreationWizard.DeliveryElementsThatCanBeAdjusted}"/>
+								</apex:selectList> 
+							</apex:pageBlockSectionItem>		
+							
+							 <apex:pageBlockSectionItem rendered="{!TheCreditNoteCreationWizard.DeliveryGroupsThatCanBeAdjusted != null && TheCreditNoteCreationWizard.DeliveryGroupsThatCanBeAdjusted.size > 0 && TheCreditNoteCreationWizard.ShowDeliveryGroupTypeList}">
+								<apex:outputText value="{!$Label.kimbleone__selectdeliveryelementforcreditnoteadjustment}" />
+									<apex:selectList id="AdjustmentDeliveryGroup" value="{!TheCreditNoteCreationWizard.TheCreditNoteAdjustment.ThisObject.KimbleOne__DeliveryGroup__c}" size="1">
+										<apex:selectOptions value="{!TheCreditNoteCreationWizard.DeliveryGroupsThatCanBeAdjusted}"/>
+									</apex:selectList> 
+							</apex:pageBlockSectionItem>				
+			
+							<apex:pageBlockSectionItem >
+									<apex:outputText value="{!$ObjectType.KimbleOne__CreditNoteAdjustment__c.Label} {!TheCreditNoteCreationWizard.TheInvoice.CurrencyISOCode}" />
+									<apex:inputField value="{!TheCreditNoteCreationWizard.TheCreditNoteAdjustment.ThisObject.KimbleOne__AdjustmentValue__c}" required="true" />
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$ObjectType.KimbleOne__CreditNoteAdjustment__c.Fields.KimbleOne__Description__c.Label}" />
+								<apex:outputPanel >
+									<div class="requiredInput">
+										<div class="requiredBlock"></div>
+					 					<apex:inputField value="{!TheCreditNoteCreationWizard.TheCreditNoteAdjustment.ThisObject.KimbleOne__Description__c}"/>
+			  						</div>
+		  						</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+						
+						</apex:pageblockSection>
+					</apex:pageBlock>
+					</apex:form>
+				</apex:outputPanel>
+			</div>
+
+		<script>
+
+		jQuery(window).load(function(){
+			initialiseItems();
+		});
+		function initialiseItems()
+		{
+		    SetupDatePicker();
+  		}
+		function SetupDatePicker()
+		{
+			//dateFormat: 'yy-mm-dd',
+			jQuery('.kimbleDatePicker').datepicker({
+					dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true,
+					selectOtherMonths: true,
+					changeMonth: true,
+					changeYear: true});
+		}
+
+		</script>
+		
+	</apex:define>
+	
+	</apex:composition>
+</apex:page>

@@ -1,0 +1,219 @@
+<apex:page standardController="KimbleOne__DeliveryElement__c" extensions="KimbleOne.DeliveryElementPeriodCostsController,KimbleOne.SecurityController"  sidebar="false" >
+ 
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+	<c:Menu DefaultHelpPage="PeriodCosts.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryElement__c.KimbleOne__DeliveryGroup__c}" MenuContextName="{!KimbleOne__DeliveryElement__c.DeliveryGroup__r.Name}"/>
+
+</apex:define>
+    
+<apex:define name="Content">
+ 	<style>
+		.boxy-content {display:none;}
+	</style>
+	
+	<apex:pageMessage summary="{!$Label.kimbleone__requisitionedperiodcosts}" severity="info" strength="2" rendered="{!KimbleOne__DeliveryElement__c.Product__r.ProductDomain__r.KimbleOne__IsSupplierRequisitioned__c}"/>
+	       		
+		<apex:outputPanel id="PeriodCosts">
+        
+        <apex:form id="TheForm">     <!--rendered="{!KimbleOne__DeliveryElement__c.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsPeriodGenerated__c}"  -->
+          <apex:pageMessages escape="False" />
+          <apex:pageBlock id="periodCosts__c" title="{!$ObjectType.KimbleOne__PeriodCost__c.labelplural}">
+            <apex:pageBlockButtons location="top"  rendered="{!KimbleOne__DeliveryElement__c.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsPeriodGenerated__c}">
+				<input id="addPeriodCost" type="button" class="btn" value="{!$Label.New} {!$ObjectType.PeriodCost__c.label} " onclick="initialiseModalBoxy('#PeriodCostPopup', '{!JSENCODE($Label.New)} {!$ObjectType.PeriodCost__c.label} ');newPeriodCost()"></input>
+            </apex:pageBlockButtons>
+
+            <apex:pageBlockTable value="{!periodCosts}" var="pc" >
+              <apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+        		
+        		<apex:outputPanel rendered="{!pc.Status__r.KimbleOne__Enum__c == 'Open' && pc.RequisitionItemAllocations__r.size = 0}">
+     				<apex:outputLink value="#" onclick="initialiseModalBoxy('#PeriodCostPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__PeriodCost__c.label}');editPeriodCost('{!JSINHTMLENCODE(pc.Id)}')">{!$Label.kimbleone__edit}</apex:outputLink>
+     				<apex:outputPanel rendered="{!pc.KimbleOne__BaselineCost__c == 0 && pc.RequisitionItemAllocations__r.size = 0}">
+     					&nbsp;|&nbsp;<apex:outputLink value="#" onclick="var d = confirmDelete();if(d) deletePeriodCost('{!JSINHTMLENCODE(pc.Id)}');">{!$Label.kimbleone__delete}</apex:outputLink>
+     				</apex:outputPanel>
+				</apex:outputPanel>
+				
+				<!-- open and not requisitioned in line complete-->
+        		<apex:outputPanel rendered="{!pc.Status__r.KimbleOne__Enum__c == 'Open' && !KimbleOne__DeliveryElement__c.Product__r.ProductDomain__r.KimbleOne__IsSupplierRequisitioned__c}">
+     				&nbsp;|&nbsp;<apex:outputLink value="#" onclick="completePeriodCost('{!JSINHTMLENCODE(pc.Id)}')">{!$Label.kimbleone__complete}</apex:outputLink>
+				</apex:outputPanel>
+				
+				<apex:outputPanel layout="none" rendered="{!pc.Status__r.KimbleOne__Enum__c == 'Open' && pc.RequisitionItemAllocations__r.size != 0 && pc.RequisitionItemAllocations__r[0].SupplierRequisitionLine__r.SupplierRequisition__r.Status__r.Enum__c = 'Approved'}">
+					<!--actualisation-->
+	        		<apex:outputPanel rendered="{! pc.RequisitionItemAllocations__r[0].SupplierRequisitionLine__r.SupplierRequisition__r.SupplierRequisitionType__r.Enum__c = 'Actualisation'}">
+	     				<apex:outputLink value="#" onclick="completePeriodCost('{!JSINHTMLENCODE(pc.Id)}')">{!$Label.kimbleone__complete}</apex:outputLink>
+					</apex:outputPanel>
+					
+					<!-- goods receipt-->
+	        		<apex:outputPanel rendered="{!pc.RequisitionItemAllocations__r[0].SupplierRequisitionLine__r.SupplierRequisition__r.SupplierRequisitionType__r.Enum__c = 'GoodsReceivedNote'}">
+	     				<apex:outputLink value="/{!$ObjectType.KimbleOne__GoodsReceivedNote__c.KeyPrefix}">{!$Label.kimbleone__receivegoodslabel}</apex:outputLink>
+					</apex:outputPanel>
+					
+					<!-- supplier invoice-->
+	        		<apex:outputPanel rendered="{!pc.RequisitionItemAllocations__r[0].SupplierRequisitionLine__r.SupplierRequisition__r.SupplierRequisitionType__r.Enum__c = 'SupplierInvoice'}">
+	     				<apex:outputLink value="/{!$ObjectType.KimbleOne__SupplierInvoice__c.KeyPrefix}">{!$Label.kimbleone__supplierinvoicelabel}</apex:outputLink>
+					</apex:outputPanel>
+					
+				</apex:outputPanel>
+
+				<apex:outputLink value="#" onclick="revertPeriodCost('{!JSINHTMLENCODE(pc.Id)}')" rendered="{!pc.Status__r.KimbleOne__Enum__c == 'Completed' && pc.TimePeriod__r.ForecastingTimePeriod__r.Status__r.KimbleOne__Enum__c != 'Closed' && pc.SupplierInvoiceableItems__r.size==0 && HasPermission['RevertCompletedPeriodCost']}">{!$Label.kimbleone__reverttodraft}</apex:outputLink>
+			
+              </apex:column>
+              
+              <apex:column value="{!pc.TimePeriod__r.Name}" headerValue="{!$ObjectType.KimbleOne__TimePeriod__c.Fields.Name.Label}" /> 
+              
+              <apex:column value="{!pc.KimbleOne__ForecastUnits__c}" rendered="{!KimbleOne__DeliveryElement__c.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsUnitGenerated__c}" />
+              <apex:column value="{!pc.KimbleOne__ForecastCost__c}" headerValue="{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__ForecastCost__c.Label}" />
+              	
+              <apex:column value="{!pc.KimbleOne__ActualUnits__c}" rendered="{!KimbleOne__DeliveryElement__c.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsUnitGenerated__c}" />
+              <apex:column value="{!pc.KimbleOne__ActualCost__c}" headerValue="{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__ActualCost__c.Label}" />
+              	
+              <apex:column value="{!pc.Status__r.Name}" headerValue="{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__Status__c.Label}"/>		
+			  
+			  <apex:column value="{!pc.KimbleOne__Approver1User__c}" headerValue="{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__Approver1User__c.Label}"/>		
+			  <apex:column value="{!pc.KimbleOne__Approver2User__c}" headerValue="{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__Approver2User__c.Label}"/>		
+			
+            </apex:pageBlockTable> 
+
+          </apex:pageBlock> 
+
+          <apex:actionFunction action="{!newPeriodCost}" name="newPeriodCost" rerender="PeriodCost" oncomplete="showModalBoxy()">
+       	  </apex:actionFunction>
+ 
+	      <apex:actionFunction action="{!getPeriodCostForEdit}" name="editPeriodCost" rerender="PeriodCost" oncomplete="showModalBoxy()">
+       		<apex:param name="pcId" value="" />
+          </apex:actionFunction>
+          
+          <apex:actionFunction action="{!DeletePeriodCost}" name="deletePeriodCost" rerender="TheForm">
+       		<apex:param name="pcId" value="" />
+          </apex:actionFunction>
+          
+          
+          <apex:actionFunction action="{!CompletePeriodCost}" name="completePeriodCost" rerender="TheForm">
+       		<apex:param name="pcId" value="" />
+          </apex:actionFunction>
+       
+          <apex:actionFunction action="{!RevertPeriodCost}" name="revertPeriodCost" rerender="TheForm">
+       		<apex:param name="pcId" value="" />
+          </apex:actionFunction>
+       
+        </apex:form>
+        
+       
+        </apex:outputPanel>
+        
+
+      <div id="PeriodCostPopup" style="display:none">
+      
+        <apex:outputPanel id="PeriodCost">
+        
+        <apex:form >
+   
+          <apex:pageBlock >
+            <div id="periodCostErrors">
+				<apex:pageMessages escape="False" />
+			</div>
+			<apex:pageBlockButtons location="bottom">
+				<apex:commandButton id="savePeriodCost" action="{!upsertPeriodCost}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#periodCostErrors')" reRender="PeriodCost,PeriodCosts"/>
+				<input id="cancelPeriodCost" class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+            </apex:pageBlockButtons>
+            
+            <apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+               
+				<!-- Don't allow user to update Time Period. If they try to change this, they are effectively creating a different Period Cost. -->                             
+				<apex:pageblockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__TimePeriod__c.Label}" for="timePeriodin" rendered="{!periodCost.KimbleOne__TimePeriod__c==null}"/>
+					<apex:selectList id="timePeriodin" value="{!periodCost.KimbleOne__TimePeriod__c}" size="1" required="true" rendered="{!periodCost.KimbleOne__TimePeriod__c == null}">
+						<apex:selectOptions value="{!ThePeriodOptions}"/>
+					</apex:selectList>              
+				</apex:pageblockSectionItem>
+				<apex:outputfield id="timePeriodout" value="{!periodCost.KimbleOne__TimePeriod__c}" rendered="{!periodCost.KimbleOne__TimePeriod__c != null}"/>
+				
+				<apex:pageBlockSectionItem >
+                   	<apex:outputLabel >{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__ForecastCost__c.Label} {!periodCost.CurrencyIsoCode}</apex:outputLabel>
+                   	<apex:inputField id="forecastCost" value="{!periodCost.KimbleOne__ForecastCost__c}" required="true"/>
+               	</apex:pageBlockSectionItem>
+				
+			</apex:pageBlockSection>
+            
+          </apex:pageBlock>
+
+        </apex:form>
+
+</apex:outputPanel>
+
+</div>
+<div id="PeriodCostActualsPopup" style="display:none">
+      
+        <apex:outputPanel id="PeriodCostActuals">
+        
+        <apex:form >
+   
+          <apex:pageBlock >
+            <div id="periodCostActualsErrors">
+				<apex:pageMessages escape="False" />
+				
+			<apex:outputpanel rendered="{!periodCost.RequisitionItemAllocations__r.size>0 }">	
+				<apex:pageMessage summary="{!$Label.kimbleone__errors}" severity="warning" strength="2" rendered="true">
+					<ul style=" margin:0px ;padding:0">
+							<li>
+								{!$Label.productCostCannotModifyCost}&nbsp;
+								 <a href="/{!supplierRequisitionLineAllocation.SupplierRequisitionLine__r.SupplierRequisition__r.Id}">
+									{!JSENCODE(supplierRequisitionLineAllocation.SupplierRequisitionLine__r.SupplierRequisition__r.Name)}
+								</a> 
+							</li>
+							<apex:outputPanel layout="none" rendered="{!showDifferentUnitOnCompleteMsg}" >
+								<li>
+									{!$Label.ProductCostUnitsDiffers} &nbsp;
+									<a href="/{!supplierRequisitionLineAllocation.SupplierRequisitionLine__r.SupplierRequisition__r.Id}">
+										{!JSENCODE(supplierRequisitionLineAllocation.SupplierRequisitionLine__r.SupplierRequisition__r.Name)}
+									</a>
+								</li>
+							</apex:outputPanel>
+					</ul>
+				</apex:pageMessage>
+			</apex:outputpanel>
+				
+					
+			</div>
+			<apex:pageBlockButtons location="bottom">
+				<apex:commandButton id="savePeriodCost" action="{!upsertPeriodCost}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#periodCostActualsErrors')" reRender="PeriodCostActuals,PeriodCosts"/>
+				<input id="cancelPeriodCost" class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+            </apex:pageBlockButtons>
+            
+            <apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+               <apex:outputfield id="timePeriodout" value="{!periodCost.KimbleOne__TimePeriod__c}" />
+			   
+			   <!-- Has Requisition -->
+			   <apex:pageBlockSectionItem rendered="{!periodCost.RequisitionItemAllocations__r.size>0}">
+               		<apex:outputLabel >{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__ActualCost__c.Label} </apex:outputLabel>
+                  	<apex:outputField value="{!periodCost.KimbleOne__ActualCost__c}" />
+               </apex:pageBlockSectionItem>
+               
+               <apex:inputField value="{!periodCost.KimbleOne__ActualUnits__c}" required="true" rendered="{!KimbleOne__DeliveryElement__c.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsUnitGenerated__c && periodCost.RequisitionItemAllocations__r.size>0}"/>
+			  
+             	
+				 <!-- Doesn't have Requisition -->
+				 <apex:pageBlockSectionItem rendered="{!periodCost.RequisitionItemAllocations__r.size==0}">
+               		<apex:outputLabel >{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__ActualCost__c.Label} {!periodCost.CurrencyIsoCode}</apex:outputLabel>
+                   	<apex:inputText value="{!periodCost.KimbleOne__ActualCost__c}"/>
+               	</apex:pageBlockSectionItem>
+				  
+				<apex:inputField value="{!periodCost.KimbleOne__ActualUnits__c}" required="true" rendered="{!KimbleOne__DeliveryElement__c.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsUnitGenerated__c && periodCost.RequisitionItemAllocations__r.size==0}"/>
+			  
+			</apex:pageBlockSection>
+            
+          </apex:pageBlock>
+
+        </apex:form>
+
+</apex:outputPanel>
+
+</div>
+
+</apex:define>
+
+</apex:composition>
+	
+</apex:page>

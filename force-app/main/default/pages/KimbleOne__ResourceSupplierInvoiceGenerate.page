@@ -1,0 +1,291 @@
+<apex:page standardController="KimbleOne__Resource__c" recordSetVar="Resources" extensions="KimbleOne.ResourceSupplierInvoiceGenCntrllr" showHeader="true" sidebar="false">
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Content">
+		<style>
+			.filterItem
+			{
+				padding-left: 20px;
+				background-repeat: no-repeat;
+				padding-right: 12px;
+				height: 18px;
+				display: block;
+				line-height: 18px;
+			}
+			.Pending
+			{
+				background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'pending16.gif')}');
+			}
+			.Processing
+			{
+				background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'running16.gif')}');
+			}
+			.Completed
+			{
+				background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'completed16.gif')}');
+			}
+			.Failed
+			{
+				background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'failed16.gif')}');
+			}
+			.btn-container {
+                margin-bottom: 6px;
+            }
+		</style>
+
+		<apex:form id="TheForm">
+			<apex:pageBlock title="{!$Label.kimbleone__generatelabel} {!$ObjectType.KimbleOne__SupplierInvoice__c.labelPlural}">
+				<apex:pageBlockSection title="{!$Label.kimbleone__filters}" columns="2" collapsible="false">
+					<apex:inputField label="{!$Label.kimbleone__from}" value="{!TheGlobalFilter.InvoiceFromDate.KimbleOne__InputDate__c}" styleClass="kimbleDatePicker" onChange="filterChange();"/>
+					<apex:pageBlockSectionItem >
+						<apex:outputLabel value="{!$Label.kimbleone__items}"/>
+						<apex:selectList value="{!TheGlobalFilter.ItemType}" size="1" onChange="filterChange();">
+							<apex:selectOptions value="{!FilterItemTypes}" />
+						</apex:selectList>
+					</apex:pageBlockSectionItem>
+					<apex:inputField label="{!$Label.kimbleone__to}" value="{!TheGlobalFilter.InvoiceUpToDate.KimbleOne__InputDate__c}" styleClass="kimbleDatePicker" onChange="filterChange();"/>
+					<apex:pageBlockSectionItem rendered="{!EnableAdhocSelfBillSupplierInvoices}">
+						<apex:outputLabel value="{!$Label.kimbleone__typelabel}"/>
+						<apex:selectList value="{!TheGlobalFilter.SupplierRequisitionState}" size="1" onChange="filterChange();">
+							<apex:selectOptions value="{!FilterSupplierRequisitionStates}" />
+						</apex:selectList>
+					</apex:pageBlockSectionItem>
+				</apex:pageBlockSection>
+
+				<apex:pageBlockSection id="limits-exceeded" title="{!$Label.kimbleone__assignmentsheading}" columns="1" collapsible="false" rendered="{!LimitsExceeded}">
+					<apex:pageMessage severity="warning" title="{!LimitsExceededMessage}"/>
+				</apex:pageBlockSection>
+
+				<apex:pageBlockSection id="filter-results" title="{!$Label.kimbleone__assignmentsheading}" columns="1" collapsible="false" rendered="{!!LimitsExceeded}">
+
+					<apex:pageMessage severity="warning" title="{!NoAssignmentsFoundMessage}" rendered="{!TheFilterItems.size == 0}"/>
+
+					<apex:outputPanel layout="none" rendered="{!TheFilterItems.size != 0}">
+						<div class="btn-container">
+							<input id="startButton" type="button" class="btn DisableButtonWhileBusy" value="{!JSENCODE($Label.Start)}" onClick="generateSupplierInvoices();"/>
+						</div>
+
+					    <apex:pageBlockTable value="{!TheFilterItems}" var="filterItem">
+						    <apex:column headervalue="{!$Label.kimbleone__statuslabel}">
+						        <span id="{!JSENCODE(filterItem.Key)}" class="filterItem Pending"/>
+							    <input id="{!JSENCODE(filterItem.Key)}_json" type="hidden" value="{!JSENCODE(filterItem.JSONString)}"/>
+						    </apex:column>
+							<apex:column >
+		                        <apex:facet name="header">
+									<apex:outputPanel layout="none">
+										<apex:outputLabel value="{!$Label.kimbleone__selectlabel}"/><br/>
+										<apex:inputCheckbox styleClass="select-all" onChange="selectAllCheckboxes(); checkForSelected();"/>
+									</apex:outputPanel>
+		                        </apex:facet>
+		                        <apex:inputCheckbox value="{!filterItem.IsSelected.KimbleOne__InputCheckbox__c}" styleClass="row-selector"/>
+		                    </apex:column>
+							<apex:column >
+		                        <apex:facet name="header">
+									<apex:outputPanel layout="none">
+				                        <apex:outputLabel value="{!$Label.kimbleone__approve}"/><br/>
+			                            <apex:inputCheckbox styleClass="select-all-approval" onChange="selectAllApprovalCheckboxes();"/>
+									</apex:outputPanel>
+		                        </apex:facet>
+		                        <apex:inputCheckbox value="{!filterItem.Approve.KimbleOne__InputCheckbox__c}" styleClass="row-selector-approval"/>
+		                    </apex:column>
+					        <apex:column headerValue="{!$ObjectType.KimbleOne__Resource__c.Label}" value="{!filterItem.ResourceName}"/>
+					        <apex:column headerValue="{!$ObjectType.KimbleOne__SupplierInvoiceableItem__c.Fields.KimbleOne__IsSupplierRequisitioned__c.Label}" value="{!filterItem.IsRequisitioned.KimbleOne__InputCheckbox__c}"/>
+					        <apex:column headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Label}" value="{!filterItem.DeliveryElementName}"/>
+					        <apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Label}" value="{!filterItem.ActivityAssignmentName}"/>
+					        <apex:column headerValue="{!$Label.kimbleone__fromlabel}" value="{!filterItem.MinDate.KimbleOne__InputDate__c}"/>
+					        <apex:column headerValue="{!$Label.kimbleone__tolabel}" value="{!filterItem.MaxDate.KimbleOne__InputDate__c}"/>
+					        <apex:column headerValue="{!$Label.kimbleone__currency}" value="{!filterItem.CurrencyCode}"/>
+					        <apex:column headerValue="{!$Label.kimbleone__serviceslabel}" value="{!filterItem.TotalServices.KimbleOne__InputDecimal__c}"/>
+					        <apex:column headerValue="{!$Label.kimbleone__expenseslabel}" value="{!filterItem.TotalExpenses.KimbleOne__InputDecimal__c}"/>
+						</apex:pageBlockTable>
+					</apex:outputPanel>
+				</apex:pageBlockSection>
+
+                <apex:actionFunction name="filterChange" action="{!FilterChange}" rerender="refresh-filter-items,filter-results" onComplete="refreshFilterItems();"/>
+                <apex:actionFunction name="redirectToEmail" action="{!RedirectToEmail}"/>
+			</apex:pageBlock>
+
+			<apex:outputPanel id="refresh-filter-items">
+				<script>
+				    function refreshFilterItems()
+					{
+					    theFilterItems = kimble.parseJSON("{!JSENCODE(TheFilterItemsJSON)}");
+					    theMap = new Map();
+						var i;
+						for (i = 0; i < theFilterItems.length; i++)
+						{
+							theMap.set(theFilterItems[i].Key, theFilterItems[i]);
+			            }
+
+			            initialiseItems();
+			            
+			            for(i=0;i<$('input.row-selector:checked:not(.selected)').length;i++)
+                            $(this).toggleClass('selected');
+			            
+			            for(i=0;i<$('input.row-selector-approval:checked:not(.selected)').length;i++)
+                            $(this).toggleClass('selected');
+					}
+
+                    $('input.row-selector').each(function(){$(this).change(function(){
+                        $(this).toggleClass('selected');
+                        checkForSelected();
+                    })});
+
+                    $('input.row-selector-approval').each(function(){$(this).change(function(){
+                        $(this).toggleClass('selected');
+                    })});
+				</script>
+			</apex:outputPanel>
+
+			<script>
+				var theMap;
+				var theFilterItems;
+
+				jQuery(window).load(function(){
+					initialiseItems();
+					refreshFilterItems();
+				});
+
+				function initialiseItems()
+				{
+					SetupDatePicker();
+	                jQuery('[id$=\'startButton\']').prop('disabled',true);
+					resetSelectAll();
+
+					if ({!DefaultApprovalsOn})
+					{
+						jQuery("input.select-all-approval:visible").prop('checked', true);
+						
+						selectAllApprovalCheckboxes();
+					}
+					else
+					{
+						resetSelectAllApprovals();
+					}
+				}
+
+				function SetupDatePicker()
+				{
+					jQuery('.kimbleDatePicker').datepicker({
+							dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+							showOtherMonths: true,
+							selectOtherMonths: true,
+							changeMonth: true,
+							changeYear: true});
+				}
+
+	            function resetSelectAll()
+				{
+					jQuery("input.select-all").each(function(){jQuery(this).prop('checked', false);jQuery(this).removeClass('selected')});
+				}
+
+				function selectAllCheckboxes()
+		        {
+		            if(jQuery("input.select-all:visible")[0].checked)
+		            {
+		                jQuery("input.row-selector:visible").each(function(){jQuery(this).prop('checked', true);jQuery(this).addClass('selected')});
+		            }
+		            else
+		            {
+		                jQuery("input.row-selector:visible").each(function(){jQuery(this).prop('checked', false);jQuery(this).removeClass('selected')});
+					}
+		        }
+
+	            function checkForSelected()
+	            {
+	                if(jQuery("input.row-selector:checked").length > 0)
+	                {
+	                    jQuery('[id$=\'startButton\']').prop('disabled',false);
+	                }
+	                else
+	                {
+	                    jQuery('[id$=\'startButton\']').prop('disabled',true);
+	                }
+	            }
+
+	            function resetSelectAllApprovals()
+				{
+					jQuery("input.select-all-approval").each(function(){jQuery(this).prop('checked', false);jQuery(this).removeClass('selected')});
+				}
+
+				function selectAllApprovalCheckboxes()
+		        {
+		            if(jQuery("input.select-all-approval:visible")[0].checked)
+		            {
+		                jQuery("input.row-selector-approval:visible").each(function(){jQuery(this).prop('checked', true);jQuery(this).addClass('selected')});
+		            }
+		            else
+		            {
+		                jQuery("input.row-selector-approval:visible").each(function(){jQuery(this).prop('checked', false);jQuery(this).removeClass('selected')});
+					}
+		        }
+
+				function generateSupplierInvoices()
+				{
+					var selectorObj = $('.row-selector.selected:first');
+
+					if (selectorObj.length)
+					{
+					    var rowContext = jQuery(selectorObj).closest('tr');
+						var sendForApproval = jQuery(rowContext).find('.row-selector-approval').hasClass('selected');
+					    var obj = jQuery(rowContext).find('.filterItem.Pending');
+						$(obj).removeClass('Pending');
+				        $(obj).addClass('Processing');
+				        $(selectorObj).removeClass('selected');
+
+				        executeJob(JSON.stringify(theMap.get($(obj).attr('id'))), obj, sendForApproval);
+					}
+					else
+					{
+					    var failed = $('.filterItem.Failed:first');
+
+					    if (failed.length)
+					    {
+						    $('#startButton').removeClass('btnDisabled');
+						    $('#startButton').addClass('btn');
+						    $('#startButton').val('{!$Label.Start}');
+						    $('#startButton').attr('disabled', true);
+							 resetSelectAll();
+							 selectAllCheckboxes();
+							 resetSelectAllApprovals();
+							 selectAllApprovalCheckboxes();
+						}
+						else
+							redirectToEmail();
+					}
+				}
+
+				function executeJob(jsonObj, obj, sendForApproval)
+				{
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ResourceSupplierInvoiceGenCntrllr.GenerateSupplierInvoice}',
+			            jsonObj, sendForApproval,
+			                function(result, event){
+			                     if (event.status)
+					             {
+					                var jobStatus = result['TheJob'][KimbleNamespaceWithUnderscores + 'Status__r'][KimbleNamespaceWithUnderscores + 'Enum__c']
+									$(".filterItem[id='" + result.TheKey + "']").removeClass('Processing');
+									$(".filterItem[id='" + result.TheKey + "']").addClass(jobStatus);
+
+									if (jobStatus == 'Failed')
+										obj.attr('title', result['TheJob'][KimbleNamespaceWithUnderscores + 'Message__c']);
+									else if (jobStatus == 'Completed')
+										$(".filterItem[id='" + result.TheKey + "']").closest('tr').fadeOut(2000);
+
+									generateSupplierInvoices();
+					             }
+					             else if (event.type === 'exception')
+					             {
+					                alert(event.message);
+					             }
+					             else
+					             {
+					                alert(event.message);
+					             }
+			            },
+			            {escape: true, timeout: 60000}
+			        );
+				}
+			</script>
+		</apex:form>
+    </apex:define>
+</apex:composition>
+</apex:page>

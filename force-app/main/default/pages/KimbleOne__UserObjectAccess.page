@@ -1,0 +1,119 @@
+<apex:page standardController="User" extensions="KimbleOne.UserObjectAccessController" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu"></apex:define>  
+   
+<apex:define name="Content">
+
+	<apex:pageMessages escape="false"/>
+	
+	<apex:form id="TheForm">   
+         <apex:pageBlock title="{!UserName}" id="TheShares">
+            <apex:pageBlockButtons location="top">
+            	<input type="button" class="btn" value="Reset" onclick="safeNavigateToSForceURL('{!$Page.UserObjectAccess}?Id={!JSENCODE(UserId)}');"></input>
+            </apex:pageBlockButtons>
+            
+            <apex:pageBlockTable value="{!TheMatchingShares}" var="shareObject" >
+              <apex:column headerValue="{!$Label.kimbleone__name}">
+                  <apex:outputLink styleclass="hidden-admin" value="/{!shareObject.Id}"><apex:outputText value="{!shareObject.Id}"/></apex:outputLink>
+                  <apex:outputText value="{!shareObject.ObjectId}" styleclass="kimble-objectid-lookup" html-data-type="{!shareObject.ObjectType}"/>
+              </apex:column>
+              
+              <apex:column headerValue="{!$Label.kimbleone__typelabel}">
+                  <apex:outputLink value="{!$Page.KimbleOne__UserObjectAccess}?Id={!UserId}&objectKey={!shareObject.ObjectKey}">
+                  	<apex:outputText value="{!shareObject.ObjectLabel}" />
+                  </apex:outputLink>
+              </apex:column>	
+               
+              <apex:column headerValue="{!$ObjectType.DeliveryGroup__Share.Fields.AccessLevel.Label}">
+                  <apex:outputText value="{!shareObject.AccessLevel}" />
+              </apex:column>
+              
+              <apex:column headerValue="{!$ObjectType.DeliveryGroup__Share.Fields.RowCause.Label}">
+                  <apex:repeat value="{!shareObject.Reasons}" var="reason">
+                  		<div style="padding-bottom: 4px;">
+                  		
+						<apex:outputText value="{!reason.Reason}"/>&nbsp;
+						<apex:outputPanel layout="none" rendered="{!!ISBLANK(reason.ContextId)}">[ <span><apex:outputText styleclass="kimble-objectid-lookup" html-data-link="{!$Page.KimbleOne__UserObjectAccess}?Id={!UserId}&objectId=" html-data-type="{!reason.ObjectType}" value="{!reason.ContextId}" /></span> ]</apex:outputPanel></div>
+                  
+                  </apex:repeat>               
+              </apex:column>	
+            
+            </apex:pageBlockTable> 
+			<br/>
+			
+			<div style="position: relative;">
+				Page: <apex:outputText value="{!PageNumber}"/>
+					<div style="position:absolute;top:0px; right:8px">
+					<apex:outputLink value="{!PreviousLink}" rendered="{!Offset != 0}">
+                  	<apex:outputText value="{!$Label.kimbleone__previous}" />
+		             </apex:outputLink>
+		             &nbsp;&nbsp;&nbsp;
+		             <apex:outputLink value="{!NextLink}" rendered="{!TheMatchingShares.size = PageSize}">
+		                  	<apex:outputText value="{!$Label.kimbleone__next}" />
+		             </apex:outputLink>
+				</div>
+			</div>
+			
+        </apex:pageBlock> 
+          		
+   </apex:form>
+   <style>
+       .kimble-objectid-lookup{display:none;}
+       .remove-share{margin-right: 4px; cursor: pointer;font-size: 14px;text-decoration: none;}
+       a.hidden-admin {margin-right: 6px;}
+   </style>
+   <script>
+            
+          jQuery(window).load(function(){
+          	
+          	initialise();
+          
+          });
+          
+          var cache = {};
+          
+          function initialise()
+          {
+          	jQuery.each(jQuery('.kimble-objectid-lookup'), function (i, obj)
+			{
+				if (jQuery(obj).text() != '')
+				{
+					var objId = jQuery(obj).text();
+					
+					if (cache[objId] == null)
+					{
+						var sObject = sforce.connection.query("SELECT Id, Name FROM " + jQuery(obj).attr("data-type") + " WHERE Id = '" + jQuery(obj).text() + "'");
+						cache[objId] = sObject.records.Name;
+					}
+					
+					var link = '/';
+					
+					var dataLink = jQuery(obj).attr("data-link"); 
+					
+					if (dataLink != null && dataLink != '')
+						link = dataLink;
+					
+					jQuery(obj).parent().append('<a href="' + link + objId + '">' + cache[objId] + '</a>');
+				}
+			
+			});
+			
+			if (kimble.user.isAdmin)
+			{
+				try
+				{
+					jQuery('.hidden-admin').show();
+				}
+				catch(e){}
+				
+			}
+          }
+            
+   </script>
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

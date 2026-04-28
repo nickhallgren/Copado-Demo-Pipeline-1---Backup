@@ -1,0 +1,192 @@
+<apex:page controller="KimbleOne.ExpenseCategoryTemplateEditController" sidebar="false">
+<apex:composition template="KimbleOne__SiteMaster">
+	<apex:define name="Content">
+	<apex:outputPanel layout="none" rendered="{!ExpenseCategoryTemplate.Id == null}">
+		<apex:sectionHeader title="{!$ObjectType.KimbleOne__ExpenseCategoryTemplate__c.Label}" subtitle="{!$Label.kimbleone__new} {!$ObjectType.KimbleOne__ExpenseCategoryTemplate__c.label}"/>
+	</apex:outputPanel>
+	<apex:outputPanel id="ExpenseCategoryTemplate">
+		<apex:form >
+			<apex:pageMessages escape="false"/>
+			
+			<apex:pageblock >
+		 	<apex:pageBlockButtons location="bottom">
+				<apex:commandButton action="{!upsertExpenseCategoryTemplate}" value="{!$Label.kimbleone__save}"/>
+			</apex:pageBlockButtons>
+			
+		 		<apex:pageblockSection collapsible="false" showheader="false"  columns="2">
+					
+					<apex:pageBlockSectionItem labelStyle="width:30%;" dataStyle="font-weight: bold;">
+						<apex:outputLabel value="{!$ObjectType.KimbleOne__ExpenseCategoryTemplate__c.Fields.KimbleOne__ExpenseCategory__c.Label}" />
+						<apex:outputpanel >
+					     	 <apex:selectList value="{!ExpenseCategoryTemplate.KimbleOne__ExpenseCategory__c}"  size="1" rendered="{!ISBLANK(ExpenseCategoryValue)}" >
+								<apex:actionSupport event="onchange" action="{!selectExpenseCategoryTemplateDefaults}" rerender="ExpenseCategoryTemplate" />
+								<apex:selectOptions value="{!AllExpenseCategories}" />
+							</apex:selectList>
+							<apex:outputText value="{!ExpenseCategoryTemplate.ExpenseCategory__r.Name}"  rendered="{!(!ISBLANK(ExpenseCategoryValue))}" />
+						</apex:outputpanel>
+				    </apex:pageBlockSectionItem>
+				    <apex:pageBlockSectionItem />
+			
+					<apex:inputField value="{!ExpenseCategoryTemplate.Name}" />
+					<apex:pageBlockSectionItem />
+			
+					<apex:pageBlockSectionItem >
+		           		<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseCategoryTemplate__c.Fields.KimbleOne__ProductDomain__c.Label}" />
+		           		<apex:selectlist value="{!ExpenseCategoryTemplate.KimbleOne__ProductDomain__c}" size="1">
+			           		<apex:SelectOptions value="{!AllProductDomains}"/>
+			           	</apex:selectlist>
+					</apex:pageBlockSectionItem>
+					
+					<apex:pageBlockSectionItem rendered="{!ExpenseCategoryTemplate.ExpenseCategory__r.KimbleOne__IsVariableByResourceType__c==true || (expenseCategoryTemplate.Id==null && ExpenseCategorySelected.KimbleOne__IsVariableByResourceType__c  )}">
+		           		<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseCategoryTemplate__c.Fields.KimbleOne__ResourceType__c.Label}" />
+		           		<apex:selectlist value="{!ExpenseCategoryTemplate.KimbleOne__ResourceType__c}" size="1" onchange="refresh()">
+			           		<apex:SelectOptions value="{!AllResourceTypes}"/>
+			           	</apex:selectlist>
+					</apex:pageBlockSectionItem>
+					<apex:pageBlockSectionItem rendered="{!ExpenseCategoryTemplate.ExpenseCategory__r.KimbleOne__IsVariableByResourceLocation__c==true || (expenseCategoryTemplate.Id==null && ExpenseCategorySelected.KimbleOne__IsVariableByResourceLocation__c  )}"> 
+		           		<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseCategoryTemplate__c.Fields.KimbleOne__Location__c.Label}" />
+		           		<apex:selectlist value="{!ExpenseCategoryTemplate.KimbleOne__Location__c}" size="1" onchange="refresh()">
+			           		<apex:SelectOptions value="{!AllLocations}"/>
+			           	</apex:selectlist>
+					</apex:pageBlockSectionItem>
+					
+				
+					
+					
+				</apex:pageBlockSection>
+        
+				<apex:pageBlockSection collapsible="false" showheader="false"  columns="2" id="CostPanel">
+	                	
+	                	<!-- Reimbursement Rule -->
+	                	<apex:pageBlockSectionItem labelStyle="width:30%;">
+							<apex:outputLabel for="ReimbursementRule" >
+								<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseCategoryTemplate__c.Fields.KimbleOne__ReimbursementRule__c.Label}" />
+				    		</apex:outputLabel>
+				    	
+				    		<apex:outputPanel layout="none">
+				    			<apex:selectList value="{!ExpenseCategoryTemplate.KimbleOne__ReimbursementRule__c}"  size="1"  rendered="{!isExpenseTypePerUnit}">
+									<apex:actionSupport event="onchange" action="{!SetReimbursementRuleValueDefault}" rerender="ExpenseCategoryTemplate" />
+									<apex:selectOptions value="{!ReimbursementRulesPerUnit}" />
+								</apex:selectList>
+							
+								<apex:selectList value="{!ExpenseCategoryTemplate.KimbleOne__ReimbursementRule__c}"  size="1"  rendered="{!!isExpenseTypePerUnit}">
+									<apex:actionSupport event="onchange" action="{!SetReimbursementRuleValueDefault}" rerender="ExpenseCategoryTemplate" />
+									<apex:selectOptions value="{!AllReimbursementRules}" />
+								</apex:selectList>
+							</apex:outputPanel>
+	               		</apex:pageBlockSectionItem>        
+				
+					
+						<!--  Rebilling Rule -->
+						<apex:pageBlockSectionItem dataStyle="width:70%" >
+							<apex:outputLabel for="RebillingRule" rendered="{!isForDeliveryElement}">
+								<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseCategoryTemplate__c.Fields.KimbleOne__RebillingRule__c.Label}" />							
+							</apex:outputLabel>						
+						
+							<apex:outputPanel layout="none" rendered="{!isForDeliveryElement}">  
+						  		
+						  		<apex:selectList value="{!ExpenseCategoryTemplate.KimbleOne__RebillingRule__c}"  size="1"  rendered="{!isExpenseTypePerUnit}">
+									<apex:actionSupport event="onchange" action="{!SetRebillingRuleValueDefault}" rerender="ExpenseCategoryTemplate" />
+									<apex:selectOptions value="{!RebillingRulesPerUnit}" />
+								</apex:selectList>
+						  
+						  		<apex:selectList value="{!ExpenseCategoryTemplate.KimbleOne__RebillingRule__c}"  size="1"  rendered="{!!isExpenseTypePerUnit}">
+									<apex:actionSupport event="onchange" action="{!SetRebillingRuleValueDefault}" rerender="ExpenseCategoryTemplate" />
+									<apex:selectOptions value="{!AllRebillingRules}" />
+						 		</apex:selectList>
+							
+							</apex:outputPanel>  
+	                
+	                	</apex:pageBlockSectionItem>  
+				
+						<!-- Reimbursement Rule Continue-->
+		    	     	<apex:pageBlockSectionItem rendered="{!CanShowCostFactorField}">
+							<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseCategoryTemplate__c.Fields.KimbleOne__CostFactor__c.Label}"  />
+							<apex:inputfield value="{!ExpenseCategoryTemplate.KimbleOne__CostFactor__c}" id="RevenueRateFactorField" /> 
+						</apex:pageBlockSectionItem>
+		    	     	<apex:pageBlockSectionItem rendered="{!CanShowCostRateField}">
+							<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseCategoryTemplate__c.Fields.KimbleOne__ReimbursementCurrencyCostRate__c.Label}"  />
+							<apex:inputfield value="{!ExpenseCategoryTemplate.KimbleOne__ReimbursementCurrencyCostRate__c}" id="RevenueRateFactorField" /> 
+						</apex:pageBlockSectionItem>
+		    		
+		    	     	<apex:pageBlockSectionItem rendered="{!(!CanShowCostRateField && !CanShowCostFactorField)}" />
+		     		 	
+						<!-- Rebilling Rule COntinue -->
+						<apex:pageBlockSectionItem rendered="{!CanShowRevenueFactorField}">
+							<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseCategoryTemplate__c.Fields.KimbleOne__RevenueFactor__c.Label}"  />
+							<apex:inputfield value="{!ExpenseCategoryTemplate.KimbleOne__RevenueFactor__c}" id="RevenueRateFactorField" /> 
+						</apex:pageBlockSectionItem>
+		    	     	<apex:pageBlockSectionItem rendered="{!CanShowRevenueRateField}">
+	            	       	<apex:outputLabel >{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__RevenueRate__c.Label} {!ExpenseCategoryTemplate.CurrencyIsoCode}</apex:outputLabel>
+	                	   	<apex:inputField value="{!ExpenseCategoryTemplate.KimbleOne__RevenueRate__c}" />
+						</apex:pageBlockSectionItem>
+				     			
+				     	<apex:pageBlockSectionItem rendered="{!(!CanShowRevenueFactorField && !CanShowRevenueRateField)}" />
+		     		 	
+		     		 	<apex:pageBlockSectionItem labelStyle="">
+							<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseCategoryTemplate__c.Fields.KimbleOne__ReimbursementCurrencyIsoCode__c.Label}" />
+				    		<apex:selectList value="{!ExpenseCategoryTemplate.KimbleOne__ReimbursementCurrencyIsoCode__c}"  size="1" >
+								<apex:selectOptions value="{!AllActiveCurrencies}" />
+							</apex:selectList>
+	    	     		</apex:pageBlockSectionItem>
+
+		     		 	<apex:pageBlockSectionItem labelStyle="">
+							<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseCategoryTemplate__c.Fields.KimbleOne__TaxCode__c.Label}" />
+				    		<apex:selectList value="{!ExpenseCategoryTemplate.KimbleOne__TaxCode__c}"  size="1" >
+								<apex:selectOptions value="{!AllInputTaxCodes}" />
+							</apex:selectList>
+	    	     		</apex:pageBlockSectionItem>
+	    	     		
+					</apex:pageBlockSection>
+					
+					<apex:pageBlockSection id="IntercompanyPanel" collapsible="false" showheader="false" columns="2" rendered="{!IsIntercompanyEnabled}">
+		     		 	
+		     		 	<apex:pageBlockSectionItem labelStyle="width:30%;">
+							<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseCategoryTemplate__c.Fields.KimbleOne__InternalRebillingRule__c.Label}" />
+				    		<apex:selectList value="{!ExpenseCategoryTemplate.KimbleOne__InternalRebillingRule__c}"  size="1" >
+								<apex:actionSupport event="onchange" action="{!SetInternalRebillingRuleValueDefault}" rerender="ExpenseCategoryTemplate" />
+				    			<apex:selectOptions value="{!InternalRebillingRules}" />
+							</apex:selectList>
+	    	     		</apex:pageBlockSectionItem>
+	    	     		
+						<apex:pageBlockSectionItem rendered="{!CanShowInternalRevenueFactorField}">
+							<apex:outputText value="{!$ObjectType.KimbleOne__ExpenseCategoryTemplate__c.Fields.KimbleOne__InternalRevenueFactor__c.Label}"  />
+							<apex:inputfield id="InternalRevenueRateFactorField" value="{!ExpenseCategoryTemplate.KimbleOne__InternalRevenueFactor__c}"  /> 
+						</apex:pageBlockSectionItem>
+	    	      		
+					</apex:pageBlockSection>
+
+					<apex:pageBlockSection collapsible="false" showheader="false"  columns="1"  id="CheckboxesPanel">
+						<apex:pageBlockSectionItem labelStyle="width:30%;" rendered="{!isCheckBoxesAvaliable}">
+							<apex:outputLabel value="{!$Label.kimbleone__updateactivityexpensecategorieslabel}" for="UpdateActivities"/>
+				    		<apex:inputCheckbox value="{!updateExistingActivities}" id="UpdateActivities" styleClass="UpdateActivities" 
+				    			onclick="clickedUpdateActivities()"/>
+	    	     		</apex:pageBlockSectionItem>
+	    	     		
+	    	     		<apex:pageBlockSectionItem rendered="{!isCheckBoxesAvaliable}">
+							<apex:outputLabel value="{!$Label.kimbleone__replaceactivityexpensecategorieslabel}" for="ReplaceActivities"/>
+				    		<apex:inputCheckbox value="{!replaceExistingActivities}" id="ReplaceActivities" styleClass="ReplaceActivities" 
+				    			onclick="clickedReplaceActivities()" />
+	    	     		</apex:pageBlockSectionItem>
+	    	      		
+					</apex:pageBlockSection>
+			
+		 	</apex:pageblock>			
+	      <apex:actionFunction action="{!Refresh}" name="refresh"  rerender="CheckboxesPanel" />
+		</apex:form>	
+		</apex:outputPanel>
+		<script>
+			function clickedReplaceActivities()
+			{
+				if(jQuery('.ReplaceActivities').prop('checked'))
+					jQuery('.UpdateActivities').prop('checked',false);
+			}
+			function clickedUpdateActivities()
+			{
+				if(jQuery('.UpdateActivities').prop('checked'))
+					jQuery('.ReplaceActivities').prop('checked',false);
+			}
+		</script>
+	</apex:define>
+</apex:composition>
+</apex:page>

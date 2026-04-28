@@ -1,0 +1,265 @@
+<apex:page showHeader="true" controller="KimbleOne.ExpenseClaimApprovalRequestsController" extensions="KimbleOne.SecurityController" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__ReferenceData__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+     	<c:Menu MenuContextName="{!$Label.kimbleone__approvalrequestspendingheading} - {!$ObjectType.KimbleOne__ExpenseClaim__c.LabelPlural}" />
+    </apex:define>
+    
+    <apex:define name="Content">
+
+		<style>
+			div#approving-user-container {
+				position: absolute;
+			    right: 10px;
+			    top: 39px;
+			}
+			.approval-mode-toggle-container {
+			    font-size: 13px;
+			    padding-top: 8px;
+			}
+			.approval-mode-toggle-container span {
+			    cursor: pointer;
+			}
+			span.approvals-tgl-label {
+				max-width: 250px;
+				display: inline-block;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				overflow: hidden;
+			}
+			span#approvalMode {
+			    font-size: 14px;
+			    padding-left: 4px;
+			    padding-right: 4px;
+			}
+			div#content-pane {
+				min-height:108px;
+   			}
+			div#filterContainer {
+                height: 22px;
+            }
+			.filter-button {
+                position: absolute;
+                top: 40px;
+                right: 292px;
+                font-size: 18px;
+                width: 20px;
+                text-align: center;
+                padding: 6px 10px 6px 10px;
+                background-color: white;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+                cursor: pointer;
+                margin: 0px 10px 10px 10px;
+   			}
+			div#FilterPopup {
+				position: absolute;
+				top: 81px;
+			    right: 302px;
+				padding: 5px;
+				width: 318px;
+				height: 163px;
+				z-index: 999;
+				border-color: #ddd;
+				border-style: solid;
+				border-width: 0px 1px 1px 1px;
+				background-color: #fff;
+				box-shadow: rgba(31, 31, 31, 0.16) 4px 3px 8px;
+				overflow-y: auto;
+			}
+			.filter-header {
+				font-weight: bold;
+				font-size: 14px;
+				padding: 10px;
+				background-color: #F5F5F5;
+				border: 1px solid #DDD;
+				border-radius: 4px;
+				margin-left: 2px;
+				margin-right: 2px;
+			}
+
+			i.filter-collapse-btn.fa.fa-angle-double-up {
+				color: #BBB;
+				cursor: pointer;
+				padding-right: 6px;
+				position: absolute;
+				right: 13px;
+				top: 13px;
+				font-size: 26px;
+			}
+   			.filter-button.active {
+				text-decoration: none;
+				color: white;
+				background-color: #1A9EFF;
+			}
+			.filter-button:not(.active):hover {
+				background-color: #f4f6f9;
+			}
+			input#applyFilterButton {
+				margin-top: 10px;
+			}
+		</style>
+
+        <apex:actionStatus id="ApprovalItemLoadingStatus">
+            <apex:facet name="start">
+                <div id="loadingIndicatorOuterContainer" class="loadingIndicator">
+                    <div id="loadingIndicatorInnerContainer">
+                        <img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+                    </div>
+                </div>
+            </apex:facet>
+        </apex:actionStatus>
+        	
+		<apex:outputPanel id="approvalsSummary">
+		<apex:form >
+
+			<div id="filterContainer">
+
+				<div class= "filter-button" title="{!$Label.Filter}" onclick="jQuery('#FilterPopup').show();"><i class="fa fa-filter"></i></div>
+
+				<div id="FilterPopup" style="display:none;">
+					<div class="filter-header">{!$Label.Filter}<i onclick="jQuery('#FilterPopup').hide();" class="filter-collapse-btn fa fa-angle-double-up" title="{!$Label.Close}"></i></div>
+					<apex:outputPanel id="FilterPopupPanel">
+						<table border="0" cellpadding="0" cellspacing="0" style="font-size: 11px;color: #4a4a56;">
+
+							<apex:outputPanel layout="none" rendered="{!BUGOptions.size > 2}">
+								<div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!$ObjectType.KimbleOne__BusinessUnitGroup__c.Label}</div>
+								<apex:selectList styleClass="filterSelect filterBUG" value="{!filterBUG}" size="1" style="width:80%; margin-left:8px;">
+									<apex:actionSupport event="onchange" action="{!getBusinessUnitOptions}" reRender="FilterPopupPanel"/>
+									<apex:selectOptions value="{!BUGOptions}"/>
+								</apex:selectList>
+							</apex:outputPanel>
+
+							<apex:outputPanel layout="none">
+								<div style="margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;">{!$ObjectType.KimbleOne__BusinessUnit__c.Label}</div>
+								<apex:selectList styleClass="filterSelect filterBU" value="{!filterBU}" size="1" style="width:80%; margin-left:8px;">
+									<apex:selectOptions value="{!BUOptions}"/>
+								</apex:selectList>
+							</apex:outputPanel>
+
+						</table>
+					</apex:outputPanel>
+
+					<div id="filterInputs" style="padding-left:8px">
+						<input class="btn" id="applyFilterButton" onclick="setFilter();" type="Button" value="{!$Label.GoButton}"/>
+						<input class="btn" id="clearButtonFilter" onclick="clearFilter();" type="Button" value="{!$Label.ClearAllLabel}"/>
+						<label>{!$Label.DefaultViewLabel}</label>
+						<input type="checkbox" id="saveAsDefault"/>
+					</div>
+
+				</div>
+			</div>
+
+			<apex:outputPanel rendered="{!HasPermission['ManageAllPendingApprovals']}">
+			<div id="approving-user-container">
+				<div class="approval-mode-toggle-container">
+					<span class="undecorated-link approvals-tgl-label" onclick="switchToMyApprovalsOnly();" title="{!JSENCODE($Label.ApprovalRequestActorLabel)}"><apex:outputText value="{!$Label.kimbleone__approvalrequestactorlabel}"/></span>
+					<span id="approvalMode" onclick="toggleApprovalMode();" class="k-tgl fa"></span>
+					<span class="undecorated-link approvals-tgl-label" onclick="switchToAllApprovals();" title="{!JSENCODE($Label.All)} {!JSENCODE($Label.ApprovalRequestsPendingHeading)}"><apex:outputText value="{!$Label.kimbleone__all} {!$Label.kimbleone__approvalrequestspendingheading}"/></span>
+				</div>
+			</div>
+			</apex:outputPanel>
+
+			<apex:actionFunction name="switchToMyApprovalsOnly" action="{!ShowOnlyMyApprovals}" rerender="approvalsSummary" status="ApprovalItemLoadingStatus"/>
+			<apex:actionFunction name="switchToAllApprovals" action="{!ShowForAllApprovers}" rerender="approvalsSummary" status="ApprovalItemLoadingStatus"/>
+
+			<apex:actionFunction name="applyFilter" action="{!applyFilters}"/>
+		</apex:form>
+		<script>
+   			var allApprovalsMode = {!IF(showAllApprovals, 'true','false')};
+
+			jQuery(document).ready(function()
+			{
+				initialiseApprovalMode();
+				initialiseFilter();
+			});
+			
+			function initialiseApprovalMode()
+			{
+				refreshApprovalMode();
+			}
+
+
+			function initialiseFilter()
+			{
+				if(filterIsActive())
+				{
+				    jQuery('.filter-button').addClass('active');
+				}
+
+				jQuery('.filter-button').css('right', jQuery('#approving-user-container').width() + 5);
+   			}
+
+   			function setFilter()
+   			{
+   			    var isDefault = jQuery('[id$="saveAsDefault"]').prop('checked');
+
+   			    if(isDefault)
+   			    {
+   			    	var selectedBUG = jQuery('.filterBUG').val();
+   			    	var selectedBU = jQuery('.filterBU').val();
+
+					{
+					    var theDefault = {BUG: selectedBUG, BU: selectedBU};
+					    createCookie('apex__kimble.expenseclaimpendingappsfilterdef',JSON.stringify(theDefault));
+     				}
+   			    }
+
+   			    applyFilter();
+      		}
+		
+	 		function toggleApprovalMode()
+	 		{
+				if(allApprovalsMode)
+				{
+					switchToMyApprovalsOnly();
+				}
+				else
+				{
+					switchToAllApprovals();
+				}	
+			}
+
+			function refreshApprovalMode()
+			{
+				if(allApprovalsMode)
+				{
+					jQuery("#approvalMode").removeClass('fa-toggle-off');
+					jQuery("#approvalMode").addClass('fa-toggle-on');
+				}
+				else
+				{
+					jQuery("#approvalMode").addClass('fa-toggle-off');
+					jQuery("#approvalMode").removeClass('fa-toggle-on');
+				}
+			}
+
+			function clearFilter()
+			{
+				jQuery('.filterSelect').each(function(ind,item)
+				{
+				    var defaultValue = jQuery(this).children()[0].value;
+				    jQuery(this).val(defaultValue);
+    			});
+   			}
+
+   			function filterIsActive()
+   			{
+   			    var filterApplied = false;
+
+   			    jQuery('.filterSelect').each(function(){
+					if(this.value != 'All'){filterApplied = true; return false;}
+          		});
+
+          		return filterApplied;
+      		}
+		</script>
+			
+		<c:PendingApprovalsForContext ComponentContext="{!$ObjectType.KimbleOne__ExpenseClaim__c.Name}" ShowAllApprovalsMode="{!ShowAllApprovals}"/>
+
+		</apex:outputPanel>
+   				
+    </apex:define>
+</apex:composition>
+
+</apex:page>

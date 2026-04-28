@@ -1,0 +1,613 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.DeliveryGroupDashboardController,KimbleOne.DeliveryGroupStatusCardController,KimbleOne.FinancialSummaryCardController,KimbleOne.RiskSummaryCardController,KimbleOne.IssueSummaryCardController,KimbleOne.TrackingPlanSummaryCardController" sidebar="false" renderAs="{!IF($CurrentPage.parameters.renderAs=='html','html','pdf')}">
+<html>
+	<head>
+		<style>
+			 @page {
+     		 	size:landscape;
+    		 }
+			.dashboardTitle
+			{
+				font-weight: bold;
+				font-size: 1.7em;
+				font-family: "Arial Black", sans-serif;
+			}
+			.dashboardTable
+			{
+				font-size: 0.80em;
+				width: 100%;
+				border: 0px;
+				cellpadding: 0px;
+				cellspacing: 0px;
+			    font-family: Arial Unicode MS;
+			    text-align: left;				
+			}
+			.text
+			{
+				font-size: 0.7em;
+				font-family: Arial Unicode MS;
+				text-align: left;
+			}
+			.dashboardRichText
+			{
+				font-size: 0.75em;
+			}
+			.dashboardLabelCell
+			{
+				font-size: 0.9em;
+				font-family: Arial Unicode MS;
+			}
+			.dashboardLabelCellNumber
+			{
+				font-size: 0.9em;
+				font-family: Arial Unicode MS;
+				text-align: right;
+			}
+			
+			.dashboardHeaderCell
+			{
+				font-size: 0.9em;
+				font-family: "Arial Black", sans-serif;
+				text-align: center;
+			}
+
+			.dashboardHeaderCellLeftAlign
+			{
+				font-size: 0.9em;
+				font-family: "Arial Black", sans-serif;
+				text-align: left;
+			}
+			
+			.dashboardHeaderCellRightAlign
+			{
+				font-size: 0.9em;
+				font-family: "Arial Black", sans-serif;
+				text-align: right;
+			}
+						
+			.dashboardHeaderCellWithBorderRight
+			{
+				font-size: 0.9em;
+				font-family: "Arial Black", sans-serif;
+				text-align: center;
+				border-right-style:solid;
+				border-width:1px;
+			}
+			
+			.dashboardPropertyValueCellText
+			{
+				font-size: 0.9em;
+				font-family: Arial Unicode MS;
+				text-align: left;
+			}
+			.dashboardPropertyValueCellNumber
+			{
+				font-size: 0.9em;
+				font-family: Arial Unicode MS;
+				text-align: right;
+			}
+			td.rightAlignDataCell {
+			    font-size: 0.9em;
+			    font-family: Arial Unicode MS;
+			    text-align: right;
+			}
+
+			.scoped-with-element-ind {
+					padding-left: 5px;
+			}
+			.scoped-with-element {
+					padding-left: 5px;
+			}
+			.with-primary
+			{
+				color:#dedede;
+			}
+			.scoped-with-element-ind {
+					padding-left: 5px;
+			}
+			.scoped-with-element {
+					padding-left: 5px;
+			}
+					
+			.DeliveryStatusRed {background-color: red; color: white !important; font-weight: bold; text-align: center; white-space:nowrap; overflow:hidden; padding: 4px 4px 4px 4px;}
+			.DeliveryStatusAmber {background-color: #FFD700; color: white; font-weight: bold; text-align: center; white-space:nowrap; overflow:hidden; padding: 4px 4px 4px 4px;}
+			.DeliveryStatusGreen {background-color: #33cc33; color: white !important; font-weight: bold; text-align: center; white-space:nowrap; overflow:hidden; padding: 4px 4px 4px 4px;}
+		</style>
+	</head>
+	<body>
+
+  	<apex:pageBlock >
+		<h4><apex:outputText styleClass="dashboardTitle" value="{!KimbleOne__DeliveryGroup__c.Name}" ></apex:outputText></h4>
+  	</apex:pageBlock>
+
+	<apex:outputPanel layout="none" rendered="{!TheGroupStatuses.size > 0}">
+ 		<apex:variable value="{!TheGroupStatuses[0]}" var="DeliveryGroupStatusSummary"/>
+	 	<table width="100%">
+ 			<tr>
+ 				<td width="60%">
+ 					<apex:pageBlock id="DeliveryGroupHomeNarrativePDF" >
+ 						<h4><apex:outputText value="{!DAY(DeliveryGroupStatusSummary.TimePeriodStartDate)}/{!MONTH(DeliveryGroupStatusSummary.TimePeriodStartDate)}/{!YEAR(DeliveryGroupStatusSummary.TimePeriodStartDate)}" ></apex:outputText></h4>
+						<apex:outputText styleClass="dashboardRichText" escape="false" value="{!DeliveryGroupStatusSummary.Narrative}"></apex:outputText>
+					</apex:pageBlock>
+ 				</td>
+ 				<td>
+ 					<table width="100%">
+						<tr>
+							<td colspan="{!DeliveryGroupStatusSummary.StatusDetails.size}" align="center" class="{!JSENCODE(DeliveryGroupStatusSummary.Style)}"><apex:outputText value="{!$Label.kimbleone__deliverygroupstatussummarystatus}"/></td>
+						</tr>
+						<apex:outputPanel layout="none" rendered="{!DeliveryGroupStatusSummary.StatusDetails.size > 0}">
+						<tr>
+							<apex:repeat value="{!DeliveryGroupStatusSummary.StatusDetails}" var="theStatusDetail">
+								<td class="{!JSENCODE(theStatusDetail.Style)}" style="width: {!100/DeliveryGroupStatusSummary.StatusDetails.size}%" >
+									<apex:outputText value="{!theStatusDetail.Name}" />
+								</td>
+							</apex:repeat>
+						</tr>
+						</apex:outputPanel>
+					</table>
+ 				</td>
+ 			</tr>
+ 		</table> 
+  	</apex:outputPanel>
+
+	<apex:pageBlock >
+		<br/>	
+		<h5><apex:outputText value="{!$Label.kimbleone__deliverygroupfinancialsummary}" ></apex:outputText></h5>
+			
+		<table class="dashboardTable">
+			<tr align="center">
+				<td class="dashboardHeaderCell"><apex:outputLabel value="{!$Label.kimbleone__projectedlabel} {!$Label.kimbleone__revenuelabel}" /></td>
+				<td class="dashboardHeaderCell"><apex:outputField value="{!KimbleOne__DeliveryGroup__c.KimbleOne__ContractRevenue__c}" /></td>
+				<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+				<td class="dashboardHeaderCell"><apex:outputLabel value="{!$Label.kimbleone__projectedlabel} {!$Label.kimbleone__marginlabel}" /></td>
+				<td class="dashboardHeaderCell">
+					<span style="width: 100px; display: inline-block; ">
+						<apex:outputField value="{!KimbleOne__DeliveryGroup__c.KimbleOne__ContractMarginAmount__c}" />
+					</span>
+					<span style=" text-align: right; width: 60px; display: inline-block; ">
+						<apex:outputField value="{!KimbleOne__DeliveryGroup__c.KimbleOne__ContractMargin__c}" />
+					</span>
+				</td>
+				</apex:outputPanel>
+			</tr>
+			<tr align="center">
+				<td class="dashboardHeaderCell"><apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__BaselineContractRevenue__c.Label}" /></td>
+				<td class="dashboardHeaderCell"><apex:outputField value="{!KimbleOne__DeliveryGroup__c.KimbleOne__BaselineContractRevenue__c}" /></td>
+				<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+				<td class="dashboardHeaderCell"><apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryGroup__c.Fields.KimbleOne__BaselineContractMargin__c.Label}" /></td>
+				<td class="dashboardHeaderCell">
+					<span style="width: 100px; display: inline-block; ">
+						<apex:outputField value="{!KimbleOne__DeliveryGroup__c.KimbleOne__BaselineContractMarginAmount__c}" />
+					</span>
+					<span style=" text-align: right; width: 60px; display: inline-block; ">
+						<apex:outputField value="{!KimbleOne__DeliveryGroup__c.KimbleOne__BaselineContractMargin__c}" />
+					</span>
+				</td>
+				</apex:outputPanel>			
+			</tr>
+		</table>
+		
+		<br/>
+
+		<table border="0" cellpadding="2" cellspacing="2" class="dashboardTable" rules="groups">
+			<thead>
+			<tr class="headerRow">
+				<th colspan="2" class="headerRow"></th>
+				<th colspan="4" class="dashboardHeaderCell" style="text-align: center;margin-bottom:4px;">{!$Label.BaselineLabel} ({!DeliveryGroup__c.CurrencyIsoCode})</th>
+				<th colspan="4" class="dashboardHeaderCell" style="text-align: center;margin-bottom:4px;">{!$Label.ProjectedLabel} ({!DeliveryGroup__c.CurrencyIsoCode})</th>
+				<th colspan="4" class="dashboardHeaderCell" style="text-align: center;margin-bottom:4px;">{!$Label.ActualLabel} ({!DeliveryGroup__c.CurrencyIsoCode})</th>
+			</tr>
+			<tr class="headerRow">
+				<th style="font-size: 0.9em; font-family: 'Arial Black', sans-serif;">{!$ObjectType.DeliveryElement__c.Fields.Name.Label}</th>
+				<th class="dashboardHeaderCellWithBorderRight"></th>
+				<th class="dashboardHeaderCell">{!$Label.UsageLabel}</th>
+				<th class="dashboardHeaderCell">{!$Label.RevenueLabel}</th>
+				<th class="dashboardHeaderCell">{!$Label.CostLabel}</th>
+				<th class="dashboardHeaderCellWithBorderRight">{!$Label.MarginLabel} (%)</th>
+				<th class="dashboardHeaderCell">{!$Label.UsageLabel}</th>
+				<th class="dashboardHeaderCell">{!$Label.RevenueLabel}</th>
+				<th class="dashboardHeaderCell">{!$Label.CostLabel}</th>
+				<th class="dashboardHeaderCellWithBorderRight">{!$Label.MarginLabel} (%)</th>
+				<th class="dashboardHeaderCell">{!$Label.UsageLabel}</th>
+				<th class="dashboardHeaderCell">{!$Label.RevenueLabel}</th>
+				<th class="dashboardHeaderCell">{!$Label.CostLabel}</th>
+				<th class="dashboardHeaderCell">{!$Label.MarginLabel} (%)</th>
+			</tr>
+			<tr>
+				<th colspan="15">
+					<hr/>
+				</th>
+			</tr>
+			</thead>
+			<tbody>	
+				<apex:repeat value="{!TheElementSequenceList}" var="theTopLevelElement">
+					<apex:variable var="fs" value="{!TheFinancialSummary.TheFinancialSummaryMap[theTopLevelElement.TheElementId]}"/>
+					<tr class="dataRow primary-row">
+						<td class="dataCell ">
+							<apex:outputText styleClass="dashboardPropertyValueCellText" value="{!fs.DeliveryElementName}"/>
+						</td>
+						<td class="dataCell "><apex:outputText styleClass="dashboardPropertyValueCellText" value="{!$Label.kimbleone__serviceslabel}"/></td>
+						<td class="dashboardHeaderCell" style="background-color: #EEE;">
+							<apex:outputField styleClass="dashboardPropertyValueCellText" rendered="{!fs.IsResourced}" value="{!fs.BaselineUsage.InputDecimal__c} " />
+							<apex:outputText styleClass="dashboardPropertyValueCellText" rendered="{!fs.IsResourced}"  value=" ({!fs.UsageUnits})"/>						
+						</td>
+						<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!fs.BaselineServicesContractRevenue.InputDecimal__c}" /></td>
+						
+						<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+							<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!fs.BaselineServicesContractCost.InputDecimal__c}" /></td>
+							<td class="rightAlignDataCell" style="background-color: #EEE; {!IF(!ISBLANK(fs.BaselineServicesContractMargin.InputInteger__c) && fs.BaselineServicesContractMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!fs.BaselineServicesContractMargin.InputInteger__c}" /></td>
+						</apex:outputPanel>
+						
+						<td class="dashboardHeaderCell">
+							<apex:outputField styleClass="dashboardPropertyValueCellText" rendered="{!fs.IsResourced}" value="{!fs.Usage.InputDecimal__c} " />
+							<apex:outputText styleClass="dashboardPropertyValueCellText" rendered="{!fs.IsResourced}"  value=" ({!fs.UsageUnits})"/>		
+						</td>
+						<td class="rightAlignDataCell">
+							<apex:outputField value="{!fs.ServicesContractRevenue.InputDecimal__c}" />
+						</td>
+						<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+							<td class="rightAlignDataCell">
+								<apex:outputField value="{!fs.ServicesContractCost.InputDecimal__c}" />
+							</td>
+							<td class="rightAlignDataCell" style="{!IF(!ISBLANK(fs.ServicesContractMargin.InputInteger__c) && fs.ServicesContractMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!fs.ServicesContractMargin.InputInteger__c}" /></td>
+						</apex:outputPanel>
+						
+						<td class="dashboardHeaderCell">
+							<apex:outputField styleClass="dashboardPropertyValueCellText" rendered="{!fs.IsResourced}" value="{!fs.ActualUsage.InputDecimal__c} " />
+							<apex:outputText styleClass="dashboardPropertyValueCellText" rendered="{!fs.IsResourced}"  value=" ({!fs.UsageUnits})"/>	
+						</td>
+						<td class="rightAlignDataCell"><apex:outputField value="{!fs.RecognisedServicesRevenue.InputDecimal__c}" /></td>
+						<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+							<td class="rightAlignDataCell"><apex:outputField value="{!fs.RecognisedServicesCost.InputDecimal__c}" /></td>
+							<td class="rightAlignDataCell" style="{!IF(!ISBLANK(fs.RecognisedServicesMargin.InputInteger__c) && fs.RecognisedServicesMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!fs.RecognisedServicesMargin.InputInteger__c}" /></td>
+						</apex:outputPanel>
+					</tr>
+					<apex:variable value="{!fs.HasExpenseTotals}" var="displayExpenseTotals"/>
+					<apex:outputPanel layout="none" rendered="{!fs.IsResourced && displayExpenseTotals}">
+						<tr class="dataRow">
+							<td class="dataCell"></td>
+							<td class="dataCell"><apex:outputText styleClass="dashboardPropertyValueCellText" value="{!$Label.kimbleone__expenseslabel}"/></td>
+							<td class="dataCell" style="background-color: #EEE;"></td>
+							<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!fs.BaselineExpensesContractRevenue.InputDecimal__c}" /></td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!fs.BaselineExpensesContractCost.InputDecimal__c}" /></td>
+								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!fs.BaselineExpensesContractMargin.InputInteger__c}" /></td>
+							</apex:outputPanel>
+							<td class="dataCell"></td>
+							<td class="rightAlignDataCell"><apex:outputField value="{!fs.ExpensesContractRevenue.InputDecimal__c}" /></td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell"><apex:outputField value="{!fs.ExpensesContractCost.InputDecimal__c}" /></td>
+								<td class="rightAlignDataCell"><apex:outputField value="{!fs.ExpensesContractMargin.InputInteger__c}" /></td>
+							</apex:outputPanel>
+							<td class="dataCell"></td>
+							<td class="rightAlignDataCell"><apex:outputField value="{!fs.RecognisedExpensesRevenue.InputDecimal__c}" /></td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell"><apex:outputField value="{!fs.RecognisedExpensesCost.InputDecimal__c}" /></td>
+								<td class="rightAlignDataCell"><apex:outputField value="{!fs.RecognisedExpensesMargin.InputInteger__c}" /></td>
+							</apex:outputPanel>
+						</tr>
+					</apex:outputPanel>
+
+					<!-- TheScopedWithElements belonging to the parent element -->						
+					<apex:repeat value="{!theTopLevelElement.TheScopedWithElements}" var="theTopLevelElementScopedWithElement">
+						<apex:variable var="topLevelElementScopedWithElementfs" value="{!TheFinancialSummary.TheFinancialSummaryMap[theTopLevelElementScopedWithElement.TheElementId]}"/>
+						<tr class="dataRow">
+							<td class="dataCell ">
+								<span class="scoped-with-element-ind">></span>
+								<span class="scoped-with-element"><apex:outputText styleClass="dashboardPropertyValueCellText" value="{!topLevelElementScopedWithElementfs.DeliveryElementName}"/></span>
+							</td>
+							<td class="dataCell "><apex:outputText styleClass="dashboardPropertyValueCellText" value="{!$Label.kimbleone__serviceslabel}"/></td>
+							<td class="dashboardHeaderCell" style="background-color: #EEE;">
+								<apex:outputField styleClass="dashboardPropertyValueCellText" rendered="{!topLevelElementScopedWithElementfs.IsResourced}" value="{!topLevelElementScopedWithElementfs.BaselineUsage.InputDecimal__c} " />
+								<apex:outputText styleClass="dashboardPropertyValueCellText" rendered="{!topLevelElementScopedWithElementfs.IsResourced}"  value=" ({!topLevelElementScopedWithElementfs.UsageUnits})"/>						
+							</td>
+							<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!topLevelElementScopedWithElementfs.BaselineServicesContractRevenue.InputDecimal__c}" /></td>
+							
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!topLevelElementScopedWithElementfs.BaselineServicesContractCost.InputDecimal__c}" /></td>
+								<td class="rightAlignDataCell" style="background-color: #EEE; {!IF(!ISBLANK(topLevelElementScopedWithElementfs.BaselineServicesContractMargin.InputInteger__c) && topLevelElementScopedWithElementfs.BaselineServicesContractMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!topLevelElementScopedWithElementfs.BaselineServicesContractMargin.InputInteger__c}" /></td>
+							</apex:outputPanel>
+							
+							<td class="dashboardHeaderCell">
+								<apex:outputField styleClass="dashboardPropertyValueCellText" rendered="{!topLevelElementScopedWithElementfs.IsResourced}" value="{!topLevelElementScopedWithElementfs.Usage.InputDecimal__c} " />
+								<apex:outputText styleClass="dashboardPropertyValueCellText" rendered="{!topLevelElementScopedWithElementfs.IsResourced}"  value=" ({!topLevelElementScopedWithElementfs.UsageUnits})"/>		
+							</td>
+							<td class="rightAlignDataCell">
+								<apex:outputField value="{!topLevelElementScopedWithElementfs.ServicesContractRevenue.InputDecimal__c}" />
+							</td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell">
+									<apex:outputField value="{!topLevelElementScopedWithElementfs.ServicesContractCost.InputDecimal__c}" />
+								</td>
+								<td class="rightAlignDataCell" style="{!IF(!ISBLANK(topLevelElementScopedWithElementfs.ServicesContractMargin.InputInteger__c) && topLevelElementScopedWithElementfs.ServicesContractMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!topLevelElementScopedWithElementfs.ServicesContractMargin.InputInteger__c}" /></td>
+							</apex:outputPanel>
+							
+							<td class="dashboardHeaderCell">
+								<apex:outputField styleClass="dashboardPropertyValueCellText" rendered="{!topLevelElementScopedWithElementfs.IsResourced}" value="{!topLevelElementScopedWithElementfs.ActualUsage.InputDecimal__c} " />
+								<apex:outputText styleClass="dashboardPropertyValueCellText" rendered="{!topLevelElementScopedWithElementfs.IsResourced}"  value=" ({!topLevelElementScopedWithElementfs.UsageUnits})"/>	
+							</td>
+							<td class="rightAlignDataCell"><apex:outputField value="{!topLevelElementScopedWithElementfs.RecognisedServicesRevenue.InputDecimal__c}" /></td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell"><apex:outputField value="{!topLevelElementScopedWithElementfs.RecognisedServicesCost.InputDecimal__c}" /></td>
+								<td class="rightAlignDataCell" style="{!IF(!ISBLANK(topLevelElementScopedWithElementfs.RecognisedServicesMargin.InputInteger__c) && topLevelElementScopedWithElementfs.RecognisedServicesMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!topLevelElementScopedWithElementfs.RecognisedServicesMargin.InputInteger__c}" /></td>
+							</apex:outputPanel>
+						</tr>
+						<!-- Scoped With Elements don't have expenses -->
+					</apex:repeat>						
+					<!-- End of TheScopedWithElements belonging to the change request -->						
+
+
+					<!-- TheChangeRequestElements -->						
+					<apex:repeat value="{!theTopLevelElement.TheChangeRequestElements}" var="theChangeRequestElement">
+						<apex:variable var="changeRequestfs" value="{!TheFinancialSummary.TheFinancialSummaryMap[theChangeRequestElement.TheElementId]}"/>
+						<tr class="dataRow">
+							<td class="dataCell ">
+								<apex:outputText styleClass="dashboardPropertyValueCellText" value="{!changeRequestfs.DeliveryElementName}"/>
+							</td>
+							<td class="dataCell "><apex:outputText styleClass="dashboardPropertyValueCellText" value="{!$Label.kimbleone__serviceslabel}"/></td>
+							<td class="dashboardHeaderCell" style="background-color: #EEE;">
+								<apex:outputField styleClass="dashboardPropertyValueCellText" rendered="{!changeRequestfs.IsResourced}" value="{!changeRequestfs.BaselineUsage.InputDecimal__c} " />
+								<apex:outputText styleClass="dashboardPropertyValueCellText" rendered="{!changeRequestfs.IsResourced}"  value=" ({!changeRequestfs.UsageUnits})"/>						
+							</td>
+							<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!changeRequestfs.BaselineServicesContractRevenue.InputDecimal__c}" /></td>
+							
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!changeRequestfs.BaselineServicesContractCost.InputDecimal__c}" /></td>
+								<td class="rightAlignDataCell" style="background-color: #EEE; {!IF(!ISBLANK(changeRequestfs.BaselineServicesContractMargin.InputInteger__c) && changeRequestfs.BaselineServicesContractMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!changeRequestfs.BaselineServicesContractMargin.InputInteger__c}" /></td>
+							</apex:outputPanel>
+							
+							<td class="dashboardHeaderCell">
+								<apex:outputField styleClass="dashboardPropertyValueCellText" rendered="{!changeRequestfs.IsResourced}" value="{!changeRequestfs.Usage.InputDecimal__c} " />
+								<apex:outputText styleClass="dashboardPropertyValueCellText" rendered="{!changeRequestfs.IsResourced}"  value=" ({!changeRequestfs.UsageUnits})"/>		
+							</td>
+							<td class="rightAlignDataCell">
+								<apex:outputField value="{!changeRequestfs.ServicesContractRevenue.InputDecimal__c}" />
+							</td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell">
+									<apex:outputField value="{!changeRequestfs.ServicesContractCost.InputDecimal__c}" />
+								</td>
+								<td class="rightAlignDataCell" style="{!IF(!ISBLANK(changeRequestfs.ServicesContractMargin.InputInteger__c) && changeRequestfs.ServicesContractMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!changeRequestfs.ServicesContractMargin.InputInteger__c}" /></td>
+							</apex:outputPanel>
+							
+							<td class="dashboardHeaderCell">
+								<apex:outputField styleClass="dashboardPropertyValueCellText" rendered="{!changeRequestfs.IsResourced}" value="{!changeRequestfs.ActualUsage.InputDecimal__c} " />
+								<apex:outputText styleClass="dashboardPropertyValueCellText" rendered="{!changeRequestfs.IsResourced}"  value=" ({!changeRequestfs.UsageUnits})"/>	
+							</td>
+							<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestfs.RecognisedServicesRevenue.InputDecimal__c}" /></td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestfs.RecognisedServicesCost.InputDecimal__c}" /></td>
+								<td class="rightAlignDataCell" style="{!IF(!ISBLANK(changeRequestfs.RecognisedServicesMargin.InputInteger__c) && changeRequestfs.RecognisedServicesMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!changeRequestfs.RecognisedServicesMargin.InputInteger__c}" /></td>
+							</apex:outputPanel>
+						</tr>
+						<apex:variable value="{!changeRequestfs.HasExpenseTotals}" var="changeRequestDisplayExpenseTotals"/>
+						<apex:outputPanel layout="none" rendered="{!changeRequestfs.IsResourced && changeRequestDisplayExpenseTotals}">
+							<tr class="dataRow">
+								<td class="dataCell"></td>
+								<td class="dataCell"><apex:outputText styleClass="dashboardPropertyValueCellText" value="{!$Label.kimbleone__expenseslabel}"/></td>
+								<td class="dataCell" style="background-color: #EEE;"></td>
+								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!changeRequestfs.BaselineExpensesContractRevenue.InputDecimal__c}" /></td>
+								<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+									<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!changeRequestfs.BaselineExpensesContractCost.InputDecimal__c}" /></td>
+									<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!changeRequestfs.BaselineExpensesContractMargin.InputInteger__c}" /></td>
+								</apex:outputPanel>
+								<td class="dataCell"></td>
+								<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestfs.ExpensesContractRevenue.InputDecimal__c}" /></td>
+								<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+									<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestfs.ExpensesContractCost.InputDecimal__c}" /></td>
+									<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestfs.ExpensesContractMargin.InputInteger__c}" /></td>
+								</apex:outputPanel>
+								<td class="dataCell"></td>
+								<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestfs.RecognisedExpensesRevenue.InputDecimal__c}" /></td>
+								<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+									<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestfs.RecognisedExpensesCost.InputDecimal__c}" /></td>
+									<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestfs.RecognisedExpensesMargin.InputInteger__c}" /></td>
+								</apex:outputPanel>
+							</tr>
+						</apex:outputPanel>
+						
+						<!-- TheScopedWithElements belonging to the change request -->						
+						<apex:repeat value="{!theChangeRequestElement.TheScopedWithElements}" var="theChangeRequestScopedWithElement">
+							<apex:variable var="changeRequestScopedWithElementfs" value="{!TheFinancialSummary.TheFinancialSummaryMap[theChangeRequestScopedWithElement.TheElementId]}"/>
+							<tr class="dataRow">
+								<td class="dataCell ">
+									<span class="scoped-with-element-ind">></span>
+									<span class="scoped-with-element"><apex:outputText styleClass="dashboardPropertyValueCellText" value="{!changeRequestScopedWithElementfs.DeliveryElementName}"/></span>
+								</td>
+								<td class="dataCell "><apex:outputText styleClass="dashboardPropertyValueCellText" value="{!$Label.kimbleone__serviceslabel}"/></td>
+								<td class="dashboardHeaderCell" style="background-color: #EEE;">
+									<apex:outputField styleClass="dashboardPropertyValueCellText" rendered="{!changeRequestScopedWithElementfs.IsResourced}" value="{!changeRequestScopedWithElementfs.BaselineUsage.InputDecimal__c} " />
+									<apex:outputText styleClass="dashboardPropertyValueCellText" rendered="{!changeRequestScopedWithElementfs.IsResourced}"  value=" ({!changeRequestScopedWithElementfs.UsageUnits})"/>						
+								</td>
+								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!changeRequestScopedWithElementfs.BaselineServicesContractRevenue.InputDecimal__c}" /></td>
+								
+								<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+									<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!changeRequestScopedWithElementfs.BaselineServicesContractCost.InputDecimal__c}" /></td>
+									<td class="rightAlignDataCell" style="background-color: #EEE; {!IF(!ISBLANK(changeRequestScopedWithElementfs.BaselineServicesContractMargin.InputInteger__c) && changeRequestScopedWithElementfs.BaselineServicesContractMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!changeRequestScopedWithElementfs.BaselineServicesContractMargin.InputInteger__c}" /></td>
+								</apex:outputPanel>
+								
+								<td class="dashboardHeaderCell">
+									<apex:outputField styleClass="dashboardPropertyValueCellText" rendered="{!changeRequestScopedWithElementfs.IsResourced}" value="{!changeRequestScopedWithElementfs.Usage.InputDecimal__c} " />
+									<apex:outputText styleClass="dashboardPropertyValueCellText" rendered="{!changeRequestScopedWithElementfs.IsResourced}"  value=" ({!changeRequestScopedWithElementfs.UsageUnits})"/>		
+								</td>
+								<td class="rightAlignDataCell">
+									<apex:outputField value="{!changeRequestScopedWithElementfs.ServicesContractRevenue.InputDecimal__c}" />
+								</td>
+								<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+									<td class="rightAlignDataCell">
+										<apex:outputField value="{!changeRequestScopedWithElementfs.ServicesContractCost.InputDecimal__c}" />
+									</td>
+									<td class="rightAlignDataCell" style="{!IF(!ISBLANK(changeRequestScopedWithElementfs.ServicesContractMargin.InputInteger__c) && changeRequestScopedWithElementfs.ServicesContractMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!changeRequestScopedWithElementfs.ServicesContractMargin.InputInteger__c}" /></td>
+								</apex:outputPanel>
+								
+								<td class="dashboardHeaderCell">
+									<apex:outputField styleClass="dashboardPropertyValueCellText" rendered="{!changeRequestScopedWithElementfs.IsResourced}" value="{!changeRequestScopedWithElementfs.ActualUsage.InputDecimal__c} " />
+									<apex:outputText styleClass="dashboardPropertyValueCellText" rendered="{!changeRequestScopedWithElementfs.IsResourced}"  value=" ({!changeRequestScopedWithElementfs.UsageUnits})"/>	
+								</td>
+								<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestScopedWithElementfs.RecognisedServicesRevenue.InputDecimal__c}" /></td>
+								<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+									<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestScopedWithElementfs.RecognisedServicesCost.InputDecimal__c}" /></td>
+									<td class="rightAlignDataCell" style="{!IF(!ISBLANK(changeRequestScopedWithElementfs.RecognisedServicesMargin.InputInteger__c) && changeRequestScopedWithElementfs.RecognisedServicesMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!changeRequestScopedWithElementfs.RecognisedServicesMargin.InputInteger__c}" /></td>
+								</apex:outputPanel>
+							</tr>
+							<!-- Scoped With Elements don't have expenses -->
+						</apex:repeat>						
+						<!-- End of TheScopedWithElements belonging to the change request -->							
+						
+					</apex:repeat>						
+					<!-- End of TheChangeRequestElements -->
+					
+				</apex:repeat>
+			</tbody>
+		</table>
+	</apex:pageBlock>	
+	
+	<apex:pageBlock >
+		<br/>	
+			<h5><apex:outputText value="{!$Label.kimbleone__deliverygroupriskssummary}" ></apex:outputText></h5>
+
+			<table class="dashboardTable">
+				<thead>
+					<tr>
+						<th width="12%" class="dashboardHeaderCell">{!$ObjectType.Risk__c.Fields.Name.Label}</th>					
+						<th width="40%" class="dashboardHeaderCell">{!$ObjectType.Risk__c.Fields.Summary__c.Label}</th>
+						<th width="12%" class="dashboardHeaderCell">{!$ObjectType.Risk__c.Fields.RaisedByContact__c.Label}</th>					
+						<th width="12%" class="dashboardHeaderCell">{!$ObjectType.Risk__c.Fields.RaisedDate__c.Label}</th>					
+						<th width="12%" class="dashboardHeaderCell">{!$ObjectType.Risk__c.Fields.RiskSeverity__c.Label}</th>
+						<th width="12%" class="dashboardHeaderCell">{!$ObjectType.Risk__c.Fields.RiskStatus__c.Label}</th>					
+					</tr>
+					<tr>
+						<th colspan="6">
+							<hr/>
+						</th>
+					</tr>
+				</thead>
+				<tbody>
+				
+				<apex:repeat value="{!HighestSeverityRisks}" var="r">
+						<tr>
+							<td class="dashboardLabelCell">
+								<apex:outputText styleClass="dashboardPropertyValueCellText" value="{!r.Name}"/>
+							</td>
+							<td class="dashboardLabelCell">
+								<apex:outputText styleClass="dashboardPropertyValueCellText" value="{!r.KimbleOne__Summary__c}"/>
+							</td>
+							<td class="dashboardLabelCell">
+								<apex:outputText styleClass="dashboardPropertyValueCellText" value="{!r.RaisedByContact__r.Name}"/>
+							</td>
+							<td class="dashboardLabelCellNumber">
+								<apex:outputField styleClass="dashboardPropertyValueCellNumber" value="{!r.KimbleOne__RaisedDate__c}"/>
+							</td>
+							<td class="dashboardLabelCell">
+								<apex:outputText styleClass="dashboardPropertyValueCellText" value="{!r.RiskSeverity__r.Name}"/>
+							</td>
+							<td class="dashboardLabelCell">
+								<apex:outputText styleClass="dashboardPropertyValueCellText" value="{!r.RiskStatus__r.Name}"/>
+							</td>							
+						</tr>			
+				</apex:repeat>
+				
+				</tbody>
+			</table>
+			
+			<br/>	
+			<h5><apex:outputText value="{!$Label.kimbleone__deliverygroupissuessummary}" ></apex:outputText></h5>
+			
+			<table class="dashboardTable">
+				<thead>
+					<tr>
+						<th width="12%" class="dashboardHeaderCell">{!$ObjectType.Issue__c.Fields.Name.Label}</th>					
+						<th width="40%" class="dashboardHeaderCell">{!$ObjectType.Issue__c.Fields.Summary__c.Label}</th>
+						<th width="12%" class="dashboardHeaderCell">{!$ObjectType.Issue__c.Fields.RaisedByContact__c.Label}</th>					
+						<th width="12%" class="dashboardHeaderCell">{!$ObjectType.Issue__c.Fields.RaisedDate__c.Label}</th>					
+						<th width="12%" class="dashboardHeaderCell">{!$ObjectType.Issue__c.Fields.IssueImpact__c.Label}</th>
+						<th width="12%" class="dashboardHeaderCell">{!$ObjectType.Issue__c.Fields.Status__c.Label}</th>					
+					</tr>
+					<tr>
+						<th colspan="6">
+							<hr/>
+						</th>
+					</tr>
+				</thead>
+				<tbody>
+				
+				<apex:repeat value="{!HighestIssues}" var="i">
+						<tr>
+							<td class="dashboardLabelCell">
+								<apex:outputText styleClass="dashboardPropertyValueCellText" value="{!i.Name}"/>
+							</td>
+							<td class="dashboardLabelCell">
+								<apex:outputText styleClass="dashboardPropertyValueCellText" value="{!i.KimbleOne__Summary__c}"/>
+							</td>
+							<td class="dashboardLabelCell">
+								<apex:outputText styleClass="dashboardPropertyValueCellText" value="{!i.RaisedByContact__r.Name}"/>
+							</td>
+							<td class="dashboardLabelCellNumber">
+								<apex:outputField styleClass="dashboardPropertyValueCellNumber" value="{!i.KimbleOne__RaisedDate__c}"/>
+							</td>
+							<td class="dashboardLabelCell">
+								<apex:outputText styleClass="dashboardPropertyValueCellText" value="{!i.IssueImpact__r.Name}"/>
+							</td>
+							<td class="dashboardLabelCell">
+								<apex:outputText styleClass="dashboardPropertyValueCellText" value="{!i.Status__r.Name}"/>
+							</td>							
+						</tr>			
+				</apex:repeat>
+				
+				</tbody>
+			</table>
+
+	</apex:pageBlock>	
+ 	
+ 	
+	<apex:pageBlock >
+		<br/>	
+			<h5><apex:outputText value="{!$Label.kimbleone__deliverygrouphomeprintperformanceagainstplan}" rendered="{!TrackingPlanList.size>0}"></apex:outputText></h5>
+
+			<apex:repeat value="{!TrackingPlanList}" var="trackingPlanInfo">
+					<table class="dashboardTable">
+						<thead>
+							<tr>
+								<th width="16%" class="dashboardHeaderCellLeftAlign">{!JSENCODE(trackingPlanInfo.deliveryElementName)}</th>					
+								<th width="16%" class="dashboardHeaderCellRightAlign">{!$Label.DeliveryGroupHomeBaseline}</th>
+								<th width="16%" class="dashboardHeaderCellRightAlign">{!$Label.DeliveryGroupHomeExpended}</th>					
+								<th width="16%" class="dashboardHeaderCellRightAlign">{!$Label.DeliveryGroupHomeRemaining}</th>
+								<th width="16%" class="dashboardHeaderCellRightAlign">{!$Label.ProjectedLabel}</th>											
+								<th width="16%" class="dashboardHeaderCellRightAlign">{!$Label.DeliveryGroupHomeVariance}</th>					
+							</tr>
+							<tr>
+								<th colspan="6">
+									<hr/>
+								</th>
+							</tr>
+						</thead>
+						<tbody>						
+						<apex:repeat value="{!trackingPlanInfo.line}" var="trackingPlanDetail">
+								<tr>
+									<td class="dashboardLabelCell">
+										<apex:outputText styleClass="dashboardPropertyValueCellText" value="{!trackingPlanDetail.tptype}"/>
+									</td>
+									<td class="dashboardLabelCellNumber">
+										<apex:outputField styleClass="dashboardPropertyValueCellNumber" value="{!trackingPlanDetail.tpbaseline.KimbleOne__InputDecimal__c}"/>
+									</td>
+									<td class="dashboardLabelCellNumber">
+										<apex:outputField styleClass="dashboardPropertyValueCellNumber" value="{!trackingPlanDetail.tpexpended.KimbleOne__InputDecimal__c}"/>
+									</td>
+									<td class="dashboardLabelCellNumber">
+										<apex:outputField styleClass="dashboardPropertyValueCellNumber" value="{!trackingPlanDetail.tpremaining.KimbleOne__InputDecimal__c}"/>
+									</td>
+									<td class="dashboardLabelCellNumber">
+										<apex:outputField styleClass="dashboardPropertyValueCellNumber" value="{!trackingPlanDetail.tptotal.KimbleOne__InputDecimal__c}"/>
+									</td>
+									<td class="dashboardLabelCellNumber">
+										<apex:outputField styleClass="dashboardPropertyValueCellNumber" value="{!trackingPlanDetail.tpvariance.KimbleOne__InputDecimal__c}"/>
+									</td>
+								</tr>			
+						</apex:repeat>						
+						</tbody>
+					</table>
+					<br/>
+			</apex:repeat>
+	</apex:pageBlock>		
+	</body>
+	</html>
+</apex:page>

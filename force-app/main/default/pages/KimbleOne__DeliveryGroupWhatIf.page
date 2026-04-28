@@ -1,0 +1,269 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.DeliveryGroupWhatIfController"  sidebar="false" >
+ 
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+	<c:Menu DefaultHelpPage="" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryGroup__c.Id}" MenuContextName="{!KimbleOne__DeliveryGroup__c.Name}"/>
+
+</apex:define>
+    
+<apex:define name="Content">
+ 	<style>
+		.boxy-content {display:none;}
+	</style>
+	<apex:stylesheet value="{!URLFOR($Page.KimbleOne__GanttViewCss)}"/>        
+	<apex:form id="TheForm"> 
+         <apex:pageMessages escape="False" /> 
+         
+         <div id="Jobs"></div>
+	
+		<apex:outputPanel layout="none" rendered="{!JobsRunning}">
+		<script>
+			jQuery(function () {
+				intialise();
+			});
+			
+			function intialise()
+			{
+				loadJobsInline(jQuery('#Jobs'), '{!JSINHTMLENCODE(JobContextId)}','{!JSENCODE($Label.AcceptingWhatIfMessage)}', refreshPage);
+			}
+			
+			function refreshPage()
+			{
+				window.location = window.location;
+			}
+			
+		</script>
+		</apex:outputPanel>
+        
+        <apex:pageBlock title="{!$ObjectType.KimbleOne__WhatIfScenarioItem__c.LabelPlural}" rendered="{!!JobsRunning}">
+          
+            	<apex:pageBlockButtons location="top"  >
+					<apex:commandButton id="recalculateAll" action="{!RecalculateAll}" value="{!$Label.kimbleone__recalculate}" rerender="TheForm" styleclass="DisableButtonWhileBusy" oncomplete="intialise()"/>
+					<apex:commandButton id="acceptAll" action="{!AcceptAll}" value="{!$Label.kimbleone__acceptall}" rerender="TheForm" styleclass="DisableButtonWhileBusy" oncomplete="intialise()"/>
+					<apex:commandButton id="rejectAll" action="{!RejectAll}" value="{!$Label.kimbleone__rejectall}" rerender="TheForm" styleclass="DisableButtonWhileBusy" oncomplete="intialise()"/>
+            	</apex:pageBlockButtons>
+				
+				<apex:pageBlockSection collapsible="false" showheader="false"  columns="2">
+					<apex:outputField value="{!WhatIfScenario.Name}" />
+					<apex:outputField value="{!WhatIfScenario.KimbleOne__WhatIfType__c}" />
+					<apex:outputField value="{!WhatIfScenario.KimbleOne__Status__c}" />
+					<apex:outputField value="{!WhatIfScenario.KimbleOne__WhatIfDate__c}" />
+				</apex:pageBlockSection>	
+				
+				<apex:outputPanel layout="none" rendered="{!WhatIfScenario.WhatIfType__r.KimbleOne__Enum__c != 'MilestoneRevenueExchangeRate'}">
+				<table class="list" border="0" cellpadding="0" cellspacing="0">
+					
+					<tr class="headerRow">
+						<th class="headerRow"><apex:outputText value="{!$Label.kimbleone__actions}"/></th>
+						
+						<th class="headerRow"><apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.Fields.Name.Label}"/></th>
+						<th class="headerRow"><apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__StartDate__c.Label}"/></th>
+						<th class="headerRow"><apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ForecastP3EndDate__c.Label}"/></th>
+						<th class="headerRow"><apex:outputText value="{!CurrentValueLabel}"/></th>						
+						<th class="headerRow"><apex:outputText value="{!$ObjectType.KimbleOne__WhatIfScenarioItem__c.Fields.KimbleOne__WhatIfDifference__c.Label}"/></th>
+					</tr>
+					<apex:repeat value="{!TheElements}" var="element" >
+						<tr class="dataRow element">
+							<td class="dataCell action-col" style="text-align:center;">
+									
+									<a class="action-icon" action-id="{!element.TheDeliveryElement.Id}" title="{!$Label.ClickForActionsMessage}">
+										<i class="fa fa-cog fa-2x"></i>
+									</a>
+									<div element-id="{!element.TheDeliveryElement.Id}" id="action-options-{!element.TheDeliveryElement.Id}" class="toolbar-icons" style="display: none;">
+										<a href="javascript:void(0);" element-id="{!element.TheDeliveryElement.Id}" class="actionLink element-accept-button"  title="{!$Label.AcceptLabel}" ><i class="fa fa-thumbs-o-up"></i></a>
+										<a href="javascript:void(0);" element-id="{!element.TheDeliveryElement.Id}" class="actionLink element-reject-button"  title="{!$Label.RejectLabel}" ><i class="fa fa-thumbs-o-down"></i></a>
+									</div>
+								
+							</td>
+							
+							<td class="dataCell"><apex:outputText value="{!element.TheDeliveryElement.Name}"/></td>
+							<td class="dataCell"><apex:outputField value="{!element.TheDeliveryElement.KimbleOne__StartDate__c}"/></td>
+							<td class="dataCell"><apex:outputField value="{!element.TheDeliveryElement.KimbleOne__EndDate__c}"/></td>
+							<td class="dataCell"><apex:outputField value="{!element.TheDeliveryElement[elementCurrentValueFieldName]}"/></td>
+							<td class="dataCell"><span class="kimble-format-currency" data-currency="{!element.TheDeliveryElement.CurrencyISOCode}"><apex:outputText value="{!element.WhatIfDifference}"/></span></td>
+						</tr>
+						
+						<apex:repeat value="{!element.TheItems}" var="item">
+						
+							<tr class="dataRow item">
+								<td class="dataCell action-col" style="text-align:center;">
+									
+									<a class="action-icon" action-id="{!item.Id}" title="{!$Label.ClickForActionsMessage}">
+										<i class="fa fa-cog fa-2x"></i>
+									</a>
+									<div item-id="{!item.Id}" id="action-options-{!item.Id}" class="toolbar-icons" style="display: none;">
+										<a href="javascript:void(0);" item-id="{!item.Id}" class="actionLink item-accept-button"  title="{!$Label.AcceptLabel}" ><i class="fa fa-thumbs-o-up"></i></a>
+										<a href="javascript:void(0);" item-id="{!item.Id}" class="actionLink item-reject-button"  title="{!$Label.RejectLabel}" ><i class="fa fa-thumbs-o-down"></i></a>
+									</div>
+								</td>
+								
+								<td class="dataCell"><apex:outputField value="{!item.ActivityAssignment__r.KimbleOne__Resource__c}"/></td>
+								<td class="dataCell"><apex:outputField value="{!item.ActivityAssignment__r.KimbleOne__StartDate__c}"/></td>
+								<td class="dataCell"><apex:outputField value="{!item.ActivityAssignment__r.KimbleOne__ForecastP3EndDate__c}"/></td>
+								<td class="dataCell"><span class="kimble-format-currency" data-currency="{!item.CurrencyISOCode}"><apex:outputText value="{!item.KimbleOne__CurrentValue__c}"/></span></td>									
+								<td class="dataCell"><span class="kimble-format-currency" data-currency="{!item.CurrencyISOCode}"><apex:outputText value="{!item.KimbleOne__WhatIfDifference__c}"/></span></td>								
+							</tr>
+						
+						</apex:repeat>
+						
+					</apex:repeat>
+										
+				</table>
+				</apex:outputPanel>
+				
+				<apex:outputPanel layout="none" rendered="{!WhatIfScenario.WhatIfType__r.KimbleOne__Enum__c = 'MilestoneRevenueExchangeRate'}">
+				<table class="list" border="0" cellpadding="0" cellspacing="0">
+					
+					<tr class="headerRow">
+						<th class="headerRow"><apex:outputText value="{!$Label.kimbleone__actions}"/></th>
+						
+						<th class="headerRow"><apex:outputText value="{!$ObjectType.KimbleOne__WhatIfScenarioItem__c.Fields.KimbleOne__Milestone__c.Label}"/></th>
+						<th class="headerRow"><apex:outputText value="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneDate__c.Label}"/></th>
+						<th class="headerRow"><apex:outputText value="{!CurrentValueLabel}"/></th>						
+						<th class="headerRow"><apex:outputText value="{!$ObjectType.KimbleOne__WhatIfScenarioItem__c.Fields.KimbleOne__WhatIfDifference__c.Label}"/></th>
+					</tr>
+					<apex:repeat value="{!TheElements}" var="element" >
+						<tr class="dataRow element">
+							<td class="dataCell action-col" style="text-align:center;">
+									
+									<a class="action-icon" action-id="{!element.TheDeliveryElement.Id}" title="{!$Label.ClickForActionsMessage}">
+										<i class="fa fa-cog fa-2x"></i>
+									</a>
+									<div element-id="{!element.TheDeliveryElement.Id}" id="action-options-{!element.TheDeliveryElement.Id}" class="toolbar-icons" style="display: none;">
+										<a href="javascript:void(0);" element-id="{!element.TheDeliveryElement.Id}" class="actionLink element-accept-button"  title="{!$Label.AcceptLabel}" ><i class="fa fa-thumbs-o-up"></i></a>
+										<a href="javascript:void(0);" element-id="{!element.TheDeliveryElement.Id}" class="actionLink element-reject-button"  title="{!$Label.RejectLabel}" ><i class="fa fa-thumbs-o-down"></i></a>
+									</div>
+								
+							</td>
+							
+							<td class="dataCell"><apex:outputText value="{!element.TheDeliveryElement.Name}"/></td>
+							<td class="dataCell"><apex:outputField value="{!element.TheDeliveryElement.KimbleOne__StartDate__c}"/></td>
+							<td class="dataCell"><apex:outputField value="{!element.TheDeliveryElement[elementCurrentValueFieldName]}"/></td>
+							<td class="dataCell"><span class="kimble-format-currency" data-currency="{!element.TheDeliveryElement.CurrencyISOCode}"><apex:outputText value="{!element.WhatIfDifference}"/></span></td>
+						</tr>
+						
+						<apex:repeat value="{!element.TheItems}" var="item">
+						
+							<tr class="dataRow item">
+								<td class="dataCell action-col" style="text-align:center;">
+									
+									<a class="action-icon" action-id="{!item.Id}" title="{!$Label.ClickForActionsMessage}">
+										<i class="fa fa-cog fa-2x"></i>
+									</a>
+									<div item-id="{!item.Id}" id="action-options-{!item.Id}" class="toolbar-icons" style="display: none;">
+										<a href="javascript:void(0);" item-id="{!item.Id}" class="actionLink item-accept-button"  title="{!$Label.AcceptLabel}" ><i class="fa fa-thumbs-o-up"></i></a>
+										<a href="javascript:void(0);" item-id="{!item.Id}" class="actionLink item-reject-button"  title="{!$Label.RejectLabel}" ><i class="fa fa-thumbs-o-down"></i></a>
+									</div>
+								</td>
+								
+								<td class="dataCell"><apex:outputField value="{!item.Milestone__r.Name}"/></td>
+								<td class="dataCell"><apex:outputField value="{!item.Milestone__r.KimbleOne__MilestoneDate__c}"/></td>
+								<td class="dataCell"><span class="kimble-format-currency" data-currency="{!item.CurrencyISOCode}"><apex:outputText value="{!item.KimbleOne__CurrentValue__c}"/></span></td>									
+								<td class="dataCell"><span class="kimble-format-currency" data-currency="{!item.CurrencyISOCode}"><apex:outputText value="{!item.KimbleOne__WhatIfDifference__c}"/></span></td>								
+							</tr>
+						
+						</apex:repeat>
+						
+					</apex:repeat>
+										
+				</table>
+				</apex:outputPanel>
+        	</apex:pageBlock> 
+        	
+        	<apex:actionFunction name="acceptElement" action="{!AcceptElement}" rerender="TheForm" oncomplete="intialise()">
+        		 <apex:param name="elementId" value="" />
+        	</apex:actionFunction>
+        	
+        	<apex:actionFunction name="rejectElement" action="{!RejectElement}" rerender="TheForm" oncomplete="intialise()">
+        		 <apex:param name="elementId" value="" />
+        	</apex:actionFunction>
+        	
+        	<apex:actionFunction name="acceptItem" action="{!AcceptItem}" rerender="TheForm" oncomplete="intialise()">
+        		 <apex:param name="itemId" value="" />
+        	</apex:actionFunction>
+        	
+        	<apex:actionFunction name="rejectItem" action="{!RejectItem}" rerender="TheForm" oncomplete="intialise()">
+        		 <apex:param name="itemId" value="" />
+        	</apex:actionFunction>
+        	
+        </apex:form>
+        
+        <script>
+   		// only run when the form is first rendered
+		jQuery(window).load(function()
+		{
+			intialise();
+			
+		});
+		
+		function intialise()
+		{
+			kimble.formatCurrencies();
+			
+			jQuery('.element-accept-button').click(function(){
+				// hide toolbar button
+        		jQuery(this).parent().parent().remove();
+				jQuery('a[action-id="' + jQuery(this).attr('element-id') + '"].action-icon').hide().parent().addClass('Loading');
+        		
+        		acceptElement(jQuery(this).attr('element-id'), this);
+			});
+			
+			jQuery('.element-reject-button').click(function(){
+				// hide toolbar button
+        		jQuery(this).parent().parent().remove();
+				jQuery('a[action-id="' + jQuery(this).attr('element-id') + '"].action-icon').hide().parent().addClass('Loading');
+        		
+        		rejectElement(jQuery(this).attr('element-id'), this);
+			});
+			
+			jQuery('.item-accept-button').click(function(){
+				// hide toolbar button
+        		jQuery(this).parent().parent().remove();
+				jQuery('a[action-id="' + jQuery(this).attr('item-id') + '"].action-icon').hide().parent().addClass('Loading');
+        		
+        		acceptItem(jQuery(this).attr('item-id'), this);
+			});
+			
+			jQuery('.item-reject-button').click(function(){
+				// hide toolbar button
+        		jQuery(this).parent().parent().remove();
+				jQuery('a[action-id="' + jQuery(this).attr('item-id') + '"].action-icon').hide().parent().addClass('Loading');
+				
+				rejectItem(jQuery(this).attr('item-id'), this);
+			});
+		
+			// Define any icon actions before calling the toolbar 
+		    jQuery('.toolbar-icons a').on('click', function( event ) {
+		          event.preventDefault();
+		    });
+		                
+		    jQuery(this).toolbar.destroyAll();
+		        
+		    jQuery.each( jQuery(".action-icon"), function(i,e){
+		        jQuery(this).toolbar({content: '#action-options-' + jQuery(this).attr('action-id'),
+						position: 'right',
+						event: 'click',
+						hideOnClick: true,
+						adjustment: -3});
+		    });
+		}
+		
+        </script>
+        <style>
+        .kimble-format-currency {
+			display: none;
+		}
+		.element
+		{
+			font-style: italic;
+    		font-weight: bold;
+    		height: 30px;
+    		background-color: #EDEDED;
+		}
+		
+        </style>
+       </apex:define>
+   </apex:composition>
+</apex:page>

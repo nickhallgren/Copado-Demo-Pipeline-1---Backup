@@ -1,0 +1,926 @@
+<apex:page controller="KimbleOne.JobAdministrationController" tabStyle="KimbleOne__ReferenceData__c" showHeader="true" sidebar="false">
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+	<c:Menu HelpSource="CfgGuide" DefaultHelpPage="WhatcanIdoinKimble.html" MenuContextName="Job Administration" />
+</apex:define>
+	
+<apex:define name="Content">
+	
+	<apex:form >
+		<apex:pageblock >
+				<div id="cards-container">
+				<div id="setupDefaultSchedule" class="expandable-card {!IF(JobScheduleConfigured,'configured','not-configured')}">
+					<div class="expandable-card-inner">
+						<span class="card-title"><span class="fa fa-clock-o icon"></span>Setup Default Job Schedule</span>
+							<div class="card-panel">
+								<div class="not-configured">
+									<div class="card-content">
+										<ul>
+											<li>Execute high priority Jobs every 5 mins</li>
+											<li>Execute medium priority Jobs every hour</li>
+											<li>Execute low priority Jobs overnight</li>
+											<li>Clear down completed jobs</li>
+											<li>Clear down completed events marked as Internal</li>
+										</ul>
+									</div>
+									<div class="card-footer">
+										<div class="running-icon"><span class="fa fa-spinner fa-spin"/></div>
+										<div class="actions">
+											<input class="btn" type="button" value="Submit" onclick="setupDefaultJobSchedule();"/>
+										</div>
+									</div>
+								</div>
+								<div class="configured">
+									<div class="card-content">
+									<b>Scheduled jobs configured. Click <a href="/08e">here</a> to view all scheduled jobs.</b>
+									</div>
+								</div>
+							</div>
+					</div>
+				</div>
+				<div id="setupCustomSchedule" class="expandable-card {!IF(JobCustomSchedulesConfigured,'configured','not-configured')}">
+					<div class="expandable-card-inner">
+						<span class="card-title"><span class="fa fa-clock-o icon"></span>Setup Custom Job Schedule</span>
+							<div class="card-panel">
+								<div class="card-content">
+									<table class="data-entry">
+										<tr>
+											<td>Schedule Name</td>
+											<td><input type="text" id="custom-schedule-name"/></td>
+										</tr>
+										<tr>
+											<td>Schedule (e.g. 0 30 * * * ?)</td>
+											<td><input type="text" id="custom-schedule"/></td>
+										</tr>
+										<tr>
+											<td title="SELECT Id FROM Job__c WHERE Priority__c = \'a35580000002I24\' AND Status__c = \'a35580000002I22\' AND Argument__c = NULL LIMIT 200">Job Query</td>
+											<td><input type="text" id="custom-schedule-query"/></td>
+										</tr>
+									</table>						
+								</div>
+								<div class="configured">
+									<div class="card-content">
+									<b>At least one custom schedule configured. Click <a href="/08e">here</a> to view all scheduled jobs.</b>
+									</div>
+								</div>
+								<div class="card-footer">
+									<div class="running-icon"><span class="fa fa-spinner fa-spin"/></div>
+									<div class="actions">
+										<input class="btn" type="button" value="Submit" onclick="setupCustomJobSchedule();"/>
+									</div>
+								</div>
+							</div>
+					</div>
+				</div>
+				<div id="setupGenerateInvoiceSchedule" class="expandable-card {!IF(GenerateInvoicesConfigured,'configured','not-configured')}">
+					<div class="expandable-card-inner">
+						<span class="card-title"><span class="fa fa-file-text-o icon"></span>Setup Generate Invoices Schedule</span>
+							<div class="card-panel">
+								<div class="not-configured">
+								<div class="card-content">
+									<table class="data-entry">
+										<tr>
+											<td>Day of Month</td>
+											<td><input type="text" id="invoice-day-of-month"/></td>
+										</tr>										
+									</table>						
+								</div>
+								</div>
+								<div class="configured">
+									<div class="card-content">
+									<b>Generate Invoices schedule configured. Click <a href="/08e">here</a> to view all scheduled jobs.</b>
+									</div>
+								</div>
+								<div class="card-footer">
+									<div class="running-icon"><span class="fa fa-spinner fa-spin"/></div>
+									<div class="actions">
+										<input class="btn" type="button" value="Submit" onclick="setupGenerateInvoicesSchedule();"/>
+									</div>
+								</div>
+							</div>
+					</div>
+				</div>
+				<div id="setupGenerateSupplierInvoiceSchedule" class="expandable-card {!IF(GenerateSupplierInvoicesConfigured,'configured','not-configured')}">
+					<div class="expandable-card-inner">
+						<span class="card-title"><span class="fa fa-file-text-o icon"></span>Setup Generate Supplier Invoices Schedule</span>
+							<div class="card-panel">
+								<div class="not-configured">
+								<div class="card-content">
+									<table class="data-entry">
+										<tr>
+											<td>Day of Month</td>
+											<td><input type="text" id="supplier-invoice-day-of-month"/></td>
+										</tr>										
+									</table>						
+								</div>
+								</div>
+								<div class="configured">
+									<div class="card-content">
+									<b>Generate Supplier Invoices schedule configured. Click <a href="/08e">here</a> to view all scheduled jobs.</b>
+									</div>
+								</div>
+								<div class="card-footer">
+									<div class="running-icon"><span class="fa fa-spinner fa-spin"/></div>
+									<div class="actions">
+										<input class="btn" type="button" value="Submit" onclick="setupGenerateSupplierInvoicesSchedule();"/>
+									</div>
+								</div>
+							</div>
+					</div>
+				</div>
+				<div id="setupRemoveAssignmentUsageSchedule" class="expandable-card {!IF(RemoveAssignmentUsageConfigured,'configured','not-configured')}">
+					<div class="expandable-card-inner">
+						<span class="card-title"><span class="fa fa-clock-o icon"></span>Setup Remove Assignment Usage Job</span>
+							<div class="card-panel">
+								<div class="not-configured">
+									<div class="card-content">
+										<ul>
+											<li>Seed job to remove Usage from Assignments for up to Offest days from start date of Earliest Open Tracking Period</li>											
+										</ul>
+									</div>
+									<div class="card-footer">
+										<div class="running-icon"><span class="fa fa-spinner fa-spin"/></div>
+										<div class="actions">
+											<input class="btn" type="button" value="Submit" onclick="setupRemoveAssignmentUsage();"/>
+										</div>
+									</div>
+								</div>
+								<div class="configured">
+									<div class="card-content">
+									<b>Remove assignment usage job configured.</b>
+									</div>
+								</div>
+							</div>
+					</div>
+				</div>
+				<div id="setupActualiseForecastSchedule" class="expandable-card {!IF(ActualiseAssignmentUsageConfigured,'configured','not-configured')}">
+					<div class="expandable-card-inner">
+						<span class="card-title"><span class="fa fa-file-text-o icon"></span>Setup Actualise Assignment Usage Schedule</span>
+							<div class="card-panel">
+								<div class="not-configured">
+								<div class="card-content">
+									<table class="data-entry">
+										<tr>
+											<td>Day of Week</td>
+											<td><apex:selectList id="actualise-forecast-select" size="1">
+												<apex:selectOptions value="{!DaysOfWeek}" />
+											</apex:selectList></td>
+										</tr>
+										<tr>
+											<td>Day of Month</td>
+											<td><apex:selectList id="actualise-forecast-select-month" size="1">
+												<apex:selectOptions value="{!DaysOfMonth}" />
+											</apex:selectList></td>
+										</tr>
+									</table>						
+								</div>
+								</div>
+								<div class="configured">
+									<div class="card-content">
+									<b>Actualise Assignment Usage Job configured. Click <a href="/08e">here</a> to view all scheduled jobs.</b>
+									</div>
+								</div>
+								<div class="card-footer">
+									<div class="running-icon"><span class="fa fa-spinner fa-spin"/></div>
+									<div class="actions">
+										<input class="btn" type="button" value="Submit" onclick="setupActualiseUsageJob();"/>
+									</div>
+								</div>
+							</div>
+					</div>
+				</div>
+				<div id="seedJob" class="expandable-card">
+					<div class="expandable-card-inner">
+						<span class="card-title"><span class="fa fa-play icon"></span>Seed Job</span>
+							<div class="card-panel">
+								<div class="card-content">
+									<table class="data-entry">
+										<tr>
+											<td>Job Name</td>
+											<td><input type="text" id="job-name"/></td>
+										</tr>
+										<tr>
+											<td>Job Argument</td>
+											<td><input type="text" id="job-arg"/></td>
+										</tr>
+										<tr>
+											<td>Job Priority</td>
+											<td><input type="text" id="job-priority"/></td>
+										</tr>
+										<tr>
+											<td>Batch Argument</td>
+											<td><input type="text" id="job-batch-arg"/></td>
+										</tr>									
+									</table>						
+								</div>
+								<div class="card-footer">
+									<div class="running-icon"><span class="fa fa-spinner fa-spin"/></div>
+									<div class="actions">
+										<input class="btn" type="button" value="Submit" onclick="seedJob();"/>
+									</div>
+								</div>
+							</div>
+					</div>
+				</div>
+				<div id="jobProfiles" class="expandable-card">
+						<div class="expandable-card-inner">
+							<span class="card-title"><span class="fa fa-cog icon"></span>Job Overrides</span>
+							<div class="card-panel">
+								<div class="card-content">
+									<apex:outputPanel id="TheJobProfiles">
+									<table class="list" border="0" cellpadding="0" cellspacing="0">
+										<thead>
+											<tr class="headerRow">
+												<td class="headerRow"></td>
+												<td class="headerRow"><apex:outputText value="{!$ObjectType.KimbleOne__JobProfile__c.LabelPlural}"/></td>
+												<td class="headerRow">Active?</td>
+											</tr>
+										</thead>
+
+										<apex:repeat var="profile" value="{!JobProfiles}">
+											<tr id="{!profile.TheProfile.Id}">
+												<td><span class="fa fa-pencil-square-o tool-btn" onclick="initialiseModalBoxy('#JobConfigurationPopup', '{!JSENCODE($Label.Edit)} {!$ObjectType.JobProfile__c.label}');editJobProfile('{!JSINHTMLENCODE(profile.TheProfile.id)}')"></span>&nbsp;&nbsp;<span class="fa fa-trash tool-btn" onclick="if (confirmDelete()) deleteJobProfile('{!JSINHTMLENCODE(profile.TheProfile.id)}');"></span></td>
+												<td><apex:outputText value="{!profile.TheProfile.Name}"/></td>
+												<td><span class="fa {!IF(profile.IsActive, 'fa-check-square-o tool-btn', 'square-o')}"></span></td>
+											</tr>
+										</apex:repeat>
+
+										<tr style="background-color: #F8F8F8;">
+											<td colspan="3"><span class="fa fa-plus-square" ></span>
+											<a href="javascript:initialiseModalBoxy('#JobConfigurationPopup', '{!JSENCODE($Label.New)} {!$ObjectType.JobProfile__c.label}');newJobProfile();" class="add-link undecorated-link" style="padding-left: 4px;">Add Profile</a></td>
+										</tr>
+
+									</table>
+									</apex:outputPanel>
+								</div>
+							</div>
+						</div>
+					<apex:actionFunction action="{!EditJobProfile}" name="editJobProfile" rerender="JobConfigurationPanel" oncomplete="showModalBoxy();">
+						<apex:param name="jobProfileId" value="" />
+					</apex:actionFunction>
+					<apex:actionFunction action="{!DeleteJobProfile}" name="deleteJobProfile" rerender="TheJobProfiles">
+						<apex:param name="jobProfileId" value="" />
+					</apex:actionFunction>
+					<apex:actionFunction action="{!NewJobProfile}" name="newJobProfile" rerender="JobConfigurationPanel" oncomplete="showModalBoxy();">
+
+					</apex:actionFunction>
+				</div>
+
+				<div id="executeBatch" class="expandable-card">
+					<div class="expandable-card-inner">
+						<span class="card-title"><span class="fa fa-cogs icon"></span>Execute Batch</span>
+							<div class="card-panel">
+								<div class="card-content">
+									<div>Executes all Pending / Processing jobs where Argument__c equals the specified context.</div>
+									<table class="data-entry">
+										<tr>
+											<td>{!$ObjectType.Job__c.Fields.Argument__c.Label}</td>
+											<td><input type="text" id="batch-job-context-id"/></td>
+										</tr>
+										<tr>
+											<td>Job Query</td>
+											<td><input type="text" id="batch-query"/></td>
+										</tr>
+										<tr>
+											<td>Scope size</td>
+											<td><input type="text" id="batch-scope-size" value="1"></input></td>
+										</tr>
+										<tr>
+											<td>Super batch (queueable)</td>
+											<td><input type="checkbox" id="super-batch" style="width:30px"></input></td>
+										</tr>
+									</table>
+									<div class="batches"></div>					
+								</div>
+								<div class="card-footer">
+									<div class="running-icon"><span class="fa fa-spinner fa-spin"/></div>
+									<div class="actions">
+										<input class="btn" type="button" value="Submit" onclick="executeBatch();"/>
+									</div>
+								</div>
+							</div>
+					</div>
+				</div>
+				<div id="decodeJobArg" class="expandable-card">
+					<div class="expandable-card-inner">
+						<span class="card-title"><span class="fa fa-user-secret icon"></span>Decode Job Argument</span>
+							<div class="card-panel">
+								<div class="card-content">
+									<table class="data-entry">
+										<tr>
+											<td>Encoded Value</td>
+											<td><input type="text" id="decode-job-arg"/></td>
+										</tr>
+										<tr>
+											<td>Decoded Value</td>
+											<td><input type="text" id="decode-job-arg-result"/></td>
+										</tr>
+									</table>
+									<div class="batches"></div>					
+								</div>
+								<div class="card-footer">
+									<div class="running-icon"><span class="fa fa-spinner fa-spin"/></div>
+									<div class="actions">
+										<input class="btn" type="button" value="Decode" onclick="decodeJobArg();"/>
+										&nbsp;
+										<input class="btn" type="button" value="Encode" onclick="encodeJobArg();"/>
+									</div>
+								</div>
+							</div>
+					</div>
+				</div>
+				</div>
+		</apex:pageblock>
+
+		<apex:pageBlock mode="edit" id="theJobSummary" title="Analyse Jobs (last 5 days)">
+	
+				<apex:pageBlockButtons location="top">
+					<apex:commandButton action="{!PopulateJobSummary}" value="Get Job Summary" onclick="showReloading('.job-summary.re-loading-ind');" oncomplete="highlightJobSummaryRows();hideReloading('.job-summary.re-loading-ind');" rerender="theJobSummary"/>
+					<i class="fa fa-spin fa fa-circle-o-notch job-summary re-loading-ind"/>
+				</apex:pageBlockButtons>
+
+				<apex:outputText value="No Jobs!" rendered="{!!ISBLANK(TheJobSummary) && TheJobSummary.size == 0}"/>
+				
+           		<apex:pageBlockTable value="{!TheJobSummary}" var="jobDetail" rendered="{!!ISBLANK(TheJobSummary) && TheJobSummary.size > 0}">
+					<apex:column headerValue="Run Date">
+						<apex:outputText value="{0,date,dd MMMM yyyy}">
+						    <apex:param value="{!jobDetail.RunDate}" /> 
+						</apex:outputText>
+					</apex:column>
+					<apex:column headerValue="Job Status">
+						<apex:outputText value="{!jobDetail.JobStatus}"/>
+					</apex:column>
+					<apex:column headerValue="" styleClass="job-highlight">
+						<span class="fa {!JSENCODE(jobDetail.StyleClass)}"/>
+					</apex:column>
+					<apex:column headerValue="Count">			
+						<apex:outputText value="{!jobDetail.JobCount}"/>
+					</apex:column>
+				</apex:pageBlockTable>				
+	
+			</apex:pageBlock>
+			<apex:pageBlock mode="edit" id="thePendingjobs" title="List Pending Jobs">
+	
+				<apex:pageBlockButtons location="top">
+					<apex:commandButton action="{!PopulatePendingJobSummary}" value="Get Pending Jobs" onclick="showReloading('.pending-jobs.re-loading-ind');" oncomplete="hideReloading('.pending-jobs.re-loading-ind');" rerender="thePendingjobs" />
+					<i class="fa fa-spin fa fa-circle-o-notch pending-jobs re-loading-ind"/>
+				</apex:pageBlockButtons>
+
+				<apex:outputText value="No Jobs Pending!" rendered="{!!ISBLANK(ThePendingJobSummary) && ThePendingJobSummary.size == 0}"/>
+				
+           		<apex:pageBlockTable value="{!ThePendingJobSummary}" var="jobDetail" rendered="{!!ISBLANK(ThePendingJobSummary) && ThePendingJobSummary.size > 0}">
+					<apex:column headerValue="Count">
+						<apex:outputText value="{!jobDetail.JobCount}"/>
+					</apex:column>
+					<apex:column headerValue="Job Name">
+						<apex:outputText value="{!jobDetail.JobName}"/>
+					</apex:column>
+					<apex:column headerValue="Dedupe This Job">
+						<a href="javascript:startDedupe('{!JSENCODE(jobDetail.JobName)}')">Dedupe</a>
+					</apex:column>
+					<apex:column headerValue="Run This Job">
+						<apex:outputLink target="_blank" value="{!$Page.KimbleOne__JobsPending}?alljobs=1&jobName={!jobDetail.JobName}&autoRefresh=1">Run</apex:outputLink>
+					</apex:column>
+				</apex:pageBlockTable>				
+	
+			</apex:pageBlock>			
+			<apex:actionFunction action="{!DedupeJobs}" name="dedupeJobs" rerender="thePendingjobs">
+				<apex:param name="jobNameToDedupe" value=""/>;
+			</apex:actionFunction>
+	</apex:form>
+
+	<div id="JobConfigurationPopup" style="display:none;">
+
+		<apex:outputPanel id="JobConfigurationPanel">
+			<apex:form id="JobConfigurationForm">
+
+				<apex:pageBlock rendered="{!!ISBLANK(TheJobProfileToEdit)}">
+
+					<div id="TheJobProfilePopupErrors"><apex:pageMessages id="TheJobProfileErrors" escape="false"/></div>
+
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton id="SaveTheJobProfileButton" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__save}" action="{!SaveTheJobProfile}"  rerender="JobConfigurationForm, TheJobProfiles" oncomplete="hideModalBoxyWithErrorCheck('#TheJobProfilePopupErrors');"/>
+						<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+					</apex:pageBlockButtons>
+
+					<apex:pageblockSection collapsible="false" showheader="false" columns="2">
+						<apex:inputfield value="{!TheJobProfileToEdit.Name}" required="true" />
+
+						<apex:pageBlockSectionItem >
+							<span>Use this Job Profile</span>
+							<apex:inputfield value="{!IsActive.KimbleOne__InputCheckbox__c}" />
+						</apex:pageBlockSectionItem>
+
+					</apex:pageblockSection>
+
+					<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+						<apex:inputfield value="{!TheJobProfileToEdit.KimbleOne__Description__c}" style="width: 640px;height: 45px;"/>
+					</apex:pageblockSection>
+
+					<apex:outputPanel id="TheJobOverrides">
+					<div class="popup-table-container">
+					<table>
+							<thead>
+							<tr>
+								<th></th>
+								<th>Job Name</th>
+								<th>Job Priority</th>
+								<th>Run Silently</th>
+								<th>Dedupe</th>
+								<th>Allow Super Batch</th>
+							</tr>
+							</thead>
+							<tbody>
+							<apex:variable var="counter" value="{!0}"/>
+							<apex:repeat var="override" value="{!TheJobOverrides}">
+								<tr>
+									<td><span class="fa fa-trash delete-job-override tool-btn" onclick="removeJobOverrideClick('{!counter}');"></span></td>
+									<td><apex:inputText value="{!override.JobName}" style="width:400px"/></td>
+									<td><apex:SelectList value="{!override.PriorityId}" size="1"><apex:selectOptions value="{!AllPriorities}"/></apex:SelectList></td>
+									<td><apex:SelectList value="{!override.RunSilently}" size="1"><apex:selectOptions value="{!TriStateBooleanOptions}"/></apex:SelectList></td>
+									<td><apex:SelectList value="{!override.Dedupe}" size="1"><apex:selectOptions value="{!TriStateBooleanOptions}"/></apex:SelectList></td>
+									<td><apex:SelectList value="{!override.AllowSuperBatch}" size="1"><apex:selectOptions value="{!TriStateBooleanOptions}"/></apex:SelectList></td>
+								</tr>
+								<apex:variable var="counter" value="{!counter+1}"/>
+							</apex:repeat>
+							<tr>
+								<td colspan="4"><span class="fa fa-plus-square"></span><a href="javascript:addJobOverrideClick()" class="add-link undecorated-link" style="padding-left: 4px;">Add new job override</a></td>
+							</tr>
+							</tbody>
+					</table>
+					</div>
+					</apex:outputPanel>
+
+					<apex:outputPanel id="TheJobSchedule">
+						<div class="popup-table-container">
+							<table>
+								<thead>
+								<tr>
+									<th></th>
+									<th>Job Priority</th>
+									<th>Cron Schedule</th>
+									<th>Batch size</th>
+								</tr>
+								</thead>
+								<tbody>
+								<apex:variable var="scheduleCounter" value="{!0}"/>
+								<apex:repeat var="theSchedule" value="{!TheJobSchedule}">
+									<tr>
+										<td><span class="fa fa-trash delete-job-override tool-btn" onclick="removeJobScheduleClick('{!scheduleCounter}');"></span></td>
+										<td><apex:SelectList value="{!theSchedule.PriorityId}" size="1"><apex:selectOptions value="{!CustomSchedulePriorities}"/></apex:SelectList></td>
+										<td><apex:inputText value="{!theSchedule.CronSchedule}" style="width:100px"/></td>
+										<td><apex:inputText value="{!theSchedule.BatchSize}" style="width:40px"/></td>
+									</tr>
+									<apex:variable var="scheduleCounter" value="{!scheduleCounter+1}"/>
+								</apex:repeat>
+								<tr>
+									<td colspan="4"><span class="fa fa-plus-square"></span><a href="javascript:addJobScheduleClick()" class="add-link undecorated-link" style="padding-left: 4px;">Add new job schedule</a></td>
+								</tr>
+								</tbody>
+							</table>
+						</div>
+					</apex:outputPanel>
+				</apex:pageBlock>
+
+				<apex:actionFunction action="{!RemoveJobOverride}" name="removeJobOverrideClick" rerender="TheJobProfileErrors, TheJobOverrides" >
+					<apex:param name="pos" value="" />
+				</apex:actionFunction>
+				<apex:actionFunction action="{!AddJobOverride}" name="addJobOverrideClick" rerender="TheJobProfileErrors, TheJobOverrides" >
+				</apex:actionFunction>
+
+				<apex:actionFunction action="{!RemoveJobSchedule}" name="removeJobScheduleClick" rerender="TheJobProfileErrors, TheJobSchedule" >
+					<apex:param name="pos" value="" />
+				</apex:actionFunction>
+				<apex:actionFunction action="{!AddJobSchedule}" name="addJobScheduleClick" rerender="TheJobProfileErrors, TheJobSchedule" >
+				</apex:actionFunction>
+
+			</apex:form>
+
+		</apex:outputPanel>
+
+	</div>
+
+	<script>
+		
+		jQuery(window).load(function()
+		{
+			jQuery(document).on('click', '.card-title', function (e) {
+				jQuery(this).next('.card-panel').toggle(200);
+				jQuery(this).parents('.expandable-card').toggleClass('active');
+			});
+
+			jQuery(document).on('click', '.new-job-profile', function (e) {
+
+   			});
+		});
+		
+		function startDedupe(jobName)
+		{
+			showReloading('.pending-jobs.re-loading-ind');
+			dedupeJobs(jobName);
+		}
+				
+		function highlightJobSummaryRows()
+		{
+			jQuery('span.job-stalled').parent().parent().toggleClass('stalled-row');
+			jQuery('span.job-today').parent().parent().toggleClass('today-row');
+		}
+		
+		function showReloading(selector)
+	    {
+	    	jQuery(selector).css('display' ,'inline-block');
+	    }
+	    
+ 			    function hideReloading(selector)
+	    {
+	    	jQuery(selector).hide();
+	    }
+		
+		function executeBatch()
+		{
+			jQuery('#executeBatch .actions').toggle();jQuery('#executeBatch .running-icon').toggle();
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JobAdministrationController.ExecuteCustomBatch}',
+	       		jQuery('#batch-job-context-id').val(), jQuery('#batch-query').val(), jQuery('#batch-scope-size').val(), jQuery('#super-batch').prop('checked'),
+	       		function(result, event){
+	             		if (event.status) 
+			            {
+			             	jQuery('#executeBatch .batches').append(jQuery('<div><b>Created batch. Click <a href="' + result  +'">here</a> to view.</b></div>'));			             	
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);			             	
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+			         	jQuery('#executeBatch .actions').toggle();jQuery('#executeBatch .running-icon').toggle();
+	         }, 
+	         {escape: true, timeout: 60000});
+		}
+		
+		function seedJob()
+		{
+			jQuery('#seedJob .actions').toggle();jQuery('#seedJob .running-icon').toggle();
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JobAdministrationController.SeedJob}',
+	       		jQuery('#job-name').val(), jQuery('#job-arg').val(), jQuery('#job-priority').val(), jQuery('#job-batch-arg').val(),
+	       		function(result, event){          
+	             		if (event.status) 
+			            {
+			             	jQuery('#seedJob .data-entry input').val('');
+			             	
+			             	window.location = '/' + result;
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);			             	
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+			         	jQuery('#seedJob .actions').toggle();jQuery('#seedJob .running-icon').toggle();
+	         }, 
+	         {escape: true, timeout: 60000});
+		}
+		
+		function setupGenerateInvoicesSchedule()
+		{
+			jQuery('#setupGenerateInvoiceSchedule .actions').toggle();jQuery('#setupGenerateInvoiceSchedule .running-icon').toggle();
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JobAdministrationController.SetupGenerateInvoicesJob}',
+	       		jQuery('#invoice-day-of-month').val(), 
+	       		function(result, event){          
+	             		if (event.status) 
+			            {
+			             	jQuery('#setupGenerateInvoiceSchedule').removeClass('not-configured').addClass('configured');
+			             	jQuery('#setupGenerateInvoiceSchedule .data-entry input').val('');
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);			             	
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+			         	jQuery('#setupGenerateInvoiceSchedule .actions').toggle();jQuery('#setupGenerateInvoiceSchedule .running-icon').toggle();
+	         }, 
+	         {escape: true, timeout: 60000});
+		}
+		
+		function setupGenerateSupplierInvoicesSchedule()
+		{
+			jQuery('#setupGenerateSupplierInvoiceSchedule .actions').toggle();jQuery('#setupGenerateSupplierInvoiceSchedule .running-icon').toggle();
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JobAdministrationController.SetupGenerateSupplierInvoicesJob}',
+	       		jQuery('#supplier-invoice-day-of-month').val(), 
+	       		function(result, event){          
+	             		if (event.status) 
+			            {
+			             	jQuery('#setupGenerateSupplierInvoiceSchedule').removeClass('not-configured').addClass('configured');
+			             	jQuery('#setupGenerateSupplierInvoiceSchedule .data-entry input').val('');
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);			             	
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+			         	jQuery('#setupGenerateSupplierInvoiceSchedule .actions').toggle();jQuery('#setupGenerateSupplierInvoiceSchedule .running-icon').toggle();
+	         }, 
+	         {escape: true, timeout: 60000});
+		}
+
+		function setupActualiseUsageJob()
+		{
+			jQuery('#setupActualiseForecastSchedule .actions').toggle();jQuery('#setupActualiseForecastSchedule .running-icon').toggle();
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JobAdministrationController.SetupJobFindAssignmentUsageToActualise}',
+	       		jQuery('[id$="actualise-forecast-select"]').val(), jQuery('[id$="actualise-forecast-select-month"]').val(),
+	       		function(result, event){          
+	             		if (event.status) 
+			            {
+			             	jQuery('#setupActualiseForecastSchedule').removeClass('not-configured').addClass('configured');
+			             	jQuery('#setupActualiseForecastSchedule .data-entry input').val('');
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);			             	
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+			         	jQuery('#setupActualiseForecastSchedule .actions').toggle();jQuery('#setupActualiseForecastSchedule .running-icon').toggle();
+	         }, 
+	         {escape: true, timeout: 60000});
+		}
+		
+		function setupRemoveAssignmentUsage()
+		{
+			jQuery('#setupRemoveAssignmentUsageSchedule .actions').toggle();jQuery('#setupRemoveAssignmentUsageSchedule .running-icon').toggle();
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JobAdministrationController.SetupJobFindAssignmentUsageToRemove}',
+	       		function(result, event){          
+	             		if (event.status) 
+			            {
+			             	jQuery('#setupRemoveAssignmentUsageSchedule').removeClass('not-configured').addClass('configured');
+			             	jQuery('#setupRemoveAssignmentUsageSchedule .data-entry input').val('');
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);			             	
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+			         	jQuery('#setupRemoveAssignmentUsageSchedule .actions').toggle();jQuery('#setupRemoveAssignmentUsageSchedule .running-icon').toggle();
+	         }, 
+	         {escape: true, timeout: 60000});
+		}
+		
+		function setupCustomJobSchedule()
+		{
+			jQuery('#setupCustomSchedule .actions').toggle();jQuery('#setupCustomSchedule .running-icon').toggle();
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JobAdministrationController.SetupCustomSchedule}',
+	       		jQuery('#custom-schedule-name').val(), jQuery('#custom-schedule').val(), jQuery('#custom-schedule-query').val(), 
+	       		function(result, event){          
+	             		if (event.status) 
+			            {
+			             	jQuery('#setupCustomSchedule').removeClass('not-configured').addClass('configured');
+			             	jQuery('#setupCustomSchedule .data-entry input').val('');
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);			             	
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+			         	jQuery('#setupCustomSchedule .actions').toggle();jQuery('#setupCustomSchedule .running-icon').toggle();
+	         }, 
+	         {escape: true, timeout: 60000});
+		}
+		
+		function setupDefaultJobSchedule()
+		{
+			jQuery('#setupDefaultSchedule .actions').toggle();jQuery('#setupDefaultSchedule .running-icon').toggle();
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JobAdministrationController.SetupDefaultSchedule}',
+	       		function(result, event){          
+	             		if (event.status) 
+			            {
+			             	jQuery('#setupDefaultSchedule').removeClass('not-configured').addClass('configured');			             
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);			             	
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+			         	jQuery('#setupDefaultSchedule .actions').toggle();jQuery('#setupDefaultSchedule .running-icon').toggle();
+	         }, 
+	         {escape: true, timeout: 60000});
+		}
+		
+		function decodeJobArg()
+		{
+			jQuery('#decodeJobArg .actions').toggle();jQuery('#decodeJobArg .running-icon').toggle();
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JobAdministrationController.DecodeJobArg}', jQuery('#decode-job-arg').val(),
+	       		function(result, event){          
+	             		if (event.status) 
+			            {
+			             	jQuery('#decode-job-arg-result').val(result);	             
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);			             	
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+			         	jQuery('#decodeJobArg .actions').toggle();jQuery('#decodeJobArg .running-icon').toggle();
+	         }, 
+	         {escape: true, timeout: 60000});
+		}
+		
+		function encodeJobArg()
+		{
+			jQuery('#decodeJobArg .actions').toggle();jQuery('#decodeJobArg .running-icon').toggle();
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.JobAdministrationController.EncodeJobArg}', jQuery('#decode-job-arg-result').val(),
+	       		function(result, event){          
+	             		if (event.status) 
+			            {
+			             	jQuery('#decode-job-arg').val(result);	             
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);			             	
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+			         	jQuery('#decodeJobArg .actions').toggle();jQuery('#decodeJobArg .running-icon').toggle();
+	         }, 
+	         {escape: true, timeout: 60000});
+		}
+		
+	</script>
+	
+	<style>
+		.card-title {
+			margin: 0;
+			font-size: 16px;
+			padding: 6px;
+			cursor: pointer;
+		}
+		.expandable-card {
+			position: relative;
+			margin-top: 10px;
+			padding: 15px;
+			box-shadow: rgba(31, 31, 31, 0.16) 1px 2px 5px 1px;
+			background-color: #FFF;
+			border-radius: 2px;
+			width: 390px;
+			display: inline-block;
+			margin-right: 10px;
+			vertical-align:top;
+		}
+		
+		.expandable-card .card-panel {
+			display: none;
+			margin-top: 8px;
+		}
+		.expandable-card.active .card-title {
+			
+		}
+		
+		.card-title .icon
+		{
+			margin-right: 10px;
+			font-size: 20px;
+		}
+		.card-footer {margin-top: 12px;}
+		.expandable-card.configured .not-configured {display: none;}
+		.expandable-card.not-configured .configured {display: none;}
+		.expandable-card.configured {background-color: lightgreen;}
+		
+		.expandable-card ul {
+			margin: 0.75em 0;
+			padding: 0 1em;
+			list-style: none;
+		}
+		
+		.expandable-card li:before { 
+			content: "";
+			border-color: transparent #111;
+			border-style: solid;
+			border-width: 0.35em 0 0.35em 0.45em;
+			display: block;
+			height: 0;
+			width: 0;
+			left: -1em;
+			top: 0.9em;
+			position: relative;
+		}
+		.running-icon {display:none;font-size: 20px;margin-left: 4px;}
+		table.data-entry td {
+			padding-bottom:4px;
+		}
+		table.data-entry td:first-child {
+			font-weight:bold;
+			text-align:right;
+			padding-right:6px;
+		}
+		table.data-entry input{
+			width:210px
+		}
+		.warning-message {
+				padding: 10px;
+				background-color: yellow;
+				border: 2px solid red;
+				margin-bottom: 8px;
+				font-size: 16px;
+				display: table;
+  			}
+  			.warning-message-text {
+				display: table-cell;
+				vertical-align: top;
+				padding-left: 10px;  			
+  			}
+  			.warning-icon {
+				color: red;
+				font-size: 30px;
+				display: table-cell;
+  			}
+			span[class*="job-summary"] {
+			    font-size: 16px;
+			    padding-right: 5px;
+			}
+			.job-summary-alert {
+			    color: red;
+			}
+			.today-row {
+			    background-color: lightyellow;
+			}
+			.stalled-row {
+			    background-color: #EAEAEA;
+			}			
+			.job-summary-pending-ok, 
+			.job-summary-warn {
+			    color: orange;
+			}
+			
+			.job-summary-ok {
+			    color: green;
+			}
+			.job-highlight {
+			    width: 22px;
+			    text-align: center;			
+			}
+			.re-loading-ind {
+				display: none;
+				float: right;
+				font-size: 21px;
+				color: #888;
+			}
+			/* override the standard trigger disabled banner to allow this screen to be usable */
+			#triggers-disabled-overlay {
+				top: 0 !important;
+				height: 16% !important;
+				background-color: #FF4242 !important;
+				position: fixed !important;
+			}
+			#triggers-disabled-message {
+				top: 0 !important;
+				color: #FFFFFF !important;
+				font-size: 28px !important;
+				margin-top: auto !important;
+				height: auto !important;
+			}
+
+			.tool-btn {
+				cursor: pointer;
+				font-size: 12px;
+			}
+			.popup-table-container {
+			   max-height: 200px;
+				overflow-y: auto;
+				border: 1px solid #ededed;
+				padding: 8px;
+				margin-top: 6px;
+				background-color: white;
+   			}
+   			.popup-table-container>table>tbody>tr:last-child>td {
+				padding-top: 8px;
+			}
+	</style>
+</apex:define>
+</apex:composition>
+
+</apex:page>

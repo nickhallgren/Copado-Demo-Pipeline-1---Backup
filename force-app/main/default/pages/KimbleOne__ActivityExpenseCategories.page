@@ -1,0 +1,432 @@
+<apex:page controller="KimbleOne.ActivityExpenseCategoriesController" extensions="KimbleOne.TooltipsController" sidebar="false" tabStyle="KimbleOne__ReferenceData__c">
+ 
+<apex:composition template="KimbleOne__SiteMaster">
+
+	<apex:define name="Menu">
+   
+   		<c:Menu DefaultHelpPage="ExpenseCategories.html" MenuContextType="{!TheMenuContext.Type}" MenuContextId="{!TheMenuContext.Id}" MenuContextName="{!TheMenuContext.Name}"/>
+    	 
+     </apex:define>
+
+<apex:define name="Content">
+
+	<!-- Kimble Guidance -->
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+	<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/ActivityExpenseCategoriesNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+		<apex:outputPanel layout="none" rendered="{!ActivityExpenseCategoriesTipOverrideEnabled}">
+			<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+		</apex:outputPanel>
+	</apex:outputPanel>
+	
+	<style>
+		div#ActivityExpenseCategoryErrors {max-height: 91px;overflow: auto;margin-bottom: 15px;}
+		#ActivityExpenseCategoryPopup th label {
+			display: inline-block;
+			width: 150px;
+		}
+		#ActivityExpenseCategoryPopup label.popup-heading-label {
+			margin-left: 13px;
+		}
+	</style>
+	
+	<apex:form >
+		
+		<apex:outputPanel id="ActivityExpenseCategorys" layout="block" >
+		
+		<apex:pageMessages escape="false" />
+        
+        <apex:pageBlock id="band">
+
+            <apex:pageBlockButtons location="top" >
+            	<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.createable}">
+            		<input type="button" class="btn" value="{!$Label.New} {!$ObjectType.ActivityExpenseCategory__c.label}" onclick="initialiseModalBoxy('#ActivityExpenseCategoryPopup', '{!JSENCODE($Label.New)} {!$ObjectType.ActivityExpenseCategory__c.label}');newActivityExpenseCategory();"></input>
+          		</apex:outputPanel>
+            </apex:pageBlockButtons>
+            
+            <apex:pageBlockButtons location="bottom" >
+            	<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.deletable}">
+            		<input type="button" class="btn" value="{!$Label.DeleteSelectedLabel}" onclick="var d = confirmDelete();if(!d) return;jQuery(this).addClass('DisableButtonWhileBusy');setSelectedExpenseCategories();deleteTheExpenseCategories()"/>
+           		</apex:outputPanel>
+            </apex:pageBlockButtons>
+                        
+      
+          	<apex:inputText id="categoryColumn" value="{!selectedExpenseCategories}"  styleclass="HideControl SelectedExpenseCategories"/>
+			<apex:pageBlockTable value="{!ActivityExpenseCategorys}" var="m" rowClasses="expense-category-row" styleClass="kimble-enhanced-table">
+ 
+            	<apex:column >
+					<apex:facet name="header">
+						<input type="checkbox" name="ExpenseCategories" value="AllExpenseCategories" id="AllExpenseCategories" />
+					</apex:facet>
+					<input type="checkbox" name="ExpenseCategories" value="{!m.Id}" class="AExpenseCategory"/>
+				</apex:column>
+            	
+            	<apex:column id="actionColumn" headerValue="{!$Label.kimbleone__actionlinksheader}">
+					<apex:outputPanel rendered="{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.updateable}">
+	        			<apex:outputLink value="#" onclick="initialiseModalBoxy('#ActivityExpenseCategoryPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__ActivityExpenseCategory__c.label}');editActivityExpenseCategory('{!JSENCODE(m.Id)}')">{!$Label.kimbleone__edit}</apex:outputLink>&nbsp;|&nbsp;
+     				</apex:outputPanel>
+					<apex:outputPanel rendered="{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.deletable}">
+	     				<apex:commandLink rendered="{!m.ExpenseItems__r.size==0}" onclick="var d = confirmDelete();if(!d) return;" action="{!deleteActivityExpenseCategory}" oncomplete="initialisePageAfterLoad();" reRender="ActivityExpenseCategorys" >{!$Label.kimbleone__delete}
+							<apex:param name="aId" value="{!m.Id}" />
+						</apex:commandLink>
+					</apex:outputPanel>
+			  	</apex:column>
+
+    			<apex:column id="categoryColumn" value="{!m.Name}" headerClass="sortable">
+    	 	    	<apex:facet name="header">{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.Name.Label}</apex:facet>
+            	</apex:column>            
+            
+            	<apex:column rendered="{!canDisplayResourceTypeCol}" headerClass="sortable">
+            		<apex:facet name="header">{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__ResourceType__c.Label}</apex:facet>
+            		<apex:outputText value="{!m.ResourceType__r.Name}" rendered="{!m.ExpenseCategory__r.KimbleOne__IsVariableByResourceType__c==true}"/>            	            		 	 
+            	</apex:column>
+            
+            	<apex:column rendered="{!canDisplayLocationCol}" headerClass="sortable">
+            		<apex:facet name="header">{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__Location__c.Label}</apex:facet>
+            		<apex:outputText value="{!m.Location__r.Name}" rendered="{!m.ExpenseCategory__r.KimbleOne__IsVariableByResourceLocation__c==true}"/>            	            		 	 
+            	</apex:column>
+            
+      			<apex:column id="rebillRuleColumn" value="{!m.KimbleOne__RebillingRule__c}" headerClass="sortable">
+	      			<apex:facet name="header">{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__RebillingRule__c.Label}</apex:facet>
+    	        </apex:column>
+             
+				<apex:column id="revenueRateColumn" headerClass="sortable">
+       	 		    <apex:facet name="header">{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__RevenueRate__c.Label}</apex:facet>
+       	 		    <apex:outputPanel layout="none">
+						<apex:outputText value="{!m.KimbleOne__InvoicingCurrencyIsoCode__c}" rendered="{!ISBLANK(m.KimbleOne__InvoicingCurrencyRevenueRate__c)==False}" styleclass="kimbleCurrencyCode" />
+						<apex:outputField value="{!m.KimbleOne__InvoicingCurrencyRevenueRate__c}" />
+					</apex:outputPanel>
+				</apex:column>
+      	
+				<apex:column id="revenueFactorColumn" value="{!m.KimbleOne__RevenueFactor__c}" headerClass="sortable">
+					<apex:facet name="header">{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__RevenueFactor__c.Label}</apex:facet>
+				</apex:column>
+				
+				<apex:column id="reimbCostColumn" headerClass="sortable">
+					<apex:facet name="header">{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__CostRate__c.Label}</apex:facet>
+       	 		    <apex:outputPanel layout="none">
+						<apex:outputText value="{!m.KimbleOne__ReimbursementCurrencyIsoCode__c}" rendered="{! !ISBLANK(m.ReimbursementCurrencyIsoCode__c) && !ISBLANK(m.ReimbursementCurrencyCostRate__c)}" styleclass="kimbleCurrencyCode" />
+						<apex:outputText value="{!m.KimbleOne__ReimbursementCurrencyCostRate__c}" />
+					</apex:outputPanel>
+				</apex:column>
+        	   
+				<apex:column id="reimbCostFactorColumn" value="{!m.KimbleOne__CostFactor__c}" headerClass="sortable">
+					<apex:facet name="header">{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__CostFactor__c.Label}</apex:facet>
+				</apex:column>
+
+				<apex:column id="taxCodeColumn" value="{!m.KimbleOne__TaxCode__c}" headerClass="sortable" >
+					<apex:facet name="header">{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__TaxCode__c.Label}</apex:facet>
+				</apex:column>
+    
+    			<apex:column id="isActiveColumn" value="{!m.KimbleOne__IsActive__c}" headerClass="sortable" html-data-sort-type="number" html-data-sort-value="{!IF(m.KimbleOne__IsActive__c, '1', '0')}">
+					<apex:facet name="header">{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__IsActive__c.Label}</apex:facet>
+				</apex:column>
+    
+			</apex:pageBlockTable>
+         </apex:pageBlock>
+         
+         </apex:outputPanel>
+         
+         
+		<apex:actionFunction action="{!newActivityExpenseCategory}" name="newActivityExpenseCategory" rerender="ActivityExpenseCategory" oncomplete="showModalBoxy();initialisePageTips();">
+		</apex:actionFunction>
+        
+		<apex:actionFunction action="{!selectActivityExpenseCategoryDefaults}" name="selectActivityExpenseCategoryDefaults" rerender="ActivityExpenseCategory" oncomplete="showModalBoxy()" status="myStatus">
+       		<apex:param name="expenseId" value="" />
+		</apex:actionFunction>
+          
+		<apex:actionFunction action="{!setReimbursementRuleValueDefault}" name="setReimbursementRuleValueDefaults" rerender="CostPanel" oncomplete="showModalBoxy()">
+       		<apex:param name="value" value="" />
+		</apex:actionFunction>
+		
+		<apex:actionFunction action="{!setRebillingRuleValueDefault}" name="setRebillingRuleValueDefaults" rerender="RevenuePanel" oncomplete="showModalBoxy()">
+       		<apex:param name="value" value="" />
+		</apex:actionFunction>
+
+		<apex:actionFunction action="{!getSpecificActivityExpenseCategory}" name="editActivityExpenseCategory" rerender="ActivityExpenseCategory" oncomplete="showModalBoxy();initialisePageTips();">
+       		<apex:param name="aId" value="" />
+		</apex:actionFunction>
+        
+        <apex:actionFunction action="{!DeleteExpenseCategories}" name="deleteTheExpenseCategories" rerender="ActivityExpenseCategorys" oncomplete="initialisePageAfterLoad();"/>
+
+		<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+		<div style="display:none;" kimble-tip="null"></div>
+        
+       	<script>
+	jQuery(document).ready(function(){
+			initialisePageAfterLoad();
+		});
+		
+		function setSelectedExpenseCategories()
+		{
+			var selectedItems=''; 
+			jQuery("input:checkbox[name=ExpenseCategories]:checked").each(function(){
+				selectedItems=selectedItems+','+jQuery(this).val();
+	  		});
+			jQuery('.SelectedExpenseCategories').val(selectedItems);
+		}
+		function setUpCheckBoxes()
+		{
+			jQuery('#AllExpenseCategories').unbind('change');
+			jQuery('#AllExpenseCategories').change(function(){
+				UncheckOrCheckGroup(jQuery(this),'ExpenseCategories');
+			});
+			jQuery('.AExpenseCategory').unbind('change');
+			jQuery('.AExpenseCategory').change(function(){
+				UnCheckParent(jQuery(this),'AllExpenseCategories');
+			});
+		}
+		
+		function initialisePageAfterLoad()
+		{
+			setUpCheckBoxes();
+			
+			jQuery('.kimble-enhanced-table').enhancedTable();
+			
+			initialisePageTips();
+		}
+		
+		/* Tooltips */
+		var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+		var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+		var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+		var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+		var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+		var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+	
+		function initialisePageTips()
+		{
+			ApplyTipAttributes();
+			initialiseTips();
+		}
+		
+		// add tip attributes to elements
+		function ApplyTipAttributes()
+		{
+			if(enableTips)
+			{
+				jQuery('[id$="actionColumnheader"]').attr('kimble-tip','Action');
+				jQuery('[id$="isActiveColumnheader"]').attr('kimble-tip','IsActive');
+				jQuery('[id$="categoryColumnheader"]').attr('kimble-tip','Name');
+				jQuery('[id$="revenueFactorColumnheader"]').attr('kimble-tip','RebillingFactor').attr('kimble-tip-extended-text','RebillingFactorExtendedText');
+				jQuery('[id$="revenueRateColumnheader"]').attr('kimble-tip','RebillingRate');
+				jQuery('[id$="rebillRuleColumnheader"]').attr('kimble-tip','RebillingRule').attr('kimble-tip-extended-text','RebillingRuleExtendedText').attr('kimble-tip-help-link','ExpenseCategoriesHelpLink');
+				jQuery('[id$="reimbCostFactorColumnheader"]').attr('kimble-tip','ReimbFactor').attr('kimble-tip-extended-text','ReimbFactorExtendedText');
+				jQuery('[id$="reimbCostColumnheader"]').attr('kimble-tip','ReimbRate').attr('kimble-tip-extended-text','ReimbRateExtendedText').attr('kimble-tip-help-link','ExpenseCategoriesHelpLink');
+				jQuery('[id$="taxCodeColumnheader"]').attr('kimble-tip','TaxCode');
+				
+				jQuery('[id$="revenueRateInput"]').attr('kimble-tip','RebillingRate').addClass('tip-right');
+				jQuery('[id$="revenueFactorInput"]').attr('kimble-tip','RebillingFactor').attr('kimble-tip-extended-text','RebillingFactorExtendedText').addClass('tip-right');
+				jQuery('[id$="ActivityExpenseCategoryName"]').attr('kimble-tip','Name').addClass('tip-right');
+				jQuery('[id$="IsActive"]').attr('kimble-tip','IsActive').addClass('tip-right');
+				jQuery('[id$="RevenueRateFactorField"]').attr('kimble-tip','ReimbFactor').attr('kimble-tip-extended-text','ReimbFactorExtendedText').addClass('tip-right');
+				jQuery('[id$="rebillingRuleInput"],[id$="rebillingRuleInput2"]').attr('kimble-tip','RebillingRule').attr('kimble-tip-extended-text','RebillingRuleExtendedText').attr('kimble-tip-help-link','ExpenseCategoriesHelpLink').addClass('tip-right');
+				jQuery('[id$="reimbRate"]').attr('kimble-tip','ReimbRate').attr('kimble-tip-extended-text','ReimbRateExtendedText').attr('kimble-tip-help-link','ExpenseCategoriesHelpLink').addClass('tip-right');
+				jQuery('[id$="taxCodeField"]').attr('kimble-tip','TaxCode').addClass('tip-right');
+				jQuery('[id$="reimbRule"],[id$="reimbRule2"]').attr('kimble-tip','ReimbRule').attr('kimble-tip-extended-text','ReimbRuleExtendedText').addClass('tip-right');
+			}
+		}
+		
+		function updateTipsConfigSetting(newTipSetting)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+				newTipSetting,
+					function(result, event){
+						if (event.status)
+						{
+							var data = {};
+							data.results = result;
+							loadGuidance();
+						}
+						else
+						{
+							alert(event.message);
+						}
+				},
+				{escape: false, timeout: 60000}
+			);
+		}
+
+</script>
+ 		
+	</apex:form>
+
+
+
+<div id="ActivityExpenseCategoryPopup" style="display:none">
+      
+	<apex:outputPanel id="ActivityExpenseCategory">
+        
+        <apex:form >
+   		
+   			<apex:outputPanel style="min-width:500px;"  layout="block" >
+		
+			<div id="ActivityExpenseCategoryErrors">
+				<apex:pageMessages escape="false" />
+			</div>
+			
+			<apex:pageBlock mode="maindetail" >
+          
+				<apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+
+			    	 <apex:pageBlockSectionItem dataStyle="font-weight: bold;">
+						<apex:outputLabel styleClass="popup-heading-label" value="{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__ExpenseCategory__c.Label}" />
+			     		<apex:outputpanel >
+				      	 	<apex:selectList value="{!ActivityExpenseCategory.KimbleOne__ExpenseCategory__c}"  size="1"  rendered="{!ISBLANK(ExpenseCategoryValue)}">
+								<apex:actionSupport event="onchange" action="{!SelectActivityExpenseCategoryDefaults}" rerender="ActivityExpenseCategory" />
+								<apex:selectOptions value="{!AllActivityExpenseCategories}" />
+							</apex:selectList>
+			      	 
+			         		<apex:outputText value="{!ActivityExpenseCategory.ExpenseCategory__r.Name}"  rendered="{!(!ISBLANK(ExpenseCategoryValue))}" />
+						</apex:outputpanel>
+			     	</apex:pageBlockSectionItem>
+			
+				</apex:pageblockSection>
+	
+			</apex:pageBlock>
+			
+			<apex:actionStatus id="myStatus">
+    
+       			<apex:facet name="start">
+       				<center>{!$Label.kimbleone__loading}</center>
+       			</apex:facet>
+    
+       			<apex:facet name="stop">
+					<apex:pageBlock mode="edit">
+					<apex:pageBlockButtons location="bottom">
+			 
+					<apex:commandButton action="{!upsertActivityExpenseCategory}" value="{!$Label.kimbleone__save}"  oncomplete="hideModalBoxyWithErrorCheck('#ActivityExpenseCategoryErrors');initialisePageAfterLoad();" reRender="ActivityExpenseCategorys, ActivityExpenseCategory"/>
+						<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+            		</apex:pageBlockButtons>
+			
+					<apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+	         			
+	         			<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.Name.Label}" />
+	        				<apex:inputfield value="{!ActivityExpenseCategory.Name}" required="true" id="ActivityExpenseCategoryName"/> 
+						</apex:pageBlockSectionItem>
+					
+						<apex:pageBlockSectionItem rendered="{!ActivityExpenseCategory.ExpenseCategory__r.KimbleOne__IsVariableByResourceType__c==true || (ActivityExpenseCategory.Id==null && ExpenseCategorySelected.KimbleOne__IsVariableByResourceType__c  )}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__ResourceType__c.Label}" />
+							<apex:selectList value="{!ActivityExpenseCategory.KimbleOne__ResourceType__c}" size="1" >
+								<apex:selectOptions value="{!AllResourceTypes}" />
+							</apex:selectList>	        			
+						</apex:pageBlockSectionItem>
+					
+						<apex:pageBlockSectionItem rendered="{!ActivityExpenseCategory.ExpenseCategory__r.KimbleOne__IsVariableByResourceLocation__c==true || (ActivityExpenseCategory.Id==null && ExpenseCategorySelected.KimbleOne__IsVariableByResourceLocation__c  )}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__Location__c.Label}" />
+	        				<apex:selectList value="{!ActivityExpenseCategory.KimbleOne__Location__c}" size="1" >
+								<apex:selectOptions value="{!AllLocations}" />
+							</apex:selectList>
+						</apex:pageBlockSectionItem>
+					
+					</apex:pageblockSection>
+	
+					<apex:pageBlockSection collapsible="false" showheader="false"  columns="1" id="RevenuePanel" rendered="{!NoWarning}">
+	 			 
+						<apex:pageBlockSectionItem >
+						
+							<apex:outputLabel for="RebillingRule">
+								<apex:outputText value="{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__RebillingRule__c.Label}" />							
+							</apex:outputLabel>						
+						
+							<apex:outputPanel layout="none">  
+						  		
+						  		<apex:selectList id="rebillingRuleInput" value="{!ActivityExpenseCategory.KimbleOne__RebillingRule__c}"  size="1"  rendered="{!isExpenseTypePerUnit}">
+									<apex:actionSupport event="onchange" action="{!SetRebillingRuleValueDefault}" rerender="ActivityExpenseCategory" />
+									<apex:selectOptions value="{!RebillingRulesPerUnit}" />
+								</apex:selectList>
+						  
+						  		<apex:selectList id="rebillingRuleInput2" value="{!ActivityExpenseCategory.KimbleOne__RebillingRule__c}"  size="1"  rendered="{!!isExpenseTypePerUnit}">
+									<apex:actionSupport event="onchange" action="{!SetRebillingRuleValueDefault}" rerender="ActivityExpenseCategory" />
+									<apex:selectOptions value="{!AllRebillingRules}" />
+						 		</apex:selectList>
+							
+							</apex:outputPanel>  
+	                
+	                	</apex:pageBlockSectionItem>            
+	      	
+	     	 			<apex:inputfield id="revenueFactorInput" value="{!ActivityExpenseCategory.KimbleOne__RevenueFactor__c}" rendered="{!CanShowRevenueFactorField}"/>
+		                
+	        			<apex:pageBlockSectionItem rendered="{!CanShowRevenueRateField}">
+	            	       	<apex:outputLabel >{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__RevenueRate__c.Label} {!ActivityExpenseCategory.KimbleOne__InvoicingCurrencyIsoCode__c}</apex:outputLabel>
+	                	   	<apex:inputField id="revenueRateInput" value="{!ActivityExpenseCategory.KimbleOne__InvoicingCurrencyRevenueRate__c}" />
+						</apex:pageBlockSectionItem>
+					
+						<apex:pageBlockSectionItem rendered="{!CanShowInvoicingCurrencyMaximumRevenueField}">
+	                   		<apex:outputLabel >{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__InvoicingCurrencyMaximumRevenue__c.Label} ({!ActivityExpenseCategory.KimbleOne__InvoicingCurrencyIsoCode__c})</apex:outputLabel>
+	                   		<apex:inputField value="{!ActivityExpenseCategory.KimbleOne__InvoicingCurrencyMaximumRevenue__c}" />
+						</apex:pageBlockSectionItem>      	 
+	       
+					</apex:pageBlockSection>
+	                
+					<apex:pageBlockSection collapsible="false" showheader="false"  columns="1" id="CostPanel" rendered="{!NoWarning}">
+	                
+	                	<apex:pageBlockSectionItem >
+							<apex:outputLabel for="ReimbursementRule" >
+								<apex:outputText value="{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__ReimbursementRule__c.Label}" />
+				    		</apex:outputLabel>
+				    	
+				    		<apex:outputPanel layout="none">
+				    			<apex:selectList id="reimbRule" value="{!ActivityExpenseCategory.KimbleOne__ReimbursementRule__c}"  size="1"  rendered="{!isExpenseTypePerUnit}">
+									<apex:actionSupport event="onchange" action="{!SetReimbursementRuleValueDefault}" rerender="ActivityExpenseCategory" />
+									<apex:selectOptions value="{!ReimbursementRulesPerUnit}" />
+								</apex:selectList>
+							
+								<apex:selectList id="reimbRule2" value="{!ActivityExpenseCategory.KimbleOne__ReimbursementRule__c}"  size="1"  rendered="{!!isExpenseTypePerUnit}">
+									<apex:actionSupport event="onchange" action="{!SetReimbursementRuleValueDefault}" rerender="ActivityExpenseCategory" />
+									<apex:selectOptions value="{!AllReimbursementRules}" />
+								</apex:selectList>
+							</apex:outputPanel>
+	               		</apex:pageBlockSectionItem>        
+				
+		    	     	<apex:inputfield value="{!ActivityExpenseCategory.KimbleOne__CostFactor__c}" id="RevenueRateFactorField" rendered="{!CanShowCostFactorField}"/> 
+	     			
+				    	<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__ReimbursementCurrencyIsoCode__c.Label}" />
+				    		<apex:selectList value="{!ActivityExpenseCategory.KimbleOne__ReimbursementCurrencyIsoCode__c}"  size="1" >
+								<apex:selectOptions value="{!AllActiveCurrencies}" />
+							</apex:selectList>
+	    	     		</apex:pageBlockSectionItem>
+
+		     			<apex:pageBlockSectionItem rendered="{!CanShowCostRateField}">
+	    	               	<apex:outputLabel >{!$Label.kimbleone__reimbursementrate}</apex:outputLabel>
+	        	           	<apex:inputField id="reimbRate" value="{!ActivityExpenseCategory.KimbleOne__ReimbursementCurrencyCostRate__c}" />
+	            	   	</apex:pageBlockSectionItem>                
+
+		     			<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__TaxCode__c.Label}" />
+				    		<apex:selectList id="taxCodeField" value="{!ActivityExpenseCategory.KimbleOne__TaxCode__c}"  size="1" >
+								<apex:selectOptions value="{!TheInputTaxCodes}" />
+							</apex:selectList>
+	            	   	</apex:pageBlockSectionItem>                
+				    
+	    	     		
+					</apex:pageBlockSection>
+					<apex:pageBlockSection >
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityExpenseCategory__c.Fields.KimbleOne__IsActive__c.Label}" for="IsActive" />
+							<apex:inputField value="{!ActivityExpenseCategory.KimbleOne__IsActive__c}" id="IsActive"/>
+						</apex:pageBlockSectionItem>
+	            	</apex:pageBlockSection>
+					</apex:pageBlock>
+		
+				</apex:facet>
+		
+			</apex:actionStatus>
+	
+		</apex:outputPanel>
+
+		</apex:form>
+
+	</apex:outputPanel>
+
+</div>
+
+</apex:define>
+
+</apex:composition>
+ 
+</apex:page>

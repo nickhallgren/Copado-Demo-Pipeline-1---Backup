@@ -1,0 +1,3719 @@
+<apex:page standardController="KimbleOne__Resource__c" extensions="KimbleOne.TimesheetController,KimbleOne.SecurityController" showHeader="true" sidebar="{!ShowSideNavBar && ISBLANK($CurrentPage.parameters.id)}" standardStylesheets="true" tabStyle="MyTimesheet__tab">
+
+	<apex:composition template="KimbleOne__SiteMaster">
+		<apex:define name="Menu">
+			<c:Menu DefaultHelpPage="TimeExpenseEntryCalendarView.html" MenuContextType="{!IF(ISBLANK($CurrentPage.parameters.id), '', 'Resource')}" MenuContextId="{!KimbleOne__Resource__c.Id}" MenuContextName="{!TheResource.Name} - {!TheResourceTrackingPeriod.Name} ({!TheResourceTrackingPeriod.KimbleOne__StartDate__c} {!$Label.kimbleone__to} {!TheResourceTrackingPeriod.KimbleOne__EndDate__c})"/>
+		</apex:define>
+		<apex:define name="Content">
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+    		<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryTimePicker, 'jquery.timepicker.min.js')}"/>
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__HoursAndMinsHelper)}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQueryTimePicker, 'jquery.timepicker.css')}"/>
+
+			<apex:outputPanel layout="none" rendered="{!EnhancedView}">
+			<!-- Kimble Guidance -->
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, TTipNarrativesResource)}" />
+			
+			<apex:outputPanel layout="none" rendered="{!TTOverrideNarrative}">
+		<apex:includeScript value="{!URLFOR($Resource[TTipNarrativesOverrideResource])}" />
+			</apex:outputPanel>
+
+			<!-- Period Summary -->
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'TimeEntryPeriodSummary.css')}"/>
+ 			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleJS, 'TimeEntryPeriodSummary.js')}"/>
+			</apex:outputPanel>
+			
+			<style>
+			<apex:outputPanel layout="none" rendered="{!EnhancedView}">
+				/* Enhanced View START */
+				/* loading panel */
+				.loadingIndicator {
+				   top:0;
+				   right:0;
+				   width:100%;
+				   height:100%;
+				   font-weight: bold;
+				   position:absolute;
+				   text-align:center;
+				   /* IE filter */
+				   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+				   -moz-opacity:0.7;	/* Mozilla extension */
+				   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+				   opacity:0.7; /* CSS3 */
+				   z-index:1000;
+				   background-color:white;
+				   display:none; 
+				}
+				.loadingIndicator img {
+					margin-right:9px;
+				}
+				#loadingIndicatorInnerContainer { 
+					position:absolute; 
+					top:50%;
+					height:10em; 
+					margin-top:-2em;
+					width:100%;
+				}
+				.kimble-format-number {display:none;}
+
+				.boxy-content .bPageBlock {
+				    background-color: white !important;
+				    border: none !important;
+				}
+				.boxy-content .pbBottomButtons {
+					border-top: none !important;	
+				}
+				.boxy-content .labelCol {
+				    font-size: 12px;
+				}
+				/*remove the horizontal scroll is > 7 days*/
+				/*div#contentWrapper {
+				    overflow-x: hidden;
+				}*/
+				div#e-timesheet-container {
+/* 				    margin-top: 5px; */
+			        margin-bottom: 36px;
+				}
+				/* Apply fixed-height to e-timesheet-container if page scroll not well received */
+				#e-timesheet-container.fixed-height #body-container .time-entry-period-body {
+				    height: 345px;
+				    overflow: auto;
+				}	
+				.time-entry-period {
+				    display: table-cell;
+				    min-width: 190px;
+				    max-width: 190px;
+				    vertical-align: top;			    
+				}
+				.time-entry-period.NonBusDay {
+					background-color: #f1f1f1;
+				    min-width: 160px;
+    				max-width: 160px;
+				}
+				.time-entry-period-header {
+			        background-color: #F5F5F5;
+	    			color: #5E5E5E;
+				    padding: 4px 4px 4px 10px;
+				}
+				.time-entry-period.NonBusDay .time-entry-period-header {
+				    background-color: #e8e8e8;
+				}
+				.time-entry-period .submission-errors-ind {
+					display: none;
+				    position: absolute;
+				    right: 85px;
+				    top: 7px;
+				    font-size: 20px;
+				    color: orange;
+				}
+				.entry-card .time-entry-comments-ind {
+				    font-size: 18px;
+				    margin-top: 10px;
+				}
+				.entry-card .time-entry-errors-ind {
+				    font-size: 18px;
+				    margin-top: 10px;
+				    color: orange;
+				}
+				.time-entry-period-name {
+				    display: table-cell;
+				    white-space: nowrap;
+				    width: 100%;
+			        font-size: 16px;
+				    font-weight: bold;
+				}
+				.time-entry-period-actions {
+					display: table-cell;
+					text-align: right;
+					position: relative;
+					white-space: nowrap;
+	   			}
+				.time-entry-period-header-btn {
+				    padding: 6px;
+				    border: 1px solid #ccc;
+				    border-radius: 2px;
+				    cursor: pointer;
+				    background-color: white;
+				    display: inline-block;
+				    margin-left: 5px;
+				    width: 20px;
+				    text-align: center;
+				    position: relative;
+				}
+				.time-entry-period-header-btn .fa {
+				    font-size: 18px;
+				    color: #6f6f6f;
+				}
+				.time-entry-period-header-btn.new-time-entry-btn i.fa-clock-o {
+				    -webkit-transform: rotate(-45deg) scale(-1, 1);
+				    -ms-transform: rotate(-45deg) scale(-1, 1);
+				    transform: rotate(-45deg) scale(-1, 1);
+				}
+				.time-entry-period-header-btn i.fa-plus-square {
+				    position: absolute;
+				    right: 3px;
+				    bottom: 3px;
+				    font-size: 11px;
+				    background-color: white;
+				}
+				#header-container {
+					display: table;
+				    border-bottom: 1px solid #ddd;
+	    			border-top: 1px solid #ddd;
+				    border-top-left-radius: 2px;
+				    border-top-right-radius: 2px;
+				}
+				.time-entry-period-body {
+				    padding: 8px;
+				    min-height: 345px;
+			    }
+			    #body-container { 
+				    display: table;
+				    border-bottom: 1px solid #ddd;
+				    border-bottom-right-radius: 2px;
+				    border-bottom-left-radius: 2px;			    
+				}
+				.time-entry-period {
+				    border-right: 1px solid #ddd;
+				}			
+				.time-entry-period-units {
+				    display: table-cell;
+				    width: 50%;
+				}
+				.time-entry-period-expenses {
+				    display: table-cell;
+				    width: 50%;
+				    text-align: right;
+				}
+				.time-entry-period-summary {
+				    display: table;
+				    width: 100%;
+				    margin-bottom: 4px;
+				}			
+				.time-entry-period-summary .unit-amt {
+					font-size: 16px;
+				    font-weight: bold;
+			        display: inline-block;
+				}
+				.entry-card.Approved {
+				    border: 1px solid #d1edc5;
+	 			    background-color: #e5f3ed;
+	 			    color: #008852;
+				}
+				.entry-card.Approved .entry-card-header {
+				    border-bottom: 1px solid #d1edc5;
+				}
+				.status-pill.Approved {
+				    color: white;
+				    background-color: #008852;
+				}
+				.entry-card.AutoActualised .entry-card-body .status-pill {
+				    color: white;
+				    background-color: #008852;
+				}				
+				.entry-card.Draft {
+				    border: 1px solid #dddddd;
+				    background-color: white;
+				    color: #949599;
+				}
+				.entry-card.Draft .entry-card-header {
+				    border-bottom: 1px solid #dddddd;
+				}
+				.entry-card.Draft .entry-card-body {
+				    background-color: white;
+				}
+				.status-pill.Draft {
+				    color: white;
+				    background-color: #949599;
+				}
+				.entry-card.ReadyForApproval {
+			        border: 1px solid #dddddd;
+				    background-color: #e7e7e8;
+				    color: #404041;
+				}			
+				.entry-card.ReadyForApproval .entry-card-header {
+			        border-bottom: 1px solid #dddddd;
+				}
+				.status-pill.ReadyForApproval {
+				    color: white;
+				    background-color: #404041;
+				}
+				.entry-card.ForecastDraft {
+				    border: 1px solid #dddddd;
+				    background-color: #e7e7e8;
+				    color: #404041;
+				}			
+				.entry-card.ForecastDraft .entry-card-header {
+				    border-bottom: 1px solid #dddddd;
+				}
+				.status-pill.ForecastDraft {
+				    color: white;
+				    background-color: #404041;
+				}
+				.entry-card.Rejected {
+			        border: 1px solid #e4b8ba;
+				    background-color: #F6E4DE;
+				    color: #B42D34;
+				}			
+				.entry-card.Rejected .entry-card-header {
+				    border-bottom: 1px solid #e4b8ba;
+				}
+				.entry-card.Rejected .entry-card-body {
+				    background-color: white;
+				}
+				.status-pill.Rejected {
+				    color: white;
+				    background-color: #B42D34;
+				}
+				.entry-card.Forecast {
+				    border: 1px solid #dddddd;
+				    background-color: #ecf3f9;
+				    color: #729BC7;
+				}
+				.entry-card.Forecast .entry-card-header {
+				    border-bottom: 1px solid #dddddd;
+				}
+				.entry-card.Forecast .entry-card-body {
+				    background-color: white;
+				}			
+				.status-pill.Forecast {
+				    color: white;
+				    background-color: #729bc7;
+				}
+				.entry-card.Draft .entry-card-body,
+				.entry-card.Draft .entry-card-actions,
+				.entry-card.Rejected .entry-card-body,
+				.entry-card.Rejected .entry-card-actions,
+				.entry-card.Forecast .entry-card-body,
+				.entry-card.Forecast .entry-card-actions {
+				    background-color: white;
+				}
+				
+				.entry-card {
+				    border-radius: 4px;
+				    border-collapse: collapse;
+				    margin-bottom: 6px;
+				    position: relative;
+				}
+				.entry-card-body {
+				    padding: 8px;
+				    border-bottom-right-radius: 4px;
+				    border-bottom-left-radius: 4px;
+					min-height: 46px;
+				}
+				.entry-card-header {
+					display: table;
+					height: 33px;
+					width: 100%;
+	   			}
+				.entry-card-icon {
+				    display: table-cell;
+				    padding: 6px;
+				    position: relative;
+				}
+				.entry-card-units {
+				    display: table-cell;
+				    width: 100%;
+				    text-align: right;
+				    padding-right: 10px;
+				    font-size: 19px;
+				    vertical-align: middle;
+				    font-weight: bold;
+				}
+				#body-container.with-menu .entry-card-units {
+				    padding-right: 6px;
+    				font-size: 16px;
+				}
+				#body-container.with-menu .status-pill {
+					font-size: 7px;
+				}
+				.entry-card-icon img {
+				    width: 22px;
+				}
+				.faicon-placeholder {
+				    width: 22px;
+				}
+				.entry-card-icon .te-icon {
+				    position: absolute;
+				}
+				.entry-card-icon .te-icon.fa-lightbulb-o {
+					left: 8px;
+					font-size: 28px;
+					top: 2px;
+				}
+				.entry-card-icon .te-icon.fa-calendar-plus-o {
+				    left: 6px;
+				    font-size: 22px;
+				    top: 4px;
+				}
+				.entry-card-icon .te-icon.fa-calendar-check-o {
+				    left: 6px;
+				    font-size: 22px;
+				    top: 4px;
+				}
+				.entry-card-icon .te-icon.fa-thumb-tack {
+					left: 9px;
+				    font-size: 22px;
+				    top: 5px;
+				}
+				.entry-card-body .activity-name {
+				    font-size: 11px !important;
+				    font-weight: bold;
+				    padding-bottom: 4px !important;
+				    display: block;
+				}
+				.entry-card-body .role-name,
+				.entry-card-body .task-name,
+				.entry-card-body .reference-val,
+				.entry-card-body .category-name,
+				.entry-card-body .case-val,
+				.entry-card-body .expense-units {
+			       	font-size: 11px !important;
+				    margin-top: 2px !important;
+				    font-weight: normal;
+				    display: block;
+				}
+				.entry-card.openable:hover,
+				.entry-card.openable:hover .entry-card-body,
+				.entry-card.openable:hover .entry-card-actions,
+				.entry-card.ActualisableForecast:hover,
+				.entry-card.ActualisableForecast:hover .entry-card-body,
+				.entry-card.ActualisableForecast:hover .entry-card-actions,
+				.entry-card.EditForecast:hover,
+				.entry-card.EditForecast:hover .entry-card-body,
+				.entry-card.EditForecast:hover .entry-card-actions {
+				    background-color: #e7f4f8;
+				}
+				.entry-card.openable,
+				.entry-card.ActualisableForecast,
+				.entry-card.EditForecast {
+				    cursor: pointer;
+				}
+				.entry-card-actions {
+				    margin-top: 10px;
+				}
+				.entry-card-actions.with-actions {
+				    height: 20px;
+				}
+				.entry-card-actions {
+				    text-align: right;
+				    position: relative;
+				}
+				.time-entry-period-details {
+				    display: table;
+				    width: 100%;
+				}			
+				.delete-forecast-time-ind {
+				    position: absolute;
+				    font-size: 18px;
+				    top: 2px;
+				    cursor: pointer;
+				}
+				.delete-time-ind {
+				    position: absolute;
+				    font-size: 18px;
+				    top: 2px;
+				    cursor: pointer;
+				}
+				.delete-forecast-time-ind:hover,
+				.delete-time-ind:hover {
+				    color: red;
+				}
+				label.action-item.delete-item, 
+				.actualise-time label,
+				.actualise-time input,
+				.select-time label,
+				.select-time input {
+				    cursor: pointer;
+				}
+				.entry-card-status {
+				    display: table-cell;
+				    vertical-align: middle;
+				    text-align: center;
+				}
+				.status-pill {
+				    font-size: 8px;
+				    padding: 4px;
+				    border-radius: 2px;
+				    display: inline-block;
+				    border: none !important;			    
+				}
+				.entry-card-actions .actualise-time label {
+				    font-size: 11px;
+				}
+				.entry-card-actions .select-time label {
+				    font-size: 11px;
+				}
+				.expense-amt {
+				    font-size: 14px;
+				    font-weight: bold;
+				    text-align: right;
+				    margin-top: 4px;
+				}
+				.expense-entry-card .entry-card-status {
+				    width: 100%;
+				    text-align: left;
+				}
+				.expense-entry-seperator {
+				    border: 1px solid #ededed;
+				    margin: 10px 25px 10px 25px;
+				}
+				.attachment-ind {
+				    position: absolute;
+				    top: -21px;
+				}				
+				.no-text-select {
+				  -webkit-touch-callout: none; /* iOS Safari */
+				    -webkit-user-select: none; /* Safari */
+				     -khtml-user-select: none; /* Konqueror HTML */
+				       -moz-user-select: none; /* Firefox */
+				        -ms-user-select: none; /* Internet Explorer/Edge */
+				            user-select: none; /* Non-prefixed version, currently
+				                                  supported by Chrome and Opera */
+				}
+				.entry-card.selected {
+				    border: 2px solid #1a9eff !important;
+				}
+				.entry-card.selecting:not(.selected) {
+				    border: 1px dashed #1a9eff !important;
+				}
+				.entry-card.not-selecting {
+				    opacity:0.4;
+				}
+				.entry-card.not-selecting:hover {
+				    cursor:not-allowed;
+				}
+				.entry-card-additional-status {
+				    margin-top: 8px;
+				}
+				.time-entry-item-warnings span {
+				    display: inline-block;
+				    padding-right: 8px;
+				}
+				.total-unit-type {
+				    display: inline-block;
+				}
+				.total-units {
+				    font-size: 20px;
+				    font-weight: bold;
+				    display: inline-block;
+				    color: #5E5E5E;
+				    vertical-align: baseline;
+				}
+				.hidden-period-total,
+				.hidden-day-total {
+					display: none;
+				}
+				/* Toolbar */
+				div#period-totals {
+				    width: 290px;
+				    text-align: center;
+				}
+				div#nav-bar {
+				    width: 165px;
+				}
+				div#nav-bar.with-timer {
+					width: 214px;
+				}
+				div#action-buttons {
+				    text-align: right;
+				}
+				.toolbar-container {
+					display: table;
+		  			background-color: #f8f8f8;
+					padding: 6px;
+					margin-bottom: 5px;
+					width: 100%;
+				    border-bottom: 1px solid #ccc;
+				}
+				div#previous-period {
+				    margin-right: 5px;
+				}
+				a.period-summary-btn {
+				    margin-right: 5px;
+				}
+				div.print-btn,
+				div.start-timer-btn,
+				div.stop-timer-btn {
+					margin-left: 15px;
+				}
+				div.stop-timer-btn {
+					color: #F44336;
+				}
+				div.toolbar-button {
+					display: inline-block;
+					padding: 6px 10px 6px 10px;
+		 			background-color: white;
+					border: 1px solid #ccc;
+					border-radius: 2px;
+					cursor: pointer;
+				}
+				div.toolbar-button.active {
+					text-decoration: none;
+					color: white;
+					background-color: #1A9EFF;
+				}
+				div.toolbar-button:not(.active):hover {
+				    background-color: #f4f6f9;
+				}
+				div.toolbar-button.bigger-btn .fa {
+					font-size: 18px;
+					width: 20px;
+		     		text-align: center;
+				}		
+				div.toolbar-button.bigger-btn{
+		    		padding: 6px;
+				}
+				#view-controls .toolbar-button .fa {
+				    margin-right: 7px;
+				    vertical-align: middle;
+				    font-size: 16px;
+				}
+				.toolbar {
+				    display: table;
+				    width: 100%;
+				}
+				.control-cell {
+				    display: table-cell;
+				    vertical-align: middle;
+				    position: relative;
+				}
+				div#toolbar-container {
+				    margin-bottom: 6px;
+			        max-width: 1310px;
+				}
+				div#view-controls {
+				    text-align: right;
+				    padding-right: 30px;
+				    width: 230px;
+				}
+				.hover-btn:hover .fa {
+					color: green !important;
+				}	
+				div#submit-controls {
+				    text-align: right;
+				    padding-right: 20px;
+				}
+				.bPageFooter {
+				    display: none;
+				}
+				/* Mutton */
+				.hover-mutton {
+				  display: inline-block;
+				  position: relative;
+				}
+				.dd-btn {
+					display: inline-block;
+					border: 1px solid gray;
+					border-radius: 4px;
+					padding: 10px 30px 10px 20px;
+					background-color: #ffffff;
+					cursor: pointer;
+					white-space: nowrap;
+					padding-right: 36px !important;
+				}
+				.dd-btn:after {
+				  content: '';
+				  position: absolute;
+				  top: 50%;
+				  right: 15px;
+				  transform: translateY(-50%);
+				  width: 0; 
+				  height: 0; 
+				  border-left: 5px solid transparent;
+				  border-right: 5px solid transparent;
+				  border-top: 5px solid black;
+				}
+				.dd-btn:hover {
+				  background-color: #f4f6f9;
+				}
+				.dd-menu {
+				  position: absolute;
+				  top: 23px;
+				  left: 0px;
+				  border: 1px solid #ccc;
+				  border-radius: 4px;
+				  padding: 0;
+				  margin: 2px 0 0 0;
+				  box-shadow: 0 0 6px 0 rgba(0,0,0,0.1);
+				  background-color: #ffffff;
+				  list-style-type: none;
+				  text-align: left;
+				  z-index: 99;
+				}
+				.dd-menu li.disabled {
+				    color: lightgray;
+			        cursor: default;
+				}
+				.dd-btn > .dd-menu {
+				  display: none;
+				} 
+				.dd-btn:hover > .dd-menu {
+				  display: block;
+				} 
+				.dd-menu li {
+				  padding: 10px 20px;
+				  cursor: pointer;
+				  white-space: nowrap;
+				  margin-left: 0px;
+				}
+				.dd-menu li:hover {
+				  background-color: #f4f6f9;
+				}
+				.dd-menu li a {
+				  display: block;
+				  margin: -10px -20px;
+				  padding: 10px 20px;
+				}
+				.cancel-select-btn .fa {
+				    padding-left: 12px;
+				}
+				.cancel-select-btn {
+				    background-color: #1a9eff !important;
+				    color: white;
+				}				
+				#fixed-header {
+                   background-color: white;
+                   position: fixed;
+                   top: 0px;
+                   z-index: 99;
+             	}
+				i.t-tip-setting {
+				    font-size: 18px;
+				    margin-left: 4px;
+				    margin-right: 3px;
+				    cursor: pointer;
+				}
+				.show-hide-btn {
+					color: black;
+					cursor: pointer;
+					text-decoration: none !important;
+					font-size: 13px;
+				}
+				.t-tip-qtip {
+					background-color: lemonchiffon;
+					padding: 2px;
+					font-size: 12px;
+				}				
+				#fixed-header .period-summary-container {top:40px;}
+             	#fixed-header-container .period-summary-container {top:90px;}
+             	/* Timers */
+             	.te-timer .timer-item,
+             	.te-timer-copy .timer-item {
+					font-size: 18px;
+				}
+				.te-timer:not(.active) .start-timer {
+				    color: #4CAF50
+				}
+				.te-timer-copy.active .stop-timer,
+				.te-timer.active .stop-timer {
+				    color: #F44336
+				}
+				.te-timer {
+				    text-align: right;
+				    padding: 2px 0px;
+				}
+				.te-timer span.ticker,
+				.te-timer-copy span.ticker-copy {
+				    margin-right: 6px;
+				    font-family: monospace;
+				    display: inline-block;
+				    vertical-align: top;
+				}
+				.te-timer span.ticker {
+				    font-size: 12px;
+				    padding-top: 2px;
+				}
+				#body-container.with-menu .te-timer span.ticker {
+				    font-size: 10px;
+				    padding-top: 3px;
+					margin-right: 2px;
+				}
+				.te-timer-copy {
+				    text-align: left;
+				    padding: unset;
+				}
+				.te-timer-copy span.ticker-copy {
+				    text-align: left;
+				    font-size: 14px;
+				}
+				.te-timer-copy .stop-timer {
+				    cursor: pointer;
+				}
+				.expense-claim-link {
+					text-decoration: underline;
+				    cursor: pointer;
+				}
+			/* Enhanced View END */
+			</apex:outputPanel>
+			<apex:outputPanel layout="none" rendered="{!EnhancedView && !ISBLANK($CurrentPage.parameters.id)}">
+				.time-entry-period {
+				    min-width: 155px !important;
+				    max-width: 155px !important;
+				}
+			</apex:outputPanel>
+			
+			<apex:outputPanel layout="none" rendered="{!EnhancedView && IsMonthView}">
+			div#body-container {
+			    border: 1px solid #ddd;
+			}			
+			.week-wrapper {
+			    display: table-row;
+			}
+			.PaddingDay {
+			    display: table-cell;
+		        border-bottom: 1px solid #ddd;
+			}
+			.PaddingDay.last-padding {
+			    border-right: 1px solid #dddddd;
+			}
+			.time-entry-period-body {
+			    min-height: 75px;
+			}
+			.time-entry-period {
+			    border-bottom: 1px solid #ddd;
+			}
+			</apex:outputPanel>
+			<apex:outputPanel layout="none" rendered="{!EnhancedView && !IsMonthView}">
+			.time-entry-period.first-period {
+			    border-left: 1px solid #ddd;
+			}
+			</apex:outputPanel>
+			
+			div#timesheet-errors {
+			    display: inline-block;
+			    width: 800px;
+			    margin-bottom: 5px;
+			}
+			div#timesheet-errors .message {
+			    margin-left: 0px;
+			}
+			
+			/*make select2 dropdown look like other dropdowns*/
+			a.select2-choice {
+			    height: 18px !important;
+			    line-height: 18px !important;
+			    background-image: none !important;
+			    border-radius: 0px !important;
+			    color: black !important;
+			    padding-left: 4px !important;
+			}
+			.select2-choice div {
+			    border-left: none !important;
+			}			
+			.ui-state-default
+			{
+				background-color: #AAA;
+				background-image: none;
+			}
+.Day{
+	height:200px;
+}
+.Hour{
+	height:25px
+}
+.TimeEntryPeriodContainer.NonBusDay {
+	background-color: lightgrey;
+	width: 132px;
+}
+
+.TimeEntryPeriodContainer.BusDay {
+	width: 160px;
+}
+
+div.TimeEntryPeriodContainer {
+	margin-right: 3px;
+	margin-bottom: 25px;
+	margin-top: 0px;
+	margin-left: 1px;
+	display:inline-block;
+	font-size: 0.75em;
+	-moz-box-shadow: rgba(0, 0, 0, 0.2) 0px 3px 7px -1px;
+	-webkit-box-shadow: rgba(0, 0, 0, 0.2) 0px 3px 7px -1px;
+	box-shadow: rgba(0, 0, 0, 0.2) 0px 3px 7px -1px;
+	white-space:normal;
+}
+
+div.TimeEntryPeriodHeader {
+	padding: 2px 0px 2px 2px;
+	position: relative;
+	height: 28px;
+	background-color: #5E5E5E;
+	color: #FFF;
+	*margin-top:1px; /* notice the * before the property - shows in IE7 and below */
+}
+
+div.TimeEntryPeriodHeaderLabel {
+	display: inline-block;
+	text-align: left;
+	font-weight: bold;
+	font-size: 14px;
+	vertical-align: top;
+	padding-left: 5px;
+	padding-top: 5px;
+	white-space: nowrap;
+	width: 84px;
+	overflow: hidden;
+}
+
+div.TimeEntryPeriodHeaderIconsRight {
+	display: inline-block;
+	position: absolute;
+	right: 2px;
+}
+
+div.TimeEntryPeriodFooter {
+	text-align: center;
+	font-weight: bold;
+	padding: 5px 5px 5px 5px;
+	position:relative;
+}
+
+div.TimeEntryPeriodBody {
+	
+}
+
+div.TimeEntryContainer {
+	margin: 0px 0px 2px 0px;
+	overflow: hidden;
+	
+}
+
+div.TimeEntryBody {
+	padding: 5px 5px 5px 5px;
+	<apex:outputText value="height: 200px;" rendered="{!HasExpenses}"/>
+	<apex:outputText value="height: 320px;" rendered="{!!HasExpenses}"/>
+/* 	border-bottom: dotted 1px black; */
+	overflow: auto;
+}
+
+div.ExpenseEntryBody {
+	padding: 5px 5px 5px 5px;
+	height: 128px;
+	overflow: auto;
+}
+div.expenseEntrySeperator {
+	border:1px solid #ededed;
+	margin-left:25px;
+	margin-right:25px;
+	margin-bottom:10px;
+}
+
+div.time-entry-item {
+	background-image: none;
+	font-weight: bold;
+}
+div.Icon{
+	background-size:20px 20px;
+	background-repeat:no-repeat;
+	height:20px;
+}
+div.time-entry-item.Draft{
+	border: 2px dotted #949599;
+	color: #949599;
+	
+	background-image: none;
+	background-color:none;
+}
+div.time-entry-item.Forecast{
+	border: 2px dotted #729BC7;
+	color: #729BC7   ;
+	background-image: none;
+	background-color:none;
+	font-weight: bold;
+}
+div.ActualisableForecast, div.EditForecast {
+    cursor: pointer;
+}
+div.time-entry-item.ForecastDraft{
+    font-weight: bold;
+    background-color: #E7E7E8;
+    color: #0F0F0F;
+}
+div.Icon.ForecastDraft{
+	background-image: url("{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Forecast_Draft.png')}");
+}
+div.Icon.Forecast{
+	background-image: url("{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Forecast.png')}");
+}
+div.Icon.Draft{
+	background-image: url("{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Time_Draft.png')}");
+	/*
+	filter: progid:DXImageTransform.Microsoft.AlphaImageLoader(src='{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Time_Draft.png')}',sizingMethod='scale');
+	-ms-filter: "progid:DXImageTransform.Microsoft.AlphaImageLoader(src='{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Time_Draft.png')}',sizingMethod='scale')";
+	*/
+}
+div.time-entry-item.TimeEntry:hover,
+div.time-entry-item.Forecast.ActualisableForecast:hover,
+div.time-entry-item.Forecast.EditForecast:hover {
+    background-color: #e7f4f8;
+}
+div.ExpenseEntry {
+	font-weight: bold;
+	font-size: 0.95em;
+	cursor: hand;
+	padding-left: 30px;
+	background-repeat: no-repeat;
+	background-position: top left;
+	background-size: 20px 20px;
+	background-position-x: 6px;
+	background-position-y: 4px;
+	
+}
+
+.ExpenseApproved {
+	background-image: url("{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Expense_Approved.png')}");
+	border: 0px;
+	background-color: #DFEEE6;
+	color:#008852;
+}
+.ExpenseRejected {
+	background-image: url("{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Expense_Rejected.png')}");
+	border: 0px;
+	background-color: #F5E2DC;
+	color:#B53038;
+}
+.ExpenseDraft {
+	background-image: url("{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Expense_Draft.png')}");
+	border: 2px dotted #949599;
+	background-color: transparent;
+	color: #949599   ;
+}
+.ExpenseUnapproved {
+	background-image: url("{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Expense_Draft.png')}");
+	border: 2px dotted #949599;
+	background-color: transparent;
+	color: #949599   ;
+}
+.ExpenseReadyForApproval {
+	background-image: url("{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Expense_Submitted.png')}");
+	border: 0px;
+	background-color: #F3F3F4;
+}
+
+div.time-entry-item.Rejected {
+	background-color: #F6E4DE;
+	color:#B42D34;
+}
+
+div.time-entry-item.ReadyForApproval {
+	background-color: #E7E7E8;
+	color: #0F0F0F;
+}
+div.Icon.ReadyForApproval{
+	background-image: url("{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Time_Submitted.png')}");
+}
+
+div.time-entry-item.RejectedForecast {
+	background-color: #FEF1EC;
+	border: 1px solid #CD0A0A;
+	color: #CD0A0A;
+}
+
+div.time-entry-item.Approved {
+	background-color: #DFEEE6;
+	color: #008852;
+}
+div.Icon.Approved{
+	background-image: url("{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Time_Approved.png')}");
+}
+div.Icon.Rejected{
+	background-image: url("{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Time_Rejected.png')}");
+}
+
+div.time-entry-item.ReadyForApprovalForecast {
+	background-color: #FF6F00;
+	border: 1px solid #000000;
+}
+
+div.time-entry-item.ApprovedForecast {
+	background-color: #F99CF9;
+	border: 1px solid #F99CF9;
+}
+
+div.RedOutlined {
+	border: 1px solid red;
+}
+
+.heading {
+	width: 630px;
+	/*float: left*/
+}
+#TimesheetHeader{
+	/*padding-bottom: 4px; 
+	vertical-align: middle; 
+	background-color: #FFFFFF;
+	width:1100px;
+	height:30px;*/
+}
+#TimesheetBody{
+margin-left:auto;
+margin-right:auto;
+
+}
+#TimesheetLoading
+{
+margin-left:auto;
+margin-right:auto;
+width:1100px;
+}
+#LoadingText
+{
+	padding:30% 50% 60% 30%;
+	font-size: large;
+}
+#TimesheetFooter{
+text-align:center;
+height:20px;
+}
+.AdditionalLoadingText{
+	font-size: small;
+}
+
+.ui-datepicker-trigger {
+	cursor: pointer;
+}
+
+.headerActionIcon {
+	background-position: 0px 0px;
+	height: 29px;
+	width: 29px;
+	background-repeat: no-repeat;
+	display: inline-block;
+	cursor: pointer;
+}
+
+.headerActionIcon:hover {
+	background-position: -0px -29px;
+}
+
+.expenseClaimEditIcon {
+	background-image: url({!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Expense_New_BtnSqNoShdw.png')});
+}
+
+.newForecastTimeEntryIcon {
+	background-image: url({!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Forecast_New_BtnSqNoShdw.png')});
+}
+
+.newTimeEntryIcon {
+	background-image: url({!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Time_New_BtnSqNoShdw.png')});
+}
+/*********** CALENDAR / GRID MODE*****************/
+.timesheet-view-toggle>span
+{
+	-webkit-background-clip: border-box;
+	-webkit-background-origin: padding-box;
+	-webkit-background-size: auto;
+	background-attachment: scroll;
+	background-clip: border-box;
+	background-color: rgb(232, 232, 233);
+	background-image: url(/img/alohaSkin/togglePill_bg.png);
+	background-origin: padding-box;
+	background-size: auto;
+	display: inline-block;
+	padding-bottom: 2px;
+	padding-left: 2px;
+	padding-right: 5px;
+	padding-top: 2px;
+	border-top-color: rgb(181, 181, 181);
+	border-top-style: solid;
+	border-top-width: 1px;
+	border-bottom-color: rgb(181, 181, 181);
+	border-bottom-style: solid;
+	border-bottom-width: 1px;
+	border-collapse: separate;
+	
+	display: inline-block;
+}
+.timesheet-view-toggle span.right
+{
+	
+	border-right-color: rgb(181, 181, 181);
+	border-right-style: solid;
+	border-right-width: 1px;		
+	border-bottom-right-radius: 3px;
+	border-top-right-radius: 3px;		
+}
+.timesheet-view-toggle span.left
+{				
+	border-left-color: rgb(181, 181, 181);
+	border-left-style: solid;
+	border-left-width: 1px;		
+	border-bottom-left-radius: 3px;
+	border-top-left-radius: 3px;
+	border-right-style: solid;
+	border-right-width: 1px;
+	border-right-color: rgb(181,181,181);		
+}
+.timesheet-view-toggle span.selected
+{
+	background-color: rgb(232, 232, 233);
+	background-image: url(/img/alohaSkin/togglePill_bg.png);
+	background-position: 0% -120px;
+	background-size: auto;
+}
+.timesheet-view-toggle span a.toggleLink
+{
+	display: inline-block;				
+}
+.timesheet-view-toggle span a.toggleLink .toggleIcon
+{
+	display: block;
+	float: left;
+	height: 16px;
+	margin-left: 6px;
+	padding-right: 5px;
+	width:18px;
+}
+
+.timesheet-view-toggle span a.toggleLink .linkText
+{
+	float: left;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 11px;
+	font-weight: bold;
+	height: 14px;
+	margin-top: 1px;
+	padding-right: 5px;
+	color:#333;
+	white-space: nowrap;
+}
+.timesheet-view-toggle span.selected a.toggleLink .linkText
+{
+	color: rgb(255, 255, 255);
+}
+.kimbleTimePicker {
+    width: 75px;
+}
+.submission-errors-ind {
+	display: none;
+    padding-bottom: 5px;
+    padding-right: 6px;
+}
+.time-has-errors {
+    border-color: #ffb000 !important;
+}
+div.TimeEntry {
+    cursor: pointer;
+}
+.message .messageText a {
+    margin: initial;
+    font-size: inherit;
+}
+
+
+
+#TimesheetBody .time-entry-item {
+	border-radius: 6px;
+}
+#TimesheetBody .time-entry-details,
+#TimesheetBody .expense-entry-details {
+	padding:7px 7px 20px 29px;
+	position: relative;
+}
+#TimesheetBody span.role-name,
+#TimesheetBody span.category-name,
+#TimesheetBody span.task-name {
+    display: block;
+    margin-top: 2px;
+    font-weight: normal;
+    font-size: 1.1em;    
+}
+#TimesheetBody div.actualise-time {
+	position: absolute;
+	bottom: 1px;
+	right: 1px;
+	padding: 2px;
+	cursor: pointer;
+}
+#TimesheetBody div.actualise-time:hover {
+	color: #005fb2;
+}
+#TimesheetBody .actualise-time label,
+#TimesheetBody .actualise-time input {
+    cursor: pointer;
+}
+/*#TimesheetBody .TimeEntryPeriodContainer {
+	font-family: Lucida Grande,Lucida Sans,Arial,sans-serif;
+}*/
+#TimesheetBody .entry-icon {
+	left: 5px;
+	width: 20px;
+	height: 20px;
+	position: absolute;
+}
+#TimesheetBody span.activity-name {
+    font-size: 1.1em;
+}
+#TimesheetBody .time-entry-units {
+	margin-top:4px;
+    margin-bottom: 4px;
+}
+#TimesheetBody .formatted-units {
+	font-size: 1.3em;
+}
+#TimesheetBody .unit-type {
+	margin-top: 2px;
+	margin-left: 2px;
+}
+#TimesheetBody .expense-entry-units {
+	margin-top:2px;
+}
+#TimesheetBody .time-entry-item-warnings {
+	position: absolute;
+	top: 28px;
+	left: 4px;
+}
+#TimesheetBody .delete-forecast-time-ind {
+    position: absolute;
+    bottom: 5px;
+    left: 7px;
+}
+#TimesheetBody .time-entry-footer {
+	position: absolute;
+    left: 0px;
+    right: 0px;
+    bottom: 0px;
+	height: 25px;
+	cursor: initial;
+}
+#TimesheetBody .time-entry-actions {
+	position: relative;
+	height: 25px;
+}
+#TimesheetBody .action-item {
+	font-size: 18px;
+	cursor:pointer;
+}
+#TimesheetBody .action-item.delete-item {
+	color: darkgray;
+}
+#TimesheetBody .action-item.delete-item:hover {
+	color: red;
+}
+input.entry-units, input.hours-and-mins {
+    width: 80px;
+}
+.quick-inputs {
+	position: absolute;
+    top: 3px;
+    left: 100px;
+    font-size: 11px;
+ }
+.quick-inputs div {
+	display: inline-block;
+    padding-right: 14px;
+    cursor: pointer;
+}
+.lookupHoverDetail {
+    z-index: 9999;
+}
+.select2-container[id$="asyncActivitySelect"] {
+    width: 287px !important;
+}
+.expense-claim-link {
+    text-decoration: underline;
+    cursor: pointer;
+}
+<apex:outputPanel layout="none" rendered="{!!EnhancedView && IsMonthView}">
+<!-- Monthly tracking period overrides -->
+[id$="TimeSheet"]>div {
+    white-space: normal !important;
+}
+
+div.TimeEntryPeriodFooter {
+    display: none;
+}
+
+.entryHeight {
+    height: 70px !important;
+}
+
+div.TimeEntryBody {
+    height: 90px;
+}
+
+div.TimeEntryPeriodContainer {
+    margin-bottom: 12px;
+}
+div.PaddingDay {
+    display: inline-block;
+    width: 160px;
+    margin-right: 3px;
+    margin-left: 1px;
+}
+</apex:outputPanel>
+</style>
+			
+			<div id="ContentBody">
+				<apex:outputPanel layout="none" id="timesheet-errors">
+					<apex:pageMessages id="timesheet-error" escape="false"/>
+					<apex:pageMessage summary="{!$Label.kimbleone__expenseitemsexpiringsoonheader}" severity="warning" strength="2" rendered="{!ClaimsSoonToExpire.size > 0}">
+						<ul style=" margin:0px ;padding:0">
+							<apex:repeat value="{!ClaimsSoonToExpire}" var="claim">
+							<li>
+								<apex:outputLink value="/{!claim.Id}"><apex:outputText value="{!claim.Name}"/></apex:outputLink>
+							</li>
+							</apex:repeat>
+						</ul>
+					</apex:pageMessage>
+					<apex:pageMessage summary="{!$Label.kimbleone__expenseitemsexpiredheader}" severity="error" strength="2" rendered="{!ClaimsExpired.size > 0}">
+						<ul style=" margin:0px ;padding:0">
+							<apex:repeat value="{!ClaimsExpired}" var="claim">
+							<li>
+								<apex:outputLink value="/{!claim.Id}"><apex:outputText value="{!claim.Name}"/></apex:outputLink>
+							</li>
+							</apex:repeat>
+						</ul>
+					</apex:pageMessage>
+				</apex:outputPanel>
+			
+				<apex:outputPanel layout="none" rendered="{!EnhancedView}">		
+				<div id="fixed-header" style="visibility:hidden; padding-top:4px;margin-bottom: 2px;"></div>
+				<div id="fixed-header-container">
+					<div id="toolbar-container">
+						<div class="toolbar">
+							<div id="nav-bar" class="control-cell no-select {!IF(CanAddEditTimeAndExpenseEntries && (CanStartTimer || HasActiveTimer) && $ObjectType.TimeEntry__c.createable, 'with-timer', '')}">
+								<apex:outputLink value="javascript:void(0);" onclick="GoPreviousPeriod()" title="{!$Label.kimbleone__previousperiod}"><div id="previous-period" class="toolbar-button bigger-btn"><i class="fa fa-angle-double-left"></i></div></apex:outputLink>
+								<apex:outputLink styleClass="period-summary-btn" value="javascript:void(0);" onclick="getPeriodSummary()" title="{!$Label.kimbleone__timeentrysummary}"><div id="period-summary" class="toolbar-button bigger-btn" t-tip="TESummary"><i class="fa fa-circle-o-notch fa-spin period-summary-working-ind"></i><i class="fa fa-calendar period-summary-ind"></i></div></apex:outputLink>
+								<apex:outputLink value="javascript:void(0);" onclick="GoNextPeriod()" title="{!$Label.kimbleone__nextperiod}"><div id="next-period" class="toolbar-button bigger-btn"><i class="fa fa-angle-double-right"></i></div></apex:outputLink>
+								
+								<apex:outputLink value="javascript:void(0);" onclick="window.open('{!$Page.KimbleOne__TimesheetPrint}?periodId={!TheResourceTrackingPeriod.Id}{!If($CurrentPage.parameters.id!=null,'&id='+$CurrentPage.parameters.id,'')}', '_printview');" title="{!$Label.kimbleone__print}"><div class="print-btn toolbar-button bigger-btn"><i class="fa fa-print"></i></div></apex:outputLink>
+
+								<apex:outputLink value="javascript:void(0);" styleClass="hidden-item" onclick="initialiseModalBoxy('#AddEntryPopup', '{!$Label.kimbleone__starttimerlabel}');newEntry('{!JSENCODE(TodayPeriodId)}', 'start');" title="{!$Label.kimbleone__starttimerlabel}" rendered="{!CanAddEditTimeAndExpenseEntries && CanStartTimer && $ObjectType.KimbleOne__TimeEntry__c.createable}" ><div class="start-timer-btn toolbar-button bigger-btn" t-tip="TETimerStart"><i class="fa fa-play-circle"></i></div></apex:outputLink>
+								<apex:outputLink value="javascript:void(0);" styleClass="hidden-item" onclick="stopActiveTimer();" title="{!$Label.kimbleone__stoptimerlabel}" rendered="{!CanAddEditTimeAndExpenseEntries && HasActiveTimer && $ObjectType.KimbleOne__TimeEntry__c.createable}"><div class="stop-timer-btn toolbar-button bigger-btn" t-tip="TETimerStop"><i class="fa fa-stop-circle"></i></div></apex:outputLink>
+							</div>
+							<div id="action-buttons" class="control-cell no-select">
+								<apex:outputPanel layout="none" rendered="{!CanAddEditTimeAndExpenseEntries && $ObjectType.KimbleOne__Timesheet__c.createable && SubmitEnabled}">
+								<div class="cancel-select-btn hidden-item toolbar-button">{!JSENCODE($Label.Cancel)}<i class="fa fa-times"></i></div>
+								<label class="hover-mutton select-btn">
+									<div class="dd-btn toolbar-button" t-tip="TESelectDropdown">{!JSENCODE($Label.SelectModeLabel)}
+										<ul class="dd-menu">
+											<li id="select-all" class="disabled" t-tip-right="SelectAll">{!JSENCODE($Label.All)}</li>
+											<li id="select-draft" class="disabled" t-tip-right="SelectAllDraft">{!JSENCODE($Label.SelectAllDraft)}</li>
+											<li id="select-items" class="disabled" t-tip-right="SelectIndividual">{!JSENCODE($Label.SelectIndividualTimeEntries)}</li>
+										</ul>
+									</div>
+								</label>
+								<div class="actualise-btn hidden-item toolbar-button" t-tip="TECreateDraftButton">{!JSENCODE($Label.EnhancedTimesheetConvertToActualButton)}</div>
+								<label class="hover-mutton">
+									<div class="dd-btn toolbar-button" t-tip="TESubmitDropdown">{!JSENCODE($Label.Submit)}
+										<ul class="dd-menu">
+											<li id="submit-all" class="disabled" t-tip-right="SubmitAll">{!JSENCODE($Label.SubmitAllTimeEntries)}</li>
+											<li id="submit-items" class="disabled" t-tip-right="SubmitSelected">{!JSENCODE($Label.SubmitSelectedTimeEntries)}</li>
+										</ul>
+									</div>
+								</label>
+								</apex:outputPanel>
+							    <apex:outputPanel layout="none" rendered="{!CanAdjustEntries && TrackingPeriodClosed && $ObjectType.KimbleOne__Timesheet__c.createable && $ObjectType.KimbleOne__TimeAdjustment__c.createable}">
+									<div class="adjust-time-btn toolbar-button" title="Allow edit of the submitted Time Entries">Adjust {!$ObjectType.KimbleOne__TimeEntry__c.labelplural}</div>
+							    </apex:outputPanel>	
+							</div>
+							<div id="period-totals" class="control-cell no-select">
+								<div class="total-units" t-tip="TotalTime"></div>
+								<apex:variable value="{!TheResourceCalendarTrackingPeriod.TimePeriodsTracking__r[0]}" var="firstPeriod"/>
+								<apex:variable value="{!$ObjectType.KimbleOne__UnitType__c.Name}:{!$ObjectType.KimbleOne__UnitType__c.Fields.KimbleOne__Suffix__c.Name}:{!firstPeriod.PeriodType__r.UsageUnitType__c}" var="firstPeriodUnitTypeTrans"/>
+								<div class="total-unit-type"><apex:outputText value="{!TranslationsMap[firstPeriodUnitTypeTrans]}"/></div>
+							</div>
+							<div id="ttips-switch" class="control-cell">
+								<apex:outputPanel >
+									<div class="show-t-tips">
+										<span class="TTipsShowTipsToggle">	
+											<apex:outputLink onclick="toggleTTips()" styleClass="show-hide-btn"><apex:outputText value=" {!$Label.kimbleone__kimbleguidancetimesheettooltips} "/></apex:outputLink> <i class="t-tip-setting show-tips-tgl k-tgl fa" onclick="toggleTTips()"/>
+										</span>	
+									</div>
+								</apex:outputPanel>
+							</div>
+							<div id="view-controls" class="control-cell no-select">
+								<a href="javascript:void(0);"><div id="calendar-view" class="toolbar-button toggle-btn bigger-btn active" t-tip="CalendarView"><i class="fa fa-calendar"></i>{!$Label.CalendarLabel}</div></a>
+								<apex:outputLink value="{!$Page.KimbleOne__TimesheetGrid}?periodId={!TheResourceTrackingPeriod.Id}{!If($CurrentPage.parameters.id!=null,'&id='+$CurrentPage.parameters.id,'')}"><div t-tip="GridView" id="grid-view" class="toolbar-button toggle-btn bigger-btn"><i class="fa fa-th-list"></i>{!$Label.GridView}</div></apex:outputLink>
+							</div>
+						</div>
+					</div>
+					<div class="period-summary-container"></div>
+					<div id="header-container">
+					<apex:variable var="dayCounter" value="{!0}"/>
+					<apex:repeat value="{!TheResourceCalendarTrackingPeriod.TimePeriodsTracking__r}" var="period" rendered="{!!IsMonthView}">
+						<apex:variable var="dayCounter" value="{!dayCounter + 1}"/>
+						<apex:outputPanel layout="block" styleClass="time-entry-period day-container no-text-select {!period.PeriodType__r.KimbleOne__StyleClass__c} {!IF(dayCounter = 1, 'first-period', '')}">
+						<div class="time-entry-period-header" period-id="{!JSENCODE(period.Id)}">
+							<div class="time-entry-period-details">
+								<div class="time-entry-period-name">
+									<apex:outputText value="{!period.Name}" rendered="{!ISBLANK(TimesheetCalendarDayNameFormat)}"/>
+									<apex:outputText value="{0,date,{!TimesheetCalendarDayNameFormat}}" rendered="{!!ISBLANK(TimesheetCalendarDayNameFormat)}">
+										<apex:param value="{!period.KimbleOne__StartDate__c}" />									
+									</apex:outputText>
+								</div>
+								<div class="time-entry-period-actions">
+									<div class="submission-errors-ind" title="{!$Label.kimbleone__timesheetsubmissionfailures}"><i class="fa fa-exclamation-triangle"></i></div>
+									<apex:outputPanel layout="none" rendered="{!CanAddEditTimeAndExpenseEntries && $ObjectType.KimbleOne__TimeEntry__c.createable}"><div class="time-entry-period-header-btn new-time-entry-btn hover-btn" t-tip="AddTE" title="+ {!$ObjectType.TimeEntry__c.label}" onclick="initialiseModalBoxy('#AddEntryPopup', '{!$ObjectType.TimeEntry__c.label}');newEntry('{!JSENCODE(period.Id)}');"><i class="fa fa-clock-o"></i><i class="fa fa-plus-square"></i></div></apex:outputPanel>
+									<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ExpenseItem__c.createable}">
+										<apex:outputLink value="{!$Page.KimbleOne__ExpenseClaimEdit}?periodId={!period.Id}&resourceId={!TheResource.id}&{!If($CurrentPage.parameters.id!=null,'ts=1','ts=2')}" title="+ {!$ObjectType.KimbleOne__ExpenseItem__c.label}"><div class="time-entry-period-header-btn hover-btn new-expense-item-btn" t-tip="AddExpenseClaim"><i class="fa fa-money"></i><i class="fa fa-plus-square"></i></div></apex:outputLink>
+									</apex:outputPanel>
+								</div>
+							</div>
+							<div class="time-entry-period-summary">
+								<div class="time-entry-period-units">
+									<div class="unit-amt" t-tip="TotalTimeDay"><apex:outputField styleClass="unit-amt" value="{!TimeEntryTotalByDayMap[period.KimbleOne__StartDate__c].InputDecimal__c}"/></div>
+									<apex:outputText styleClass="unit-type" value=" {!period.PeriodType__r.UsageUnitType__r.KimbleOne__Suffix__c}"/>
+								</div>
+							</div>
+						</div>
+						</apex:outputPanel>
+					</apex:repeat>
+					</div>
+				</div>
+				</apex:outputPanel>
+						
+				<apex:form id="TimeForm"><div>
+				<apex:outputPanel layout="none" rendered="{!ClassicView}">
+				<div Id="TimesheetHeader" style="position:relative">
+					
+					<apex:outputLink value="#" onclick="GoPreviousPeriod()" title="{!$Label.kimbleone__previousperiod}"><apex:image url="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'PreviousButtonSquare.png')}" alt="{!$Label.kimbleone__previousperiod}" /></apex:outputLink> 
+					<apex:inputText styleClass="datepicker" style="width:0px;border:0px; margin:0px; padding:0px;height:0px;cursor:none;" value="{!GoDate.KimbleOne__InputDate__c}">
+						<apex:actionSupport event="onchange" action="{!ResourceTrackingPeriodChange}" />
+					</apex:inputText>
+					<apex:outputLink value="#" onclick="GoNextPeriod()" title="{!$Label.kimbleone__nextperiod}"><apex:image url="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'NextButtonSquare.png')}"	alt="{!$Label.kimbleone__nextperiod}" /></apex:outputLink>
+					&nbsp;
+					<apex:outputLink value="#" onclick="window.open('{!$Page.KimbleOne__TimesheetPrint}?periodId={!TheResourceTrackingPeriod.Id}{!If($CurrentPage.parameters.id!=null,'&id='+$CurrentPage.parameters.id,'')}', '_printview');" title="{!$Label.kimbleone__print}">
+						<apex:image url="{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Blank_BtnSqShdw.png')}" />
+						<i class="fa fa-print" style="font-size: 18px;position: relative;left: -26px;top: -8px;color: #6F6F6F;"></i>
+					</apex:outputLink>
+					
+					<span style="display:inline-block;vertical-align:top;margin-left:100px;">	
+						<apex:commandButton id="actualiseEntriesBtn" action="{!ActualiseSelectedEntries}" styleclass="DisableButtonWhileBusy actualise-selected-btn" value="{!$Label.kimbleone__timesheetconverttoactualbutton}"  rerender="TimeForm, timesheet-errors" rendered="{!CanAddEditTimeAndExpenseEntries && CanActualiseTime && $ObjectType.KimbleOne__TimeEntry__c.updateable}" oncomplete="checkOperationSuccess(jQuery('[id$=\'actualiseEntriesBtn\']'));updateHeader();"/>
+		         		<apex:commandButton id="submitTimeEntriesBtn" action="{!SubmitTimeEntries}" styleclass="DisableButtonWhileBusy submit-all-btn" value="{!$Label.kimbleone__submittimeentries}" rendered="{!CanAddEditTimeAndExpenseEntries && $ObjectType.KimbleOne__Timesheet__c.createable && SubmitEnabled}"  rerender="TimeForm, timesheet-errors" oncomplete="checkOperationSuccess(jQuery('[id$=\'submitTimeEntriesBtn\']'));updateHeader();showSubmissionErrors();"/>
+		         		
+					    <apex:outputPanel layout="none" rendered="{!CanAdjustEntries && TrackingPeriodClosed && $ObjectType.KimbleOne__Timesheet__c.createable && $ObjectType.KimbleOne__TimeAdjustment__c.createable}">
+					   		<input type="button" id="adjustTimeEntriesBtn" class="btn" value="Adjust {!$ObjectType.TimeEntry__c.labelplural}" onclick="AdjustPeriod()" title="Allow edit of the submitted Time Entries" t-tip="TEAdjustTime" />
+					    </apex:outputPanel>	
+					</span>			 
+					
+					<div class="timesheet-view-toggle" style="position: absolute;right:6px;top: 0px;" >
+						<span class="selected left"><a href="javascript:void(0);" class="toggleLink" ><i class="fa fa-calendar" style="font-size: 14px;color: white;position: relative;left: -76px;"></i><span class="toggleIcon"></span><span class="linkText">{!$Label.CalendarLabel}</span></a></span><span class="clickable right"><a href="{!$Page.KimbleOne__TimesheetGrid}?periodId={!TheResourceTrackingPeriod.Id}{!If($CurrentPage.parameters.id!=null,'&id='+$CurrentPage.parameters.id,'')}" class="toggleLink" ><i class="fa fa-th-list" style="font-size: 14px;color: #6f6f6f;position: relative;left: -80px;top: 2px;"></i><span class="toggleIcon"></span><span class="linkText">{!$Label.Gridview}</span></a></span>
+					</div>
+         			         				
+         		</div>
+         		</apex:outputPanel>
+			</div>
+			<script>jQuery(window).load(function(){updateHeader();});</script>
+
+			<apex:outputPanel layout="none" rendered="{!EnhancedView}">
+			<div id="e-timesheet-container">
+				<div class="hidden-period-total"><apex:outputField value="{!FormattedTotalForTrackingPeriod.KimbleOne__InputDecimal__c}"/></div>
+				<div id="loadingIndicatorOuterContainer" class="loadingIndicator" style="display:none">
+					<div id="loadingIndicatorInnerContainer">
+						<img src="{!URLFOR($Resource.LoadingImageK)}" />
+					</div>
+				</div>
+				<div id="body-container" class="{!IF(ISBLANK($CurrentPage.parameters.id), 'no-menu', 'with-menu')}">
+				<apex:variable var="dayCounter" value="{!0}"/>
+				<apex:variable var="dayOfWeekCounter" value="{!0}"/>
+				<apex:variable var="paddingDayCounter" value="{!1}"/>
+				<apex:outputPanel layout="none" rendered="{!IsMonthView && PeriodStartOffsetDays.size > 0}">
+				<apex:repeat value="{!PeriodStartOffsetDays}" var="paddingDay">
+				<apex:outputPanel layout="block" styleClass="PaddingDay {!IF(paddingDayCounter = PeriodStartOffsetDays.size, 'last-padding', '')}"></apex:outputPanel>
+				<apex:variable var="dayOfWeekCounter" value="{!dayOfWeekCounter + 1}"/>
+				<apex:variable var="paddingDayCounter" value="{!paddingDayCounter + 1}"/>
+				</apex:repeat>
+				</apex:outputPanel>
+				<apex:repeat value="{!TheResourceCalendarTrackingPeriod.TimePeriodsTracking__r}" var="period">
+					<apex:variable var="isLastDayOfWeek" value="{!IsMonthView && EndOfWeekDayMap[dayOfWeekCounter]}" rendered="{!IsMonthView}"/>
+					<apex:variable var="dayOfWeekCounter" value="{!dayOfWeekCounter + 1}"/>
+					<apex:variable var="dayCounter" value="{!dayCounter + 1}"/>				
+					<apex:outputPanel layout="block" styleClass="time-entry-period day-container {!period.PeriodType__r.KimbleOne__StyleClass__c} {!IF(dayCounter = 1, 'first-period', '')}">					
+					<apex:outputPanel layout="none" rendered="{!IsMonthView}">
+					<div id="header-container-monthly">
+					<div class="time-entry-period-header" period-id="{!JSENCODE(period.Id)}">
+						<div class="time-entry-period-details">
+							<div class="time-entry-period-name">
+								<apex:outputText value="{!period.Name}" rendered="{!ISBLANK(TimesheetCalendarDayNameFormat)}"/>
+								<apex:outputText value="{0,date,{!TimesheetCalendarDayNameFormat}}" rendered="{!!ISBLANK(TimesheetCalendarDayNameFormat)}">
+									<apex:param value="{!period.KimbleOne__StartDate__c}" />									
+								</apex:outputText>
+							</div>
+							<div class="time-entry-period-actions">
+								<div class="submission-errors-ind" title="{!$Label.kimbleone__timesheetsubmissionfailures}"><i class="fa fa-exclamation-triangle"></i></div>
+								<apex:outputPanel layout="none" rendered="{!CanAddEditTimeAndExpenseEntries && $ObjectType.KimbleOne__TimeEntry__c.createable}"><div class="time-entry-period-header-btn new-time-entry-btn hover-btn" t-tip="AddTE" title="+ {!$ObjectType.TimeEntry__c.label}" onclick="initialiseModalBoxy('#AddEntryPopup', '{!$ObjectType.TimeEntry__c.label}');newEntry('{!JSENCODE(period.Id)}');"><i class="fa fa-clock-o"></i><i class="fa fa-plus-square"></i></div></apex:outputPanel>
+								<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ExpenseItem__c.createable}"><apex:outputLink value="{!$Page.KimbleOne__ExpenseClaimEdit}?periodId={!period.Id}&resourceId={!TheResource.id}&{!If($CurrentPage.parameters.id!=null,'ts=1','ts=2')}&src=t" title="+ {!$ObjectType.KimbleOne__ExpenseItem__c.label}"><div class="time-entry-period-header-btn hover-btn new-expense-item-btn" t-tip="AddExpenseClaim"><i class="fa fa-money"></i><i class="fa fa-plus-square"></i></div></apex:outputLink></apex:outputPanel>
+							</div>
+						</div>
+						<div class="time-entry-period-summary">
+							<div class="time-entry-period-units">
+								<div class="unit-amt" t-tip="TotalTimeDay"><apex:outputField styleClass="unit-amt" value="{!TimeEntryTotalByDayMap[period.KimbleOne__StartDate__c].InputDecimal__c}"/></div>
+								<apex:variable value="{!$ObjectType.KimbleOne__UnitType__c.Name}:{!$ObjectType.KimbleOne__UnitType__c.Fields.KimbleOne__Suffix__c.Name}:{!period.PeriodType__r.KimbleOne__UsageUnitType__c}" var="periodUnitTypeTrans"/>
+								<apex:outputText styleClass="unit-type" value="{!TranslationsMap[periodUnitTypeTrans]}"/>
+							</div>
+						</div>
+					</div>
+					</div>
+					</apex:outputPanel>
+					<div class="time-entry-period-body" period-id="{!JSENCODE(period.Id)}">
+						<div class="hidden-day-total"><apex:outputField value="{!TimeEntryTotalByDayMap[period.KimbleOne__StartDate__c].InputDecimal__c}"/></div>
+						<apex:repeat value="{!TimeEntriesByDayMap[period.KimbleOne__StartDate__c]}" var="entry">
+							<apex:variable var="Status" value="{!IF(ISBLANK(entry.Entry.TimeSheet__c), 'Draft', entry.Entry.TimeSheet__r.ApprovalStatus__c)}"/>
+							
+							<div class="entry-card time-entry-card no-text-select openable {!JSINHTMLENCODE(Status)} {!IF(entry.CanSelect, 'selectable', '')}" data-hours="{!entry.UnitsInHours}" data-entry-id="{!entry.Entry.Id}" t-tip="{!entry.DisplayNarrative}">
+								<div class="entry-card-header">
+									<div class="entry-card-icon"><apex:image value="{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Time_' + Status + '.png')}"/></div>
+									<div class="entry-card-status"><div class="status-pill {!JSINHTMLENCODE(Status)}">{!JSINHTMLENCODE(UPPER(entry.DisplayStatus))}</div></div>
+									<div class="entry-card-units">
+									<apex:outputPanel rendered="{!entry.HasActiveTimer}" layout="none" >
+									<div class="te-timer active" t-tip-right="TETimerActive">
+										<span class="ticker" timer-start-time="{!JSENCODE(entry.TimerStartDateTimeUTC)}" entry-id="{!entry.Entry.Id}"></span><i class="fa fa-stop-circle timer-item stop-timer" title="{!JSENCODE($Label.StopTimerLabel)}"></i>
+									</div>
+									</apex:outputPanel>
+									<apex:outputPanel rendered="{!!entry.HasActiveTimer}" layout="none" >
+									<apex:outputText value="{!entry.Units}" styleclass="kimble-format-number" html-kimble-number-format="0.####"/>
+									</apex:outputPanel>
+									</div>
+								</div>
+								<div class="entry-card-body">
+									<apex:outputText styleClass="activity-name" value="{!entry.Entry.ActivityAssignment__r.ResourcedActivity__r.FullName__c}"/>
+									<apex:outputText styleClass="role-name" value="{!entry.Entry.ActivityAssignment__r.ActivityRole__r.Name}" rendered="{!!ISBLANK(entry.Entry.ActivityAssignment__r.ActivityRole__r.Name)}"/>
+									<apex:outputText styleClass="task-name" value="{!entry.Entry.PlanTaskAssignment__r.PlanTask__r.Task__r.Name}" rendered="{!!ISBLANK(entry.Entry.PlanTaskAssignment__r.PlanTask__r.Task__r.Name)}"/>
+									<apex:outputText styleClass="reference-val" value="{!entry.Entry.Reference__c}" rendered="{!!ISBLANK(entry.Entry.Reference__c) && entry.Entry.ActivityAssignmentRate__r.ActivityPeriodRateBand__r.UsageAllocationType__r.Enum__c == 'Reference'}"/>
+									<div class="case-val"><apex:outputField value="{!entry.Entry.Case__c}" rendered="{!!ISBLANK(entry.Entry.Case__c)}"/></div>
+
+									<div class="time-entry-item-warnings">
+										<apex:outputPanel rendered="{!!entry.HasActiveTimer && TimesheetSubmissionErrorsMap[entry.Entry.Id].HasError}" title="{!TimesheetSubmissionErrorsMap[entry.Entry.Id].Reason}"><div class="time-entry-errors-ind" t-tip="TEErrors"><i class="fa fa-exclamation-triangle"></i></div></apex:outputPanel>
+										<apex:outputPanel rendered="{!!ISBLANK(entry.RejectionComments)}" title="{!entry.RejectionComments}"><div class="time-entry-comments-ind"><i class="fa fa-exclamation-circle" t-tip-right="TERejectionNotes"></i></div></apex:outputPanel>
+										<apex:outputPanel rendered="{!!ISBLANK(entry.Notes)}" title="{!entry.Notes}"><div class="time-entry-comments-ind"><i class="fa fa-comment" t-tip-right="TENotes"></i></div></apex:outputPanel>
+									</div>
+									<div class="entry-card-actions {!IF(entry.CanSelect || entry.IsDeletable, 'with-actions', '')}">
+										<apex:outputPanel layout="none" rendered="{!entry.IsDeletable}">
+										<div class="delete-time-ind" t-tip-right="TEDelete">
+											<label class="fa fa-trash-o action-item delete-item" onclick="if(confirmDelete()){jQuery(this).removeClass('fa-trash-o').addClass('fa-circle-o-notch').addClass('fa-spin');inlineDeleteTimeEntry('{!entry.Entry.Id}')};"></label>
+										</div>
+										</apex:outputPanel>										
+										<apex:outputPanel rendered="{!entry.CanSelect}" layout="none" >
+										<div class="select-time" t-tip-right="TESelectCheckbox" >
+											<label>{!$Label.TimesheetSelectForSubmit}<apex:inputField styleClass="select-time-checkbox" value="{!entry.Selected.InputCheckbox__c}"/></label>
+										</div>
+										</apex:outputPanel>
+									</div>
+								</div>
+							</div>
+						</apex:repeat>
+						
+						<apex:repeat value="{!ForecastTimeEntriesByDayMap[period.KimbleOne__StartDate__c]}" var="entry">
+							<apex:variable var="Status" value="{!If(entry.Approved,'Forecast','ForecastDraft')}"/>
+													
+							<div class="entry-card time-entry-card no-text-select {!JSINHTMLENCODE(Status)} {!IF(entry.IsActualisable && !ISBLANK(entry.ActivityAssignmentRate), 'selectable', '')} {!IF(entry.IsDeletable,'DeleteableForecast', '')}  {!IF(entry.IsEditable,'EditForecast', '')}  {!IF(entry.IsActualisable,'ActualisableForecast','')} {!IF(entry.IsAutoActualised,'AutoActualised','')}" data-hours="{!entry.UnitsInHours}" data-actualisable-key="{!entry.ActualisableTimeEntryKey}" t-tip="{!entry.DisplayNarrative}">
+								<div class="entry-card-header">
+									<apex:outputPanel rendered="{!entry.DisplayStatus == $Label.kimbleone__testatussuggested}" layout="none"><div class="entry-card-icon"><div class="faicon-placeholder"><i class="te-icon fa fa-lightbulb-o"></i></div></div></apex:outputPanel>
+									<apex:outputPanel rendered="{!entry.DisplayStatus == $Label.kimbleone__testatusscheduled}" layout="none"><div class="entry-card-icon"><div class="faicon-placeholder"><i class="te-icon fa fa-thumb-tack"></i></div></div></apex:outputPanel>
+									<apex:outputPanel rendered="{!entry.DisplayStatus == $Label.kimbleone__testatusrequested}" layout="none"><div class="entry-card-icon"><div class="faicon-placeholder"><i class="te-icon fa fa-calendar-plus-o"></i></div></div></apex:outputPanel>
+									<apex:outputPanel rendered="{!entry.DisplayStatus == $Label.kimbleone__testatusrequestapproved}" layout="none"><div class="entry-card-icon"><div class="faicon-placeholder"><i class="te-icon fa fa-calendar-check-o"></i></div></div></apex:outputPanel>
+									<apex:outputPanel rendered="{!entry.DisplayStatus == $Label.kimbleone__testatusforecast}" layout="none"><div class="entry-card-icon"><apex:image value="{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Forecast.png')}"/></div></apex:outputPanel>
+									<div class="entry-card-status"><div class="status-pill {!JSINHTMLENCODE(Status)}">{!JSINHTMLENCODE(UPPER(entry.DisplayStatus))}</div></div>
+									<div class="entry-card-units"><apex:outputText value="{!entry.FormattedUnits}"/></div>
+								</div>
+								<div class="entry-card-body">
+									<apex:outputText styleClass="activity-name" value="{!entry.ActivityAssignment.ResourcedActivity__r.FullName__c}"/>
+									<apex:outputText styleClass="role-name" value="{!entry.RoleName}" rendered="{!!ISBLANK(entry.RoleName)}"/>
+
+									<apex:outputPanel layout="none" rendered="{!entry.IsAutoActualised}">
+									<div class="entry-card-additional-status"><div t-tip-right="TEAutoActualise" class="status-pill">{!JSENCODE(UPPER($Label.TEStatusAutoActualised))}</div></div>
+									</apex:outputPanel>
+
+									<div class="entry-card-actions {!IF((entry.IsDeletable) || (entry.IsActualisable && !ISBLANK(entry.ActivityAssignmentRate)), 'with-actions', '')}">
+										<apex:outputPanel layout="none" rendered="{!entry.IsDeletable && !ISBLANK(entry.ForecastTimeEntryId)}">
+										<div class="delete-forecast-time-ind" t-tip-right="TEDelete">
+											<label class="fa fa-trash-o action-item delete-item" onclick="if(confirmDelete()){jQuery(this).removeClass('fa-trash-o').addClass('fa-circle-o-notch').addClass('fa-spin');deleteForecastTimeEntry('{!entry.ForecastTimeEntryId}')};"></label>
+										</div>
+										</apex:outputPanel>
+                                        <apex:outputPanel layout="none" rendered="{!entry.IsDeletable && entry.IsScheduledDay && ISBLANK(entry.ForecastTimeEntryId)}">
+                                            <div class="delete-forecast-time-ind" t-tip-right="TEDelete">
+                                                <label class="fa fa-trash-o no-fte action-item delete-item" onclick="if(confirmDelete()){jQuery(this).removeClass('fa-trash-o').addClass('fa-circle-o-notch').addClass('fa-spin');deleteForecastTimeEntry('{!entry.ActualisableTimeEntryKey}')};"></label>
+                                            </div>
+                                        </apex:outputPanel>
+										<apex:outputPanel rendered="{!entry.IsActualisable && !ISBLANK(entry.ActivityAssignmentRate)}" layout="none" >
+										<div class="actualise-time" t-tip-right="TEActualiseCheckbox">
+											<label>{!$Label.kimbleone__timesheetactual}<apex:inputField styleClass="actualise-time-checkbox" value="{!entry.Selected.InputCheckbox__c}"/></label>
+										</div>
+										</apex:outputPanel>
+									</div>
+								</div>
+							</div>
+						</apex:repeat>
+
+						<div class="expense-entry-body" style="display:{!IF(!HasExpenses,'none','')}">
+						<apex:variable var="expenseCounter" value="{!0}"/>
+						<apex:repeat value="{!ExpenseItemsByDayMap[period.KimbleOne__StartDate__c]}" var="item">
+							<apex:outputPanel layout="none" rendered="{!expenseCounter == 0}">
+							<div class="expense-entry-seperator"></div>
+							</apex:outputPanel>
+							<apex:variable var="expenseCounter" value="{!expenseCounter + 1}"/>
+							<apex:variable var="Status" value="{!IF(OR(ISBLANK(item.ExpenseClaim__r.ApprovalStatus__c), item.ExpenseClaim__r.ApprovalStatus__c = 'Unapproved'),'Draft',JSINHTMLENCODE(item.ExpenseClaim__r.ApprovalStatus__c))}"/>
+							<apex:variable var="DisplayStatus" value="{!IF(ISBLANK(item.ExpenseClaim__r.ApprovalStatus__c),$Label.kimbleone__testatusdraft,IF(item.ExpenseClaim__r.ApprovalStatus__c = 'ReadyForApproval',$Label.kimbleone__testatussubmitted,IF(item.ExpenseClaim__r.ApprovalStatus__c = 'Approved',$Label.kimbleone__testatusapproved,IF(item.ExpenseClaim__r.ApprovalStatus__c = 'Rejected',$Label.kimbleone__testatusrejected,$Label.kimbleone__testatusdraft))))}"/>
+								
+							<div class="entry-card expense-entry-card no-text-select openable {!JSINHTMLENCODE(Status)}" data-item-id="{!item.Id}">
+								<div class="entry-card-header">
+									<div class="entry-card-icon"><apex:image styleClass="entry-icon" value="{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Expense_' + IF (OR(ISBLANK(item.ExpenseClaim__r.ApprovalStatus__c), item.ExpenseClaim__r.ApprovalStatus__c = 'Unapproved'),'Draft',JSINHTMLENCODE(item.ExpenseClaim__r.ApprovalStatus__c)) + '.png')}"/></div>
+									<div class="entry-card-status"><div class="status-pill {!JSINHTMLENCODE(Status)}">{!JSINHTMLENCODE(UPPER(DisplayStatus))}</div></div>
+								</div>
+								<div class="entry-card-body">
+									<apex:outputText styleClass="activity-name" value="{!item.ActivityExpenseCategory__r.ResourcedActivity__r.Name}"/>
+									<apex:outputText styleClass="category-name" value="{!item.ActivityExpenseCategory__r.Name}"/>
+									<apex:outputText styleClass="expense-units" value="{!item.ExpenseUnits__c} {!item.ActivityExpenseCategory__r.ExpenseCategory__r.UnitType__r.Name}" rendered="{!ISBLANK(item.ExpenseUnits__c) == false}" />
+									<div class="expense-amt"><apex:outputText value="{!item.ReimbursementCurrencyISOCode__c}" styleclass="kimbleCurrencyCode"/><apex:outputField value="{!item.ReimbursementCurrencyReimbursementAmount__c}" /></div>
+											
+									<div class="entry-card-actions {!IF(item.IsReceipted__c && item.Attachments.size>0, 'with-actions', '')}">
+										<div class="attachment-ind">
+											<apex:image url="{!URLFOR($Resource.KimbleOne__AttcIcon)}" rendered="{!item.IsReceipted__c && item.Attachments.size>0}" title="{!$Label.kimbleone__receiptattachmentsheading}" width="20" height="20" />
+										</div>									
+									</div>
+								</div>
+							</div>
+						</apex:repeat>
+						</div>
+					</div>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!IsMonthView && isLastDayOfWeek}">
+						<div class="week-wrapper"></div>
+					</apex:outputPanel>					
+				</apex:repeat>
+				</div>
+			</div>
+			</apex:outputPanel>
+
+			<apex:outputPanel layout="none" rendered="{!ClassicView}">
+			<div class="period-summary-container">
+			</div>
+
+			<div id="TimesheetBody">
+			<apex:outputPanel id="TimeSheet" layout="block">
+				<apex:outputPanel layout="block" style="white-space: nowrap;">
+				
+				<apex:variable var="dayCounter" value="{!0}"/>
+				<apex:variable var="dayOfWeekCounter" value="{!0}"/>
+				<apex:outputPanel layout="none" rendered="{!IsMonthView && PeriodStartOffsetDays.size > 0}">
+				<apex:repeat value="{!PeriodStartOffsetDays}" var="paddingDay">
+				<apex:outputPanel layout="block" styleClass="PaddingDay"></apex:outputPanel>
+				<apex:variable var="dayOfWeekCounter" value="{!dayOfWeekCounter + 1}"/>
+				</apex:repeat>
+				</apex:outputPanel>
+				<apex:repeat value="{!TheResourceCalendarTrackingPeriod.TimePeriodsTracking__r}" var="period">
+					<apex:variable var="isLastDayOfWeek" value="{!IsMonthView && EndOfWeekDayMap[dayOfWeekCounter]}" rendered="{!IsMonthView}"/>
+					<apex:variable var="dayOfWeekCounter" value="{!dayOfWeekCounter + 1}"/>
+					<apex:variable var="dayCounter" value="{!dayCounter + 1}"/>
+					<apex:outputPanel layout="block" styleClass="TimeEntryPeriodContainer day-container {!period.PeriodType__r.KimbleOne__StyleClass__c}">
+						<div class="TimeEntryPeriodHeader">
+							<div class="TimeEntryPeriodHeaderLabel">
+								<apex:outputText value="{!period.Name}" rendered="{!ISBLANK(TimesheetCalendarDayNameFormat)}"/>
+								<apex:outputText value="{0,date,{!TimesheetCalendarDayNameFormat}}" rendered="{!!ISBLANK(TimesheetCalendarDayNameFormat)}">
+									<apex:param value="{!period.KimbleOne__StartDate__c}" />									
+								</apex:outputText>
+							</div>
+							<div class="TimeEntryPeriodHeaderIconsRight">
+								<apex:image value="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'warning.png')}" styleClass="submission-errors-ind" title="{!$Label.kimbleone__timesheetsubmissionfailures}"/>
+								<apex:outputPanel layout="none" rendered="{!CanAddEditTimeAndExpenseEntries && $ObjectType.KimbleOne__TimeEntry__c.createable}"><span class="newTimeEntryIcon headerActionIcon" title="+ {!$ObjectType.TimeEntry__c.label}" onclick="initialiseModalBoxy('#AddEntryPopup', '{!$ObjectType.TimeEntry__c.label}');newEntry('{!JSENCODE(period.Id)}');"/></apex:outputPanel>
+								<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ExpenseItem__c.createable}">
+									<a href="{!$Page.KimbleOne__ExpenseClaimEdit}?periodId={!period.Id}&resourceId={!TheResource.id}&{!If($CurrentPage.parameters.id!=null,'ts=1','ts=2')}&src=t" class="expenseClaimEditIcon headerActionIcon" title="+ {!$ObjectType.KimbleOne__ExpenseItem__c.label}" />
+								</apex:outputPanel>
+							</div>
+						</div>
+						<div class="TimeEntryPeriodBody">
+						<div class="TimeEntryBody">
+							<apex:repeat value="{!TimeEntriesByDayMap[period.KimbleOne__StartDate__c]}" var="entry">
+							<div class="TimeEntryContainer" id="TimeEntryContainer">
+								<apex:variable var="Status" value="{!IF(ISBLANK(entry.Entry.TimeSheet__c), 'Draft', entry.Entry.TimeSheet__r.ApprovalStatus__c)}"/>
+								<div onclick="initialiseModalBoxy('#EditTimeEntryPopup', '{!$ObjectType.TimeEntry__c.label}');editTimeEntry('{!JSENCODE(entry.Entry.Id)}')"
+									class="entryHeight time-entry-item TimeEntry P{!Floor(entry.Entry.ActivityAssignmentRate__r.ActivityPeriodRateBand__r.PeriodRateBand__r.Priority__c)} {!JSINHTMLENCODE(Status)}"
+									 data-hours="{!entry.UnitsInHours}"
+									 style="position:relative;">
+								 	<div class="time-entry-details" title="{!JSINHTMLENCODE(entry.Entry.ActivityAssignmentRate__r.ActivityPeriodRateBand__r.Name)}: {!JSINHTMLENCODE(Status)}.">
+										<apex:image styleClass="entry-icon" value="{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Time_' + Status + '.png')}"/>
+										<apex:outputText styleClass="activity-name" value="{!entry.Entry.ActivityAssignment__r.ResourcedActivity__r.FullName__c}"/>
+										<apex:outputText styleClass="role-name" value="{!entry.Entry.ActivityAssignment__r.ActivityRole__r.Name}" rendered="{!!ISBLANK(entry.Entry.ActivityAssignment__r.ActivityRole__r.Name)}"/>
+										<apex:outputText styleClass="task-name" value="{!entry.Entry.PlanTaskAssignment__r.PlanTask__r.Task__r.Name}" rendered="{!!ISBLANK(entry.Entry.PlanTaskAssignment__r.PlanTask__r.Task__r.Name)}"/>
+										<div class="case-val"><apex:outputField value="{!entry.Entry.Case__c}" rendered="{!!ISBLANK(entry.Entry.Case__c)}"/></div>
+										<div class="time-entry-units">
+											<apex:outputText value="{!entry.Units}" styleclass="kimble-format-number" html-kimble-number-format="0.####"/><apex:outputText styleClass="unit-type" value="{!period.PeriodType__r.UsageUnitType__r.KimbleOne__Suffix__c}"/>
+										</div>
+									</div>
+									<div class="time-entry-item-warnings">
+										<apex:image value="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'warning.png')}" styleClass="time-entry-errors-ind" rendered="{!TimesheetSubmissionErrorsMap[entry.Entry.Id].HasError}" title="{!TimesheetSubmissionErrorsMap[entry.Entry.Id].Reason}" />
+									</div>
+									<div class="time-entry-footer">
+										<div class="time-entry-actions"></div>
+									</div>
+									<div style="clear:both"></div>
+								</div>
+							</div>
+							</apex:repeat> 
+							
+							<!-- Show each forecast time period  --> 
+							<apex:repeat value="{!ForecastTimeEntriesByDayMap[period.KimbleOne__StartDate__c]}" var="entry">
+							<div class="TimeEntryContainer" id="TimeEntryContainer" >
+								<div class="entryHeight time-entry-item {!If(entry.Approved,'Forecast','ForecastDraft')} {!IF(entry.IsEditable,'EditForecast', '')}  {!IF(entry.IsActualisable,'ActualisableForecast','')} {!IF(entry.IsAutoActualised,'AutoActualised','')}" style="position:relative;" data-hours="{!entry.UnitsInHours}" data-period-id="{!period.Id}" data-actualisable-key="{!entry.ActualisableTimeEntryKey}">
+									<div class="time-entry-details">
+										<apex:image styleClass="entry-icon" value="{!URLFOR($Resource.KimbleOne__TimesheetIcons, If(entry.Approved,'Forecast','Forecast_ReadyForApproval') + '.png')}"/>
+										<apex:outputText styleClass="activity-name" value="{!entry.ActivityAssignment.ResourcedActivity__r.FullName__c}"/>
+										<apex:outputText styleClass="role-name" value="{!entry.RoleName}" rendered="{!!ISBLANK(entry.RoleName)}"/>
+
+										<div class="time-entry-units">
+											<apex:outputText styleClass="formatted-units" value="{!entry.FormattedUnits}"/><apex:outputText styleClass="unit-type" value="{!period.PeriodType__r.UsageUnitType__r.KimbleOne__Suffix__c}"/>
+										</div>
+									</div>
+									<div class="time-entry-footer">
+										<div class="time-entry-actions">
+											<apex:outputPanel rendered="{!entry.IsActualisable && entry.Approved && !ISBLANK(entry.ActivityAssignmentRate)}" layout="none" >
+											<div class="actualise-time">
+												<label>{!$Label.kimbleone__timesheetactual}<apex:inputField styleClass="actualise-time-checkbox" value="{!entry.Selected.InputCheckbox__c}"/></label>
+											</div>
+											</apex:outputPanel>
+											<apex:outputPanel rendered="{!entry.Approved && entry.ActivityAssignment.ResourcedActivity__r.CanSelfForecast__c && entry.ActivityAssignment.ResourcedActivity__r.SelfForecastApprovalRequired__c && !ISBLANK(entry.ForecastTimeEntryId)}">
+											<div class="delete-forecast-time-ind">
+												<label class="fa fa-trash-o action-item delete-item" onclick="if(confirmDelete()){jQuery(this).removeClass('fa-trash-o').addClass('fa-circle-o-notch').addClass('fa-spin');deleteForecastTimeEntry('{!entry.ForecastTimeEntryId}')};"></label>
+											</div>
+											</apex:outputPanel>
+										</div>
+									</div>
+									<div style="clear:both"></div>
+								</div>
+							</div>
+						</apex:repeat>
+						<p>
+						</p>
+						</div>
+						
+						<div class="ExpenseEntryBody" style="display:{!IF(!HasExpenses,'none','')}">
+						<apex:variable var="TotalExpense" value="{!0}" />
+						<div class="expenseEntrySeperator"></div>
+						<apex:repeat value="{!ExpenseItemsByDayMap[period.KimbleOne__StartDate__c]}" var="item">
+							<div class="TimeEntryContainer" >
+								<div onclick="initialiseModalBoxy('#ExpenseItemPopup', '{!$ObjectType.KimbleOne__ExpenseItem__c.label}');getExpenseItem('{!JSINHTMLENCODE(item.Id)}');" layout="block"
+									class="time-entry-item TimeEntry {!IF (OR(ISBLANK(item.ExpenseClaim__r.ApprovalStatus__c), item.ExpenseClaim__r.ApprovalStatus__c = 'Unapproved'),'Draft',JSINHTMLENCODE(item.ExpenseClaim__r.ApprovalStatus__c))}"
+									title="{!JSINHTMLENCODE(item.ActivityExpenseCategory__r.Name)} {!JSINHTMLENCODE(item.ExpenseClaim__r.ApprovalStatus__c)}">
+
+									<div class="expense-entry-details">
+										<apex:image styleClass="entry-icon" value="{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Expense_' + IF (OR(ISBLANK(item.ExpenseClaim__r.ApprovalStatus__c), item.ExpenseClaim__r.ApprovalStatus__c = 'Unapproved'),'Draft',JSINHTMLENCODE(item.ExpenseClaim__r.ApprovalStatus__c)) + '.png')}"/>
+										<apex:outputText styleClass="activity-name" value="{!item.ActivityExpenseCategory__r.ResourcedActivity__r.Name}"/>
+										<apex:outputText styleClass="category-name" value="{!item.ActivityExpenseCategory__r.Name}" />
+										<div class="expense-entry-units">
+											<apex:outputText value="{!item.ReimbursementCurrencyISOCode__c}" styleclass="kimbleCurrencyCode"/>
+											<apex:outputField value="{!item.ReimbursementCurrencyReimbursementAmount__c}" />
+											&nbsp;
+											<apex:outputText value="({!item.ExpenseUnits__c} {!item.ActivityExpenseCategory__r.ExpenseCategory__r.UnitType__r.Name})" rendered="{!ISBLANK(item.ExpenseUnits__c) == false}" />
+											<span style="position:relative;left: -23px;top: -10px;">
+												<apex:image url="{!URLFOR($Resource.KimbleOne__AttcIcon)}" rendered="{!item.IsReceipted__c && item.Attachments.size>0}"
+													title="{!$Label.kimbleone__receiptattachmentsheading}" width="20" height="20" />
+											</span>
+										</div>
+									</div>
+								</div>
+							</div>
+						</apex:repeat>
+						<p>
+						</p>
+						</div>
+						</div>
+
+						<div class="TimeEntryPeriodFooter">
+							<apex:outputText value="{!$Label.kimbleone__totaltime}  : "/>
+							<apex:outputField value="{!TimeEntryTotalByDayMap[period.KimbleOne__StartDate__c].InputDecimal__c}"/>
+							<apex:outputText value=" {!period.PeriodType__r.UsageUnitType__r.KimbleOne__Suffix__c}"/>
+							<br />
+							<apex:outputText value="{!$Label.kimbleone__totalexpense}  : "/>
+							<apex:outputText value="{!ExpenseItemTotalByDayMap[period.KimbleOne__StartDate__c].CurrencyISOCode}" styleclass="kimbleCurrencyCode"/>
+							<apex:outputField value="{!ExpenseItemTotalByDayMap[period.KimbleOne__StartDate__c].InputDecimal__c}" />
+							
+							<apex:outputPanel layout="none" rendered="{!dayCounter == TheResourceCalendarTrackingPeriod.TimePeriodsTracking__r.Size}">
+								<div id="TotalForTrackingPeriodInHours" style="font-weight:bold;position:absolute;top: 45px;width:132px;left:0px;font-size: 11px;">{!$Label.TotalTimeHeading}  :&nbsp;<apex:outputField value="{!FormattedTotalForTrackingPeriod.KimbleOne__InputDecimal__c}"/></div>
+							</apex:outputPanel>
+						</div>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!IsMonthView && isLastDayOfWeek}">
+						<div class="week-wrapper"></div>
+					</apex:outputPanel>
+				</apex:repeat>
+				</apex:outputpanel>
+			
+				<div id="TimesheetFooter" style="clear:both">
+				</div>
+				
+			</apex:outputPanel>
+			</div>
+			</apex:outputPanel>
+			<script>
+				var showSuggestions = true;
+				var hoursAndMinsHelper;
+
+				var l = {};
+				l['activeTimers'] = '<apex:outputText value="{!$Label.kimbleone__timermessage01}"/>';
+
+				jQuery(document).ready(function(){
+					jQuery.each($('.entryHeight'), function (i, obj) {var h = $(obj).height();var nh = 20 * $(obj).attr('data-hours');if(nh > h) $(obj).height(nh+'px');})
+					
+					jQuery("div.time-entry-footer").click(function(e) {
+					   // prevent click on the actualise time checkbox bubbling up to the click handler for the forecast time entry
+					   e.stopPropagation();
+					});
+					
+					jQuery(document).off('click', 'div.ActualisableForecast').on('click', 'div.ActualisableForecast', createNewTimeEntryFromForecast);
+					jQuery(document).off('click', 'div.EditForecast').on('click', 'div.EditForecast', getForecastEntryForEdit);
+					jQuery(document).off('click', 'div.time-entry-card.openable').on('click', 'div.time-entry-card.openable', openTimeEntry);
+					jQuery(document).off('click', 'div.expense-entry-card.openable').on('click', 'div.expense-entry-card.openable', openExpenseItem);
+					
+					jQuery(document).off('click', 'li#select-all:not(.disabled)').on('click', 'li#select-all:not(.disabled)', selectAll);
+					jQuery(document).off('click', 'li#select-draft:not(.disabled)').on('click', 'li#select-draft:not(.disabled)', selectAllDraft);
+					jQuery(document).off('click', 'li#select-items:not(.disabled)').on('click', 'li#select-items:not(.disabled)', selectModeOn);
+					jQuery(document).off('click', '.cancel-select-btn').on('click', '.cancel-select-btn', selectModeOff);
+					jQuery(document).off('click', '.actualise-btn').on('click', '.actualise-btn', convertSelectedToActual);
+					jQuery(document).off('click', 'li#submit-all:not(.disabled)').on('click', 'li#submit-all:not(.disabled)', submitAllTime);
+					jQuery(document).off('click', 'li#submit-items:not(.disabled)').on('click', 'li#submit-items:not(.disabled)', submitSelectedTime);
+					jQuery(document).off('click', '.adjust-time-btn').on('click', '.adjust-time-btn', AdjustPeriod);
+					
+					jQuery(document).off('change', '.actualise-time, .select-time').on('change', '.actualise-time, .select-time', checkboxChange);
+					
+					// stop the createNewTimeEntryFromForecast firing when checking the actualise checkbox
+					jQuery('.entry-card-actions .actualise-time, .entry-card-actions .select-time, .entry-card-actions .delete-forecast-time-ind, .entry-card-actions .delete-time-ind').on('click', function(e){
+						e.stopPropagation();
+					});
+
+					if({!EnhancedView})
+					{
+						jQuery(document).off('click', '.te-timer .stop-timer').on('click', '.te-timer .stop-timer', stopTimer);
+						jQuery(document).off('click', '.te-timer-copy .stop-timer').on('click', '.te-timer-copy .stop-timer', stopPopupTimer);
+
+						jQuery('.stop-timer-btn').parent().toggleClass('hidden-item', jQuery('.stop-timer').length == 0);
+						jQuery('.start-timer-btn').parent().toggleClass('hidden-item', jQuery('.stop-timer').length > 0);
+
+						//fixed-header-container
+						jQuery('#fixed-header').html(jQuery('#fixed-header-container').html());
+						jQuery(window).unbind('scroll');
+	            		jQuery(window).scroll(scrollFixed);
+
+						destroyTTips();	
+						initialiseTTipsToggle();
+						
+						if({!ShowTimesheetTooltips}) jQuery('.TTipsShowTipsToggle').attr('t-tip-default','ShowTipsToggleOn');
+						else jQuery('.TTipsShowTipsToggle').attr('t-tip-default','ShowTipsToggleOff');
+
+						jQuery.fn.timer = function() {
+							this.each(function(){
+								var t = jQuery(this);
+								var intervalId = setInterval(function() {
+									var eTime = t.attr('timer-elapsed-time-s');
+									
+									// add a second
+									var totalSeconds = parseInt(eTime) + 1;
+									var seconds = totalSeconds + 1;
+									var minutes = Math.floor(seconds/60);
+									var hours = Math.floor(minutes/60);
+									var days = Math.floor(hours/24);
+									
+									minutes = minutes-(hours*60);
+									seconds = (seconds-(hours*60*60)-(minutes*60)).toFixed(0);
+	
+									t.attr('timer-elapsed-time-s', totalSeconds);
+									var formattedTimer = padPart(hours) + ':' + padPart(minutes) + ':' + padPart(seconds);
+									t.text(formattedTimer);
+									// if there is an open time entry popup for this time entry we also update the timer
+									// (more accurate than attempting to run another timer in parallel)
+									var theEntryId = t.attr('entry-id');
+									jQuery('.ticker-copy[entry-id="' + theEntryId + '"]').text(formattedTimer);
+							    }, 1000);
+							    t.data('int-id', intervalId);
+							    t.addClass('ticking');
+							});
+						}
+	
+						jQuery.fn.stopTimer = function() {
+							this.each(function(){
+								var t = jQuery(this);
+								clearInterval(t.data('int-id'));
+								t.removeClass('ticking');
+							});
+						}						
+						
+						initialiseTTips();
+						
+						initialiseTimers();
+
+						hoursAndMinsHelper = initialiseHoursAndMinsHelper('{!JSENCODE($Label.HoursPart)}','{!JSENCODE($Label.MinutesPart)}', '{!JSENCODE($Label.HoursAndMinsEntryHelp)}');
+					}
+				});			
+
+			    var padPart = function(n) { return ('' + n).length < 2? padPart('0' + n) : n;};
+				
+				function initialiseTimers()
+				{
+				    
+				    jQuery('.ticker').each(function() {
+				    	var t = jQuery(this);
+						// time the timer was started
+						var sDateTime = t.attr('timer-start-time');
+						var sTime = sDateTime.getTimeFromDateTime(true);
+						var sTimeParts = sTime.split(':');
+						var sDate = sDateTime.toDateDiscardTime();
+						sDate.setHours(sTimeParts[0], sTimeParts[1], sTimeParts[2]);
+						
+						// current time
+						var cDate = new Date();
+
+						// difference between start time and current time stored as counted time
+						// adjust for timezone
+						var tzAdj = new Date(new Date() - new Date()).getTimezoneOffset() * 60 * 1000
+
+						// work out the difference in seconds and add one
+						var diff = cDate.getTime() - sDate.getTime();
+						var totalSeconds = diff / 1000;
+						var seconds = totalSeconds;
+						var minutes = Math.floor(seconds/60);
+						var hours = Math.floor(minutes/60);
+						var days = Math.floor(hours/24);
+						
+						minutes = minutes-(hours*60);
+						seconds = (seconds-(hours*60*60)-(minutes*60)).toFixed(0);						
+
+						t.attr('timer-elapsed-time-s', totalSeconds);
+	
+						var formattedTimer = padPart(hours) + ':' + padPart(minutes) + ':' + padPart(seconds);
+						t.text(formattedTimer);
+				    });
+					                
+					jQuery('.ticker:not(.ticking)').timer();
+				}
+				
+				function stopPopupTimer(e)
+				{
+					jQuery(this).removeClass('fa-stop-circle').addClass('fa-circle-o-notch').addClass('fa-spin');
+					var timerEntryId = jQuery(this).closest('.te-timer-copy').find('.ticker-copy').attr('entry-id');
+					
+					jQuery('.ticker[entry-id="' + timerEntryId + '"]').stopTimer();
+					saveTimeEntryStopTimer('stop', new Date().toKimbleUTC(), jQuery('.ticker[entry-id="' + timerEntryId + '"]').attr('timer-elapsed-time-s'), 'reload');
+				}
+
+				function hideWorking()
+				{
+					jQuery('#loadingIndicatorOuterContainer').hide();
+				}
+				
+				function showWorking()
+				{
+					jQuery('#loadingIndicatorOuterContainer').show();
+				}
+				
+				function submitAllTime()
+				{
+					if(checkActiveTimers())
+					{
+						showWorking();
+						enhancedSubmitAll();
+					}
+				}
+				
+				function submitSelectedTime()
+				{
+					if(checkActiveTimers(true))
+					{
+						showWorking();
+						enhancedSubmitSelected();
+					}
+				}
+				
+				function convertSelectedToActual()
+				{
+					showWorking();
+					enhancedActualise();
+				}
+				
+				function checkActiveTimers(selectedOnly)
+				{
+					var timerCount = (selectedOnly ? jQuery('.time-entry-card.selected .te-timer.active').length : jQuery('.te-timer.active').length);
+					
+					if(timerCount > 0) alert(l['activeTimers']);
+					
+					return timerCount == 0;
+				}
+				
+				function updateTotals()
+				{
+					jQuery('.total-units').text(jQuery('.hidden-period-total span').text());
+					jQuery('.hidden-day-total span').each(function() {
+						var thisTotal = jQuery(this);jQuery('div.time-entry-period-header[period-id="' + thisTotal.closest('div.time-entry-period-body').attr('period-id') + '"] div.unit-amt span').text(thisTotal.text());
+					});
+				}
+
+				function checkboxChange()
+				{
+					var clickedItem = jQuery(this);
+					selectItem(clickedItem.closest('.entry-card'), clickedItem.find('input').is(':checked'));
+				}
+				
+				function selectModeOn()
+				{
+					jQuery('div.entry-card.selectable').addClass('selecting');
+					jQuery('.entry-card:not(.selectable)').addClass('not-selecting');
+					jQuery('.select-btn').addClass('hidden-item');
+					jQuery('.cancel-select-btn').removeClass('hidden-item');
+				}
+
+				function selectAll()
+				{
+					selectModeOn();
+					jQuery('div.entry-card.selectable').addClass('selected');
+					enableSelectAndSubmit();
+					jQuery('.entry-card-actions input[type="checkbox"]').prop('checked', true);
+				}
+				
+				function enableSelectAndSubmit()
+				{
+					jQuery('li#select-all').toggleClass('disabled', jQuery('.selectable').length == 0);
+					jQuery('li#select-draft').toggleClass('disabled', jQuery('.select-time').length == 0);
+					jQuery('li#select-items').toggleClass('disabled', jQuery('.selectable').length == 0);
+
+					jQuery('li#submit-items').toggleClass('disabled', jQuery('.selected').length == 0);
+					jQuery('li#submit-all').toggleClass('disabled', jQuery('.select-time').length == 0);
+				}
+				
+				function selectAllDraft()
+				{
+					selectModeOn();
+					jQuery('.select-time').closest('.entry-card.selectable').addClass('selected');
+					enableSelectAndSubmit();
+					jQuery('.select-time input[type="checkbox"]').prop('checked', true);
+				}
+				
+				function selectItem(clickedItem, forceState)
+				{
+					if(forceState != undefined)
+					{
+						clickedItem.toggleClass('selected', forceState);
+					}
+					else
+					{
+						clickedItem.toggleClass('selected');
+						clickedItem.find('input[type="checkbox"]').prop('checked', clickedItem.hasClass('selected'));
+					}
+
+					enableSelectAndSubmit();
+					jQuery('.actualise-btn').toggleClass('hidden-item', jQuery('.actualise-time input[type="checkbox"]:checked').length == 0);
+				}
+				
+				function selectModeOff()
+				{
+					jQuery('div.selecting').removeClass('selecting').removeClass('selected');
+					jQuery('.not-selecting').removeClass('not-selecting');
+					jQuery('.select-btn').removeClass('hidden-item');
+					jQuery('.cancel-select-btn, .actualise-btn').addClass('hidden-item');
+					enableSelectAndSubmit();
+					jQuery('.entry-card-actions input[type="checkbox"]').prop('checked', false);
+				}
+				
+				function stopActiveTimer()
+				{
+					// find and stop the active timer
+					jQuery('.stop-timer-btn i').removeClass('fa-stop-circle').addClass('fa-circle-o-notch').addClass('fa-spin');
+					jQuery('.te-timer .stop-timer').click();
+				}
+				
+				function stopTimer(e)
+				{
+					jQuery(this).removeClass('fa-stop-circle').addClass('fa-circle-o-notch').addClass('fa-spin');
+					jQuery(this).closest('.te-timer').find('.ticker').stopTimer();
+					inlineStopTimer(jQuery(this).closest('.time-entry-card').attr('data-entry-id'), 'stop', new Date().toKimbleUTC(), jQuery(this).closest('.te-timer').find('.ticker').attr('timer-elapsed-time-s'));
+					
+					e.stopPropagation();
+				}
+				
+				function getLocalTime()
+				{
+					// EDGE has a bug which returns the "right-to-left" character within a locale based string so this needs to be parsed out
+					// secondly EDGE will default to AM/PM format not 24h so we force the 2-digit format
+					return new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit', hour12: false}).replace(/\u200E/g,"");
+				}
+				
+				function defaultFieldsAndStartNewTimerFromForecast()
+				{
+					// if mandatory fields are applicable but null they'll prevent the save of the entry
+					// default them based on the logic that would apply if the entry was from scratch
+					
+					// Default Start/End Time to now and Units to 0 - the timer will populate these when stopped
+					var currentTime = getLocalTime().slice(0,5);
+					
+					var remainingUnitsField = jQuery('.boxy-content:visible .remaining-effort');
+					var startTimeField = jQuery('.kimbleTimePicker.StartTimeText:visible');
+					var endTimeField = jQuery('.kimbleTimePicker.EndTimeText:visible');
+					var entryUnitsField = jQuery('.EntryUnitsText:visible');
+					
+					remainingUnitsField.attr('disabled', 'disabled');
+					entryUnitsField.attr('disabled', 'disabled');
+					startTimeField.attr('disabled', 'disabled');
+					endTimeField.attr('disabled', 'disabled');
+					
+					if(startTimeField.val() == "") startTimeField.val(currentTime);
+					if(endTimeField.val() == "") endTimeField.val(currentTime).change();
+					
+					startNewTimerFromForecast('start', new Date().toKimbleUTC(), getLocalTime());
+				}
+				
+				function scrollFixed()
+				{
+					if(jQuery($thePeriodSummaryContainer).hasClass('floating')) hidePeriodSummary();
+
+				    var $orginal = jQuery('#fixed-header-container');
+				    var originalTop = $orginal.offset().top;
+					var winScroll = jQuery(window).scrollTop();
+
+					var $f = jQuery('#fixed-header');
+
+					if (winScroll > originalTop - 2)
+					{
+						$f.css({visibility:'visible'});
+						$f.width($orginal.width());
+					}
+					else
+					{
+						$f.css({visibility:'hidden'});
+					}
+    			}
+
+				function createNewTimeEntryFromForecast()
+				{
+					var clickedItem = jQuery(this);
+
+					if(clickedItem.hasClass('selecting'))
+					{
+						selectItem(clickedItem);
+					}
+					else
+					{
+						var theActualisableKey = clickedItem.attr('data-actualisable-key');
+
+						initialiseModalBoxy('#NewTimeEntryFromForecastPopup', '{!$ObjectType.TimeEntry__c.label}');
+						newTimeEntryFromForecast(theActualisableKey);
+					}
+				}
+				
+				function toggleSuggestions()
+				{
+					var clickedItem = jQuery(this);
+				}
+
+				function getForecastEntryForEdit()
+				{
+				    var clickedItem = jQuery(this);
+					var theEntryKey = clickedItem.attr('data-actualisable-key');
+
+					initialiseModalBoxy('#EditForecastEntryPopup', '{!$ObjectType.ForecastTimeEntry__c.label}');
+					getForecastEntry(theEntryKey);
+    			}
+    			
+    			function openTimeEntry()
+    			{
+				    var clickedItem = jQuery(this);
+
+					if(clickedItem.hasClass('selecting'))
+					{
+						selectItem(clickedItem);
+					}
+					else
+					{
+						var theEntryId = clickedItem.attr('data-entry-id');
+
+						initialiseModalBoxy('#EditTimeEntryPopup', '{!$ObjectType.TimeEntry__c.label}');
+						editTimeEntry(theEntryId);
+					}
+    			}
+    			
+    			function openExpenseItem()
+    			{
+				    var clickedItem = jQuery(this);
+					var theItemId = clickedItem.attr('data-item-id');
+
+					initialiseModalBoxy('#ExpenseItemPopup', '{!$ObjectType.KimbleOne__ExpenseItem__c.label}');
+					getExpenseItem(theItemId);
+    			}
+				
+				function destroyTTips()
+				{
+					jQuery('[t-tip]').qtip('destroy', true);
+					jQuery('[t-tip-right]').qtip('destroy', true);
+					jQuery('[t-tip-grid-row]').qtip('destroy', true);
+				}
+				
+				function initialiseTTips()
+				{
+					var enableTTips = <apex:outputText value="{!ShowTimesheetTooltips}"/>; 
+					
+					// set up default TTips 
+					jQuery('[t-tip-default]').qtip('destroy', true).each(function()
+					{
+					   jQuery(this).qtip({
+							content: ttipLabels[jQuery(this).attr('t-tip-default')],
+							position: {my: 'bottom center', at: 'top center',viewport: $(window)},
+							style: {classes: 'qtip-light qtip-shadow qtip-rounded t-tip-qtip'},
+							show: { solo: true }
+					   });
+					});
+					
+					// set up tips if setting enabled
+					if(enableTTips)
+					{
+						jQuery('[t-tip]').qtip('destroy', true).each(function()
+						{
+						   jQuery(this).qtip({
+								content: ttipLabels[jQuery(this).attr('t-tip')],
+								position: {my: 'bottom center', at: 'top center',viewport: $(window)},
+								style: {classes: 'qtip-light qtip-shadow qtip-rounded t-tip-qtip'},
+								show: { solo: true }
+						   });
+						});
+						
+						jQuery('[t-tip-right]').qtip('destroy', true).each(function()
+						{
+							jQuery(this).qtip({
+								content: ttipLabels[jQuery(this).attr('t-tip-right')],
+								position: {my: 'left center', at: 'right center', viewport: $(window)},
+								style: {classes: 'qtip-light qtip-shadow qtip-rounded t-tip-qtip'},
+								show: { solo: true }
+						    });
+						});
+						
+						jQuery('[t-tip-grid-row]').qtip('destroy', true).each(function()
+						{
+							jQuery(this).qtip({
+								content: ttipLabels[jQuery(this).attr('t-tip-grid-row')],
+								position: {my: 'top right', at: 'bottom center', viewport: $(window)},
+								style: {classes: 'qtip-light qtip-shadow qtip-rounded t-tip-qtip'},
+								show: { solo: true }
+							});
+						});
+					}
+				}	
+
+			</script>
+
+			<apex:actionFunction action="{!GetNewEntry}" name="newEntry" rerender="AddEntryDetails" oncomplete="initialiseAsynAssignments();showModalBoxyWithFocus($('.ResourceActivityName'));">
+				<apex:param name="dayPeriodId" value="" />
+				<apex:param name="tmrAction" value="" />
+			</apex:actionFunction>
+			
+			<apex:actionFunction action="{!EditTimeEntry}" name="editTimeEntry" rerender="EditTimeEntryDetails" oncomplete="initialiseDynamicElements();showModalBoxyWithFocus($('.EntryUnitsText'));cacheTaskValues();">
+				<apex:param name="entryId" value="" />
+			</apex:actionFunction>
+
+			<apex:actionFunction action="{!NewTimeEntryFromForecast}" name="newTimeEntryFromForecast" rerender="NewTimeEntryFromForecastDetails" oncomplete="initialiseDynamicElements();showModalBoxyWithFocus($('.EntryUnitsText'));refreshDraftRemainingEffort();">
+				<apex:param name="actualisableTimeEntryKey" value="" />
+			</apex:actionFunction>
+			<apex:actionFunction action="{!GetExpenseItem}" name="getExpenseItem" rerender="ExpenseItemDetailsPopup" oncomplete="showModalBoxy()">
+				<apex:param name="expenseItemId" value="" />
+			</apex:actionFunction>
+
+			<apex:actionFunction action="{!GetForecastEntryToEdit}" name="getForecastEntry" rerender="EditForecastEntryDetails" oncomplete="initialiseDynamicElements();showModalBoxyWithFocus($('.EntryUnitsText'));">
+				<apex:param name="forecastTimeEntryKey" value="" />
+			</apex:actionFunction>
+
+			<apex:actionFunction action="{!QuickDeleteTimeEntry}" name="inlineDeleteTimeEntry" oncomplete="updateHeader();initialiseDynamicElements();" rerender="TimeForm, timesheet-errors">
+				<apex:param name="teId" value=""/>
+			</apex:actionFunction>
+
+			<apex:actionFunction action="{!QuickToggleTimer}" name="inlineStopTimer" oncomplete="updateHeader();initialiseDynamicElements();stopTimerWorking();" rerender="TimeForm, timesheet-errors">
+				<apex:param name="entryId" value="" />
+				<apex:param name="tmrAction" value=""/>
+				<apex:param name="tmrEndDateUTC" value=""/>
+				<apex:param name="tmrVal" value=""/>
+			</apex:actionFunction>
+
+			<apex:actionFunction action="{!DeleteForecastTimeEntry}" name="deleteForecastTimeEntry" oncomplete="updateHeader();initialiseDynamicElements();" rerender="TimeForm, timesheet-errors">
+				<apex:param name="identifier" value=""/>
+			</apex:actionFunction>
+
+			<apex:actionFunction action="{!JumpToDate}" name="jumpToDate" oncomplete="updateHeader();initialiseDynamicElements();" rerender="TimeForm, timesheet-errors">
+				<apex:param name="jumpToDateUTC" value=""/>
+			</apex:actionFunction>
+						
+			<apex:actionFunction action="{!JumpToTrackingPeriod}" name="jumpToTrackingPeriod" oncomplete="updateHeader();initialiseDynamicElements();" rerender="TimeForm, timesheet-errors">
+				<apex:param name="trackingPeriodId" value=""/>
+			</apex:actionFunction>
+						
+			<apex:actionFunction action="{!GoPreviousPeriod}" name="GoPreviousPeriod" />
+			<apex:actionFunction action="{!GoNextPeriod}" name="GoNextPeriod"/>
+					
+			<apex:actionFunction action="{!AdjustPeriod}" name="AdjustPeriod"/>
+			
+			<!-- Enhanced Timesheet action functions -->
+			<apex:outputPanel layout="none" rendered="{!EnhancedView}">
+			<apex:actionFunction action="{!SubmitTimeEntries}" name="enhancedSubmitAll" rerender="TimeForm, timesheet-errors" oncomplete="updateHeader();showSubmissionErrors();selectModeOff();hideWorking();"/>
+			<apex:actionFunction action="{!SubmitSelectedTimeEntries}" name="enhancedSubmitSelected" rerender="TimeForm, timesheet-errors" oncomplete="updateHeader();showSubmissionErrors();selectModeOff();hideWorking();"/>
+			<apex:actionFunction action="{!ActualiseSelectedEntries}" name="enhancedActualise" rerender="TimeForm, timesheet-errors" oncomplete="updateHeader();showSubmissionErrors();selectModeOff();hideWorking();"/>
+			</apex:outputPanel>
+			</apex:form>
+
+			<div id="AddEntryPopup" style="display: none">
+
+					<apex:outputPanel id="AddEntryDetails" style="min-width:550px;min-height:400px;display:block" >
+						<apex:form >
+							<apex:actionFunction action="{!SaveNewEntry}" rendered="{!!NewTimerMode}" name="saveNewEntry" oncomplete="if (checkOperationSuccess(jQuery('[id$=\'saveNewTimeEntryBtn\']'))) {hideModalBoxyWithErrorCheck('#new-entry-panel-errors');updateHeader();initialiseDynamicElements();}" rerender="TimeForm, AddEntryDetails"></apex:actionFunction>
+							<apex:actionFunction action="{!SaveNewEntry}" rendered="{!NewTimerMode && !HasActiveTimer}" name="saveNewEntryStartTimer" oncomplete="if (checkOperationSuccess(jQuery('[id$=\'saveNewTimeEntryBtn\']'))) {hideModalBoxyWithErrorCheck('#new-entry-panel-errors');updateHeader();initialiseDynamicElements();}" rerender="TimeForm, AddEntryDetails">
+								<apex:param name="tmrAction" value="start" />
+								<apex:param name="tmrStartDteUTC" value="" />
+								<apex:param name="tmrStartTime" value="" />
+							</apex:actionFunction>
+							<apex:outputPanel id="NewEntryMessagePanel">
+								<div id="new-entry-panel-errors"><apex:pageMessages escape="false" id="errormessages" /></div>
+							</apex:outputPanel>
+
+							<apex:variable var="SuffixTranslationKey" value="{!$ObjectType.KimbleOne__UnitType__c.Name}:{!$ObjectType.KimbleOne__UnitType__c.Fields.KimbleOne__Suffix__c.Name}:{!TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__UsageUnitType__c}" />
+							<apex:variable var="SuffixTrans" value="{!TranslationsMap[SuffixTranslationKey]}" />
+							<apex:variable var="Suffix" value="{!TheSelectedAssignment.ResourcedActivityOperatedWith__r.UsageUnitType__r.KimbleOne__Suffix__c}" />
+							<apex:variable var="EntryTranslationKey" value="{!$ObjectType.KimbleOne__TimeEntry__c.Name}:{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__EntryUnits__c.Name}:{!TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__UsageUnitType__c}" />
+							<apex:variable var="EntryLabelTrans" value="{!TranslationsMap[EntryTranslationKey]}" />
+
+							<apex:pageBlock mode="edit" rendered="{!NewEntryMode}">
+								<apex:outputPanel id="AddTimeEntryDetailsSubPanel"  >
+
+									<apex:actionStatus id="ActivityLoadingStatus">
+										<apex:facet name="start">
+											<h2 style="margin-left: 32px;margin-bottom:100px;display:block;font-size: 1.1em;"><img src="{!URLFOR($Resource.LoadingImage)}" />{!$Label.Loading}</h2>
+										</apex:facet>
+										<apex:facet name="stop">
+
+											<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+
+												<apex:pageBlockSectionItem labelStyle="width:40%">
+													<apex:outputText value="{!$ObjectType.KimbleOne__Timesheet__c.Fields.KimbleOne__ResourcedActivity__c.Label}" />
+													<apex:outputPanel layout="block" styleClass="requiredInput">
+														<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+														<apex:actionRegion >
+															<apex:selectList rendered="{!!AsyncAssignments}" id="plannedActivitySelect" styleclass="ResourceActivityName " value="{!NewEntryAssignmentId}" multiselect="false" size="1" required="true">
+																<apex:actionSupport event="onchange" action="{!SelectNewEntryActivityAssignment}" rerender="ActivityLoadingStatus, TimeButtonPanel" status="ActivityLoadingStatus" oncomplete="initialiseDynamicElements();"/>
+																<apex:selectOptions value="{!TheAvailableAssignmentOptions}" />
+															</apex:selectList>
+
+															<apex:inputText id="asyncActivitySelect" value="{!NewEntryAssignmentId}" html-data-name="{!SelectedAssignmentName}" html-data-startdate="{!EntryPeriodStartDateUTC}" style="visibility:hidden" rendered="{!AsyncAssignments}">
+																<apex:actionSupport event="onchange" action="{!SelectNewEntryActivityAssignment}" rerender="ActivityLoadingStatus, TimeButtonPanel" status="ActivityLoadingStatus" oncomplete="initialiseDynamicElements();initialiseAsynAssignments();"/>
+
+															</apex:inputText>
+
+														</apex:actionRegion>
+													</apex:outputPanel>
+												</apex:pageBlockSectionItem>
+
+												<apex:pageBlockSectionItem labelStyle="width:40%" rendered="{!!NewTimerMode && !ISBLANK(NewEntryAssignmentId)}">
+													<apex:outputLabel value="{!$ObjectType.KimbleOne__TimePeriod__c.Fields.KimbleOne__StartDate__c.Label}"/>
+                                                    <apex:actionRegion ><apex:inputField id="entryStartDate" styleclass="datePickerPopup kimbleDatePicker entry-date start-entry-date persist-time-field" value="{!FakeForDateEntryStartDate.KimbleOne__InputDate__c}">
+                                                        <apex:actionSupport event="onchange" action="{!StartDateChange}" rerender="ActivityLoadingStatus, TimeButtonPanel, NewEntryMessagePanel" status="ActivityLoadingStatus" onsubmit="validateEndDate('AddEntryPopup');disableTimeFields('AddEntryPopup')" oncomplete="closeActiveDatePicker();enableTimeFields('AddEntryPopup'); initialiseDynamicElements();initialiseAsynAssignments();"/>
+                                                    </apex:inputField>
+                                                    </apex:actionRegion>
+												</apex:pageBlockSectionItem>
+
+												<apex:pageBlockSectionItem labelStyle="width:40%" rendered="{!!NewTimerMode && !ISBLANK(NewEntryAssignmentId)}">
+													<apex:outputLabel value="{!$ObjectType.KimbleOne__TimePeriod__c.Fields.KimbleOne__EndDate__c.Label}"/>
+													<apex:inputField id="entryEndDate" styleclass="datePickerPopup kimbleDatePicker entry-date end-entry-date persist-time-field" value="{!FakeForDateEntryEndDate.KimbleOne__InputDate__c}"/>
+												</apex:pageBlockSectionItem>
+
+												<apex:pageBlockSectionItem rendered="{!!ISBLANK(NewTimeEntry)}">
+													<apex:outputLabel value="{!$Label.kimbleone__periodratebandalternatenamelabel}" />
+													<apex:outputPanel layout="block" styleClass="requiredInput">
+														<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+														<apex:actionRegion >
+															<apex:selectList value="{!NewTimeEntry.KimbleOne__ActivityAssignmentRate__c}" multiselect="false" size="1" required="true" styleClass="NewTimeEntryRates">
+																<apex:actionSupport event="onchange" action="{!SelectActivityAssignmentRate}" rerender="AddTimeEntryDetailsSubPanel, TimeButtonPanel" onsubmit="disableTimeFields('AddEntryPopup')" oncomplete="enableTimeFields('AddEntryPopup');initialiseAsynAssignments();" />
+																<apex:selectOptions value="{!TheActivityPeriodRateBandOptions}" />
+															</apex:selectList>
+															<apex:outputPanel styleclass="TimeFieldsLoadingPanel" style="display:none">
+																<img src="{!URLFOR($Resource.LoadingImage)}" />
+															</apex:outputPanel>
+														</apex:actionRegion>
+
+													</apex:outputPanel>
+												</apex:pageBlockSectionItem>
+												<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && ShowCurrentRemainingUsageInTimeEntry}">
+													<apex:outputLabel value="{!$Label.kimbleone__currentremainingusagelabel}"/>
+													<apex:outputPanel layout="none">
+														<span class="kimble-format-number" kimble-number-format="0.####" display-hours-mins="{!!ISBLANK(TheSelectedAssignment) && TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__ShowUsageAsHoursAndMins__c}">
+															<apex:outputText value="{!AssignmentCurrentRemainingUsage}" />
+														</span>
+														<apex:outputText styleClass="CurrentRemainingUsageOutput" value=" {!SuffixTrans}" rendered="{!!ISBLANK(TheSelectedAssignment) && !TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__ShowUsageAsHoursAndMins__c}"/>
+													</apex:outputPanel>
+												</apex:pageBlockSectionItem>
+
+												<apex:pageBlockSectionItem rendered="{!TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'Task' || TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'CategoryAndTask'}">
+													<apex:outputText value="{!$ObjectType.KimbleOne__Task__c.Fields.Name.Label}" />
+													<apex:outputPanel layout="block" styleClass="requiredInput">
+														<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+														<apex:actionRegion >
+															<apex:selectList id="planTaskSelect" value="{!NewTimeEntry.KimbleOne__PlanTaskAssignment__c}"  multiselect="false" size="1" required="true">
+																<apex:selectOptions value="{!ThePlanTaskOptions}" />
+																<apex:actionSupport event="onchange" action="{!SelectPlanTaskAssignmentNew}" rerender="AddTimeEntryDetailsSubPanel, TimeButtonPanel" onsubmit="disableTimeFields('AddEntryPopup')" oncomplete="enableTimeFields('AddEntryPopup');refreshDraftRemainingEffort();" />
+															</apex:selectList>
+														</apex:actionRegion>
+													</apex:outputPanel>
+												</apex:pageBlockSectionItem>
+
+												<apex:pageBlockSectionItem rendered="{!!NewTimerMode && !ISBLANK(ThePlanTaskAssignment.Id) && !ThePlanTaskAssignment.PlanTask__r.Task__r.KimbleOne__IsFixedEffort__c}">
+													<apex:outputText value="{!$ObjectType.KimbleOne__PlanTaskAssignment__c.Fields.KimbleOne__DraftRemainingEffort__c.Label}" />
+													<apex:outputPanel layout="none">
+														<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+														<apex:inputField required="true" value="{!ThePlanTaskAssignment.KimbleOne__DraftRemainingEffort__c}" html-display-hours-mins="{!!ISBLANK(TheSelectedAssignment) && TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__ShowUsageAsHoursAndMins__c}" html-orig-value="{!ThePlanTaskAssignment.KimbleOne__DraftRemainingEffort__c}" styleclass=" remaining-effort" />
+													</apex:outputPanel>
+												</apex:pageBlockSectionItem>
+
+												<apex:pageBlockSectionItem rendered="{!StartEndTimeRequired && !NewTimerMode && !ISBLANK(TheSelectedAssignmentRate)}">
+													<apex:outputText value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__StartTime__c.Label}"/>
+													<apex:inputField id="entryStartTime" styleclass="kimbleTimePicker StartTimeText persist-time-field" value="{!NewTimeEntry.KimbleOne__StartTime__c}" required="true" />
+												</apex:pageBlockSectionItem>
+
+												<apex:pageBlockSectionItem rendered="{!StartEndTimeRequired && !NewTimerMode && !ISBLANK(TheSelectedAssignmentRate)}">
+													<apex:outputText value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__EndTime__c.Label}"/>
+													<apex:inputField id="entryEndTime" styleclass=" kimbleTimePicker EndTimeText persist-time-field" value="{!NewTimeEntry.KimbleOne__EndTime__c}" required="true" />
+												</apex:pageBlockSectionItem>
+
+												<apex:pageBlockSectionItem rendered="{!!NewTimerMode && !ISBLANK(TheSelectedAssignmentRate)}">
+													<apex:outputText >
+														<div><apex:outputText value="{!EntryLabelTrans}"/></div>
+													</apex:outputText>
+													<apex:outputPanel layout="block" style="position:relative;">
+														<apex:inputField id="entryUnits" required="true" html-display-hours-mins="{!!ISBLANK(TheSelectedAssignment) && TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__ShowUsageAsHoursAndMins__c}" styleclass="EntryUnitsText entry-units persist-time-field " value="{!NewTimeEntry.KimbleOne__EntryUnits__c}" html-orig-value="{!NewTimeEntry.KimbleOne__EntryUnits__c}"/>
+
+														<div class="quick-inputs">
+															<apex:repeat value="{!GetQuickEntryOptions}" var="opt">
+																<div onclick="quickInputClick(this);" quick-inp-val="{!opt.Value}"><apex:outputText value="[ {!opt.Label} ]"/></div>
+															</apex:repeat>
+														</div>
+													</apex:outputPanel>
+
+												</apex:pageBlockSectionItem>
+
+
+												<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && TheSelectedAssignmentRate.ActivityPeriodRateBand__r.RevenueUnitsCalculationMethod__r.KimbleOne__Enum__c = 'Manual'}">
+													<apex:outputText >
+														<div><apex:outputText value="{!$Label.kimbleone__revenuelabel} {!SuffixTrans}"/></div>
+													</apex:outputText>
+													<apex:inputField id="revUnits" required="true" value="{!NewTimeEntry.KimbleOne__RevenueUnits__c}" html-display-hours-mins="{!!ISBLANK(TheSelectedAssignment) && TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__ShowUsageAsHoursAndMins__c}" styleclass="persist-time-field" />
+												</apex:pageBlockSectionItem>
+
+												<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__HasCases__c}">
+													<apex:outputLabel value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Case__c.Label}"/>
+													<apex:inputField id="caseInput" value="{!NewTimeEntry.KimbleOne__Case__c}"  styleclass="persist-time-field kimbleSearch" html-data-typename="LookupObjectCase" html-data-filter="TimesheetCaseFilter;{!TheSelectedAssignment.KimbleOne__ResourcedActivity__c}:{!TheSelectedAssignment.KimbleOne__DeliveryGroup__c}" />
+												</apex:pageBlockSectionItem>
+
+												<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate)}">
+													<apex:outputLabel value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Notes__c.Label}"/>
+													<apex:outputPanel layout="none">
+														<apex:outputPanel layout="block" styleClass="requiredInput" >
+															<apex:outputPanel layout="block" styleClass="requiredBlock" rendered="{!TimeEntryNotesMandatory}"></apex:outputPanel>
+															<apex:inputTextarea id="notesField" rows="4" cols="45" value="{!NewTimeEntry.KimbleOne__Notes__c}" styleclass="NoteText persist-time-field" required="{!TimeEntryNotesMandatory}"/>
+														</apex:outputPanel>
+													</apex:outputPanel>
+												</apex:pageBlockSectionItem>
+												
+												<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'Reference'}">
+													<apex:outputLabel value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Reference__c.Label}"/>
+													<apex:inputText id="referenceInput" value="{!NewTimeEntry.KimbleOne__Reference__c}"  styleclass="persist-time-field"/>
+												</apex:pageBlockSectionItem>
+
+												<apex:repeat value="{!NumberOfTimeCategories}" var="num" rendered="{!!ISBLANK(TheSelectedAssignmentRate) && (TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c = 'Category' || TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'CategoryAndTask')}">
+													<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && (TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c = 'Category' || TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'CategoryAndTask' ) && TheActivityTimeCategories[num].Show}">
+														<apex:outputLabel value="{!TheActivityTimeCategories[num].TheCategory.Name}" />
+
+														<apex:outputPanel layout="none">
+															<apex:inputField id="categoryInput" styleclass="persist-time-field" value="{!NewTimeEntry['Category' & TEXT(TheActivityTimeCategories[num].TheCategory.DisplaySequence__c) & '__c']}" required="{!TheActivityTimeCategories[num].TheCategory.IsMandatory__c}" rendered="{!TheActivityTimeCategories[num].TheCategory.DisplayType__r.Enum__c = 'Text'}"  />
+
+															<apex:outputPanel layout="block" styleClass="requiredInput" rendered="{!(TheActivityTimeCategories[num].TheCategory.DisplayType__r.Enum__c = 'Dropdown') && TheActivityTimeCategories[num].TheCategory.IsMandatory__c}">
+																<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+																<apex:selectList styleclass="persist-time-field" value="{!NewTimeEntry['Category' & TEXT(TheActivityTimeCategories[num].TheCategory.DisplaySequence__c) & '__c']}" multiselect="false" size="1" required="true"  >
+																	<apex:selectOptions value="{!TheActivityTimeCategories[num].TheOptions}" />
+																</apex:selectList>
+															</apex:outputPanel>
+															<apex:selectList styleclass="persist-time-field" value="{!NewTimeEntry['Category' & TEXT(TheActivityTimeCategories[num].TheCategory.DisplaySequence__c) & '__c']}" multiselect="false" size="1" rendered="{!(TheActivityTimeCategories[num].TheCategory.DisplayType__r.Enum__c = 'Dropdown') && !TheActivityTimeCategories[num].TheCategory.IsMandatory__c}"  >
+																<apex:selectOptions value="{!TheActivityTimeCategories[num].TheOptions}" />
+															</apex:selectList>
+														</apex:outputPanel>
+													</apex:pageBlockSectionItem>
+												</apex:repeat>
+
+												<apex:pageBlockSectionItem rendered="{!!ISBLANK(NewForecastTimeEntry)}">
+													<apex:outputText value="{!EntryLabelTrans}"/>
+													<apex:outputPanel layout="block" style="position:relative;">
+														<apex:inputField styleclass="EntryUnitsText entry-units" value="{!NewForecastTimeEntry.KimbleOne__EntryUnits__c}" required="true"/>
+														<div class="quick-inputs">
+															<apex:repeat value="{!GetQuickEntryOptions}" var="opt">
+																<div onclick="quickInputClick(this);" quick-inp-val="{!opt.Value}"><apex:outputText value="[ {!opt.Label} ]"/></div>
+															</apex:repeat>
+														</div>
+													</apex:outputPanel>
+												</apex:pageBlockSectionItem>
+
+												<apex:pageBlockSectionItem rendered="{!!NewTimerMode && ShowForecastStartEndTime}">
+													<apex:outputLabel value="{!$ObjectType.KimbleOne__ForecastTimeEntry__c.Fields.KimbleOne__StartTime__c.Label}"/>
+													<apex:inputField id="entryStartTime" styleclass="kimbleTimePicker StartTimeText" value="{!NewForecastTimeEntry.KimbleOne__StartTime__c}" />
+												</apex:pageBlockSectionItem>
+
+												<apex:pageBlockSectionItem rendered="{!!NewTimerMode && ShowForecastStartEndTime}">
+													<apex:outputLabel value="{!$ObjectType.KimbleOne__ForecastTimeEntry__c.Fields.KimbleOne__EndTime__c.Label}"/>
+													<apex:inputField id="entryEndTime" styleclass="kimbleTimePicker EndTimeText" value="{!NewForecastTimeEntry.KimbleOne__EndTime__c}" />
+												</apex:pageBlockSectionItem>
+
+												<apex:pageBlockSectionItem rendered="{!!NewTimerMode && !ISBLANK(NewForecastTimeEntry)}">
+													<apex:outputLabel value="{!$ObjectType.KimbleOne__ForecastTimeEntry__c.Fields.KimbleOne__Notes__c.Label}"/>
+													<apex:outputPanel layout="none">
+														<apex:outputPanel layout="block" styleClass="requiredInput">
+															<apex:outputPanel layout="block" styleClass="requiredBlock" rendered="{!TimeEntryNotesMandatory}"></apex:outputPanel>
+															<apex:inputTextarea rows="4" cols="45" value="{!NewForecastTimeEntry.KimbleOne__Notes__c}" required="{!TimeEntryNotesMandatory}"/>			
+														</apex:outputPanel>
+													</apex:outputPanel>
+												</apex:pageBlockSectionItem>
+
+											</apex:pageblockSection>
+										</apex:facet>
+									</apex:actionStatus>
+								</apex:outputPanel>
+
+							<apex:outputPanel id="TimeButtonPanel">
+
+								<apex:pageBlock >
+									<apex:pageBlockButtons styleclass="ButtonPanelAddTimeEntry" id="ButtonPanelAddTimeEntry" location="bottom">
+										<apex:outputPanel layout="none" rendered="{!!NewTimerMode && !ISBLANK(TheSelectedAssignment)}"><input id="saveNewEntryBtn" class="btn DisableButtonWhileBusy TimeSaveButton" type="button" onclick="saveNewEntry(); destroyTTips();" value="{!IF(TheSelectedAssignment.ResourcedActivityOperatedWith__r.SelfForecastApprovalRequired__c && EntryPeriod.StartDate__c > TODAY(), $Label.SubmitForApprovalButton, $Label.SaveTimeEntry)}"/></apex:outputPanel>
+										<apex:outputPanel layout="none" rendered="{!NewTimerMode && !HasActiveTimer && !ISBLANK(TheSelectedAssignment)}"><input id="saveNewEntryStartTimerBtn" class="btn DisableButtonWhileBusy TimeSaveButton" type="button" onclick="saveNewEntryStartTimer('start', new Date().toKimbleUTC(), getLocalTime()); destroyTTips();" value="{!$Label.kimbleone__starttimerlabel}" t-tip="TETimerStartBtn"/></apex:outputPanel>
+										<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}" />
+									</apex:pageBlockButtons>
+								</apex:pageBlock>
+							</apex:outputPanel>
+							</apex:pageBlock>
+						</apex:form>
+
+					</apex:outputPanel></div>
+
+			<div id="EditForecastEntryPopup" style="display:none;">
+				<apex:outputPanel id="EditForecastEntryDetails" style="min-width:550px;min-height:400px;display:block" >
+
+					<apex:form >
+						<apex:actionFunction action="{!SaveForecastTimeEntry}" name="saveForecastTimeEntry" oncomplete="if (checkOperationSuccess(jQuery('[id$=\'saveForecastTimeEntryBtn\']'))) {hideModalBoxyWithErrorCheck('#errors');updateHeader();initialiseDynamicElements();}" rerender="TimeForm, EditForecastEntryDetails"></apex:actionFunction>
+						<apex:outputPanel id="EditForecastEntryMessagePanel">
+							<div id="errors"><apex:pageMessages escape="false" id="errormessages" /></div>
+						</apex:outputPanel>
+
+						<apex:variable var="SuffixTranslationKey" value="{!$ObjectType.KimbleOne__UnitType__c.Name}:{!$ObjectType.KimbleOne__UnitType__c.Fields.KimbleOne__Suffix__c.Name}:{!TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__UsageUnitType__c}" />
+						<apex:variable var="SuffixTrans" value="{!TranslationsMap[SuffixTranslationKey]}" />
+						<apex:variable var="Suffix" value="{!TheSelectedAssignment.ResourcedActivityOperatedWith__r.UsageUnitType__r.KimbleOne__Suffix__c}" />
+						<apex:variable var="EntryTranslationKey" value="{!$ObjectType.KimbleOne__TimeEntry__c.Name}:{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__EntryUnits__c.Name}:{!TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__UsageUnitType__c}" />
+						<apex:variable var="EntryLabelTrans" value="{!TranslationsMap[EntryTranslationKey]}" />
+
+						<apex:pageBlock mode="edit" rendered="{!!ISBLANK(NewForecastTimeEntry)}">
+							<apex:outputPanel id="EditForecastEntryDetailsSubPanel"  >
+
+								<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+
+									<apex:pageBlockSectionItem labelStyle="width:40%">
+										<apex:outputText value="{!$Label.kimbleone__resourceactivityalternativelabel}" />
+										<apex:outputPanel >
+											<apex:outputText value="{!TheSelectedAssignment.ResourcedActivity__r.Name}" />
+											<apex:outputText value=" ({!TheSelectedAssignment.ActivityRole__r.Name})" rendered="{!!ISBLANK(TheSelectedAssignment.ActivityRole__r.Name)}" />
+										</apex:outputPanel>
+									</apex:pageBlockSectionItem>
+
+									<apex:pageBlockSectionItem labelStyle="width:40%">
+										<apex:outputLabel value="{!$ObjectType.KimbleOne__TimePeriod__c.Fields.KimbleOne__StartDate__c.Label}"/>
+										<apex:outputField value="{!FakeForDateEntryStartDate.KimbleOne__InputDate__c}"/>
+									</apex:pageBlockSectionItem>
+
+									<apex:pageBlockSectionItem >
+										<apex:outputText value="{!EntryLabelTrans}"/>
+										<apex:inputField styleclass="EntryUnitsText entry-units" value="{!NewForecastTimeEntry.KimbleOne__EntryUnits__c}" required="true"/>
+									</apex:pageBlockSectionItem>
+									<apex:pageBlockSectionItem rendered="{!ShowForecastStartEndTime}">
+										<apex:outputLabel value="{!$ObjectType.KimbleOne__ForecastTimeEntry__c.Fields.KimbleOne__StartTime__c.Label}"/>
+										<apex:inputField id="entryStartTime" styleclass="kimbleTimePicker StartTimeText" value="{!NewForecastTimeEntry.KimbleOne__StartTime__c}" />
+									</apex:pageBlockSectionItem>
+
+									<apex:pageBlockSectionItem rendered="{!ShowForecastStartEndTime}">
+										<apex:outputLabel value="{!$ObjectType.KimbleOne__ForecastTimeEntry__c.Fields.KimbleOne__EndTime__c.Label}"/>
+										<apex:inputField id="entryEndTime" styleclass="kimbleTimePicker EndTimeText" value="{!NewForecastTimeEntry.KimbleOne__EndTime__c}" />
+									</apex:pageBlockSectionItem>
+
+								</apex:pageblockSection>
+							</apex:outputPanel>
+
+							<apex:outputPanel id="TimeButtonPanel">
+
+
+								<apex:pageBlock >
+									<apex:pageBlockButtons styleclass="ButtonPanelAddTimeEntry" id="ButtonPanelAddTimeEntry" location="bottom">
+										<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheSelectedAssignment)}"><input id="saveNewEntryBtn" class="btn DisableButtonWhileBusy TimeSaveButton" type="button" onclick="saveForecastTimeEntry(); destroyTTips();" value="{!$Label.SaveTimeEntry}"/></apex:outputPanel>
+										<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}" />
+									</apex:pageBlockButtons>
+								</apex:pageBlock>
+							</apex:outputPanel>
+						</apex:pageBlock>
+					</apex:form>
+
+				</apex:outputPanel>
+			</div>
+
+			<script> 	
+			var valuesLV = Array();
+				
+			var autoDecrementRemainingEffort = <apex:outputText value="{!AutoDecrementRemainingEffort}"/>;;
+			var oldFieldValues = {};
+
+				function validateEndDate(containerId)
+				{
+				   containerId = '#' + containerId;
+
+				    var startDate = kimble.parseDate(jQuery(containerId).find('[id$="entryStartDate"]').val(), true);
+				    var endDate = kimble.parseDate(jQuery(containerId).find('[id$="entryEndDate"]').val(), true);
+
+				    if (endDate < startDate) jQuery(containerId).find('[id$="entryEndDate"]').val(kimble.formatDate(startDate.toKimbleUTC()));
+    			}
+
+                function closeActiveDatePicker()
+                {
+                    DatePicker.getDatePicker().skipReopen = false;
+                }
+
+				function disableTimeFields(containerId)
+				{
+					oldFieldValues = {};
+					containerId = '#' + containerId;
+
+					jQuery(containerId).find('input, select').attr('disabled', 'disabled');
+					jQuery('.TimeFieldsLoadingPanel').show();
+
+					jQuery.each(jQuery(containerId + ' .persist-time-field:visible'), function(i, obj){
+
+						var $o = jQuery(obj);
+
+						oldFieldValues[obj.id] = $o.val();
+     				});
+
+				}
+
+				function enableTimeFields(containerId)
+				{
+					containerId = '#' + containerId;
+
+					jQuery.each(jQuery(containerId + ' .persist-time-field:visible'), function(i, obj){
+
+						var $o = jQuery(obj);
+
+						$o.val(oldFieldValues[obj.id]);
+     				});
+
+					oldFieldValues = {};
+
+					initialiseDynamicElements();
+				}
+				
+				function updateHeader() {
+					$('.datepicker').datepicker({
+							dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+							showOtherMonths: true,
+							selectOtherMonths: true,
+							buttonText: '{!JSENCODE($Label.OpenTimePeriodDropdownToolTip)}',
+							buttonImageOnly: true,
+							buttonImage: '{!URLFOR($Resource.AssignmentImages, 'CalendarButtonSquare.png')}',
+							showOn: "button"
+							});
+							
+					updateTotals();
+					enableSelectAndSubmit();
+
+					findNumbersToFormat();
+				}
+
+				function findNumbersToFormat() {
+					jQuery('.kimble-format-number').each(function (i, o) {
+						let $o = jQuery(o);
+						if  ($o.attr('kimble-raw-val') == null) {
+						    $o.attr('kimble-raw-val', $o.text());
+							$o.text(kimble.formatNumber($o.text(), $o.attr('kimble-number-format'))).show();
+						}
+     				});
+    			}
+
+				function quickInputClick(obj)
+				{
+				    var $o = jQuery(obj);
+
+				    jQuery('.boxy-content:visible .entry-units').val(kimble.formatNumber($o.attr('quick-inp-val'), '.##')).change();
+				}
+				
+				var origPTA = null;
+				var origEntryUnits = null;
+				function cacheTaskValues()
+				{
+					origPTA = jQuery('.edit-time-pta:visible').val();
+					origEntryUnits = kimble.parseNumber(jQuery('.boxy-content:visible .entry-units').val());
+				}
+				
+				function selectedTaskChanged()
+				{
+					if(autoDecrementRemainingEffort)
+					{
+						var origValueReset = (jQuery('.edit-time-pta:visible').val() != origPTA ? 0 : origEntryUnits);
+						jQuery('.boxy-content:visible .entry-units').attr('orig-value', origValueReset);
+					}
+				}
+				
+				function refreshDraftRemainingEffort()
+				{
+					if(autoDecrementRemainingEffort) jQuery('.boxy-content:visible .entry-units').change();
+				}
+
+				function initialiseAsynAssignments()
+				{
+					jQuery('[id $= "asyncActivitySelect"]').select2({
+	            		minimumInputLength: 2,
+	            		multiple: false,
+	            		query: function (params) {
+	            			var find = function() {findMatchingAssignments(params);};        		
+	        				find();
+	            		},
+	            		initSelection : function (element, callback) {
+					        var data = {id: element.val(), text: element.attr('data-name')};
+					        callback(data);
+					    }
+        			})
+        			.on("change", function(e) {  });
+				
+					if({!ShowTimesheetTooltips} && {!EnhancedView})
+					{
+						jQuery('.ResourceActivityName').attr('t-tip-right','TEPopUpActivityName');
+						initialiseTTips();	
+					}		
+        		}
+        		
+        		function stopTimerWorking()
+        		{
+        			jQuery('.stop-timer-btn i.fa-circle-o-notch').addClass('fa-stop-circle').removeClass('fa-circle-o-notch').removeClass('fa-spin');
+        			
+					jQuery('.stop-timer-btn').parent().toggleClass('hidden-item', jQuery('.stop-timer').length == 0);
+					jQuery('.start-timer-btn').parent().toggleClass('hidden-item', jQuery('.stop-timer').length > 0);
+        		}
+        		
+        		function initialiseDynamicElements()
+        		{
+        			jQuery('.kimbleTimePicker').timepicker({ 'timeFormat': 'H:i', 'show2400': 'true'});
+        			
+        			if(jQuery('.kimbleTimePicker').length > 0)
+        			{
+	        			jQuery(document).on('change', '.kimbleTimePicker, .EntryUnitsText', function ()
+						{
+							timeChange(this);
+						});
+					}
+
+					jQuery('.kimbleDatePicker').datepicker({
+						dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+						showOtherMonths: true,
+						selectOtherMonths: true,
+						changeMonth: true,
+						changeYear: true});
+
+					if(autoDecrementRemainingEffort)
+					{
+						jQuery('input.datePickerPopup[id$="entryStartDate"]:visible').attr('orig-value', kimble.parseDate(jQuery('input.datePickerPopup[id$="entryStartDate"]:visible').val()));
+						jQuery('input.datePickerPopup[id$="entryEndDate"]:visible').attr('orig-value', kimble.parseDate(jQuery('input.datePickerPopup[id$="entryEndDate"]:visible').val()));
+
+						jQuery(document).off('change', '.boxy-content:visible .remaining-effort');
+						jQuery(document).on('change', '.boxy-content:visible .remaining-effort', function() {
+							var j = jQuery(this);
+							j.attr('orig-value', kimble.parseNumber(j.val()));
+						});
+						
+						jQuery(document).off('change', '.boxy-content:visible .entry-units');
+						jQuery(document).on('change', '.boxy-content:visible .entry-units', function() {
+							var origValue = jQuery(this).attr('orig-value');
+	
+							var newTotal = kimble.parseNumber(jQuery(this).val());
+							jQuery(this).attr('orig-value', newTotal);
+							
+							// config switch for auto-decrementing remaining effort
+							if(autoDecrementRemainingEffort && jQuery('.boxy-content:visible .remaining-effort').length > 0)
+							{
+								var currentRemaining = jQuery('.boxy-content:visible .remaining-effort').attr('orig-value');
+								
+								var delta = newTotal - (origValue != undefined ? origValue : 0);
+								
+								// the calendar allows you to create an entry for each day in a range so determine the number of days
+								var entryDays = 1;
+								if(jQuery('input.datePickerPopup[id$="entryStartDate"]:visible').length > 0)
+								{
+									var entryStartDate = kimble.parseDate(jQuery('input.datePickerPopup[id$="entryStartDate"]:visible').val()).toDate();
+									var entryEndDate = kimble.parseDate(jQuery('input.datePickerPopup[id$="entryEndDate"]:visible').val()).toDate();
+									entryDays = dateDiffInDays(entryStartDate, entryEndDate) + 1;
+								}
+								
+								var newRemaining = currentRemaining - (delta * entryDays);
+								jQuery('.boxy-content:visible .remaining-effort').attr('orig-value', newRemaining);
+								
+								var realRemaining = Math.max(0, newRemaining);
+								jQuery('.boxy-content:visible .remaining-effort').val(kimble.formatNumber(realRemaining, '0.####')).change();
+							}
+						});
+						
+						jQuery(document).off('change', '.entry-date:visible');
+						jQuery(document).on('change', '.entry-date:visible', function() {
+							if(autoDecrementRemainingEffort && jQuery('.boxy-content:visible .remaining-effort').length > 0)
+							{
+								// if units are set we must add those back onto the draft remaining total
+								// before firing the change event which will then remove the new total based on the new dates
+								if(jQuery('.boxy-content:visible .entry-units').val() != undefined && jQuery('.boxy-content:visible .entry-units').val() != '' && jQuery('input.datePickerPopup[id$="entryStartDate"]:visible').length > 0)
+								{
+									var currentRemaining = kimble.parseNumber(jQuery('.boxy-content:visible .remaining-effort').val());
+									var currentUnits = kimble.parseNumber(jQuery('.boxy-content:visible .entry-units').val());
+									
+									var entryStartDate = jQuery('input.datePickerPopup[id$="entryStartDate"]:visible').attr('orig-value').toDate();
+									var entryEndDate = jQuery('input.datePickerPopup[id$="entryEndDate"]:visible').attr('orig-value').toDate();
+									var entryDays = dateDiffInDays(entryStartDate, entryEndDate) + 1;
+																	
+									// add them back into the remaining
+									var newRemaining = currentRemaining + (currentUnits * entryDays);
+									jQuery('.boxy-content:visible .remaining-effort').attr('orig-value', newRemaining);
+									jQuery('.boxy-content:visible .remaining-effort').val(kimble.formatNumber(newRemaining, '0.####')).change();
+									
+									// force a change event to re-react to this value			
+									jQuery('.boxy-content:visible .entry-units').attr('orig-value', 0);
+									jQuery('.boxy-content:visible .entry-units').change();
+								}
+							}
+
+							var currentValue = kimble.parseDate(jQuery(this).val());
+							jQuery(this).attr('orig-value', currentValue);
+							//jQuery('input.datePickerPopup[id$="entryStartDate"]:visible').attr('orig-value', kimble.parseDate(jQuery('input.datePickerPopup[id$="entryStartDate"]:visible').val()));
+							//jQuery('input.datePickerPopup[id$="entryEndDate"]:visible').attr('orig-value', kimble.parseDate(jQuery('input.datePickerPopup[id$="entryEndDate"]:visible').val()));						
+						});
+					}
+
+					findNumbersToFormat();
+
+					jQuery('.hours-and-mins').remove();
+
+					jQuery(document).off('change','[display-hours-mins=true]').on('change', '[display-hours-mins=true]', function(e) {
+							if (jQuery(this).next().hasClass('hours-and-mins'))
+								jQuery(this).next().val(hoursAndMinsHelper.formatHours(kimble.parseNumber(jQuery(this).val())));
+						});
+
+						jQuery(document).off('blur','.hours-and-mins').on('blur', '.hours-and-mins', function(e) {
+							var hrs = hoursAndMinsHelper.parseHours(this.value);
+							jQuery(this).qtip('destroy', true);
+
+							if (hrs == null) {
+								var h = jQuery('<div style="white-space: pre-wrap;">' + hoursAndMinsHelper.helpMessage + '</div>');
+								jQuery('.hours-and-mins').qtip({
+															content: h,
+															position: {my: 'bottom center', at: 'top center',viewport: $(window)},
+															style: {classes: 'qtip-light qtip-shadow qtip-rounded t-tip-qtip'},
+															show: {ready:true, solo: true }
+															});
+							} else {
+								jQuery(this).prev().val(kimble.formatNumber(hrs, '#,##0.####')).change();
+							}
+						})
+
+					jQuery('[display-hours-mins=true]').each(function(i, obj){
+						let $o = jQuery(obj);
+
+						if ($o.is('input')) {
+							$o.hide().after('<input type="text" class="hours-and-mins"/>');
+							$o.change();
+						}
+						else {
+							$o.text(hoursAndMinsHelper.formatHours(kimble.parseNumber($o.text())));
+						}
+					});
+
+					if({!ShowTimesheetTooltips} && {!EnhancedView})
+					{
+						destroyTTips();	
+						// jquery for pop up elements tips
+						jQuery('.ResourceActivityName').attr('t-tip-right','TEPopUpActivityName');
+						jQuery('.start-entry-date').attr('t-tip-right','TEPopUpStartDateInput');
+						jQuery('.end-entry-date').attr('t-tip-right','TEPopUpEndDateInput');
+						jQuery('.EntryUnitsText').attr('t-tip-right','TEPopUpEntryUnits');
+						jQuery('.NoteText').attr('t-tip-right','TEPopUpNotes');
+						jQuery('.EndTimeText').attr('t-tip-right','TEPopUpEndTime');
+						jQuery('.StartTimeText').attr('t-tip-right','TEPopUpStartTime');
+						jQuery('.NewTimeEntryRates').attr('t-tip-right','TEPopUpTimeType');
+						jQuery('.PeriodRateBandSelect').attr('t-tip-right','TEPopUpTimeType');
+						jQuery('.CurrentRemainingUsageOutput').attr('t-tip-right','TEPopUpCurrentRemainingUsage');
+						initialiseTTips();	
+					}
+					
+					if({!EnhancedView}) initialiseTimers();
+        		}
+        		
+				var millisecondsPerDay = 1000 * 60 * 60 * 24;
+				function dateDiffInDays(date1, date2) {
+				  // Discard the time and time-zone information.
+				  var date1UTC = Date.UTC(date1.getFullYear(), date1.getMonth(), date1.getDate());
+				  var date2UTC = Date.UTC(date2.getFullYear(), date2.getMonth(), date2.getDate());
+				
+				  return Math.floor((date2UTC - date1UTC) / millisecondsPerDay);
+				}
+				
+				function timeChange(theField)
+				{
+					if (jQuery('.kimbleTimePicker.StartTimeText:visible').length == 0) return;
+
+					var currentStartTime = jQuery('.kimbleTimePicker.StartTimeText:visible').val();
+					var currentEndTime = jQuery('.kimbleTimePicker.EndTimeText:visible').val();
+
+					var $e = jQuery(theField).closest('table').find('.EntryUnitsText');
+
+					var currentEntryUnits = kimble.parseNumber($e.val());
+				
+					// given a end time and a start time work out the usage
+					if (jQuery(theField).hasClass('StartTimeText') && currentEndTime != '') {
+						$e.val(kimble.formatNumber(timeDiff(currentStartTime, currentEndTime), '0.###'));
+						$e.change();
+					} else if (jQuery(theField).hasClass('EndTimeText') && currentStartTime != '') {
+						$e.val(kimble.formatNumber(timeDiff(currentStartTime, currentEndTime).toFixed(3), '0.###'));
+						$e.change();
+					} else if (jQuery(theField).hasClass('EntryUnitsText') && currentStartTime != '') {
+						// we only update the end time if the value is blank or the calculated value is greater
+						// meaning that you can update the usage to less than the difference
+						var newEndTime = timeAddHours(currentStartTime, currentEntryUnits);
+						if(currentEndTime == '' || currentEndTime < newEndTime)
+						{
+							jQuery('.kimbleTimePicker.EndTimeText:visible').val(newEndTime);
+						}
+					}
+				}
+				
+				function timeDiff(startTime, endTime)
+				{
+					// date is unimportant, using Date construct to do time maths
+					return (new Date(2000, 0, 1, parseTime(endTime).hh, parseTime(endTime).mm) - new Date(2000, 0, 1, parseTime(startTime).hh, parseTime(startTime).mm)) / 1000 / 60 / 60;
+				}
+				
+				function timeAddHours(startTime, hours)
+				{
+					var newDateTime = addHours(new Date(2000, 0, 1, parseTime(startTime).hh, parseTime(startTime).mm), hours);
+				
+					var min = newDateTime.getMinutes();
+					
+					if (min < 10) {
+						min = "0" + min;
+					}
+			
+					var hour = newDateTime.getHours();
+					if (hour < 10) {
+						hour = "0" + hour;
+					}
+			
+					var newTime = hour + ':' + min;
+					
+					// special case - if the result is 00:00 and we are adding >0 hours then this must be 24:00
+					newTime = (newTime == "00:00" && hours > 0 ? "24:00" : newTime);
+					
+					return newTime;
+				}
+				
+				function addHours(theDate, hours)
+				{
+					theDate.setTime(theDate.getTime() + (hours * 60 * 60 * 1000));
+					return theDate;
+				}
+				
+				function parseTime(s)
+				{
+					var part = s.match(/(\d+):(\d+)(?: )?(am|pm)?/i);
+					var hh = parseInt(part[1], 10);
+					var mm = parseInt(part[2], 10);
+					var ap = part[3] ? part[3].toUpperCase() : null;
+					if (ap === "AM") {
+						if (hh == 12) {
+							hh = 0;
+						}
+					}
+					if (ap === "PM") {
+						if (hh != 12) {
+							hh += 12;
+						}
+					}
+					return {
+						hh : hh,
+						mm : mm
+					};
+				}
+
+        		// Called by select2 to dynamically populate selects with large lists 
+				function findMatchingAssignments(params)
+				{
+					var trackingPeriodStartDateUTC = '{!YEAR(TheResourceTrackingPeriod.StartDate__c)}-{!MONTH(TheResourceTrackingPeriod.StartDate__c)}-{!DAY(TheResourceTrackingPeriod.StartDate__c)}';
+					
+					// take the start date from the onscreen entryStartDate if visible, otherwise read the default from the select2 control
+					var defaultEntryDateUTC = (params.element != undefined && params.element != null && params.element.attr('data-startdate') != '' ? params.element.attr('data-startdate') : trackingPeriodStartDateUTC);
+					var entryStartDateUTC = (kimble.parseDate(jQuery('[id$="entryStartDate"]:visible').val(), false) != null ? kimble.parseDate(jQuery('[id$="entryStartDate"]:visible').val(), false) : defaultEntryDateUTC);
+					
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TimesheetController.FindMatchingAssignments}',
+			       		'{!TheResource.Id}', entryStartDateUTC, trackingPeriodStartDateUTC, params.term,
+			      			function(result, event){          
+			             		if (event.status) 
+					            {
+					             	var data = {};
+					             	data.results = result;
+					             	params.callback(data);
+					         	} 
+					         	else if (event.type === 'exception') 
+					         	{
+					             	alert(event.message);
+					         	} 
+					         	else 
+					         	{
+					             	alert(event.message);
+					         	}
+			         	}, 
+			         	{escape: false, timeout: 60000}
+			     	);
+				}
+								
+				var periodSummary = {};
+				var currentPeriodId = '{!JSENCODE(TheResourceTrackingPeriod.Id)}';
+				var timesheetPageUrl = '{!$Page.Timesheet}?periodId=';
+
+	            var summaryLabel = [];
+				summaryLabel['active-timer'] = '<apex:outputText value="{!$Label.kimbleone__timermessage02}"/>';
+								
+				var resourceParam = ((getQueryVariable('id') != '') ? '&id={!TheResource.id}' : '');
+
+				function jumpToTimesheetPage(periodId)
+            	{
+                	safeNavigateToSForceURL(timesheetPageUrl + periodId + resourceParam);
+            	}
+
+				function getPeriodSummary(relativeToDate)
+				{
+					jQuery('.period-summary-working-ind').show();
+					jQuery('.period-summary-ind').addClass('working');
+					var trackingPeriodStartDateUTC = '{!YEAR(TheResourceTrackingPeriod.StartDate__c)}-{!MONTH(TheResourceTrackingPeriod.StartDate__c)}-{!DAY(TheResourceTrackingPeriod.StartDate__c)}';
+					
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TimesheetController.GetTimeEntrySummary}',
+			       		(relativeToDate == null ? trackingPeriodStartDateUTC : relativeToDate), true, '{!TheResource.Id}',
+			      			function(result, event){          
+			             		if (event.status) 
+					            {
+					             	periodSummary = result;
+					             	
+					             	if(periodSummary.ForecastingPeriodIds.length 
+					             		&& periodSummary.ForecastingPeriodMap[periodSummary.ForecastingPeriodIds[0]].TrackingPeriodIds.length)
+					             	{	
+					             		var $container;
+					             		if (jQuery('#fixed-header').css("visibility") === "visible")
+					             			$container = jQuery('#fixed-header .period-summary-container');
+					             		else
+					             			$container = jQuery('#fixed-header-container .period-summary-container');
+					             		refreshPeriodSummary($container);
+					             		showPeriodSummary();
+				             		}
+					         	} 
+					         	else 
+					         	{
+					             	alert(event.message);
+					         	}
+
+				             	jQuery('.period-summary-working-ind').hide();
+				             	jQuery('.period-summary-ind').removeClass('working');
+			         	}, 
+			         	{escape: false, timeout: 60000}
+			     	);				
+				}
+				
+				function redirectToExpenseClaimEdit(expenseId)
+				{
+					var expenseURL = '<apex:outputText value="{!$Page.KimbleOne__ExpenseClaimEdit}?Id=EXPENSE_ID_PLACEHOLDER&ts={!ExpenseClaimRedirectKey}&src=t" />';
+					var newURL = expenseURL.replace('EXPENSE_ID_PLACEHOLDER',expenseId);
+			        safeNavigateToSForceURL(newURL);
+				}
+				
+				<apex:outputPanel layout="none" rendered="{!EnhancedView}">
+				function showSubmissionErrors()
+				{
+					if(jQuery('.time-entry-errors-ind').length)
+					{
+						var dayContainer = jQuery('.time-entry-errors-ind').closest('.time-entry-period-body')
+						
+						jQuery('#header-container .time-entry-period-header[period-id="' + dayContainer.attr('period-id') + '"]').find('.submission-errors-ind').show();
+						
+						jQuery('.time-entry-errors-ind').closest('.time-entry-card').addClass('time-has-errors');
+					}
+					else
+					{
+						jQuery('.submission-errors-ind').hide();
+						jQuery('.time-has-errors').removeClass('time-has-errors');
+					}
+				}
+
+				function initialiseTTipsToggle()
+				{
+					
+					var ShowTTips = <apex:outputText value="{!ShowTimesheetTooltips}"/>; 
+				
+					if(ShowTTips)
+					{
+						jQuery(".show-tips-tgl").removeClass('fa-toggle-off');
+						jQuery(".show-tips-tgl").addClass('fa-toggle-on');
+					}
+					else
+					{
+						jQuery(".show-tips-tgl").addClass('fa-toggle-off');
+						jQuery(".show-tips-tgl").removeClass('fa-toggle-on');
+					}
+				}
+				
+				function toggleTTips()
+				{
+					var ShowTTipsOld = <apex:outputText value="{!ShowTimesheetTooltips}"/>; 
+					var ShowTTipsNew = false;
+					if(ShowTTipsOld == ShowTTipsNew) ShowTTipsNew = true;
+				
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TimesheetController.UpdateToolTipSetting}',
+			       		ShowTTipsNew,
+			      			function(result, event){          
+			             		if (event.status) 
+					            {
+					             	var data = {};
+					             	data.results = result;
+					             	location.reload();
+					         	} 
+					         	else if (event.type === 'exception') 
+					         	{
+					             	alert(event.message);
+					         	} 
+					         	else 
+					         	{
+					             	alert(event.message);
+					         	}
+			         	}, 
+			         	{escape: false, timeout: 60000}
+			     	);
+				}
+				</apex:outputPanel>
+				<apex:outputPanel layout="none" rendered="{!ClassicView}">
+				function showSubmissionErrors()
+				{
+					if(jQuery('.time-entry-errors-ind').length)
+					{
+						jQuery('.time-entry-errors-ind').closest('.day-container').find('.submission-errors-ind').show();
+						
+						jQuery('.time-entry-errors-ind').closest('.TimeEntry').addClass('time-has-errors');
+												
+						jQuery.each(jQuery('.time-entry-errors-ind'), function(key) {
+							jQuery('.time-entry-errors-ind')[key].scrollIntoView(false);
+						});
+					}
+					else
+					{
+						jQuery('.submission-errors-ind').hide();
+						jQuery('.time-has-errors').removeClass('time-has-errors');
+					}
+				}
+				</apex:outputPanel>
+			</script>
+			<div id="EditTimeEntryPopup" style="display: none">
+			
+			<apex:outputPanel id="EditTimeEntryDetails" style="min-width:550px;min-height:300px;display:block">
+
+				<apex:form >
+					<apex:actionFunction action="{!SaveTimeEntry}" name="saveTimeEntry" oncomplete="if (checkOperationSuccess(jQuery('[id$=\'saveTimeEntryBtn\']'))) {hideModalBoxyWithErrorCheck('#editErrors'); updateHeader();initialiseDynamicElements();}" rerender="TimeForm, EditTimeEntryDetails"></apex:actionFunction>
+					<apex:actionFunction action="{!SaveTimeEntry}" name="saveTimeEntryStopTimer" oncomplete="if (checkOperationSuccess(jQuery('[id$=\'saveTimeEntryStopTimerBtn\']'))) {updateHeader();initialiseDynamicElements();}" rerender="TimeForm, EditTimeEntryDetails">
+						<apex:param name="tmrAction" value="stop" />
+						<apex:param name="tmrEndDateUTC" value="" />
+						<apex:param name="tmrVal" value=""/>
+						<apex:param name="reloadAction" value="reload" />
+					</apex:actionFunction>
+					<apex:actionRegion >
+						<apex:actionFunction action="{!DeleteTimeEntry}" name="deleteTimeEntry" oncomplete="if (checkOperationSuccess(jQuery('[id$=\'deleteTimeEntryBtn\']'))) {hideModalBoxyWithErrorCheck('#editErrors'); updateHeader();}" rerender="TimeForm, EditTimeEntryDetails"></apex:actionFunction>
+					</apex:actionRegion>
+						
+					<apex:outputPanel id="TimeMessagePanel">
+						<div id="editErrors"><apex:pageMessages escape="false" id="errormessages" /></div>
+					</apex:outputPanel>
+					
+					<apex:variable value="{!ISBLANK(TimeEntry.KimbleOne__Timesheet__c) || TimeEntry.Timesheet__r.KimbleOne__ApprovalStatus__c = 'Rejected'}" var="canEdit"/>
+					<apex:variable value="{!!ISBLANK(TimeEntry.KimbleOne__Timesheet__c) && TimeEntry.Timesheet__r.KimbleOne__ApprovalStatus__c = 'Approved'}" var="isApproved"/>
+					<apex:variable var="SuffixTranslationKey" value="{!$ObjectType.KimbleOne__UnitType__c.Name}:{!$ObjectType.KimbleOne__UnitType__c.Fields.KimbleOne__Suffix__c.Name}:{!TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__UsageUnitType__c}" />
+					<apex:variable var="SuffixTrans" value="{!TranslationsMap[SuffixTranslationKey]}" />
+					<apex:variable var="Suffix" value="{!TheSelectedAssignment.ResourcedActivityOperatedWith__r.UsageUnitType__r.KimbleOne__Suffix__c}" />
+					<apex:variable var="EntryTranslationKey" value="{!$ObjectType.KimbleOne__TimeEntry__c.Name}:{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__EntryUnits__c.Name}:{!TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__UsageUnitType__c}" />
+					<apex:variable var="EntryLabelTrans" value="{!TranslationsMap[EntryTranslationKey]}" />
+					<apex:variable value="{!!ISBLANK(TheTimeEntryTimer) && ISBLANK(TheTimeEntryTimer.KimbleOne__EndTime__c)}" var="hasActiveTimer"/>
+					
+					<apex:pageBlock mode="edit" rendered="{!!ISBLANK(TimeEntry)}">
+						<apex:outputPanel id="EditTimeEntryDetailsSubPanel">
+						
+						<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+							
+							<apex:pageBlockSectionItem labelStyle="width:30%">
+								<apex:outputText value="{!$Label.kimbleone__resourceactivityalternativelabel}" />
+								<apex:outputPanel >
+									<apex:outputText value="{!TimeEntry.ActivityAssignment__r.Case__r.CaseNumber} " rendered="{!!ISBLANK(TimeEntry.ActivityAssignment__r.KimbleOne__Case__c)}"/>
+									<apex:outputText value="{!TimeEntry.ActivityAssignment__r.ResourcedActivity__r.Name}" />
+									<apex:outputText value=" ({!TimeEntry.ActivityAssignment__r.ActivityRole__r.Name})" rendered="{!!ISBLANK(TimeEntry.ActivityAssignment__r.ActivityRole__r.Name)}" />
+								</apex:outputPanel>		
+							</apex:pageBlockSectionItem>
+						
+							<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$Label.kimbleone__day}" />
+								<apex:outputText value="{!TimeEntry.TimePeriod__r.Name}" />
+							</apex:pageBlockSectionItem>
+						
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$Label.kimbleone__periodratebandalternatenamelabel}" />
+								<apex:outputPanel layout="none">
+									<apex:outputPanel layout="block" styleClass="requiredInput" rendered="{!canEdit}">
+										<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+											<apex:actionRegion >
+												<apex:selectList value="{!TimeEntry.KimbleOne__ActivityAssignmentRate__c}" styleclass=" PeriodRateBandSelect" multiselect="false" size="1" required="true">
+													<apex:actionSupport event="onchange" action="{!SelectActivityAssignmentRateEdit}" rerender="EditTimeEntryDetailsSubPanel, TimeButtonPanel" onsubmit="disableTimeFields('EditTimeEntryPopup')" oncomplete="enableTimeFields('EditTimeEntryPopup')" />
+													<apex:selectOptions value="{!TheActivityPeriodRateBandOptionsEdit}" />
+												</apex:selectList>
+												<apex:outputPanel styleclass="TimeFieldsLoadingPanel" style="display:none">	
+													<img src="{!URLFOR($Resource.LoadingImage)}" />
+												</apex:outputPanel>
+											</apex:actionRegion>
+									</apex:outputPanel>
+									<apex:outputText value="{!TimeEntry.ActivityAssignmentRate__r.ActivityPeriodRateBand__r.Name}" rendered="{!!canEdit}"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && ShowCurrentRemainingUsageInTimeEntry && !isApproved}">
+								<apex:outputLabel value="{!$Label.kimbleone__currentremainingusagelabel}"/>
+								<apex:outputPanel layout="none">
+									<span class="kimble-format-number" kimble-number-format="0.####" display-hours-mins="{!!ISBLANK(TheSelectedAssignment) && TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__ShowUsageAsHoursAndMins__c}">
+															<apex:outputText value="{!AssignmentCurrentRemainingUsage}" />
+														</span>
+									<apex:outputText styleClass="CurrentRemainingUsageOutput" value=" {!SuffixTrans}" rendered="{!!ISBLANK(TheSelectedAssignment) && !TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__ShowUsageAsHoursAndMins__c}"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'Task' || TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'CategoryAndTask'}">
+									<apex:outputText value="{!$ObjectType.KimbleOne__Task__c.Fields.Name.Label}" />
+									<apex:outputPanel layout="none">
+										<apex:outputPanel layout="block" styleClass="requiredInput" rendered="{!canEdit}">
+											<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+												<apex:actionRegion >
+													<apex:selectList value="{!TimeEntry.KimbleOne__PlanTaskAssignment__c}" styleclass="edit-time-pta" multiselect="false" size="1" required="true">
+														<apex:selectOptions value="{!ThePlanTaskOptions}" />
+														<apex:actionSupport event="onchange" action="{!SelectPlanTaskAssignmentEdit}" rerender="EditTimeEntryDetailsSubPanel, TimeButtonPanel" onsubmit="disableTimeFields('EditTimeEntryPopup');" oncomplete="enableTimeFields('EditTimeEntryPopup');selectedTaskChanged();refreshDraftRemainingEffort();" />
+													</apex:selectList>
+												</apex:actionRegion>
+										</apex:outputPanel>
+										<apex:outputField value="{!TimeEntry.PlanTaskAssignment__r.PlanTask__r.Task__r.Name}" rendered="{!!canEdit}"/>							
+									</apex:outputPanel>		 	 
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!!hasActiveTimer && !ISBLANK(ThePlanTaskAssignment.Id) && !ThePlanTaskAssignment.PlanTask__r.Task__r.KimbleOne__IsFixedEffort__c}">
+									<apex:outputText value="{!$ObjectType.KimbleOne__PlanTaskAssignment__c.Fields.KimbleOne__DraftRemainingEffort__c.Label}" />
+									<apex:outputPanel layout="none">
+										<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+										<apex:inputField required="true" html-display-hours-mins="{!!ISBLANK(TheSelectedAssignment) && TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__ShowUsageAsHoursAndMins__c}" value="{!ThePlanTaskAssignment.KimbleOne__DraftRemainingEffort__c}" html-orig-value="{!ThePlanTaskAssignment.KimbleOne__DraftRemainingEffort__c}" styleclass=" remaining-effort persist-time-field" rendered="{!canEdit}"/>
+									</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!!hasActiveTimer && StartEndTimeRequired && !ISBLANK(TheSelectedAssignmentRate)}">
+								<apex:outputText value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__StartTime__c.Label}"/>
+								<apex:outputPanel layout="none">
+									<apex:inputField id="entryStartTime" styleclass=" kimbleTimePicker StartTimeText persist-time-field" value="{!TimeEntry.KimbleOne__StartTime__c}" required="true" rendered="{!canEdit}"/>
+									<apex:outputField value="{!TimeEntry.KimbleOne__StartTime__c}" rendered="{!!canEdit}"/>
+								</apex:outputPanel>								
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!!hasActiveTimer && StartEndTimeRequired && !ISBLANK(TheSelectedAssignmentRate)}">
+								<apex:outputText value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__EndTime__c.Label}"/>
+								<apex:outputPanel layout="none">
+									<apex:inputField id="entryEndTime" styleclass=" kimbleTimePicker EndTimeText persist-time-field" value="{!TimeEntry.KimbleOne__EndTime__c}" required="true" rendered="{!canEdit}"/>
+									<apex:outputField value="{!TimeEntry.KimbleOne__EndTime__c}" rendered="{!!canEdit}"/>
+								</apex:outputPanel>							
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!!hasActiveTimer && !ISBLANK(TheSelectedAssignmentRate)}">
+								<apex:outputText >
+									<div><apex:outputText value="{!EntryLabelTrans}"/></div>
+								</apex:outputText>
+								<apex:outputPanel layout="none">
+									<apex:inputField required="true" html-display-hours-mins="{!!ISBLANK(TheSelectedAssignment) && TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__ShowUsageAsHoursAndMins__c}" value="{!TimeEntry.KimbleOne__EntryUnits__c}" html-orig-value="{!TimeEntry.KimbleOne__EntryUnits__c}" styleclass=" EntryUnitsText entry-units persist-time-field " rendered="{!canEdit}"/>
+
+									<apex:outputPanel layout="none" rendered="{!!canEdit}">
+										<span display-hours-mins="{!!ISBLANK(TheSelectedAssignment) && TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__ShowUsageAsHoursAndMins__c}">
+											<apex:outputField value="{!TimeEntry.KimbleOne__EntryUnits__c}" />
+										</span>
+									</apex:outputPanel>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!hasActiveTimer && !ISBLANK(TheSelectedAssignmentRate)}">
+								<apex:outputText >
+									<div><apex:outputText value="{!EntryLabelTrans}"/></div>
+								</apex:outputText>							
+								<div class="te-timer-copy active">
+									<span class="ticker-copy" entry-id="{!TimeEntry.Id}"></span><i class="fa fa-stop-circle timer-item stop-timer" title="{!JSENCODE($Label.StopTimerLabel)}" t-tip-right="TETimerActive"></i>
+								</div>
+							</apex:pageBlockSectionItem>
+							 
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && TheSelectedAssignmentRate.ActivityPeriodRateBand__r.RevenueUnitsCalculationMethod__r.KimbleOne__Enum__c = 'Manual'}">
+								<apex:outputText >
+									<div><apex:outputText value="{!EntryLabelTrans}"/></div>
+								</apex:outputText>
+								<apex:outputPanel layout="none">
+									<apex:inputField id="EditRevenueUnitsField" required="true" value="{!TimeEntry.KimbleOne__RevenueUnits__c}" styleclass=" persist-time-field" rendered="{!canEdit}"/>
+									<apex:outputPanel layout="none" rendered="{!!canEdit}">
+										<span display-hours-mins="{!!ISBLANK(TheSelectedAssignment) && TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__ShowUsageAsHoursAndMins__c}">
+											<apex:outputField value="{!TimeEntry.KimbleOne__RevenueUnits__c}" />
+										</span>
+									</apex:outputPanel>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__HasCases__c}">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Case__c.Label}"/>
+								<apex:outputPanel layout="none">
+									<apex:inputField id="caseInput" value="{!TimeEntry.KimbleOne__Case__c}"  rendered="{!canEdit}" styleclass="persist-time-field kimbleSearch" html-data-typename="LookupObjectCase" html-data-filter="TimesheetCaseFilter;{!TheSelectedAssignment.KimbleOne__ResourcedActivity__c}:{!TheSelectedAssignment.KimbleOne__DeliveryGroup__c}" />
+									<apex:outputField value="{!TimeEntry.KimbleOne__Case__c}" rendered="{!!canEdit}"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate)}">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Notes__c.Label}"/>
+								<apex:outputPanel layout="none">
+									<apex:outputPanel layout="block" styleClass="requiredInput" rendered="{!canEdit}">
+										<apex:outputPanel layout="block" styleClass="requiredBlock" rendered="{!TimeEntryNotesMandatory}"></apex:outputPanel>
+										<apex:inputTextarea id="EditNotesField" rows="4" cols="45" value="{!TimeEntry.KimbleOne__Notes__c}" styleclass="NoteText  persist-time-field" required="{!TimeEntryNotesMandatory}"/>
+									</apex:outputPanel>
+									<apex:outputField value="{!TimeEntry.KimbleOne__Notes__c}" rendered="{!!canEdit}"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'Reference'}">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Reference__c.Label}"/>
+								<apex:outputPanel layout="none">
+									<apex:inputText id="EditReferenceField" value="{!TimeEntry.KimbleOne__Reference__c}"  styleclass=" persist-time-field"  rendered="{!canEdit}"/>
+									<apex:outputField value="{!TimeEntry.KimbleOne__Reference__c}" rendered="{!!canEdit}"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							
+
+							<apex:repeat value="{!NumberOfTimeCategories}" var="num" rendered="{!!ISBLANK(TheSelectedAssignmentRate) && (TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c = 'Category'  || TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'CategoryAndTask')}">
+								<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && (TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c = 'Category' || TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'CategoryAndTask') && TheActivityTimeCategories[num].Show}">
+								
+								<apex:outputLabel value="{!TheActivityTimeCategories[num].TheCategory.Name}" />
+								<apex:outputPanel layout="none">
+									<apex:inputField styleclass="persist-time-field" value="{!TimeEntry['Category' & TEXT(TheActivityTimeCategories[num].TheCategory.DisplaySequence__c) & '__c']}" required="{!TheActivityTimeCategories[num].TheCategory.IsMandatory__c}" rendered="{!canEdit && TheActivityTimeCategories[num].TheCategory.DisplayType__r.Enum__c = 'Text'}"/>
+								
+									<apex:outputPanel layout="block" styleClass="requiredInput" rendered="{!canEdit && (TheActivityTimeCategories[num].TheCategory.DisplayType__r.Enum__c = 'Dropdown') && TheActivityTimeCategories[num].TheCategory.IsMandatory__c}">
+											<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+											<apex:selectList value="{!TimeEntry['Category' & TEXT(TheActivityTimeCategories[num].TheCategory.DisplaySequence__c) & '__c']}" multiselect="false" size="1" required="true" styleclass=" persist-time-field" >
+												<apex:selectOptions value="{!TheActivityTimeCategories[num].TheOptions}" />
+											</apex:selectList>
+									</apex:outputPanel>
+									<apex:selectList value="{!TimeEntry['Category' & TEXT(TheActivityTimeCategories[num].TheCategory.DisplaySequence__c) & '__c']}" styleclass=" persist-time-field" multiselect="false" size="1" rendered="{!canEdit && (TheActivityTimeCategories[num].TheCategory.DisplayType__r.Enum__c = 'Dropdown') && !TheActivityTimeCategories[num].TheCategory.IsMandatory__c}">
+										<apex:selectOptions value="{!TheActivityTimeCategories[num].TheOptions}" />
+									</apex:selectList>
+									<apex:outputField value="{!TimeEntry['Category' & TEXT(TheActivityTimeCategories[num].TheCategory.DisplaySequence__c) & '__c']}" rendered="{!!canEdit}"/>	
+								</apex:outputPanel>
+								
+								</apex:pageBlockSectionItem>
+							</apex:repeat>					
+							
+							<apex:pageBlockSectionItem labelStyle="width:30%" rendered="{!!ISBLANK(TimeEntry.Timesheet__r.KimbleOne__ApprovalComments__c)}">
+								<apex:outputText value="{!$ObjectType.KimbleOne__Timesheet__c.Fields.KimbleOne__ApprovalComments__c.Label}"  styleclass="" />
+								<apex:outputText value="{!TimeEntry.Timesheet__r.KimbleOne__ApprovalComments__c}" />
+							</apex:pageBlockSectionItem>
+						</apex:pageblockSection>
+						
+						<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+							<apex:pageBlockSectionItem labelStyle="width:30%" rendered="{!!ISBLANK(TimeEntry.KimbleOne__Timesheet__c) && (HasPermission['ApproveAllTimesheet'] || HasPermission['ApproveTimesheet'])}">
+								<apex:outputText value="{!$ObjectType.KimbleOne__Timesheet__c.Label}" styleclass="" />
+								<apex:outputLink styleClass="k-link" value="/{!TimeEntry.KimbleOne__Timesheet__c}">
+				      	   			<apex:outputText value="{!TimeEntry.Timesheet__r.Name}"/>
+				      			</apex:outputLink>
+							</apex:pageBlockSectionItem>
+							
+			       		</apex:pageblockSection>
+		        	</apex:outputPanel>				       			
+					</apex:pageBlock>
+					
+						
+						<apex:outputPanel id="TimeButtonPanel">
+						
+						<apex:pageBlock >
+						<apex:pageBlockButtons styleclass="ButtonPanelAddTimeEntry" id="ButtonPanelAddTimeEntry" location="bottom">
+							<apex:outputPanel layout="none" rendered="{!canEdit && $ObjectType.KimbleOne__TimeEntry__c.updateable}">
+								<input id="saveTimeEntryBtn" class="btn DisableButtonWhileBusy TimeSaveButton" type="button" onclick="saveTimeEntry(); destroyTTips();"
+									value="{!$Label.SaveTimeEntry}" />
+							</apex:outputPanel>
+							<apex:outputPanel layout="none" rendered="{!canEdit && $ObjectType.KimbleOne__TimeEntry__c.deletable}">
+								<input id="deleteTimeEntryBtn" class="btn DisableButtonWhileBusy"  type="button" onclick="deleteTimeEntry()" value="{!$Label.DeleteButton}"  />
+							</apex:outputPanel>
+							<input class="btn" type="button" onclick="hideModalBoxy();"	value="{!$Label.Cancel}" />
+						</apex:pageBlockButtons>
+						</apex:pageBlock>
+						</apex:outputPanel>
+						
+				</apex:form>
+
+			</apex:outputPanel></div>
+
+			<div id="NewTimeEntryFromForecastPopup" style="display: none">
+
+			<apex:outputPanel id="NewTimeEntryFromForecastDetails" style="min-width:550px;min-height:300px;display:block">
+
+				<apex:form >
+					<apex:actionFunction action="{!SaveTimeEntry}" name="saveNewTimeEntryFromForecast" oncomplete="if (checkOperationSuccess(jQuery('[id$=\'saveNewTimeEntryFromForecastBtn\']'))) {hideModalBoxyWithErrorCheck('#newFromForecastErrors'); updateHeader();initialiseDynamicElements();}" rerender="TimeForm, NewTimeEntryFromForecastDetails"></apex:actionFunction>
+					<apex:actionFunction action="{!SaveTimeEntry}" rendered="{!EntryPeriod.Id == TodayPeriodId}" name="startNewTimerFromForecast" oncomplete="if (checkOperationSuccess(jQuery('[id$=\'startNewTimerFromForecastBtn\']'))) {hideModalBoxyWithErrorCheck('#newFromForecastErrors'); updateHeader();initialiseDynamicElements();}" rerender="TimeForm, NewTimeEntryFromForecastDetails">
+						<apex:param name="tmrAction" value="start" />
+						<apex:param name="tmrStartDteUTC" value="" />
+						<apex:param name="tmrStartTime" value="" />
+					</apex:actionFunction>
+						
+					<apex:outputPanel id="TimeMessagePanel">
+						<div id="newFromForecastErrors"><apex:pageMessages escape="false" id="errormessages" /></div>
+					</apex:outputPanel>
+					
+					<apex:variable var="SuffixTranslationKey" value="{!$ObjectType.KimbleOne__UnitType__c.Name}:{!$ObjectType.KimbleOne__UnitType__c.Fields.KimbleOne__Suffix__c.Name}:{!TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__UsageUnitType__c}" />
+					<apex:variable var="SuffixTrans" value="{!TranslationsMap[SuffixTranslationKey]}" />
+					<apex:variable var="Suffix" value="{!TheSelectedAssignment.ResourcedActivityOperatedWith__r.UsageUnitType__r.KimbleOne__Suffix__c}" />
+					<apex:variable var="EntryTranslationKey" value="{!$ObjectType.KimbleOne__TimeEntry__c.Name}:{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__EntryUnits__c.Name}:{!TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__UsageUnitType__c}" />
+					<apex:variable var="EntryLabelTrans" value="{!TranslationsMap[EntryTranslationKey]}" />
+						
+					<apex:pageBlock mode="edit" rendered="{!!ISBLANK(TimeEntry)}">
+						<apex:outputPanel id="NewTimeEntryFromForecastDetailsSubPanel">
+						
+						<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+							
+							<apex:pageBlockSectionItem labelStyle="width:30%">
+								<apex:outputText value="{!$Label.kimbleone__resourceactivityalternativelabel}" />
+								<apex:outputPanel >
+									<apex:outputText value="{!TheSelectedAssignment.Case__r.CaseNumber} " rendered="{!!ISBLANK(TheSelectedAssignment.KimbleOne__Case__c)}"/>
+									<apex:outputText value="{!TheSelectedAssignment.ResourcedActivity__r.Name}" />
+									<apex:outputText value=" ({!TheSelectedAssignment.ActivityRole__r.Name})" rendered="{!!ISBLANK(TheSelectedAssignment.ActivityRole__r.Name)}" />
+								</apex:outputPanel>		
+							</apex:pageBlockSectionItem>
+						
+							<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$Label.kimbleone__day}" />
+								<apex:outputText value="{!EntryPeriod.Name}" />
+							</apex:pageBlockSectionItem>
+						
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$Label.kimbleone__periodratebandalternatenamelabel}" />
+								<apex:outputPanel layout="none">
+									<apex:outputPanel layout="block" styleClass="requiredInput">
+										<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+											<apex:actionRegion >
+												<apex:selectList value="{!TimeEntry.KimbleOne__ActivityAssignmentRate__c}" styleclass="" multiselect="false" size="1" required="true">
+													<apex:actionSupport event="onchange" action="{!SelectActivityAssignmentRateEdit}" rerender="NewTimeEntryFromForecastDetailsSubPanel, TimeButtonPanel" onsubmit="disableTimeFields('NewTimeEntryFromForecastPopup')" oncomplete="enableTimeFields('NewTimeEntryFromForecastPopup')" />
+													<apex:selectOptions value="{!TheActivityPeriodRateBandOptionsEdit}" />
+												</apex:selectList>
+												<apex:outputPanel styleclass="TimeFieldsLoadingPanel" style="display:none">	
+													<img src="{!URLFOR($Resource.LoadingImage)}" />
+												</apex:outputPanel>
+											</apex:actionRegion>
+									</apex:outputPanel>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && ShowCurrentRemainingUsageInTimeEntry}">
+								<apex:outputLabel value="{!$Label.kimbleone__currentremainingusagelabel}"/>
+								<apex:outputPanel layout="none">
+									<span class="kimble-format-number" kimble-number-format="0.####" display-hours-mins="{!!ISBLANK(TheSelectedAssignment) && TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__ShowUsageAsHoursAndMins__c}">
+										<apex:outputText value="{!AssignmentCurrentRemainingUsage}" />
+									</span>
+								<apex:outputText styleClass="CurrentRemainingUsageOutput" value=" {!SuffixTrans}"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'Task' || TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'CategoryAndTask'}">
+									<apex:outputText value="{!$ObjectType.KimbleOne__Task__c.Fields.Name.Label}" />
+									<apex:outputPanel layout="none">
+										<apex:outputPanel layout="block" styleClass="requiredInput">
+											<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+												<apex:actionRegion >
+													<apex:selectList value="{!TimeEntry.KimbleOne__PlanTaskAssignment__c}" styleclass="" multiselect="false" size="1" required="true">
+														<apex:selectOptions value="{!ThePlanTaskOptions}" />
+														<apex:actionSupport event="onchange" action="{!SelectPlanTaskAssignmentEdit}" rerender="NewTimeEntryFromForecastDetailsSubPanel, TimeButtonPanel" onsubmit="disableTimeFields('NewTimeEntryFromForecastPopup')" oncomplete="enableTimeFields('NewTimeEntryFromForecastPopup');refreshDraftRemainingEffort();" />
+													</apex:selectList>
+												</apex:actionRegion>
+										</apex:outputPanel>
+									</apex:outputPanel>		 	 
+							</apex:pageBlockSectionItem>
+													
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(ThePlanTaskAssignment.Id) && !ThePlanTaskAssignment.PlanTask__r.Task__r.KimbleOne__IsFixedEffort__c}">
+									<apex:outputText value="{!$ObjectType.KimbleOne__PlanTaskAssignment__c.Fields.KimbleOne__DraftRemainingEffort__c.Label}" />
+									<apex:outputPanel layout="none">
+										<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+										<apex:inputField required="true" html-display-hours-mins="{!!ISBLANK(TheSelectedAssignment) && TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__ShowUsageAsHoursAndMins__c}" value="{!ThePlanTaskAssignment.KimbleOne__DraftRemainingEffort__c}" html-orig-value="{!ThePlanTaskAssignment.KimbleOne__DraftRemainingEffort__c}" styleclass=" remaining-effort" />
+									</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!StartEndTimeRequired && !ISBLANK(TheSelectedAssignmentRate)}">
+								<apex:outputText value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__StartTime__c.Label}"/>
+								<apex:outputPanel layout="none">
+									<apex:inputField id="entryStartTime" styleclass=" kimbleTimePicker StartTimeText persist-time-field" value="{!TimeEntry.KimbleOne__StartTime__c}" required="true"/>
+								</apex:outputPanel>								
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!StartEndTimeRequired && !ISBLANK(TheSelectedAssignmentRate)}">
+								<apex:outputText value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__EndTime__c.Label}"/>
+								<apex:outputPanel layout="none">
+									<apex:inputField id="entryEndTime" styleclass=" kimbleTimePicker EndTimeText persist-time-field" value="{!TimeEntry.KimbleOne__EndTime__c}" required="true"/>
+								</apex:outputPanel>							
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate)}">
+								<apex:outputText >
+									<div><apex:outputText value="{!EntryLabelTrans}"/></div>
+								</apex:outputText>
+								<apex:outputPanel layout="none">
+									<apex:inputField required="true" html-display-hours-mins="{!!ISBLANK(TheSelectedAssignment) && TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__ShowUsageAsHoursAndMins__c}" value="{!TimeEntry.KimbleOne__EntryUnits__c}" html-orig-value="0" styleclass=" EntryUnitsText entry-units persist-time-field "/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							 
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && TheSelectedAssignmentRate.ActivityPeriodRateBand__r.RevenueUnitsCalculationMethod__r.KimbleOne__Enum__c = 'Manual'}">
+								<apex:outputText >
+									<div><apex:outputText value="{!$Label.kimbleone__revenuelabel} {!SuffixTrans}"/></div>
+								</apex:outputText>
+								<apex:outputPanel layout="none">
+									<apex:inputField required="true" value="{!TimeEntry.KimbleOne__RevenueUnits__c}" styleclass="persist-time-field"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && TheSelectedAssignment.ResourcedActivityOperatedWith__r.KimbleOne__HasCases__c}">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Case__c.Label}"/>
+								<apex:inputField id="caseInput" value="{!TimeEntry.KimbleOne__Case__c}"  styleclass="persist-time-field kimbleSearch" html-data-typename="LookupObjectCase" html-data-filter="TimesheetCaseFilter;{!TheSelectedAssignment.KimbleOne__ResourcedActivity__c}:{!TheSelectedAssignment.KimbleOne__DeliveryGroup__c}" />
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate)}">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Notes__c.Label}"/>
+								<apex:outputPanel layout="none">
+									<apex:outputPanel layout="block" styleClass="requiredInput">
+										<apex:outputPanel layout="block" styleClass="requiredBlock" rendered="{!TimeEntryNotesMandatory}"></apex:outputPanel>
+										<apex:inputTextarea id="FromForecastNotes" rows="4" cols="45" value="{!TimeEntry.KimbleOne__Notes__c}" styleclass="NoteText  persist-time-field" required="{!TimeEntryNotesMandatory}"/>
+									</apex:outputPanel>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'Reference'}">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Reference__c.Label}"/>
+								<apex:outputPanel layout="none">
+									<apex:inputText id="FromForecastReference" value="{!TimeEntry.KimbleOne__Reference__c}"  styleclass=" persist-time-field"/>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+							
+
+							<apex:repeat value="{!NumberOfTimeCategories}" var="num" rendered="{!!ISBLANK(TheSelectedAssignmentRate) && (TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c = 'Category'  || TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'CategoryAndTask')}">
+								<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheSelectedAssignmentRate) && (TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c = 'Category' || TheSelectedAssignmentRate.ActivityPeriodRateBand__r.UsageAllocationType__r.KimbleOne__Enum__c == 'CategoryAndTask') && TheActivityTimeCategories[num].Show}">
+								
+								<apex:outputLabel value="{!TheActivityTimeCategories[num].TheCategory.Name}" />
+								<apex:outputPanel layout="none">
+									<apex:inputField styleclass="persist-time-field" value="{!TimeEntry['Category' & TEXT(TheActivityTimeCategories[num].TheCategory.DisplaySequence__c) & '__c']}" required="{!TheActivityTimeCategories[num].TheCategory.IsMandatory__c}" rendered="{!TheActivityTimeCategories[num].TheCategory.DisplayType__r.Enum__c = 'Text'}"/>
+								
+									<apex:outputPanel layout="block" styleClass="requiredInput" rendered="{!(TheActivityTimeCategories[num].TheCategory.DisplayType__r.Enum__c = 'Dropdown') && TheActivityTimeCategories[num].TheCategory.IsMandatory__c}">
+											<apex:outputPanel layout="block" styleClass="requiredBlock"></apex:outputPanel>
+											<apex:selectList value="{!TimeEntry['Category' & TEXT(TheActivityTimeCategories[num].TheCategory.DisplaySequence__c) & '__c']}" multiselect="false" size="1" required="true" styleclass=" persist-time-field" >
+												<apex:selectOptions value="{!TheActivityTimeCategories[num].TheOptions}" />
+											</apex:selectList>
+									</apex:outputPanel>
+									<apex:selectList value="{!TimeEntry['Category' & TEXT(TheActivityTimeCategories[num].TheCategory.DisplaySequence__c) & '__c']}" styleclass=" persist-time-field" multiselect="false" size="1" rendered="{!(TheActivityTimeCategories[num].TheCategory.DisplayType__r.Enum__c = 'Dropdown') && !TheActivityTimeCategories[num].TheCategory.IsMandatory__c}">
+										<apex:selectOptions value="{!TheActivityTimeCategories[num].TheOptions}" />
+									</apex:selectList>
+								</apex:outputPanel>
+								
+								</apex:pageBlockSectionItem>
+							</apex:repeat>					
+							
+						</apex:pageblockSection>
+						
+		        	</apex:outputPanel>				       			
+					</apex:pageBlock>
+					
+						
+						<apex:outputPanel id="TimeButtonPanel">
+						
+						<apex:pageBlock >
+						<apex:pageBlockButtons styleclass="ButtonPanelAddTimeEntry" id="ButtonPanelAddTimeEntry" location="bottom">
+							<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__TimeEntry__c.updateable}">
+								<input id="saveNewTimeEntryFromForecastBtn" class="btn DisableButtonWhileBusy TimeSaveButton" type="button" onclick="saveNewTimeEntryFromForecast();"
+									value="{!$Label.ForecastTimeSaveAsDraftBtn}" />
+									
+								<apex:outputPanel layout="none" rendered="{!EntryPeriod.Id == TodayPeriodId && !HasActiveTimer}">
+								<input id="startNewTimerFromForecastBtn" class="btn DisableButtonWhileBusy TimeSaveButton" type="button" onclick="defaultFieldsAndStartNewTimerFromForecast();"
+									value="{!$Label.kimbleone__starttimerlabel}" />
+								</apex:outputPanel>
+							</apex:outputPanel>
+							<input class="btn" type="button" onclick="hideModalBoxy();"	value="{!$Label.Cancel}" />
+						</apex:pageBlockButtons>
+						</apex:pageBlock>
+						</apex:outputPanel>
+						
+				</apex:form>
+
+			</apex:outputPanel></div>
+						
+			<div id="ExpenseItemPopup" style="display: none"><apex:outputPanel id="ExpenseItemDetails">
+				<apex:outputPanel id="ExpenseItemDetailsPopup" >
+					<apex:pageBlock title="{!$ObjectType.KimbleOne__ExpenseItem__c.label}">
+						<apex:pageBlockButtons location="bottom" >
+							<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}" />
+						</apex:pageBlockButtons>
+						<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+							
+							<apex:outputField value="{!expenseItem.KimbleOne__ExpenseClaim__c}" rendered="{!expenseItem.ExpenseClaim__r.Status__r.KimbleOne__Enum__c != 'Draft'}"/>
+							
+							<apex:pageBlockSectionItem rendered="{!expenseItem.ExpenseClaim__r.Status__r.KimbleOne__Enum__c = 'Draft'}">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__ExpenseClaim__c.label}" />
+								<apex:outputPanel >
+									<a class="expense-claim-link" onclick="redirectToExpenseClaimEdit('{!JSENCODE(expenseItem.ExpenseClaim__c)}');" >
+										<apex:outputText value="{!expenseItem.ExpenseClaim__r.Name}" />
+									</a>
+								</apex:outputPanel>
+							</apex:pageBlockSectionItem>						
+							
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$Label.kimbleone__resourceactivityalternativelabel}" />
+								<apex:outputField value="{!expenseItem.ActivityExpenseCategory__r.ResourcedActivity__r.Name}" />
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$Label.kimbleone__expensecategory}" />
+								<apex:outputField value="{!expenseItem.ActivityExpenseCategory__r.Name}" />
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem >
+									<apex:outputText value="{!$Label.kimbleone__day}" />
+									<apex:outputText value="{!expenseItem.TimePeriod__r.Name}" />
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!expenseItem.ActivityExpenseCategory__r.ExpenseCategory__r.ExpenseType__r.KimbleOne__Enum__c = 'PerUnit'}">
+								<apex:outputLabel value="{!expenseItem.ActivityExpenseCategory__r.ExpenseCategory__r.UnitType__r.KimbleOne__Suffix__c}"/>
+								<apex:outputField value="{!expenseItem.KimbleOne__ExpenseUnits__c}" />
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem rendered="{!expenseItem.KimbleOne__IncurredCurrencyIsoCode__c!=null  && expenseItem.KimbleOne__IncurredCurrencyIsoCode__c!=expenseItem.CurrencyIsoCode}">
+									<apex:outputLabel value="{!$Label.kimbleone__incurredamount}" />
+									<apex:outputText value="{!expenseItem.KimbleOne__IncurredCurrencyIsoCode__c} {!expenseItem.KimbleOne__IncurredCurrencyGrossAmount__c}" />
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem >
+								<apex:outputpanel >
+									<apex:outputText value="{!$Label.kimbleone__amount}" />
+								</apex:outputpanel>
+								<apex:outputField value="{!expenseItem.KimbleOne__ExpenseGrossAmount__c}" />
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem >
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__ExpenseItem__c.Fields.KimbleOne__IsReceipted__c.Label}?"  />
+								<apex:outputField value="{!expenseItem.KimbleOne__IsReceipted__c}" />
+							</apex:pageBlockSectionItem>
+							<apex:outputField value="{!expenseItem.KimbleOne__Notes__c}" />
+						</apex:pageblockSection>
+					</apex:pageBlock>
+
+				</apex:outputPanel>
+			</apex:outputPanel></div>
+			
+			</div>
+
+
+		</apex:define>
+		
+	</apex:composition>
+	
+</apex:page>

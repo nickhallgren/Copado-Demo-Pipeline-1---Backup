@@ -1,0 +1,252 @@
+<apex:page controller="KimbleOne.ActivityAssignmentRemoteActions" showHeader="false" sidebar="false">
+
+    <apex:includeScript value="{!URLFOR($Resource.KimbleOne__Handlebars)}" />
+
+    <style>
+        div#data-loading {
+            text-align: center;
+            font-size: 46px;
+            color: lightgray;
+        }
+        .model-details-container {
+            min-width: 500px;
+            padding: 5px;
+        }
+        .model-narrative {
+            padding: 12px;
+            font-size: 14px;
+            background-color: #f1f1f1;
+            color: #454545;
+            font-weight: bold;
+            margin-bottom: 4px;
+            position: relative;
+        }
+        div.tbl {
+            display: table;
+            margin-top: 10px;
+        }
+        div.tbl-row {
+            display: table-row;
+        }
+        .details-table div.tbl-row div {
+            padding: 2px;
+        }
+        .details-table {
+            margin-bottom: 10px;
+        }
+        .d-name {
+            display: table-cell;
+        }
+        .tbl-lbl {
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .tbl-val {
+            display: inline-block;
+            font-size: 14px;
+            font-weight: bold;
+            color: #454545;
+        }
+        .d-sd {
+            display: table-cell;
+        }
+        .d-num-child {
+            display: table-cell;
+        }
+        .demand-assignments {
+            max-height: 120px;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        .demand-items th {
+            white-space: nowrap;
+            font-size: 0.75em;
+            line-height: 18px;
+            border-bottom: solid #e0e3e5 1px;
+            border-right: solid #e0e3e5 1px;
+            background-color: #f2f3f3;
+            padding-left: 4px;
+        }
+        table.demand-items {
+            width: 100%;
+        }
+        .demand-assignments tr.citm {
+            height: 32px;
+        }
+        .demand-assignments tr.citm:hover {
+            background-color: #e7f4f8;
+        }
+        td.citm-fstatus {
+            text-align: center;
+            font-size: 16px;
+        }
+        td.citm-actions {
+            text-align: center;
+            font-size: 16px;
+        }
+        .demand-assignments tr.citm td {
+            padding-left: 2px;
+            padding-right: 2px;
+        }
+        tr.citm.Draft .citm-fstatus i {
+            color: grey;
+        }
+        tr.citm.Open .citm-fstatus i {
+            color: grey;
+        }
+        tr.citm.CandidatesProposed .citm-fstatus i {
+            color: orange;
+        }
+        tr.citm.Fulfilled .citm-fstatus i {
+            color: green;
+        }
+        .citm.ThisDemand td {
+            background-color: #e0f7ff;
+        }
+        i.action-jump-to-ass {
+            color: #454545;
+            cursor: pointer;
+        }
+    </style>
+
+    <div id="assignment-model-details" style="display:none">
+
+        <div id="data-loading" class="hidden-item"><i class="fa fa-circle-o-notch fa-spin"></i></div>
+
+        <div class="model-details-container"></div>
+
+        <script id="model-details-template" type="text/x-handlebars-template">
+            <div class="model" tp-id="{{AssignmentId}}">
+                <div class="model-narrative">{!JSENCODE($Label.DemandModelAssignmentNarrative)}</div>
+                <div class="details-table tbl">
+                    <div class="tbl-row">
+                        <div class="d-name"><div class="tbl-lbl">{!JSENCODE($ObjectType.Resource__c.Label)}</div><div class="tbl-val">{{{ResourceName}}}</div></div>
+                    </div>
+                    <div class="tbl-row">
+                        <div class="d-sd"><div class="tbl-lbl">{!JSENCODE($ObjectType.ActivityAssignment__c.Fields.StartDate__c.Label)}</div><div class="tbl-val">{{formatUTCDate StartDateUTC}}</div></div>
+                        <div class="d-ed"><div class="tbl-lbl">{!JSENCODE($Label.EndDateLabel)}</div><div class="tbl-val">{{formatUTCDate EndDateUTC}}</div></div>
+                    </div>
+                    <div class="tbl-row">
+                        <div class="d-num-child"><div class="tbl-lbl">{!JSENCODE($Label.NumberOfRequiredAssignments)}</div><div class="tbl-val">{{formatNumber RequiredAssignments}}</div></div>
+                        <div class="d-num-complete-child"><div class="tbl-lbl">{!JSENCODE($Label.NumberOfFulfilledAssignments)}</div><div class="tbl-val">{{formatNumber FulfilledAssignments}}</div></div>
+                    </div>
+                </div>
+                <div class="demand-assignments">
+                    <table class="demand-items" border="0" cellpadding="0" cellspacing="0">
+                        <thead>
+                        <tr>
+                            <th class="h-fstatus">{!JSENCODE($Label.StatusLabel)}</th>
+                            <th class="h-action">{!JSENCODE($Label.ActionLinksHeader)}</th>
+                            <th class="h-res-name">{!JSENCODE($ObjectType.Resource__c.Label)}</th>
+                            <th class="h-sd">{!JSENCODE($ObjectType.ActivityAssignment__c.Fields.StartDate__c.Label)}</th>
+                            <th class="h-ed">{!JSENCODE($Label.EndDateLabel)}</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {{#each ChildAssignments}}
+                        {{> citm-template}}
+                        {{/each}}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </script>
+
+        <script id="citm-template" type="text/x-handlebars-template" partial="true">
+            <tr class="citm {{Status}} {{#if CurrentDemand}}ThisDemand{{/if}}" a-id="{{AssignmentId}}" da-id="{{AssignmentDemandId}}">
+                <td class="citm-fstatus" title="{{Status}}"><i class="fa {{#if Draft}}fa-times-circle{{/if}} {{#if Open}}fa-circle{{/if}} {{#if CandidatesProposed}}fa-user-circle{{/if}} {{#if Fulfilled}}fa-check-circle{{/if}}"></i></td>
+                <td class="citm-actions" res-id="{{ResourceId}}">{{#notEqual CurrentDemand true}}<i class="action-jump-to-ass fa fa-external-link" title="{!JSENCODE($Label.JumpToAssignmentDemand)}" onclick="safeNavigateToSForceURL('{!$Page.ActivityAssignmentDemand}?id={{AssignmentDemandId}}');"></i>{{/notEqual}}</td>
+                <td class="citm-res-name" res-id="{{ResourceId}}">{{{ResourceName}}}</td>
+                <td class="citm-sd">{{formatUTCDate StartDateUTC}}</td>
+                <td class="citm-ed">{{formatUTCDate EndDateUTC}}</td>
+            </tr>
+        </script>
+
+        <script>
+            var modelDetails = {};
+
+            var handlebarsTemplates = {};
+            function initialiseHandlebars()
+            {
+                //register templates
+                jQuery.each(jQuery('script[type="text/x-handlebars-template"]:not([partial]'), function (i, s) {
+                    handlebarsTemplates[s.id] = Handlebars.compile(s.innerHTML);
+                });
+
+                //register partials
+                jQuery.each(jQuery('script[type="text/x-handlebars-template"][partial="true"]'), function (i, s) {
+                    Handlebars.registerPartial(s.id, s.innerHTML);
+                });
+
+                Handlebars.registerHelper('formatUTCDate', function(UTCDate){
+                  return kimble.formatDate(UTCDate);
+                });
+
+                Handlebars.registerHelper('formatNumber', function(num){
+                  return (num == 0 ? 0 : kimble.formatNumber(num, '#,#.##'));
+                });
+
+                Handlebars.registerHelper('notEqual', function(lvalue, rvalue, options) {
+
+                    if( lvalue==rvalue ) {
+                        return options.inverse(this);
+                    } else {
+                        return options.fn(this);
+                    }
+                });
+            }
+
+            function getModelAssignmentDetailsHtml()
+            {
+                var html = '';
+                html += handlebarsTemplates['model-details-template'].call(this, modelDetails);
+                return html;
+            }
+
+            function populateModelDetails()
+            {
+                if(!Object.keys(handlebarsTemplates).length) initialiseHandlebars();
+                jQuery('.model-details-container').html(getModelAssignmentDetailsHtml());
+                jQuery.publish('kimble.modelpopulated');
+            }
+
+            function hideModelDetailsWorking()
+            {
+                jQuery('#data-loading').addClass('hidden-item');
+            }
+
+            function showModelDetailsWorking()
+            {
+                jQuery('#data-loading').removeClass('hidden-item');
+            }
+
+            function getModelAssignmentDetails(modelId, demandAssignmentId)
+            {
+                showModelDetailsWorking();
+
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.GetModelActivityAssignmentDetails}',
+                                modelId, demandAssignmentId,
+                            function(result, event)
+                            {
+                                if (event.status)
+                                {
+                                    modelDetails = result;
+                                    populateModelDetails();
+                                }
+                                else if (event.type === 'exception')
+                                {
+                                    alert(event.message);
+                                }
+                                else
+                                {
+                                    alert(event.message);
+                                }
+
+                                hideModelDetailsWorking();
+                     },
+                     {escape: true, timeout: 60000});
+            }
+        </script>
+    </div>
+
+</apex:page>

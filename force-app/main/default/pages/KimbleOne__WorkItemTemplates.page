@@ -1,0 +1,1048 @@
+<apex:page standardController="KimbleOne__Product__c" extensions="KimbleOne.WorkItemTemplatesController" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+	<c:Menu MenuContextType="ProductDefinition" MenuContextId="{!KimbleOne__Product__c.Id}" MenuContextName="{!KimbleOne__Product__c.Name}"/>
+
+</apex:define>
+	
+<apex:define name="Content">
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+    <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+
+	<style>
+		/* loading panel */
+		.loadingIndicator {
+		   top:0;
+		   right:0;
+		   width:100%;
+		   height:100%;
+		   font-weight: bold;
+		   position:absolute;
+		   text-align:center;
+		   /* IE filter */
+		   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+		   -moz-opacity:0.7;	/* Mozilla extension */
+		   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+		   opacity:0.7; /* CSS3 */
+		   z-index:1000;
+		   background-color:white;
+		   display:none; 
+		}
+		.loadingIndicator img {
+			margin-right:9px;
+		}
+		#loadingIndicatorInnerContainer { 
+			position:absolute; 
+			top:50%;
+			height:10em; 
+			margin-top:-2em;
+			width:100%;
+		}
+		.working {
+			cursor: wait !important;
+		}
+		.auto-save-toggle-container span {
+			cursor: pointer;
+		}
+		.auto-save-toggle-container {
+			position: absolute;
+			right: 5px;
+			top: 0px;
+		}		
+		/* toolbar styling */
+		.toolbar-container {
+			position: relative;
+			background-color: #f8f8f8;
+			padding: 6px;
+			margin-bottom: 5px;
+			height: 26px;
+		}
+		.toolbar {
+			display: table;
+			width: 100%;
+		}
+		div#toolbar-buttons {
+			display: table-cell;
+			position: relative;
+		}
+		a.toolbar-button {
+			display: inline-block;
+			padding: 6px 10px 6px 10px;
+			background-color: white;
+			margin-right: 4px;
+			border: 1px solid #ccc;
+			border-radius: 2px;
+		}
+		a.toolbar-button.active-toolbar-button {
+			color: white;
+			background-color: #888;
+		}		
+		a.toolbar-button:hover {
+			text-decoration: none;
+			color: white;
+			background-color: #1A9EFF;
+		}
+		a.toolbar-button.button-left {
+			border-top-right-radius: 0px;
+			border-bottom-right-radius: 0px;
+			margin-right: 0px;
+		}
+		a.toolbar-button.button-middle {
+			border-radius: 0px;
+			border-left: 0;
+			margin-right: 0px;
+		}
+		a.toolbar-button.button-right {
+			border-top-left-radius: 0px;
+			border-left: 0;
+			border-bottom-left-radius: 0px;
+		}
+		a.toolbar-button .fa {font-size: 14px;}
+		a.toolbar-button.disabled {background-color: #ccc;color: darkgray;}
+		a.toolbar-button.disabled:hover {background-color: #ccc;color: darkgray;}
+		#saveButton.has-changes {
+			background-color: #ffa500;
+		}
+		.pbBody {
+			margin: 0px !important;
+		}
+		/* list styling */
+		.ai-name-details,
+		.ai-metrics,
+		.ai-actions {
+			display: inline-block;
+		}
+		.wi-status-details {
+			position: absolute;
+			right: 10px;
+		    border-radius: 4px;
+		    padding: 2px 10px 2px 10px;
+		    background-color: #AFAFAF;
+		    border-color: #AFAFAF;
+		    color: white;
+		    width:80px !important;
+		    top: 10px;
+		}
+		.ai-actions {
+			margin-right: 5px;
+			width: 14px;			
+		}
+		.ai-actions i {
+			color: #888;
+			font-size: 16px;
+			cursor: pointer;
+		}
+		i:hover, .ai-actions i:hover {
+			color: black;
+		}
+		.ai-prod-name,
+		.ai-start-date,
+		.ai-end-date {
+			display: inline-block;
+		}
+		.wi-name {
+			display: inline-block;
+		}
+		li.work-item.list-item {
+			list-style: none;
+			margin-left: 50px;
+			padding-left: 28px;
+		}
+		.wi-add-details {
+		    margin-top: 15px;
+		    display: none;
+		}
+		.wi-add-details.detail-edit-mode {
+		    display: block;
+		}
+		.list-item {
+			position: relative;
+		}		
+		.feed-me {
+			min-height: 38px;
+			border: 2px dashed #add8e6;
+			margin-left: 90px;
+			margin-right: 5px;
+			background-color: #fff;			
+		}	
+		.ti-name {
+			font-weight: bold;
+			margin-right: 10px;
+			font-size: 14px;
+		}
+		.wi-name {
+			width: 582px;
+			margin-right: 10px;
+		}
+		.work-item-name, .work-item-units {
+			padding: 0px;
+			border: none;
+		}
+		textarea.work-item-name {
+			width: 520px;
+			height:15px;
+			line-height:15px;
+			min-width: 220px;
+			resize:none;
+			overflow:hidden;
+		}
+		input.work-item-units {
+	        width: 32px;
+		    text-align: center;
+		    padding: 0px;
+		    border: none;
+		    position: absolute;
+		    right: 296px;
+		    font-size: 16px;
+		    top: 4px;
+		}
+		.work-item-unit-type {
+		    position: absolute;
+		    right: 296px;
+		    font-size: 8px;
+		    top: 25px;
+		}
+		.task-units-total {
+	        position: absolute;
+		    right: 293px;
+		    font-size: 18px;
+		    font-weight: bold;
+		    top: 3px;
+		    width: 34px;
+		    text-align: center;		    
+		}
+		.task-units-type {
+		    position: absolute;
+		    top: 24px;
+		    right: 296px;
+		    font-size: 8px;
+		}					
+		.wi-actions i:hover {
+			color: black;
+		}
+		.wi-actions {
+			position: absolute;
+			left: 6px;
+			top: 2px;
+			font-size: 14px;
+			color: #888;
+			cursor: pointer;
+		}
+		.wi-actions i {
+			display: block;
+			margin-top: 2px;
+		}		
+		.list-item div {
+			vertical-align: middle;
+		}		
+		.ai-prod-name {
+			font-style: italic;
+   		}
+		.ai-prod-name {
+			font-size: 14px;
+   		}
+		.ai-start-date,
+		.ai-end-date {
+			margin-right: 10px;
+			text-align: center;
+			padding: 4px;
+		}
+		.ai-status,
+		.wi-status-details {
+			display: inline-block;
+			width: 130px;
+			text-align: center;
+		}
+		.list-item[item-status='NotStarted'] {
+			border-right-color: #AFAFAF;
+		}
+		.work-item.selectable {
+			cursor: pointer;
+		}
+		.selectable:hover {
+			background-color: #e3f3ff;
+		}	
+		.list-item {
+			padding: 10px;
+			background-color: white;
+			border-radius: 3px;
+			box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+			margin: 5px;
+			border-right-style: solid;
+			border-right-width: 10px;
+			border-right-color: white;
+			border-bottom-left-radius: 2px !important;
+			border-top-left-radius: 2px !important;
+			position: relative;
+		}
+		/* Make select2 dropdowns look like conventional dropdowns */
+		a.select2-choice {
+		    height: 18px !important;
+		    line-height: 18px !important;
+		    background-image: none !important;
+		    border-radius: 0px !important;
+		    color: black !important;
+		    padding-left: 4px !important;
+		}
+		.select2-choice div {
+		    border-left: none !important;
+		}
+		.owner-selector-container {
+			position: inherit;
+			top: 55px;
+			width: 365px;
+			display: inline-table;
+			padding-top: 8px;
+			height: 20px;
+		}
+
+		input.owner-selector-input {
+			border: none;
+			height: 14px;
+			font-size: 100%;
+			padding-left: 20px;
+			margin-left: 10px;
+			border-radius: 4px;
+			width: 95%;
+		}
+		.owner-selector-container label {
+			display: table-cell;
+			vertical-align: middle;
+			width: 15%;
+		}
+		.clear-button {
+			visibility: hidden;
+			position: relative;
+			font-size: 14px;
+			top: 2px;
+			right: 32px;
+			color: #aaa;
+			cursor: pointer;
+		}	
+		.ti-owner-details div {
+		    font-size: 14px;
+		    font-weight: normal;
+		    margin-bottom: 1px;
+		}
+		.ti-owner-details {
+		    text-align: right;
+    		display: none;
+   			margin-top: 5px;
+		}
+		.task-owner-name {
+		    font-size: 12px !important;
+		    padding: 5px 0px 0px 12px;
+		    text-align: right;
+    		margin-right: 610px;
+		}
+		.owner-ind {
+			font-size: 16px;
+			color: #afafaf;
+			position: absolute;
+			top: 8px;
+			right: 621px;
+   		}	
+		/* filter */
+		.filter-container {
+			position: absolute;
+			top: -2px;
+			width: 500px;
+		}
+		input#filter-input {
+			border: none;
+			height: 30px;
+			font-size: 15px;
+			padding-left: 20px;
+			border-radius: 4px;
+			width: 100%;
+		}
+		.filter-not-matched {
+			display: none;
+		}
+	</style>	
+
+	<script>
+		var l = {};
+		l['move-dependent-tasks-warning'] = '<apex:outputText value="{!$Label.kimbleone__movedependenttaskswarning}"/>';
+		l['balance-label'] = '<apex:outputText value="{!$Label.kimbleone__balancelabel}"/>';
+		l['Backlog'] = '<apex:outputText value="{!$Label.kimbleone__unassignedworkitems}"/>';
+		l['AddWorkItem'] = '<apex:outputText value="{!$Label.kimbleone__addworkitem}"/>';
+		l['WorkItem'] = '<apex:outputText value="{!$ObjectType.KimbleOne__WorkItem__c.Label}"/>';
+		l['WorkItems'] = '<apex:outputText value="{!$ObjectType.KimbleOne__WorkItem__c.LabelPlural}"/>';
+		l['NewItem'] = '<apex:outputText value="{!$Label.kimbleone__newplanitem}"/>';
+		l['AddIterations'] = '<apex:outputText value="{!$Label.kimbleone__additerations}"/>';
+
+		l['NotStarted'] = '<apex:outputText value="{!$Label.kimbleone__notstartedlabel}"/>';
+		l['InProgress'] = '<apex:outputText value="{!$Label.kimbleone__inprogresslabel}"/>';
+		l['Completed'] = '<apex:outputText value="{!$Label.kimbleone__complete}"/>';
+		
+		l['ActualUnits'] = '<apex:outputText value="{!$ObjectType.KimbleOne__WorkItem__c.Fields.KimbleOne__ActualUnits__c.Label}"/>';
+		l['RemainingUnits'] = '<apex:outputText value="{!$ObjectType.KimbleOne__WorkItem__c.Fields.KimbleOne__RemainingUnits__c.Label}"/>';
+		l['ShowDetails'] = '<apex:outputText value="{!$Label.kimbleone__clicktoshowhideapprovaldetails}"/>';
+		l['Delete'] = '<apex:outputText value="{!$Label.kimbleone__deletebutton}"/>';
+		l['Owner'] = '<apex:outputText value="{!$Label.kimbleone__ownerlabel}"/>';
+		l['None'] = '<apex:outputText value="{!$Label.kimbleone__none}"/>';
+		
+		var newWorkItemStatus = '<apex:outputText value="{!NotStartedStatus}"/>';
+		var inProgressWorkItemStatus = '<apex:outputText value="{!InProgressStatus}"/>';
+		var completedWorkItemStatus = '<apex:outputText value="{!CompletedStatus}"/>';
+
+		var theWorkItemUnitType = '<apex:outputText value="{!WorkItemUnitType}"/>';
+	
+		var unitTypeEnumToSuffixMap = {};
+		<apex:outputText value="unitTypeEnumToSuffixMap={!UnitTypeEnumToSuffixJson};" rendered="{!!ISBLANK(UnitTypeEnumToSuffixJson)}"/>
+		
+		var enableOwners = <apex:outputText value="{!EnableOwnersWorkItems}"/>;
+		
+		var currentProductId = '<apex:outputText value="{!KimbleOne__Product__c}"/>';
+		
+		var disablePlan = false;
+		
+		var theActivities = [];
+		var theResources = [];
+		
+		var theActivityAssignments = {};
+		<apex:outputPanel layout="none" rendered="{!!ISBLANK(ActivityAssignmentsJson)}">
+			theActivityAssignments = kimble.parseJSON("{!JSENCODE(ActivityAssignmentsJson)}");
+		</apex:outputPanel>
+		
+		var theDeletedItems = {};
+		
+		var workItemMap = {};
+		
+		jQuery(window).load(function()
+		{
+			initialiseActions();
+			
+			getTaskList();
+		});
+		
+		function refreshList()
+		{
+			jQuery('.task-list-container').html(getTaskListHtml());
+			
+			//reapplyFilter();
+			
+			if({!$ObjectType.KimbleOne__WorkItemTemplate__c.updateable})initialiseTaskWorkItemsDragAndDrop();
+		}
+		
+		function getTaskListHtml()
+		{
+			var html = '';
+			
+			html += '<div class="task-list-table">';
+			
+			var theActivitiesLength = theActivities.length;
+			for(var i = 0; i < theActivitiesLength; i++)
+			{
+				var theActivityItem = theActivities[i];
+
+				var actualUnits = 0;
+				var forecastUnits = 0;
+				var remainingUnits = 0;
+							
+				var activityHtml = '';
+				activityHtml += '<div node-id="' + theActivityItem.ProductId + '" scoping-id="' + theActivityItem.ProductId + '" class="activity-item list-item">';
+
+				activityHtml += '<div class="ai-actions">';
+				if({!$ObjectType.WorkItemTemplate__c.createable})activityHtml += '<div class="add-work-item"><i class="fa fa-plus-square activity-action-ind" title="' + l['AddWorkItem'] + '"></i></div>';
+				activityHtml += '</div>';
+				
+				activityHtml += '<div class="ai-name-details">';
+				activityHtml += '<div class="ai-prod-name">' + theActivityItem.ProductName + '</div>';
+				activityHtml += '</div>';
+
+				activityHtml += '<div class="ai-metrics">';
+				activityHtml += '</div>';
+				
+				var workItemHtml = '';
+				var theWorkItemLength = theActivityItem.WorkItems.length;
+				workItemHtml += '<ul class="work-items activity-work-items" node-id="' + theActivityItem.ProductId + '" scoping-id="' + theActivityItem.ProductId + '">';
+				for(var j = 0; j < theWorkItemLength; j++)
+				{
+					var theWorkItem = theActivityItem.WorkItems[j];
+					workItemMap[theWorkItem.WorkItemTemplateId] = theWorkItem;
+					
+					workItemHtml += getWorkItemHtml(theWorkItem);
+
+					if(theWorkItemUnitType == 'Point' || theWorkItemUnitType == 'Item')
+					{
+						remainingUnits += (theWorkItem.RemainingUnits == undefined ? 0 : theWorkItem.RemainingUnits);
+					}					
+				}
+				workItemHtml += '</ul>';
+				
+				var workItemUnitsHtml = '';
+				if(theWorkItemUnitType == 'Point' || theWorkItemUnitType == 'Item')
+				{
+					workItemUnitsHtml += '<div class="task-units-total" title="' + l['RemainingUnits'] + '">' + formatNumberNat2DP(remainingUnits) + '</div>';
+					workItemUnitsHtml += '<div class="task-units-type">' + unitTypeEnumToSuffixMap[theWorkItemUnitType] + '</div>';
+				}
+				activityHtml += workItemUnitsHtml;
+				
+				activityHtml += '</div>';
+
+				html += activityHtml + workItemHtml;
+			}
+			html += '</div>';	
+			
+			return html;
+		}
+
+		function getWorkItemHtml(theWorkItem)
+		{
+			
+			theResources = [];
+			for(var x in theActivityAssignments) {
+				theResources.push({id: theActivityAssignments[x].Id, text: theActivityAssignments[x].ResourceName + (theActivityAssignments[x].RoleName != undefined && theActivityAssignments[x].RoleName != '' ? ' - ' + theActivityAssignments[x].RoleName : '')});
+			}
+			var html = '';
+			
+			var itemIsDeleted = (theWorkItem.WorkItemTemplateId in theDeletedItems); 
+		
+			if({!$ObjectType.KimbleOne__WorkItemTemplate__c.updateable})var workItemNameHtml = '<textarea maxlength="80" class="work-item-name" placeholder="' + l['NewItem'] + '">' + (theWorkItem.Name != undefined && theWorkItem.Name != '' ? theWorkItem.Name : '') + '</textarea>';
+			else{var workItemNameHtml = '<class="work-item-name" placeholder="' + l['NewItem'] + '">' + (theWorkItem.Name != undefined && theWorkItem.Name != '' ? theWorkItem.Name : '');}
+
+			var additionalDetailsHtml = '';
+			
+			if(enableOwners) {
+				additionalDetailsHtml += '<div class="wi-add-details"><div class="owner-selector-container">';
+				additionalDetailsHtml += '<label for="owner-selector-input">' + l['Owner'] + ':</label>';
+				if({!$ObjectType.WorkItem__c.updateable})additionalDetailsHtml += '<input class="owner-selector-input" placeholder="' + (theWorkItem.ActivityAssignmentTemplateId != undefined && theWorkItem.ActivityAssignmentTemplateId != null && theResources.filter(function(x){return x.id == theWorkItem.ActivityAssignmentTemplateId})[0] != undefined ? theResources.filter(function(x){return x.id == theWorkItem.ActivityAssignmentTemplateId})[0].text : '{!$Label.kimbleone__none}') + '"/>';
+				else{additionalDetailsHtml += '<maxlength="2000" class="owner-selector-input" placeholder="{!$Label.kimbleone__none}">' + (theWorkItem.ActivityAssignmentTemplateId != undefined && theWorkItem.ActivityAssignmentTemplateId != null && theResources.filter(function(x){return x.id == theWorkItem.ActivityAssignmentTemplateId})[0] != undefined ? theResources.filter(function(x){return x.id == theWorkItem.ActivityAssignmentTemplateId})[0].text : '');}
+				additionalDetailsHtml += '<i class="clear-button fa fa-times"' + (theWorkItem.ActivityAssignmentTemplateId != undefined && theWorkItem.ActivityAssignmentTemplateId != null && theResources.filter(function(x){return x.id == theWorkItem.ActivityAssignmentTemplateId})[0] != undefined? 'style="visibility:visible;" title="{!$Label.RemoveOwnerHover}"' : '')+'></i>';
+				additionalDetailsHtml += '</div></div>';
+			}
+			
+			var actionsHtml = '<div class="wi-actions">'
+			if(enableOwners) actionsHtml += '<i class="fa fa-pencil-square-o edit-work-item" title="' + l['ShowDetails'] + '"></i>';
+			if({!$ObjectType.WorkItemTemplate__c.deletable})actionsHtml += '<i class="fa fa-trash del-work-item" title="' + l['Delete'] + '"></i>';
+			actionsHtml += '</div>';
+			
+			var workItemClass = 'work-item list-item selectable';
+			
+			html += '<li node-id="' + theWorkItem.WorkItemTemplateId + '" parent-node-id="' + (theWorkItem.TaskId != null ? theWorkItem.TaskId : theWorkItem.ProductId) + '" item-status="' + theWorkItem.Status + '" class="' + workItemClass + (theWorkItem.IsNew ? ' new last-added' : '') + '">' + workItemNameHtml + additionalDetailsHtml + actionsHtml;
+
+			var workItemUnitsHtml = '';
+			if(enableOwners) workItemUnitsHtml += '<i class="fa fa-user owner-ind" owner-detail="on" style="visibility:' + (theWorkItem.ActivityAssignmentTemplateId != null ? 'visible' : 'hidden') +'"></i>';
+			
+			if(theWorkItemUnitType == 'Point' || theWorkItemUnitType == 'Item')
+			{
+				workItemUnitsHtml += '<input class="work-item-units" value="' + (theWorkItem.RemainingUnits == undefined ? 0 : formatNumberNat2DP(theWorkItem.RemainingUnits)) + '"/>';
+				workItemUnitsHtml += '<div class="work-item-unit-type">' + unitTypeEnumToSuffixMap[theWorkItemUnitType] + '</div>';
+			}
+			html += workItemUnitsHtml;
+			
+			if(enableOwners) html += '<div class="ti-owner-details"><div class="task-owner-name">' + l['Owner'] + ': ' + (theWorkItem.ActivityAssignmentTemplateId != null ? theResources.filter(function(x){return x.id == theWorkItem.ActivityAssignmentTemplateId})[0].text : l['None']) + '</div></div>';
+			if({!$ObjectType.KimbleOne__WorkItemTemplate__c.updateable})html += '<div class="wi-status-details">' + l['NotStarted'] + '</div>';
+			
+			html += '</li>';
+						
+			return html;
+		}		
+
+		function workItemObjectHasDetail(theWorkItem)
+		{
+			return false;
+		}
+		
+		function workItemHasDetail(theWorkItem)
+		{
+			return false;
+		}	
+				
+		function initialiseActions()
+		{
+			jQuery.unsubscribe('kimble.task-list-working-start');
+			jQuery.subscribe('kimble.task-list-working-start', function(event, assignment){
+				showWorking();
+			});
+			
+			jQuery.unsubscribe('kimble.task-list-working-end');
+			jQuery.subscribe('kimble.task-list-working-end', function(event, assignment){
+				hideWorking();
+			});
+			
+			jQuery.unsubscribe('kimble.task-list-save-start');
+			jQuery.subscribe('kimble.task-list-save-start', function(event, assignment){
+				showSaving();
+			});
+			
+			jQuery.unsubscribe('kimble.task-list-save-end');
+			jQuery.subscribe('kimble.task-list-save-end', function(event, assignment){
+				hideSaving();
+			});
+			
+			jQuery(document).off('keydown', '.work-item-name').on('keydown', '.work-item-name', workItemChange);
+			jQuery(document).off('keydown', '.work-item-units').on('keydown', '.work-item-units', workItemChange);
+			jQuery(document).off('keyup', '.work-item-name').on('keyup', '.work-item-name', workItemNameChange);
+			jQuery(document).off('click', '.add-work-item').on('click', '.add-work-item', addWorkItemClick);
+			jQuery(document).off('click', '.del-work-item').on('click', '.del-work-item', deleteWorkItemClick);
+			jQuery(document).off('click', '#saveButton').on('click', '#saveButton', saveTaskList);
+			jQuery(document).off('click', '.edit-work-item').on('click', '.edit-work-item', editWorkItemClick);
+
+			jQuery(document).off('change', '.work-item-units').on('change', '.work-item-units', workItemUnitsChange);
+			
+			//jQuery(document).off('keyup', '#filter-input').on('keyup', '#filter-input', filterChange);
+		
+			if(enableOwners) {
+				jQuery(document).off('mouseover', 'i.owner-ind[owner-detail="on"]').on('mouseover', 'i.owner-ind[owner-detail="on"]', showOwner);
+				jQuery(document).off('click', 'i.owner-ind[owner-detail="on"]').on('click', 'i.owner-ind[owner-detail="on"]', editWorkItemClick);
+				jQuery(document).off('mouseleave', 'li.owner-on[node-id]').on('mouseleave', 'li.owner-on[node-id]', hideOwner);
+			}
+		}
+		
+		function initialiseTaskWorkItemsDragAndDrop()
+		{
+			if(jQuery('.work-items').data('ui-sortable')) jQuery('.work-items').sortable('destroy');
+			
+			jQuery('.work-items').each(function(index) { 
+				var scopingId = jQuery(this).attr('scoping-id');
+				jQuery('.work-items[scoping-id="' + scopingId + '"]').sortable({
+					connectWith: '.work-items[scoping-id="' + scopingId + '"]',
+					cancel : '.wi-actions, .status-select, textarea, input',
+					tolerance: "pointer",
+					over: function(e, ui) {
+						jQuery(ui.sender).data('ui-sortable').scrollParent = jQuery(e.target);
+					},
+					receive: function( e, ui ) {
+						ui.item.attr('parent-node-id', jQuery(e.target).closest('.work-items').attr('node-id'));
+						workItemMap[ui.item.attr('node-id')].TaskId = jQuery(e.target).closest('.work-items').attr('node-id');
+						listChanged();
+					},
+					stop: function( e, ui ) {
+						jQuery('.feed-me').removeClass('feed-me');
+						listChanged();
+					},
+					start: function (e, ui ) {
+						clearTimer();
+						jQuery('.work-items:empty').addClass('feed-me');
+					}
+				}).disableSelection();
+			});
+		}
+		
+		function workItemChange(e)
+		{
+			// enter to create a new work item
+			if(jQuery(this).parent('.work-item').hasClass('new') && e.keyCode == 13)
+			{
+				e.preventDefault();
+				e.stopPropagation();
+				jQuery('.last-added').removeClass('last-added');
+				
+				addWorkItemClick(e, jQuery(this).closest('.work-item'));
+			}
+			
+			if(!jQuery(this).parent('.work-item').hasClass('new') && e.keyCode == 13)
+			{
+				e.preventDefault();
+				e.stopPropagation();
+			}
+		}
+
+		function workItemUnitsChange(e)
+		{
+			var workItemParent = jQuery('div[node-id="' + jQuery(this).parent('.work-item').attr('parent-node-id') + '"]');
+			var workItems = jQuery('li[parent-node-id="' + jQuery(this).parent('.work-item').attr('parent-node-id') + '"]');
+			
+			workItemMap[jQuery(this).parent('.work-item').attr('node-id')].RemainingUnits = kimble.parseNumber(jQuery(this).val());
+			
+			calculateParentUnitsTotal(workItemParent, workItems);
+		
+			listChanged();
+		}			
+
+		function calculateParentUnitsTotal(theParent, theChildren)
+		{
+			var theTotal = 0;
+			jQuery.each(theChildren.find('.work-item-units'), function (i, item){
+				theTotal += kimble.parseNumber(jQuery(item).val());
+			});
+			theParent.find('.task-units-total').text(formatNumberNat2DP(theTotal));
+		}
+		
+		function editWorkItemClick(e)
+		{
+			var theItem = jQuery(this).closest('.work-item');
+			
+			if(enableOwners) {
+				theItem.find('.ti-owner-details').hide();
+				theItem.removeClass('owner-on');
+			}
+			theItem.find('.edit-work-item').toggleClass('detail-edit-mode');
+			theItem.find('.wi-add-details').toggleClass('detail-edit-mode',  theItem.find('.edit-work-item').hasClass('detail-edit-mode'));
+			jQuery.each(theItem.find('.wi-add-details textarea'), function (i, theTextArea)
+			{
+				jQuery(this).height(1);
+				var totalHeight = jQuery(this).prop('scrollHeight') - parseInt(jQuery(this).css('padding-top')) - parseInt(jQuery(this).css('padding-bottom'));
+				jQuery(this).height(totalHeight);
+			});
+		}
+			
+		function deleteWorkItemClick(e)
+		{
+			var workItemParent = jQuery('div[node-id="' + jQuery(this).closest('.work-item').attr('parent-node-id') + '"]');
+
+			if (!jQuery(this).closest('.work-item').hasClass('new'))
+				theDeletedItems[jQuery(this).closest('.work-item').attr('node-id')] = jQuery(this).closest('.work-item').attr('node-id');
+				
+			jQuery(this).closest('.work-item').remove();
+			
+			delete workItemMap[jQuery(this).closest('.work-item').attr('node-id')];
+
+			var workItems = jQuery('li[parent-node-id="' + jQuery(this).closest('.work-item').attr('parent-node-id') + '"]');
+			
+			calculateParentUnitsTotal(workItemParent, workItems);
+			
+			listChanged();
+		}
+		
+		function getNewWorkItemObject(productIdIn)
+		{
+			var theWorkItem = {WorkItemTemplateId: getUniqueId(), IsNew: true, Status: newWorkItemStatus, TaskId: null, ProductId: productIdIn, TrackingPlanId: null};
+			
+			workItemMap[theWorkItem.WorkItemTemplateId] = theWorkItem;
+			
+			return theWorkItem;
+		}
+		
+		function showOwner()
+		{
+			var theNode = jQuery(this).closest('li[node-id]');
+			if(!jQuery('.task-list-container').hasClass('drag-active') && !theNode.find('.wi-add-details').hasClass('detail-edit-mode'))
+			{	
+				theNode.addClass('owner-on');
+				theNode.find('.ti-owner-details').slideDown();
+			}
+		}
+		
+		function hideOwner()
+		{
+			var theNode = jQuery(this).closest('li[node-id]');
+			theNode.removeClass('owner-on');
+			theNode.find('.ti-owner-details').slideUp();
+		}
+		
+		function getUniqueId()
+		{
+			  // Math.random should be unique because of its seeding algorithm.
+			  // Convert it to base 36 (numbers + letters), and grab the first 9 characters
+			  // after the decimal.
+			  return '__' + Math.random().toString(36).substr(2, 9);
+		}
+		
+		function workItemNameChange(e)
+		{	
+			var itemId = jQuery(this).closest('.list-item').attr('node-id');
+			
+			workItemMap[itemId].Name = jQuery(this).val();
+			
+			listChanged(); 
+		}
+		
+		function ownerChange(newId, itemId)
+		{
+			workItemMap[itemId].ActivityAssignmentTemplateId = newId;
+			listChanged();		
+		}
+		
+		function addWorkItemClick(e, triggerWorkItem)
+		{
+			var thisItem = (triggerWorkItem == undefined ? jQuery(this) : jQuery(triggerWorkItem));
+			
+			var isActivity = (triggerWorkItem == undefined ? thisItem.closest('.list-item').hasClass('activity-item') : thisItem.closest('.work-items').hasClass('activity-work-items'));
+			
+			var productId = (triggerWorkItem == undefined ? thisItem.closest('.list-item').attr('scoping-id') : thisItem.attr('parent-node-id'));
+			
+			var targetWorkItems = jQuery('.work-items[node-id="' + productId + '"]');
+			
+			var newItemObject = getNewWorkItemObject(productId);
+			
+			if(triggerWorkItem != undefined)
+			{
+				jQuery(triggerWorkItem).after(getWorkItemHtml(newItemObject));
+			}
+			else
+			{
+				targetWorkItems.append(getWorkItemHtml(newItemObject));
+			}
+			
+			var newItem = targetWorkItems.find('.work-item.last-added textarea');
+			newItem.focus().select();
+			initialiseResourceSelectorNewItem(newItem);
+		}		
+		
+		function initialiseResourceSelector()
+		{
+			
+			if(!enableOwners) return;
+			
+			theResources = [];
+			for(var x in theActivityAssignments) {
+				theResources.push({id: theActivityAssignments[x].Id, text: theActivityAssignments[x].ResourceName + (theActivityAssignments[x].RoleName != undefined && theActivityAssignments[x].RoleName != '' ? ' - ' + theActivityAssignments[x].RoleName : '')});
+			}
+						
+			jQuery('.owner-selector-input').select2({
+				//minimumInputLength: 2,
+				multiple: false,
+				data: theResources,
+				initSelection : function (element, callback) {
+					var data = {id: element.val(), text: element.attr('data-name')};
+					callback(data);
+				},
+				 escapeMarkup: function(text) {return text;}
+			});
+			
+			intitialiseResourceSelectorActions();		
+		}
+		
+		function initialiseResourceSelectorNewItem(item)
+		{
+			if(!enableOwners) return;
+			
+			theResources = [];
+			for(var x in theActivityAssignments) {
+				theResources.push({id: theActivityAssignments[x].Id, text: theActivityAssignments[x].ResourceName + (theActivityAssignments[x].RoleName != undefined && theActivityAssignments[x].RoleName != '' ? ' - ' + theActivityAssignments[x].RoleName : '')});
+			}
+			
+			jQuery(item).last().parent().find('.owner-selector-input').select2({
+				//minimumInputLength: 2,
+				multiple: false,
+				data: theResources,
+				initSelection : function (element, callback) {
+					var data = {id: element.val(), text: element.attr('data-name')};
+					callback(data);
+				},
+				 escapeMarkup: function(text) {return text;}
+			});
+			
+			intitialiseResourceSelectorActions();		
+		}
+		
+		function intitialiseResourceSelectorActions() 
+		{
+			jQuery('.owner-selector-input').on("select2-selecting", function(e) {
+				var itemId = jQuery(this).closest('.work-item').attr('node-id');
+				$(this).closest('.owner-selector-container').find('.clear-button').css('visibility', 'visible');
+				$(this).closest('li').find('.owner-ind').css('visibility', 'visible');
+				$(this).closest('li').find('.task-owner-name').text(l['Owner'] + ': ' + e.object.text);
+				ownerChange(e.object.id, itemId);
+			});
+			
+			jQuery('.clear-button').on('click', function() {
+				$(this).closest('.owner-selector-container').find('span').text('{!$Label.kimbleone__none}');
+				$(this).css('visibility', 'hidden');
+				$(this).closest('li').find('.owner-ind').css('visibility', 'hidden');
+				$(this).closest('li').find('.task-owner-name').text(l['Owner'] + ': ' + l['None']);
+				var itemId = jQuery(this).closest('.work-item').attr('node-id');
+				ownerChange(null, itemId);	
+			});		
+		}
+		
+		var autoSaveInd = true;
+		
+		function toggleAutoSave() {
+			autoSaveInd = !autoSaveInd;
+			jQuery("#autoSaveMode").toggleClass('fa-toggle-off').toggleClass('fa-toggle-on');
+		}
+		
+		function autoSave(autoSaveIndIn) {
+			autoSaveInd = autoSaveIndIn;
+			jQuery("#autoSaveMode").toggleClass('fa-toggle-off', !autoSaveInd).toggleClass('fa-toggle-on', autoSaveIndIn);			
+		}
+		
+		function hideWorking()
+		{
+			if(!disablePlan) jQuery('#toolbar-buttons>a').removeClass('disabled');
+			jQuery('#loadingIndicatorOuterContainer').hide();
+		}
+		
+		function showWorking()
+		{
+			jQuery('#toolbar-buttons>a').addClass('disabled');
+			jQuery('#loadingIndicatorOuterContainer').show();
+		}
+		
+		function hideSaving()
+		{
+			if(!disablePlan) jQuery('#toolbar-buttons>a, #toolbar-buttons>.auto-save-toggle-container>a').removeClass('disabled');
+			jQuery('.list-input').prop('disabled', false).removeClass('working');
+		}
+		
+		function showSaving()
+		{
+			jQuery('#toolbar-buttons>a, #toolbar-buttons>.auto-save-toggle-container>a').addClass('disabled');
+			jQuery('.list-input').prop('disabled', 'disabled').addClass('working');
+		}
+
+		function getTaskList()
+		{
+			jQuery.publish('kimble.task-list-working-start');
+			
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.WorkItemTemplatesController.GetTaskList}',
+					currentProductId,
+						function(result, event){		  
+							if (event.status) 
+							{
+								theActivities = result.TheActivityItems;
+
+								resetWorkingMaps();
+								
+								refreshList();
+								
+								initialiseResourceSelector();
+								jQuery.publish('kimble.task-list-working-end');				
+							} 
+							else if (event.type === 'exception') 
+							{
+								alert(event.message);
+							} 
+							else 
+							{
+								alert(event.message);
+							}
+					}, 
+					{escape: true, timeout: 60000}
+				);
+		}
+		
+		var saveTimer;
+		
+		function listChanged()
+		{
+			jQuery(window).off('.has-changes').on('beforeunload.has-changes', function(){
+				return kimble.labels['UnsavedChangesHeading'] + "\n\n" + kimble.labels['UnsavedChangesMessage']; 
+			});
+
+			// start a timer and then save on expiry - compensates for the user probably wanting to change the state of many items
+			clearTimer();
+			
+			if(autoSaveInd)
+			{
+				saveTimer = setTimeout(saveTaskList, 4000);
+			}
+			
+			jQuery('#saveButton').addClass('has-changes');
+		}
+		
+		function clearTimer()
+		{
+			clearTimeout(saveTimer);
+		}
+		
+		function resetListChanged()
+		{
+			jQuery(window).off('.has-changes');
+			jQuery('#saveButton').removeClass('has-changes');
+		}
+		
+		function processWorkItemSequenceChanges()
+		{
+			jQuery('.work-items').each(function(index) { 
+				jQuery(this).find('li:not(.deleted)').each(function(wiIndex) {
+					var itemId = jQuery(this).attr('node-id');
+					workItemMap[itemId].Position = wiIndex + 1; 
+				});
+			});
+		}
+		
+		function resetWorkingMaps()
+		{
+			taskMap = {};
+			workItemMap = {};
+			theDeletedItems = {};		
+		}
+
+		function formatNumberNat2DP(theVal)
+		{
+			var formattedVal = '0';
+			if(theVal != undefined && theVal != '') formattedVal = theVal;
+			formattedVal = kimble.formatNumber(formattedVal, "#.##");
+			
+			return (formattedVal != undefined && formattedVal != '' ? formattedVal : '0'); 
+		}
+		
+		function saveTaskList()
+		{
+			clearTimer();
+			
+			jQuery.publish('kimble.task-list-save-start');
+			
+			// work items may have been moved around in their respective lists - iterate the controls and order them
+			processWorkItemSequenceChanges();
+						
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.WorkItemTemplatesController.SaveTaskList}',
+					currentProductId, workItemMap, theDeletedItems, 
+						function(result, event){		  
+							if (event.status) 
+							{
+								theActivities = result.TheActivityItems;
+								
+								resetWorkingMaps();
+								
+								refreshList();
+								initialiseResourceSelector();
+								
+								resetListChanged();
+								
+								jQuery.publish('kimble.task-list-save-end');				
+							} 
+							else if (event.type === 'exception') 
+							{
+								alert(event.message);
+							} 
+							else 
+							{
+								alert(event.message);
+							}
+					}, 
+					{escape: true, timeout: 60000}
+				);
+		}		
+	</script>
+	
+	<apex:outputPanel id="ErrorMessages">
+		<apex:pageMessages escape="false"/>
+	</apex:outputPanel>
+	<div id="remote-action-error" style="display:none"><span><div class="message errorM3"><table border="0" cellpadding="0" cellspacing="0" class="messageTable" style="padding:0px;margin:0px;"><tbody><tr valign="top"><td><img alt="error" class="msgIcon" src="/s.gif" title="{!$Label.Error}"/></td><td class="messageCell"><div class="messageText" id="remote-action-error-text"><br/></div></td></tr><tr><td></td><td></td></tr></tbody></table></div></span></div>
+
+<apex:outputPanel rendered="{!$ObjectType.KimbleOne__WorkItemTemplate__c.updateable}">
+	<div class="toolbar-container">
+		<div class="toolbar">
+			<div id="toolbar-buttons">
+<!-- 				<div class="filter-container"> -->
+<!-- 					<input id="filter-input" placeholder="Filter the list"/> -->
+<!-- 				</div> -->
+				<div class="auto-save-toggle-container">
+					<a id="saveButton" title="{!$Label.Save}" class="toolbar-button" href="#"><i class="fa fa-save"></i></a>
+					<span class="undecorated-link" onclick="autoSave(false)">{!$Label.AutoSaveOffLabel}</span>
+					<span id="autoSaveMode" onclick="toggleAutoSave()" class="k-tgl fa fa-toggle-on"></span>
+					<span class="undecorated-link" onclick="autoSave(true)">{!$Label.On}</span>
+				</div>
+			</div>
+		</div>
+	</div>
+</apex:outputPanel>
+
+	<apex:pageBlock id="taskListPB">
+		<div id="loadingIndicatorOuterContainer" class="loadingIndicator" style="display:none">
+			<div id="loadingIndicatorInnerContainer">
+				<img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+			</div>
+		</div>
+		
+		<div class="task-list-container">
+			<div class="task-list-grid">
+			</div>
+		</div>
+	</apex:pageBlock>
+	
+</apex:define>
+
+</apex:composition>
+</apex:page>

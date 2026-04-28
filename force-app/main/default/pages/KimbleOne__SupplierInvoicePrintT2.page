@@ -1,0 +1,265 @@
+<apex:page controller="KimbleOne.SupplierInvoicePrintController" showHeader="false" sidebar="false" renderAs="{!IF($CurrentPage.parameters.renderAs=='html','html','pdf')}">
+<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__PdfHeaderFooterStyle, 'PdfHeaderFooterStyle-A4.css')}"/>
+<apex:stylesheet value="{!$Resource.KimbleOne__InvoiceCreditNoteStyle}" />
+<apex:variable var="DraftCSS" value="Draft" rendered="{!$CurrentPage.parameters.IsDraft = 'true'}">
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__Watermark,'watermark.css')}" />
+</apex:variable>
+
+
+<c:PdfHeaderFooter type="header" position="right" >
+	<div>
+		<br/>
+		<br/>					
+	</div>
+</c:PdfHeaderFooter>
+<c:PdfHeaderFooter type="header" position="left" textStyleClass="title">
+	<div>
+		<br/>
+		<apex:outputText value="{!$Label.kimbleone__invoiceprintt4invoice}"></apex:outputText>
+	</div>
+</c:PdfHeaderFooter>
+<!-- Following two lines ensure that the header is not repeated on each subsequent page -->
+<c:PdfHeaderFooter type="header" position="left" textStyleClass="title">
+</c:PdfHeaderFooter>
+<c:PdfHeaderFooter type="header" position="right" textStyleClass="title">
+</c:PdfHeaderFooter>
+
+<html>
+	<body>
+	
+	<table id="invDetails" class="table" >	
+		<tbody>
+			<!-- Addresses -->
+			<tr>
+				<!-- Left Hand Column -->
+				<!-- explicit height, width and padding ensures that the address banner always takes up the same space  -->
+				<!-- (as if only a few lines the rest of the document would come into view in the envelope window) -->
+				<td width="55%" height="160px" style="padding-top: 37px;">
+					<!-- Business Unit Address -->
+					<c:AddressOutput TheAddress="{!ToAddress}" addressStyle="UKWindowC4Recipient"/>
+				</td>
+				
+				<!-- Right Hand Column -->
+				<!-- explicit height, width and padding ensures that the address banner always takes up the same space  -->
+				<!-- (as if only a few lines the rest of the document would come into view in the envelope window) -->				
+				<td width="45%" height="160px" style="padding-top: 37px;">
+					<!-- Nested table ensures that the address has a left hand edge matching the values in the table in the next row -->
+					<table class="table">
+						<tr>
+							<td class="referenceLabelCell">  
+								<!-- No content, this cell ensures the address is in the RHS of the page -->
+							</td>
+							<td>
+								<!-- Supplier Address -->
+								<c:AddressOutput TheAddress="{!FromAddress}" addressStyle="UKPlainFormatting"/>	
+							</td>
+						</tr>
+					</table>
+				</td>
+			</tr>
+			<!-- Addresses (end) -->
+
+			<!-- References -->
+			<tr>
+				<td>
+					<!--  No content, just preserving tabular format -->
+				</td>
+				<td>
+					<!-- Reference, Date and Terms -->
+					<table class="table">
+						<tr>
+							<td class="referenceLabelCell">
+								<apex:outputText value="{0}" styleClass="boldLabel">
+									<apex:param value="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.Name.Label}"></apex:param>
+								</apex:outputText>						
+							</td>
+							<td class="valueCell">
+								<apex:outputText value="{0}" styleClass="textLeft">
+									<apex:param value="{!supplierInvoice.Name}"></apex:param>
+								</apex:outputText>
+							</td>
+						</tr>
+						<tr>
+							<td>
+								<apex:outputPanel layout="none" rendered="{!!ISBLANK(supplierAccountInvoicingModel.KimbleOne__TaxCodeReference__c)}">
+									<tr>
+										<td id="taxCodeReferenceLabel" class="referenceLabelCell">
+											<apex:outputText value="{0}" styleClass="boldLabel">
+												<apex:param value="{!$ObjectType.KimbleOne__AccountInvoicingModel__c.Fields.KimbleOne__TaxCodeReference__c.Label}"></apex:param>
+												</apex:outputText>
+										</td>
+										<td id="taxCodeReferenceValue" class="valueCell">
+											<apex:outputText value="{0}" >
+												<apex:param value="{!supplierAccountInvoicingModel.KimbleOne__TaxCodeReference__c}"></apex:param>
+											</apex:outputText>
+										</td>						
+									</tr>
+								</apex:outputPanel>
+							</td>
+						</tr>
+						<tr>
+							<td class="referenceLabelCell">
+								<apex:outputText value="{0}" styleClass="boldLabel">
+									<apex:param value="{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.KimbleOne__InvoiceDate__c.Label}"></apex:param>
+								</apex:outputText>											
+							</td>
+							<td class="valueCell">
+								<apex:outputText value="{0, date, dd MMMM yyyy}" styleClass="textLeft">
+									<apex:param value="{!supplierInvoice.KimbleOne__InvoiceDate__c}"></apex:param>
+								</apex:outputText>
+							</td>
+						</tr>
+						<apex:outputPanel layout="none" rendered="{!!ISBLANK(supplierInvoice.KimbleOne__InvoicePaymentTermDays__c)}">
+							<tr>
+								<td class="referenceLabelCell">
+									<apex:outputText value="{0}" styleClass="boldLabel">
+										<apex:param value="{!$Label.kimbleone__supplierpot2paymentterms}"></apex:param>
+									</apex:outputText>
+								</td>
+								<td class="valueCell">
+									<apex:outputText value="{!$Label.kimbleone__dayssuffix}" styleClass="textLeft">
+										<apex:param value="{!supplierInvoice.KimbleOne__InvoicePaymentTermDays__c}"></apex:param>
+									</apex:outputText>
+								</td>
+							</tr>
+						</apex:outputPanel>
+					</table>
+					<!-- Reference, Date and Terms (end) -->
+				</td>
+			</tr>
+			<!-- References (end) -->
+			
+			<!--  Notes -->
+			<tr>
+				<td colspan="2">
+					<apex:outputPanel layout="none" rendered="{!supplierInvoice.KimbleOne__Notes__c != null}">
+						<apex:outputText value="{0}" styleClass="boldLabel">
+							<apex:param value="{!$Label.kimbleone__supplierpot2suppliernotes}"></apex:param>
+						</apex:outputText>	<br/>
+						<apex:outputText value="{0}" styleClass="textLeft">
+							<apex:param value="{!supplierInvoice.KimbleOne__Notes__c}"></apex:param>
+						</apex:outputText>
+					</apex:outputPanel>
+				</td>
+			</tr>
+			<!--  Notes (end) -->
+			<!--  Self Bill Tax Narrative -->
+			<tr>
+				<td colspan="2">
+					<apex:outputPanel layout="none" rendered="{!supplierInvoice.KimbleOne__TaxAmount__c > 0}">
+						<apex:outputText value="{0}" styleClass="textLeft" rendered="{!!SupplierInvoiceTaxStatementEnabled}">
+							<apex:param value="{!$Label.kimbleone__invoiceprintt4invoicenotes}"></apex:param>
+						</apex:outputText>
+						<apex:outputText value="{0}" styleClass="textLeft" rendered="{!SupplierInvoiceTaxStatementEnabled}">
+							<apex:param value="{!supplierInvoice.TaxCode__r.KimbleOne__SupplierInvoiceTaxStatement__c}"></apex:param>
+						</apex:outputText>
+					</apex:outputPanel>
+				</td>
+			</tr>
+			<!--  Notes (end) -->
+
+		</tbody>
+	</table>
+	
+	<br/>
+	
+	<table id="supplierInvoiceLines" class="table">
+		<thead>
+			<tr>
+				<th width="10%" class="boldLabel">{!$label.SUPPLIERPOT2LineNo}</th>
+				<th width="60%" class="boldLabel">{!$Label.SUPPLIERPOT2Desc}</th>					
+				<th width="10%" class="boldLabelRight">{!$Label.NetLabel}</th>					
+				<th width="10%" class="boldLabelRight">{!$Label.TaxLabel}</th>
+			</tr>
+				<tr>
+					<th colspan="4" style="">
+						<hr/>
+					</th>
+				</tr>
+		</thead>
+		<tbody>
+			<tr><td></td></tr>
+			<tr><td></td></tr>
+    		<apex:repeat value="{!SupplierInvoiceLines}" var="invLine">
+			<tr>
+				<td class="textLeft" >
+					<apex:outputField value="{!invLine.KimbleOne__LineNumber__c}"/>
+				</td>
+				<td class="textLeft">
+					<apex:outputField value="{!invLine.KimbleOne__Narrative__c}"/>
+				</td>
+				<td class="amount">
+					<apex:outputText value="{0, number, #,##0.00}">
+						<apex:param value="{!ROUND(invLine.KimbleOne__NetAmount__c,2)}"/>
+					</apex:outputText>
+				</td>
+				<td class="amount">
+					<apex:outputText value="{0, number, #,##0.00}">
+						<apex:param value="{!ROUND(invLine.KimbleOne__TaxAmount__c,2)}"/>
+					</apex:outputText>
+				</td>
+			</tr>
+			</apex:repeat>
+			<tr>
+				<th colspan="4">
+					<hr/>
+				</th>
+			</tr>
+		</tbody>
+	</table>
+
+	<br/>
+		
+	<table id="invoiceTotals" class="tableTotals nobreak">
+		<thead>
+			<tr>
+				<th width="20%"/>
+				<th width="20%"/>
+				<th width="20%"/>
+				<th width="20%"/>
+			</tr>
+		</thead>
+			<tbody>
+				<apex:outputPanel layout="none">
+				<tr>
+					<td colspan="3"/>
+					<td class="textLeft">{!$Label.kimbleone__invoiceprintt1subtotal}</td>
+					<td class="amount">
+						<apex:outputText value="{0, number, #,##0.00}">
+ 							<apex:param value="{!supplierInvoice.KimbleOne__NetAmount__c}"/>
+						</apex:outputText>
+					</td>
+				</tr>
+				<tr>
+					<td colspan="3"/>
+					<td class="textLeft">
+						<apex:outputText value="{!supplierInvoice.TaxCode__r.KimbleOne__InvoiceTaxCodeName__c}"/>&nbsp;
+						<apex:outputText value="{!supplierInvoiceTaxRate.KimbleOne__TaxRate__c}"/>%					
+					</td>
+					<td class="amount">
+						<apex:outputText value="{0, number, #,##0.00}">
+ 							<apex:param value="{!supplierInvoice.KimbleOne__TaxAmount__c}"/>
+						</apex:outputText>
+					</td>
+				</tr>
+				</apex:outputPanel>
+	
+				<tr>
+					<td colspan="3"/>
+					<td colspan="3"><hr/></td>
+				</tr>
+				<tr>
+					<td colspan="3"/>
+					<td class="boldLabel">{!$Label.kimbleone__invoiceprintt1maintabletotal} <apex:outputText value="{!supplierInvoice.CurrencyIsoCode}"/></td>
+					<td class="boldLabelRight" >
+						<apex:outputText value="{0, number, #,##0.00}">
+ 							<apex:param value="{!ROUND(supplierInvoice.KimbleOne__NetAmount__c + supplierInvoice.KimbleOne__TaxAmount__c, 2)}"/>
+						</apex:outputText>
+					</td>
+				</tr>
+			</tbody>			
+
+	</table>
+	</body>
+</html>
+</apex:page>

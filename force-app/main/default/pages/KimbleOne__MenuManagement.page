@@ -1,0 +1,498 @@
+<apex:page controller="KimbleOne.MenuManagementController" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">    
+
+<apex:define name="Content">
+
+	<apex:form id="TheForm">
+	
+	<style>
+		.mainContainer
+		{white-space: nowrap;}
+		.all-columns {
+		    overflow-x: auto;
+		    position: relative;
+		}		
+		.groupedLine
+		{display: inline}
+		.filterColumn {
+			display: inline-block;
+			width:395px;
+			padding: 5px;
+			vertical-align:top;
+			border: 1px solid #DADADA;
+			border-radius: 4px;
+			margin-right: 6px;
+			margin-top: 3px;
+			box-shadow: rgba(0, 0, 0, 0.2) 0px 3px 7px 0px;
+		}
+		.columnHeading
+		{font-weight:bold; text-align: center;}
+		.objectProperties
+		{padding-top: 5px;}
+		.menuDetails
+		{background-color: #C4C7A6; text-align: center; padding-top: 50px; margin-top:10px}		
+		.columnContainer
+		{display: inline; white-space: nowrap}	
+		.buttonBar
+		{text-align: right}
+		.errorMessages
+		{color: red;}
+		
+		/*
+		    loading panel
+		*/
+		.loadingIndicator {
+		   top:0;
+		   right:0;
+		   width:100%;
+		   height:100%;
+		   font-weight: bold;
+		   position:absolute;
+		   text-align:center;
+		   /* IE filter */
+		   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+		   -moz-opacity:0.7;    /* Mozilla extension */
+		   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+		   opacity:0.7; /* CSS3 */
+		   z-index:1000;
+		   background-color:white;
+		}
+		
+		.loadingIndicator img {
+		    margin-right:9px;
+		}
+		
+		#loadingIndicatorInnerContainer { 
+		    position:absolute; 
+		    top:40px;
+		    height:10em; 
+		    margin-top:-2em;
+		    width:100%;
+		}
+				
+		.reorder-sequence-ind {
+		    float: left;
+		    font-size: 18px;
+		    display: inline;
+		    margin-top: 5px;
+		    margin-left: 3px;
+		    cursor: move;
+		    color: #626262;
+		}
+		
+		.reorder-sequence-ind:hover {
+			color: #015BA7;
+		}
+		
+		.manage-translations-btn {
+			padding: 4px 3px !important;
+			text-decoration: none;
+			margin-right: 10px !important;
+		}
+		
+		.manage-translations-btn:hover {
+			text-decoration: none !important;
+		}
+
+		.delivery-stage-permissions-header {
+			padding-left: 2px;
+			padding-bottom: 3px;
+			font-size: 12px;
+			font-weight: bold;
+			position: relative;
+		}
+
+	    .delivery-stage-permission-attribute {
+	        white-space: nowrap;
+        }
+	</style>
+	
+	<script>
+		jQuery( document ).ready(function() {
+			RefreshAll();
+		});
+		
+		function initialiseSortableElements()
+		{
+			jQuery( ".sortable.OpportunityStages" ).sortable({
+				update: function(event, ui) {			
+					var currentOrder = []; 
+					
+					jQuery('.filterColumn.OpportunityStage').each(function () {
+						currentOrder.push(jQuery(this).attr('stage-id'));
+					});
+					
+					UpdateStageOrderAction(currentOrder.join(','), "OpportunityStage");
+				}
+			});
+			
+			jQuery( ".sortable.DeliveryStages" ).sortable({
+				update: function(event, ui) {			
+					var currentOrder = []; 
+					
+					jQuery('.filterColumn.DeliveryStage').each(function () {
+						currentOrder.push(jQuery(this).attr('stage-id'));
+					});
+					
+					UpdateStageOrderAction(currentOrder.join(','), "DeliveryStage");
+				}
+			});
+
+			jQuery( ".sortable.CandidateStages" ).sortable({
+				update: function(event, ui) {			
+					var currentOrder = []; 
+					
+					jQuery('.filterColumn.CandidateStage').each(function () {
+						currentOrder.push(jQuery(this).attr('stage-id'));
+					});
+					
+					UpdateStageOrderAction(currentOrder.join(','), "CandidateStage");
+				}
+			});
+			
+			initialiseScrollbar();
+		}
+		
+		jQuery(window).resize(function() 
+		{
+			initialiseScrollbar();
+		});
+		
+		function initialiseScrollbar()
+		{
+			if(isSFLightning()) jQuery('#all-menu-columns').height(jQuery(window).height() - 45);
+		}
+		        
+	</script>
+ 
+	 <apex:actionStatus id="WorkingStatus">
+	    <apex:facet name="start">
+	        <div id="loadingIndicatorOuterContainer" class="loadingIndicator">
+	            <div id="loadingIndicatorInnerContainer">
+	                <img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+	            </div>
+	        </div>
+	    </apex:facet>
+	</apex:actionStatus>
+            
+	<div class="mainContainer">
+		<div class="contextContainer">
+			<div class="groupedLine"><apex:outputText value="{!$Label.kimbleone__contexttypeheading}:"/></div>
+			<div class="groupedLine">
+				<apex:selectList value="{!SelectedContext}" size="1">
+            		<apex:selectOptions value="{!AvailableContexts}"/>
+					<apex:actionSupport event="onchange" reRender="DetailContainer" action="{!RenderForContext}" status="WorkingStatus"/>
+        		</apex:selectList>
+        		<input type="button" class="btn" onclick="RefreshAll();" value="Refresh" />
+        		<input type="button" class="btn pref-button" onclick="collapseMenus();" value="Collapse Menus" />
+        		<input type="button" class="btn pref-button" onclick="expandMenus();" value="Expand Menus" />
+        		<apex:outputLink styleClass="btn manage-translations-btn pref-button" value="{!$Page.KimbleOne__TranslationManagement}">
+        			<apex:outputText value="{!$Label.kimbleone__managetranslationslabel}"/>
+					<apex:param name="domain" value="menu"/>
+        		</apex:outputLink>
+        	</div>
+		</div>
+
+		<apex:actionFunction action="{!RenderForContext}" name="RefreshAll" reRender="DetailContainer" status="WorkingStatus">
+	    </apex:actionFunction>
+	    		
+		<apex:actionFunction action="{!UpdateStageOrder}" name="UpdateStageOrderAction" reRender="DetailContainer" status="WorkingStatus">
+	        <apex:param name="sortedIds" value=""/>
+	        <apex:param name="contextType" value=""/>
+	    </apex:actionFunction>
+		
+	    <apex:actionFunction action="{!EnableEditMode}" name="EnableEditModeAction" reRender="DetailContainer">
+	        <apex:param name="targetItem" value=""/>
+	    </apex:actionFunction>
+
+	    <apex:actionFunction action="{!CloneOpportunityStage}" name="CloneOpportunityStageAction" reRender="DetailContainer" status="WorkingStatus">
+	        <apex:param name="targetItem" value=""/>
+	    </apex:actionFunction>
+
+	    <apex:actionFunction action="{!CloneDeliveryStage}" name="CloneDeliveryStageAction" reRender="DetailContainer" status="WorkingStatus">
+	        <apex:param name="targetItem" value=""/>
+	    </apex:actionFunction>
+
+	    <apex:actionFunction action="{!CloneCandidateStage}" name="CloneCandidateStageAction" reRender="DetailContainer" status="WorkingStatus">
+	        <apex:param name="targetItem" value=""/>
+	    </apex:actionFunction>
+
+	    <apex:actionFunction action="{!DeleteOpportunityStage}" name="DeleteOpportunityStageAction" reRender="DetailContainer" status="WorkingStatus">
+	        <apex:param name="targetItem" value=""/>
+	    </apex:actionFunction>
+
+	    <apex:actionFunction action="{!DeleteDeliveryStage}" name="DeleteDeliveryStageAction" reRender="DetailContainer" status="WorkingStatus">
+	        <apex:param name="targetItem" value=""/>
+	    </apex:actionFunction>
+	    
+	    <apex:actionFunction action="{!DeleteCandidateStage}" name="DeleteCandidateStageAction" reRender="DetailContainer" status="WorkingStatus">
+	        <apex:param name="targetItem" value=""/>
+	    </apex:actionFunction>
+
+	    <apex:actionFunction action="{!SaveOpportunityStage}" name="SaveOpportunityStageAction" reRender="DetailContainer" status="WorkingStatus">
+	        <apex:param name="targetItem" value=""/>
+	    </apex:actionFunction>
+
+	    <apex:actionFunction action="{!SaveDeliveryStage}" name="SaveDeliveryStageAction" reRender="DetailContainer" status="WorkingStatus">
+	        <apex:param name="targetItem" value=""/>
+	    </apex:actionFunction>
+
+	    <apex:actionFunction action="{!SaveCandidateStage}" name="SaveCandidateStageAction" reRender="DetailContainer" status="WorkingStatus">
+	        <apex:param name="targetItem" value=""/>
+	    </apex:actionFunction>
+
+	    <apex:actionFunction action="{!CancelOpportunityStageEditMode}" name="CancelOpportunityStageEditModeAction" reRender="DetailContainer" status="WorkingStatus">
+	        <apex:param name="targetItem" value=""/>
+	    </apex:actionFunction>
+
+	    <apex:actionFunction action="{!CancelDeliveryStageEditMode}" name="CancelDeliveryStageEditModeAction" reRender="DetailContainer" status="WorkingStatus">
+	        <apex:param name="targetItem" value=""/>
+	    </apex:actionFunction>
+	    
+	    <apex:actionFunction action="{!CancelCandidateStageEditMode}" name="CancelCandidateStageEditModeAction" reRender="DetailContainer" status="WorkingStatus">
+	        <apex:param name="targetItem" value=""/>
+	    </apex:actionFunction>
+
+		<apex:outputPanel id="DetailContainer">
+			<apex:pageMessages escape="false"/>
+
+			<div class="all-columns" id="all-menu-columns">
+      		<div class="columnContainer {!IF(AllowReorder, 'sortable', '')} OpportunityStages">
+        		<apex:repeat value="{!OpportunityStages}" var="theSalesOppFilter">
+        			<apex:variable value="{!CanDeleteMap[theSalesOppFilter.Id]}" var="notInUse" />
+	        		<apex:variable value="{!EditModeMap[theSalesOppFilter.Id]}" var="editMode" />
+	        		<div class="filterColumn OpportunityStage" stage-id="{!theSalesOppFilter.Id}">
+        				<apex:outputPanel layout="block" styleClass="reorder-sequence-ind fa fa-arrows" title="{!$Label.kimbleone__draganddropmenuorderlabel}" rendered="{!AllowReorder}"/>
+	        			<div class="buttonBar">
+	        				<apex:outputPanel layout="none" rendered="{!!editMode}">
+								<input type="button" class="btn" onclick="EnableEditModeAction('{!JSINHTMLENCODE(theSalesOppFilter.Id)}');" value="{!$Label.Edit}" />
+							</apex:outputPanel>
+							<apex:outputPanel layout="none" rendered="{!editMode}">
+								<input type="button" class="btn" onclick="SaveOpportunityStageAction('{!JSINHTMLENCODE(theSalesOppFilter.Id)}');" value="{!$Label.kimbleone__save}" />
+							</apex:outputPanel>
+							<apex:outputPanel layout="none" rendered="{!!editMode}">
+								<input type="button" class="btn" onclick="var d = confirmDelete();if(!d) return;CloneOpportunityStageAction('{!JSINHTMLENCODE(theSalesOppFilter.Id)}');" value="{!$Label.CloneLabel}" />
+							</apex:outputPanel>
+							<apex:outputPanel layout="none" rendered="{!notInUse && !editMode}">
+								<input type="button" class="btn" onclick="var d = confirmDelete();if(!d) return;DeleteOpportunityStageAction('{!JSINHTMLENCODE(theSalesOppFilter.Id)}');" value="{!$Label.DeleteButton}" />
+							</apex:outputPanel>
+							<apex:outputPanel layout="none" rendered="{!editMode}">
+								<input type="button" id="cancelBtn" class="btn" onclick="CancelOpportunityStageEditModeAction('{!JSINHTMLENCODE(theSalesOppFilter.Id)}');" value="{!$Label.Cancel}" />
+							</apex:outputPanel>
+						</div>
+		        		<div class="objectProperties">
+	        				<c:OpportunityStage OpportunityStageObjectIn="{!theSalesOppFilter}" EditModeIn="{!editMode}" LockModeIn="{!!notInUse}"/>
+		        		</div>
+		        		
+						<div id="menuItems">
+							<c:MenuItemsEdit MenuFilterContextIn="{!theSalesOppFilter.Name}" MenuContextTypeIn="{!SelectedContext}"/>
+						</div>
+		       		</div>
+	          	</apex:repeat>          
+       		</div>
+       		<div class="columnContainer {!IF(AllowReorder, 'sortable', '')} DeliveryStages">
+	        	<apex:repeat value="{!DeliveryStages}" var="theDeliveryGrpFilter">
+	        		<apex:variable value="{!CanDeleteMap[theDeliveryGrpFilter.Id]}" var="notInUse" />
+	        		<apex:variable value="{!EditModeMap[theDeliveryGrpFilter.Id]}" var="editMode" />
+	        		<apex:variable value="{!EditModeMapErrors[theDeliveryGrpFilter.Id]}" var="editModeErrors" />
+	        		<div class="filterColumn DeliveryStage" stage-id="{!theDeliveryGrpFilter.Id}">
+        				<apex:outputPanel layout="block" styleClass="reorder-sequence-ind fa fa-arrows" title="{!$Label.kimbleone__draganddropmenuorderlabel}" rendered="{!AllowReorder}"/>
+        				<div class="buttonBar">
+        					<apex:outputPanel layout="none" rendered="{!!editMode}">
+								<input type="button" class="btn" onclick="EnableEditModeAction('{!JSINHTMLENCODE(theDeliveryGrpFilter.Id)}');" value="{!$Label.Edit}" />
+							</apex:outputPanel>
+							<apex:outputPanel layout="none" rendered="{!editMode}">
+								<input type="button" class="btn" onclick="SaveDeliveryStageAction('{!JSINHTMLENCODE(theDeliveryGrpFilter.Id)}');" value="{!IF(editModeErrors, $Label.IgnoreErrorsAndSave,$Label.Save)}" />
+							</apex:outputPanel>
+							<apex:outputPanel layout="none" rendered="{!!editMode}">
+								<input type="button" class="btn" onclick="var d = confirmDelete();if(!d) return;CloneDeliveryStageAction('{!JSINHTMLENCODE(theDeliveryGrpFilter.Id)}');" value="{!$Label.CloneLabel}" />
+							</apex:outputPanel>
+							<apex:outputPanel layout="none" rendered="{!notInUse && !editMode}">
+								<input type="button" class="btn" onclick="var d = confirmDelete();if(!d) return;DeleteDeliveryStageAction('{!JSINHTMLENCODE(theDeliveryGrpFilter.Id)}');" value="{!$Label.DeleteButton}" />
+							</apex:outputPanel>
+							<apex:outputPanel layout="none" rendered="{!editMode}">
+								<input type="button" id="cancelBtn" class="btn" onclick="CancelDeliveryStageEditModeAction('{!JSINHTMLENCODE(theDeliveryGrpFilter.Id)}');" value="{!$Label.Cancel}" />
+							</apex:outputPanel>
+						</div>
+		        		<div class="objectProperties">
+	        				<c:DeliveryStage DeliveryStageObjectIn="{!theDeliveryGrpFilter}" EditModeIn="{!editMode}"/>
+		        		</div>
+
+						<apex:outputPanel layout="none" rendered="{!ShowDeliveryStagePermissions}">
+					        <div class="objectProperties">
+								<div class="delivery-stage-permissions-header">
+									<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryStagePermission__c.labelPlural}:"/>
+								</div>
+				                <apex:pageBlock >
+				                    <apex:pageblockSection collapsible="false" showheader="false" columns="1">
+										<apex:repeat value="{!DeliveryStageManagedPermissionsMap[theDeliveryGrpFilter.Id]}" var="permission">
+											<apex:pageBlockSectionItem >
+												<apex:outputText styleClass="delivery-stage-permission-attribute" value="{!PermissionsMap[permission].Name}"/>
+												<apex:inputCheckbox value="{!DeliveryStageManagedPermissionsMap[theDeliveryGrpFilter.Id][permission].InputCheckbox__c}" disabled="{!!editMode}"/>
+											</apex:pageBlockSectionItem>
+										</apex:repeat>
+				                    </apex:pageblockSection>
+				                </apex:pageBlock>
+				            </div>
+						</apex:outputPanel>
+
+						<div id="menuItems">
+							<c:MenuItemsEdit MenuFilterContextIn="{!theDeliveryGrpFilter.Name}" MenuContextTypeIn="{!SelectedContext}"/>
+						</div>
+		       		</div>
+	          	</apex:repeat>
+          	</div>
+          	<div class="columnContainer {!IF(AllowReorder, 'sortable', '')} CandidateStages">          
+	        	<apex:repeat value="{!CandidateStages}" var="theCandResFilter">
+	        		<apex:variable value="{!CanDeleteMap[theCandResFilter.Id]}" var="notInUse" />
+	        		<apex:variable value="{!EditModeMap[theCandResFilter.Id]}" var="editMode" />
+	        		<div class="filterColumn CandidateStage" stage-id="{!theCandResFilter.Id}">
+        				<apex:outputPanel layout="block" styleClass="reorder-sequence-ind fa fa-arrows" title="{!$Label.kimbleone__draganddropmenuorderlabel}" rendered="{!AllowReorder}"/>
+	        			<div class="buttonBar">
+        					<apex:outputPanel layout="none" rendered="{!!editMode}">
+								<input type="button" class="btn" onclick="EnableEditModeAction('{!JSINHTMLENCODE(theCandResFilter.Id)}');" value="{!$Label.Edit}" />
+							</apex:outputPanel>
+							<apex:outputPanel layout="none" rendered="{!editMode}">
+								<input type="button" class="btn" onclick="SaveCandidateStageAction('{!JSINHTMLENCODE(theCandResFilter.Id)}');" value="{!$Label.kimbleone__save}" />
+							</apex:outputPanel>
+							<apex:outputPanel layout="none" rendered="{!!editMode}">
+								<input type="button" class="btn" onclick="var d = confirmDelete();if(!d) return;CloneCandidateStageAction('{!JSINHTMLENCODE(theCandResFilter.Id)}');" value="{!$Label.CloneLabel}" />
+							</apex:outputPanel>
+							<apex:outputPanel layout="none" rendered="{!notInUse && !editMode}">
+								<input type="button" class="btn" onclick="var d = confirmDelete();if(!d) return;DeleteCandidateStageAction('{!JSINHTMLENCODE(theCandResFilter.Id)}');" value="{!$Label.DeleteButton}" />
+							</apex:outputPanel>
+							<apex:outputPanel layout="none" rendered="{!editMode}">
+								<input type="button" id="cancelBtn" class="btn" onclick="CancelCandidateStageEditModeAction('{!JSINHTMLENCODE(theCandResFilter.Id)}');" value="{!$Label.Cancel}" />
+							</apex:outputPanel>
+						</div>
+		        		<div class="objectProperties">
+	        				<c:CandidateStage CandidateStageObjectIn="{!theCandResFilter}" EditModeIn="{!editMode}"/>
+		        		</div>
+		        		
+						<div id="menuItems">
+							<c:MenuItemsEdit MenuFilterContextIn="{!theCandResFilter.Name}" MenuContextTypeIn="{!SelectedContext}"/>
+						</div>
+		       		</div>
+	        	</apex:repeat>   
+        	</div>
+      		<div class="columnContainer {!IF(AllowReorder, 'sortable', '')} MenusWithNullContext">
+        		<div class="filterColumn MenuWithNullContext" stage-id="null">
+	        		<div class="objectProperties"></div>
+					<div id="menuItems">
+						<c:MenuItemsEdit MenuFilterContextIn="" MenuContextTypeIn="{!SelectedContext}"/>
+					</div>
+	       		</div>
+       		</div>
+			</div>       		   	
+        	<script>
+        		// called when the detail panel is re-rendered
+		        initialiseSortableElements();
+		    </script>
+      
+		</apex:outputPanel>
+	</div>
+	
+	</apex:form>
+
+	<apex:form id="MenuItemEditForm">
+		<div id="MenuItemPopup" style="display:none">
+			<apex:outputPanel id="MenuItemPopupPanel">
+				<div id="MenuItemErrors">
+					<apex:pageMessages escape="false"/>
+				</div>
+
+				<apex:pageBlock title="{!$ObjectType.KimbleOne__MenuItem__c.Label}">
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton action="{!SaveMenuItem}" value="{!$Label.kimbleone__save}" styleClass="DisableButtonWhileBusy" reRender="MenuItemPopupPanel" onComplete="hideModalBoxyWithErrorCheck('#MenuItemErrors');" />
+						<input class="btn" type="button" styleClass="DisableButtonWhileBusy" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+					</apex:pageBlockButtons>
+
+					<apex:pageBlockSection >
+
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__MenuItem__c.Fields.Name.Label}" />
+							<apex:outputPanel layout="none">
+								<div class="requiredInput">
+									<apex:outputPanel layout="none"><div class="requiredBlock"></div></apex:outputPanel>
+									<apex:inputField value="{!SelectedMenuItem.Name}"/>
+								</div>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__MenuItem__c.Fields.KimbleOne__FormattedNodeName__c.Label}" />
+							<apex:outputPanel layout="none">
+								<div class="requiredInput">
+									<apex:outputPanel layout="none"><div class="requiredBlock"></div></apex:outputPanel>
+									<apex:inputField value="{!SelectedMenuItem.KimbleOne__FormattedNodeName__c}"/>
+								</div>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+
+						<apex:inputField value="{!SelectedMenuItem.KimbleOne__IsActive__c}" />
+
+						<apex:pageBlockSectionItem >
+							<apex:outputText value="{!$ObjectType.KimbleOne__MenuItem__c.Fields.KimbleOne__MenuItemType__c.Label}"/>
+								<apex:selectList value="{!SelectedMenuItem.KimbleOne__MenuItemType__c}" size="1">
+									<apex:selectOptions value="{!MenuItemTypeOptions}"/>
+									<apex:actionSupport event="onchange" reRender="conditionalFieldsSection"/>
+								</apex:selectList>
+						</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__MenuItem__c.Fields.KimbleOne__Sequence__c.Label}" />
+							<apex:outputPanel layout="none">
+								<div class="requiredInput">
+									<apex:outputPanel layout="none"><div class="requiredBlock"></div></apex:outputPanel>
+									<apex:inputField value="{!SelectedMenuItem.KimbleOne__Sequence__c}"/>
+								</div>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+
+						<apex:inputField value="{!SelectedMenuItem.KimbleOne__MenuItem__c}"/>
+						<apex:inputField value="{!SelectedMenuItem.KimbleOne__FilterContext__c}"/>
+						<apex:inputField value="{!SelectedMenuItem.KimbleOne__ObjectSource__c}" />
+
+					</apex:pageBlockSection>
+
+					<apex:pageBlockSection id="conditionalFieldsSection">
+
+					<apex:pageBlockSectionItem >
+						<apex:outputText value="{!$ObjectType.KimbleOne__MenuItem__c.Fields.KimbleOne__MenuCommand__c.Label}"  rendered="{!SelectedMenuItem.KimbleOne__MenuItemType__c == TypeCommandId}"/>
+						<apex:inputField value="{!SelectedMenuItem.KimbleOne__MenuCommand__c}"  rendered="{!SelectedMenuItem.KimbleOne__MenuItemType__c == TypeCommandId}"/>
+					</apex:pageBlockSectionItem>
+
+					</apex:pageBlockSection>
+				</apex:pageBlock>
+			</apex:outputPanel>
+		</div>
+
+		<apex:actionFunction name="initialiseEditMenuItem" action="{!LoadMenuItem}" onComplete="openEditMenuItemPopup();" reRender="MenuItemPopupPanel">
+			<apex:param name="selectedMenuItemId" value=""/>
+			<apex:param name="itemEditMode" value=""/>
+		</apex:actionFunction>
+
+		<apex:actionFunction name="initialiseCloneMenuItem" action="{!LoadMenuItem}" onComplete="openCloneMenuItemPopup();" reRender="MenuItemPopupPanel">
+			<apex:param name="selectedMenuItemId" value=""/>
+			<apex:param name="itemEditMode" value=""/>
+		</apex:actionFunction>
+	</apex:form>
+
+	<script>
+		function openEditMenuItemPopup()
+		{
+			initialiseModalBoxy('#MenuItemPopup', '{!$Label.Edit}' + ' ' + '{!$ObjectType.KimbleOne__MenuItem__c.Label}', jQuery('form[id$=\'MenuItemEditForm\']'));
+			showModalBoxy();
+  		}
+
+  		function openCloneMenuItemPopup()
+  		{
+ 			initialiseModalBoxy('#MenuItemPopup', '{!$Label.CloneLabel}' + ' ' + '{!$ObjectType.KimbleOne__MenuItem__c.Label}', jQuery('form[id$=\'MenuItemEditForm\']'));
+			showModalBoxy();
+    	}
+	</script>
+
+</apex:define>
+</apex:composition>
+</apex:page>

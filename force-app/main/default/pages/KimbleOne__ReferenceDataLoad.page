@@ -1,0 +1,978 @@
+<apex:page controller="KimbleOne.ReferenceDataLoad" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">
+	<apex:define name="Menu">
+		<c:Menu HelpSource="CfgGuide" />
+	</apex:define>
+	<apex:define name="Content">
+		<style>
+			.warning-message {
+				padding: 10px;
+				background-color: yellow;
+				border: 2px solid red;
+				margin-bottom: 8px;
+				font-size: 16px;
+				display: table;
+  			}
+  			.warning-message-text {
+				display: table-cell;
+				vertical-align: top;
+				padding-left: 10px;
+  			}
+  			.warning-icon {
+				color: red;
+				font-size: 30px;
+				display: table-cell;
+  			}
+			span[class*="job-summary"] {
+			    font-size: 16px;
+			    padding-right: 5px;
+			}
+			.job-summary-alert {
+			    color: red;
+			}
+			.today-row {
+			    background-color: lightyellow;
+			}
+			.stalled-row {
+			    background-color: #EAEAEA;
+			}
+			.job-summary-pending-ok,
+			.job-summary-warn {
+			    color: orange;
+			}
+
+			.job-summary-ok {
+			    color: green;
+			}
+			.job-highlight {
+			    width: 22px;
+			    text-align: center;
+			}
+			.re-loading-ind {
+				display: none;
+				float: right;
+				font-size: 21px;
+				color: #888;
+			}
+			/* override the standard trigger disabled banner to allow this screen to be usable */
+			#triggers-disabled-overlay {
+				top: 0 !important;
+				height: 16% !important;
+				background-color: #FF4242 !important;
+				position: fixed !important;
+			}
+			#triggers-disabled-message {
+				top: 0 !important;
+				color: #FFFFFF !important;
+				font-size: 28px !important;
+				margin-top: auto !important;
+				height: auto !important;
+			}
+
+			.tpe-err {
+				color: red;
+			}
+			.tpe-ok {
+				color: green;
+			}
+			.tpe-info {
+				color: blue;
+			}
+			.tpe-info-b {
+				color: blue;
+				font-weight: bold;
+			}
+			#InfoMessages {
+				max-height: 70px;
+				overflow: auto;
+			    margin-bottom: 10px;
+			}
+			#logMessages {
+				max-height: 300px;
+				overflow: auto;
+			    background-color: white;
+			    padding-left: 10px;
+			    padding-top: 10px;
+			    padding-bottom: 10px;
+			}
+			#InfoMessages div,
+			#logMessages div {
+			    height: 15px;
+			}
+			div#tpe-progressbar {
+			    margin-bottom: 10px;
+			    margin-top: 5px;
+				width: 600px;
+			}
+			.ui-progressbar
+			{
+			  position: relative;
+			}
+			.ui-progressbar-value.tpe-good {
+			    background-color: #4CAF50 !important;
+			    background-image: none;
+			}
+			.ui-progressbar-value.tpe-bad {
+			    background-color: red !important;
+			    background-image: none;
+			}
+			.tpe-progress-label
+			{
+				position: absolute;
+				left: 50%;
+				top: 4px;
+				font-weight: bold;
+				color: black;
+				font-size: 14px;
+			}
+
+		</style>
+		<apex:form >
+
+	      	<apex:pageMessages escape="false"/>
+
+	      	<apex:outputPanel rendered="{!MaintenanceMode.KimbleOne__InputCheckbox__c}">
+	      		<div class="warning-message">
+	      			<div class="fa fa-warning warning-icon"/>
+	      			<div class="warning-message-text">Warning: Maintenance Mode is enabled, please disable as soon as maintenance activity is complete. Leaving Maintenance Mode enabled allows users to make updates to Reference Data and key configuration objects</div>
+      			</div>
+	      	</apex:outputPanel>
+
+			<apex:pageBlock title="{!$Label.kimbleone__loadreferencedataheading}">
+
+				<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+
+	           		<apex:commandButton action="{!LoadReferenceData}" value="{!$Label.kimbleone__loadbutton}"/>
+					<apex:outputText value="{!LoadReferenceDataMessage}" escape="false"></apex:outputText>
+
+	           		<apex:commandButton action="{!LoadReferenceData2}" value="{!$Label.kimbleone__loadbutton}"/>
+					<apex:outputText value="{!LoadReferenceData2Message}" escape="false"></apex:outputText>
+
+	           		<apex:commandButton action="{!LoadReferenceData3}" value="{!$Label.kimbleone__loadbutton}"/>
+					<apex:outputText value="{!LoadReferenceData3Message}" escape="false"></apex:outputText>
+
+					<apex:commandButton action="{!LoadOtherReferenceData}" value="{!$Label.kimbleone__loadotherbutton}"/>
+					<apex:outputText value="{!LoadOtherReferenceDataMessage}" escape="false"></apex:outputText>
+
+					<apex:commandButton action="{!LoadOtherReferenceData2}" value="{!$Label.kimbleone__loadotherbutton}"/>
+					<apex:outputText value="{!LoadOtherReferenceData2Message}" escape="false"></apex:outputText>
+
+					<apex:commandButton action="{!LoadMenuData}" value="{!$Label.kimbleone__loadmenusbutton}"/>
+					<apex:outputText value="{!LoadMenuDataMessage}" escape="false"></apex:outputText>
+
+					<apex:commandButton action="{!ConfigureMenuforStandalone}" value="Configure Standalone Menu"/>
+					<apex:outputText value="{!LoadConfigureMenuforStandaloneMessage}" escape="false"></apex:outputText>
+
+					<apex:commandButton action="{!ConfigureMenuforConnected}" value="{!$Label.kimbleone__configuresalesmenuforconnected}"/>
+					<apex:outputText value="{!LoadConfigureMenuforConnectedMessage}" escape="false"></apex:outputText>
+
+					<apex:commandButton action="{!SeedEventCompletionActions}" value="Seed event completion action objects"/>
+					<apex:outputText value="{!SeedEventCompletionActionsMessage}" escape="false"></apex:outputText>
+
+				</apex:pageblockSection>
+
+			</apex:pageBlock>
+
+
+			<apex:pageBlock id="extendTimePeriods" mode="edit" title="{!$Label.kimbleone__extendtimeperiodslabel}">
+
+				<apex:pageBlockButtons location="bottom" rendered="{!calendarType == 'GregorianWithBreak' || calendarType == 'Gregorian'}">
+					<input type="button" class="btn" id="extendTimePeriodsBtn" value="{!$Label.ExtendButton}" onclick="extendTimePeriods();"/>
+				</apex:pageBlockButtons>
+
+				<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+	 	           	<apex:pageBlockSectionItem rendered="{!showCalendarTypeError}">
+						<div class="warning-message">
+							<div class="fa fa-warning warning-icon"/>
+							<div class="warning-message-text">Warning: Looks like you are not using Monthly Forecasting Periods required for Gregorian Calendar extension. Please check the Org Wide Settings for Calendar Type and Calendar Reference Date to ensure these are configured correctly before proceeding.</div>
+						</div>
+					</apex:pageBlockSectionItem>
+
+	 	           	<apex:pageBlockSectionItem >
+		           		<apex:outputLabel value="Week Pattern"/>
+		           		<apex:outputLabel value="{!calendarWeekPatternDisplay}"/>
+					</apex:pageBlockSectionItem>
+
+					<apex:pageBlockSectionItem >
+						<apex:outputLabel value="Calendar Type"/>
+		           		<apex:outputLabel value="{!calendarType}"/>
+					</apex:pageBlockSectionItem>
+
+					<apex:pageBlockSectionItem rendered="{!calendarType == 'GregorianWithBreak'}" helpText="This day of the month will be the start of a new tracking period.">
+						<apex:outputLabel value="Day of Month to Break" />
+						<apex:inputField id="dayOfBreakInput" value="{!breakDay.KimbleOne__InputInteger__c}" required="true"/>
+					</apex:pageBlockSectionItem>
+
+	           		<apex:pageBlockSectionItem rendered="{!calendarType == 'GregorianWithBreak' || calendarType == 'Gregorian'}">
+	           			<apex:outputLabel value="{!$Label.kimbleone__startingfromlabel}"/>
+	           			<apex:inputField id="extendFromInput" value="{!extendFrom.KimbleOne__InputDate__c}" styleClass="kimbleDatePicker" />
+	 	           	</apex:pageBlockSectionItem>
+
+	           		<apex:pageBlockSectionItem rendered="{!calendarType == 'GregorianWithBreak' || calendarType == 'Gregorian'}">
+	           			<apex:outputLabel value="Number of Forecasting Periods"/>
+	           			<apex:inputField id="numberOfMonthsInput" value="{!numOfMonths.KimbleOne__InputInteger__c}" />
+		           	</apex:pageBlockSectionItem>
+
+	           		<div id="tpe-progressbar" class="hidden-item"><div class="tpe-progress-label"></div></div>
+	           		<div id="InfoMessages" class="hidden-item" style="width: 100%;"></div>
+	           		<div id="logMessages" class="hidden-item" style="width: 100%;"></div>
+	           	</apex:pageblockSection>
+
+				<apex:pageblockSection collapsible="false" showheader="true" columns="2" title="Last Created Fiscal Year: {!LastCreatedFiscalYear.Name}"  rendered="{!(calendarType != 'Gregorian') && (calendarType != 'GregorianWithBreak') && !ISBLANK(LastCreatedFiscalYear)}">
+					<apex:pageBlockSectionItem >
+						<apex:outputLabel value="Start Date"/>
+		           		<apex:outputField value="{!LastCreatedFiscalYear.startDateField.KimbleOne__InputDate__c}"/>
+					</apex:pageBlockSectionItem>
+
+					<apex:pageBlockSectionItem >
+						<apex:outputLabel value="End Date"/>
+		           		<apex:outputField value="{!LastCreatedFiscalYear.endDateField.KimbleOne__InputDate__c}"/>
+					</apex:pageBlockSectionItem>
+				</apex:pageblockSection>
+
+				<apex:pageblockSection collapsible="false" showheader="true" columns="1" title="Next Fiscal Year: {!NextFiscalYear.Name}"  rendered="{!calendarType != 'Gregorian' && calendarType != 'GregorianWithBreak'}">
+					<apex:pageBlockSectionItem >
+						<apex:outputPanel layout="none">
+							<input type="button" class="btn" id="extendFiscalPeriodBtn" value="{!$Label.ExtendButton}" onclick="extendAllFiscalPeriods();"/>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+					<apex:pageBlockSectionItem >
+						<apex:pageBlockTable value="{!NextFiscalYear.months}" var="month">
+							<apex:column headerValue="Status">
+								<div id="fiscalLoadingPanel{!month.Sequence}" style="display:none">
+									<div style="height: 50%; margin: 0px auto;"></div>
+									<img src="{!URLFOR($Resource.LoadingImage)}" style="padding-left: 22px;" /> <span>Creating...</span>
+								</div>
+								<div id="fiscalLoadingPanelComplete{!month.Sequence}" style="display:none">
+									<div style="height: 50%; margin: 0px auto;"></div>
+									<span>{!$Label.Complete}</span>
+								</div>
+							</apex:column>
+							<apex:column value="{!month.TimePeriod.Name}"></apex:column>
+							<apex:column value="{!month.TimePeriod.KimbleOne__StartDate__c}" styleClass="kimbleDatePicker"></apex:column>
+							<apex:column value="{!month.TimePeriod.KimbleOne__EndDate__c}" styleClass="kimbleDatePicker"></apex:column>
+							<apex:column >
+								<div id="trackingPeriodTable{!month.Sequence}">
+									<apex:pageBlockTable value="{!month.Children}" var="week">
+										<apex:column value="{!week.TimePeriod.Name}"></apex:column>
+										<apex:column value="{!week.TimePeriod.KimbleOne__StartDate__c}" styleClass="kimbleDatePicker"></apex:column>
+										<apex:column value="{!week.TimePeriod.KimbleOne__EndDate__c}" styleClass="kimbleDatePicker"></apex:column>
+									</apex:pageBlockTable>
+								</div>
+							</apex:column>
+						</apex:pageBlockTable>
+					</apex:pageBlockSectionItem>
+				</apex:pageblockSection>
+
+				<div id="LoadingPanel" style="display:none">
+	 				<div style="height: 50%; margin: 0px auto;"></div>
+	 				<img src="{!URLFOR($Resource.LoadingImage)}" style="padding-left: 22px;" /> <span>Extending...</span>
+				</div>
+
+			</apex:pageBlock>
+
+
+			<apex:pageBlock mode="edit" title="{!$Label.kimbleone__syncexchangeratesheading}">
+
+				<apex:pageBlockButtons location="bottom">
+					<apex:commandButton action="{!SyncExchangeRates}" value="{!$Label.kimbleone__syncbutton}" />
+				</apex:pageBlockButtons>
+
+				<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+
+	           		<apex:outputText value="{!SyncExchangeRatesMessage}"></apex:outputText>
+
+	           	</apex:pageblockSection>
+
+			</apex:pageBlock>
+
+
+			<apex:pageBlock mode="edit" title="{!$Label.kimbleone__updatesalesopportunitybasecurrencyheading}">
+
+				<apex:pageBlockButtons location="bottom">
+					<apex:commandButton action="{!UpdateProposalBaseCurrency}" value="{!$Label.kimbleone__updatebutton}" />
+				</apex:pageBlockButtons>
+
+				<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+
+	           		<apex:pageBlockSectionItem >
+	           			<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Label}"/>
+	           			<apex:inputField value="{!proposalDummy.KimbleOne__Proposal__c}" />
+		           	</apex:pageBlockSectionItem>
+
+	           		<apex:pageBlockSectionItem >
+	           			<apex:outputLabel value="{!$Label.kimbleone__tocurrencylabel}"/>
+	           			<apex:inputField value="{!proposalDummy.CurrencyIsoCode}" />
+		           	</apex:pageBlockSectionItem>
+
+	           		<apex:outputText value="{!UpdateProposalBaseCurrencyMessage}"></apex:outputText>
+
+	           	</apex:pageblockSection>
+
+			</apex:pageBlock>
+
+			<apex:pageBlock mode="edit" title="Update Proposal Business Unit Group">
+
+				<apex:pageBlockButtons location="bottom">
+					<apex:commandButton action="{!UpdateProposalBusinessUnitGroup}" value="{!$Label.kimbleone__updatebutton}" />
+				</apex:pageBlockButtons>
+
+				<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+
+	           		<apex:pageBlockSectionItem >
+	           			<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposal__c.Label}"/>
+	           			<apex:inputField value="{!proposalDummy2.KimbleOne__Proposal__c}" />
+		           	</apex:pageBlockSectionItem>
+
+	           		<apex:outputText value="{!UpdateProposalBusinessUnitGroupMessage}"></apex:outputText>
+
+	           	</apex:pageblockSection>
+
+			</apex:pageBlock>
+
+			<apex:pageBlock mode="edit" title="Maintenance Mode">
+
+				<apex:pageBlockButtons location="bottom">
+					<apex:commandButton action="{!UpdateMaintenanceMode}" value="{!$Label.kimbleone__updatebutton}" />
+					<apex:outputText value="{!UpdateMaintenanceModeMessage}" escape="false"></apex:outputText>
+				</apex:pageBlockButtons>
+
+				<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+
+	           		<apex:pageBlockSectionItem >
+	           			<apex:outputLabel value="Maintenance Mode Enabled"/>
+	           			<apex:inputField value="{!MaintenanceMode.KimbleOne__InputCheckbox__c}" />
+		           	</apex:pageBlockSectionItem>
+
+	           	</apex:pageblockSection>
+
+			</apex:pageBlock>
+
+			<apex:pageBlock mode="edit" title="Execute Event Class Completion Actions">
+
+				<apex:pageBlockButtons location="bottom">
+					<apex:commandButton action="{!ExecuteEventClassCompletion}" value="{!$Label.kimbleone__submit}" />
+				</apex:pageBlockButtons>
+
+				<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+
+	           		<apex:pageBlockSectionItem >
+	           			<apex:outputLabel value="Event Class Id"/>
+	           			<apex:inputText value="{!EventClassId}" />
+		           	</apex:pageBlockSectionItem>
+		           	<apex:pageBlockSectionItem >
+	           			<apex:outputLabel value="Scope size"/>
+	           			<apex:inputText value="{!EventClassScopeSize}" />
+		           	</apex:pageBlockSectionItem>
+
+	           	</apex:pageblockSection>
+
+			</apex:pageBlock>
+
+			<apex:pageBlock mode="edit" title="Recalculate Object Shares">
+
+				<apex:pageBlockButtons location="bottom">
+					<apex:commandButton action="{!RecalculateObjectShares}" value="{!$Label.kimbleone__submit}" />
+				</apex:pageBlockButtons>
+
+				<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+
+	           		<apex:pageBlockSectionItem >
+	           			<apex:outputLabel value="Object Id"/>
+	           			<apex:inputText value="{!ObjectId}" />
+		           	</apex:pageBlockSectionItem>
+		        </apex:pageblockSection>
+
+			</apex:pageBlock>
+
+			<apex:pageBlock mode="edit" title="Update Invoice Paid Gross Amount">
+
+				<apex:pageBlockButtons location="bottom">
+					<apex:commandButton action="{!updateInvoicePaidGrossAmount}" value="{!$Label.kimbleone__updatebutton}" />
+					<apex:outputText value="{!updateInvoicePaidGrossAmountMessage}" escape="false"></apex:outputText>
+				</apex:pageBlockButtons>
+
+			</apex:pageBlock>
+
+			<apex:pageBlock mode="edit" title="Update Invoice Is Emailed">
+
+				<apex:pageBlockButtons location="bottom">
+					<apex:commandButton action="{!updateInvoiceIsEmailed}" value="{!$Label.kimbleone__updatebutton}" />
+					<apex:outputText value="{!updateInvoiceIsEmailedMessage}" escape="false"></apex:outputText>
+				</apex:pageBlockButtons>
+
+			</apex:pageBlock>
+
+			<apex:pageBlock mode="edit" title="Update Credit Note Is Emailed">
+
+				<apex:pageBlockButtons location="bottom">
+					<apex:commandButton action="{!updateCreditNoteIsEmailed}" value="{!$Label.kimbleone__updatebutton}" />
+					<apex:outputText value="{!updateCreditNoteIsEmailedMessage}" escape="false"></apex:outputText>
+				</apex:pageBlockButtons>
+
+			</apex:pageBlock>
+			
+			<apex:pageBlock id="calculateCumulativeValues" mode="edit" title="Calculate Cumulative Values">
+
+				<apex:pageBlockButtons location="bottom" >
+					<apex:commandButton action="{!calculateCumulativeValues}" value="Calculate" />
+				</apex:pageBlockButtons>
+
+				<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+
+					<apex:pageBlockSectionItem >
+	           			<apex:outputLabel value="{!$Label.kimbleone__startingfromlabel}"/>
+	           			<apex:inputField id="cumulativeStartDate" value="{!cumulativeFrom.KimbleOne__InputDate__c}" styleClass="kimbleDatePicker" />
+	 	           	</apex:pageBlockSectionItem>
+
+					<apex:pageBlockSectionItem dataStyle="font-weight: bold;">
+						<apex:outputLabel styleClass="popup-heading-label" value="{!$ObjectType.KimbleOne__AnalysisFact__c.Label}" />
+			     		<apex:selectList value="{!paDummy.KimbleOne__AnalysisFact__c}"  size="1" >
+							<apex:selectOptions value="{!TheCumulativeFacts}" />
+						</apex:selectList>
+					</apex:pageBlockSectionItem>
+
+	           	</apex:pageblockSection>
+
+			</apex:pageBlock>
+			
+
+			<script>
+				var calendarIdsJSON = '<apex:outputText value="{!CalendarIdsJSON}"/>';
+				var calendarIds = JSON.parse(calendarIdsJSON);
+				var calendarThreshold = <apex:outputText value="{!CalendarThreshold}"/>;
+				var calendarCounter = 0;
+
+				var progressbar;
+				var progressStep = 0;
+
+				function incrementProgressBar(incrementValue)
+				{
+			 		var val = progressbar.progressbar( "value" ) || 0;
+
+			    	progressbar.progressbar( "value",  val + incrementValue);
+
+			    	jQuery('.ui-progressbar-value').addClass('tpe-good');
+			 	}
+
+			 	function resetProgressBar()
+			 	{
+			 		progressbar.progressbar( "value",  0);
+
+			 		jQuery('.ui-progressbar-value').removeClass('tpe-good').removeClass('tpe-bad');
+
+			 		//default is step for the progress bar is one month;
+			 		progressStep = parseInt(jQuery("input[id$='numberOfMonthsInput']").val());
+
+			 		// however if we are above the calendar threshold we also need to factor
+			 		// in the number of calendar based calls we'll make on top of this
+			 		if(calendarIds.length > calendarThreshold)
+			 		{
+			 			jQuery('#InfoMessages').removeClass('hidden-item');
+
+			 			logInfoMessageToScreen('This org has ' + calendarIds.length + ' calendars. Time Period creation will first seed Reporting and Operational Time Periods, the process will then continue on to seed Calendar periods for each Calendar', 'tpe-info');
+			 			logInfoMessageToScreen(' ');
+			 			logInfoMessageToScreen('Do not navigate away from this page during this operation, doing so will leave Time Periods in an inconsistent state', 'tpe-info-b');
+
+			 			progressStep = progressStep + (calendarIds.length * parseInt(jQuery("input[id$='numberOfMonthsInput']").val()));
+		 			}
+
+		 			jQuery('#logMessages').removeClass('hidden-item');
+			 	}
+
+			 	function completeProgressBar()
+			 	{
+			 		progressbar.progressbar( "value",  100);
+			 	}
+
+				function extendTimePeriods()
+				{
+					resetProgressBar();
+
+					jQuery('#tpe-progressbar').removeClass('hidden-item');
+
+					disableExtendBtn();
+
+					var extendFromInputIn = jQuery("input[id$='extendFromInput']").val();
+					var numberOfMonthsIn = jQuery("input[id$='numberOfMonthsInput']").val();
+					var dayOfBreakIn = jQuery("input[id$='dayOfBreakInput']").val();
+
+					//can return undefined if field not rendered on page
+					if(dayOfBreakIn === undefined)
+					{
+					    dayOfBreakIn = 0;
+     				}
+
+					// the date needs to be converted to UTC in order to pass to apex
+					var regionalDate = jQuery.datepicker.parseDate(kimble.regional.dateFormat, extendFromInputIn);
+
+					// make the initial call to kick of the creation of the first month of time periods
+					var monthsOutput = 'month';
+					if(numberOfMonthsIn > 1)
+					{
+						monthsOutput = monthsOutput + 's';
+					}
+
+					logMessageToScreen('Extending Time Periods from ' + extendFromInputIn + ' for ' + numberOfMonthsIn + ' ' + monthsOutput);
+					logMessageToScreen(' ');
+					// first param no longer needed but signature needs to be preserved in a patch
+
+					extendTimePeriodFromDate(null, 0, numberOfMonthsIn,dayOfBreakIn);
+					initialiseItems();
+				}
+
+				// recursive function that is first triggered from extendTimePeriods
+				// and then re-triggered for each subsequent month via the remote action callback
+				function extendTimePeriodFromDate(fromDateIn, monthOffset, monthsLeftToProcess, dayOfBreakIn)
+				{
+					// always read from the onscreen seed date
+					var extendFromInputIn = jQuery("input[id$='extendFromInput']").val();
+
+					// the date needs to be converted to UTC in order to pass to apex
+					var regionalDate = jQuery.datepicker.parseDate(kimble.regional.dateFormat, extendFromInputIn);
+
+					// add monthCounter to the date and pass into the remote action
+					var parsedDate = new Date(regionalDate.getFullYear(), regionalDate.getMonth() + monthOffset, regionalDate.getDate(), 0, 0, 0, 0).toKimbleUTC();
+
+					// count down a month
+					monthsLeftToProcess = monthsLeftToProcess - 1;
+					monthOffset = monthOffset + 1;
+
+					extendTimePeriodRemoteAction(parsedDate, monthOffset, monthsLeftToProcess, dayOfBreakIn,
+						function(extendTimePeriodRemoteActionResult, parsedDateCB, monthOffsetCB, monthsLeftToProcessCB)
+						{
+							logMessageToScreen(extendTimePeriodRemoteActionResult);
+							incrementProgressBar(100/progressStep);
+
+							if(monthsLeftToProcess > 0)
+							{
+								// first param no longer needed but signature needs to be preserved in a patch
+								extendTimePeriodFromDate(null, monthOffsetCB, monthsLeftToProcess, dayOfBreakIn);
+							}
+							else
+							{
+								// depending on the number of Calendars we may now need to create
+								// the calendar periods in a separate operation
+								if(calendarIds.length > calendarThreshold)
+								{
+									calendarCounter = 0;
+									extendCalendarTimePeriods(calendarCounter);
+								}
+								else
+								{
+									logMessageToScreen('---');
+									logMessageToScreen('Time Period extension complete', 'tpe-ok');
+									getNextTimePeriodDate();
+									enableExtendBtn();
+									completeProgressBar();
+								}
+							}
+						}
+					);
+				}
+
+				function extendCalendarTimePeriods(calendarCounter)
+				{
+					if(calendarCounter < calendarIds.length)
+					{
+						disableExtendBtn();
+
+						var extendFromInputIn = jQuery("input[id$='extendFromInput']").val();
+						var numberOfMonthsIn = jQuery("input[id$='numberOfMonthsInput']").val();
+
+						// the date needs to be converted to UTC in order to pass to apex
+						var regionalDate = jQuery.datepicker.parseDate(kimble.regional.dateFormat, extendFromInputIn);
+
+						// make the initial call to kick of the creation of the first month of time periods
+						var monthsOutput = 'month';
+						if(numberOfMonthsIn > 1)
+						{
+							monthsOutput = monthsOutput + 's';
+						}
+
+						var calendarId = calendarIds[calendarCounter];
+
+						logMessageToScreen(' ');
+						logMessageToScreen('Extending Time Periods for calendar ' + calendarId + ' from ' + extendFromInputIn + ' for ' + numberOfMonthsIn + ' ' + monthsOutput);
+						logMessageToScreen(' ');
+						extendCalendarTimePeriodFromDate(calendarId, null, 0, numberOfMonthsIn);
+					}
+					else
+					{
+						logMessageToScreen('---');
+						logMessageToScreen('Time Period extension complete', 'tpe-ok');
+						getNextTimePeriodDate();
+						enableExtendBtn();
+						completeProgressBar();
+					}
+				}
+
+				// recursive function that is first triggered from extendTimePeriods
+				// and then re-triggered for each subsequent month via the remote action callback
+				function extendCalendarTimePeriodFromDate(calendarId, fromDateIn, monthOffset, monthsLeftToProcess)
+				{
+					// always read from the onscreen seed date
+					var extendFromInputIn = jQuery("input[id$='extendFromInput']").val();
+
+					// the date needs to be converted to UTC in order to pass to apex
+					var regionalDate = jQuery.datepicker.parseDate(kimble.regional.dateFormat, extendFromInputIn);
+
+					// add monthCounter to the date and pass into the remote action
+					var parsedDate = new Date(regionalDate.getFullYear(), regionalDate.getMonth() + monthOffset, regionalDate.getDate(), 0, 0, 0, 0).toKimbleUTC();
+
+					// count down a month
+					monthsLeftToProcess = monthsLeftToProcess - 1;
+					monthOffset = monthOffset + 1;
+
+					extendCalendarTimePeriodsRemoteAction(calendarId, parsedDate, monthOffset, monthsLeftToProcess,
+						function(extendTimePeriodRemoteActionResult, calendarId, parsedDateCB, monthOffsetCB, monthsLeftToProcessCB)
+						{
+							logMessageToScreen(extendTimePeriodRemoteActionResult);
+							incrementProgressBar(100/progressStep);
+
+							if(monthsLeftToProcess > 0)
+							{
+								// first param no longer needed but signature needs to be preserved in a patch
+								extendCalendarTimePeriodFromDate(calendarId, null, monthOffsetCB, monthsLeftToProcess);
+							}
+							else
+							{
+								// if there are calendars left to go
+								if(calendarIds.length > calendarCounter)
+								{
+									calendarCounter += 1;
+									extendCalendarTimePeriods(calendarCounter);
+								}
+								else
+								{
+									logMessageToScreen('---');
+									logMessageToScreen('Time Period extension complete', 'tpe-ok');
+									getNextTimePeriodDate();
+									enableExtendBtn();
+									completeProgressBar();
+								}
+							}
+						}
+					);
+				}
+
+				function extendTimePeriodRemoteAction(fromDateIn, monthOffset, totalNumOfMonths, dayOfBreakIn, callback)
+				{
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ReferenceDataLoad.ExtendTimePeriods}',
+				       		fromDateIn, monthOffset, totalNumOfMonths, dayOfBreakIn,
+				      			function(result, event)
+				      			{
+
+				             		if (event.status)
+						            {
+						             	callback(result, fromDateIn, monthOffset, totalNumOfMonths);
+						         	}
+						         	else if (event.type === 'exception')
+						         	{
+						             	logErrorToScreen(event.message);
+						             	enableExtendBtn();
+						         	}
+						         	else
+						         	{
+						             	logErrorToScreen(event.message);
+						             	enableExtendBtn();
+						         	}
+					         	},
+					         	{escape: true, buffer: false, timeout: 120000});
+			    }
+
+				function extendCalendarTimePeriodsRemoteAction(calendarId, fromDateIn, monthOffset,totalNumOfMonths, callback)
+				{
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ReferenceDataLoad.ExtendCalendarTimePeriods}',
+				       		calendarId, fromDateIn, monthOffset, totalNumOfMonths,
+				      			function(result, event)
+				      			{
+
+				             		if (event.status)
+						            {
+						             	callback(result, calendarId, fromDateIn, monthOffset, totalNumOfMonths);
+						         	}
+						         	else if (event.type === 'exception')
+						         	{
+						             	logErrorToScreen(event.message);
+						             	enableExtendBtn();
+						         	}
+						         	else
+						         	{
+						             	logErrorToScreen(event.message);
+						             	enableExtendBtn();
+						         	}
+					         	},
+					         	{escape: true, buffer: false, timeout: 120000});
+			    }
+
+				// Fiscal Year Javascript
+				var fiscalYearMonths = [];
+
+				function extendAllFiscalPeriods()
+				{
+					<apex:repeat value="{!NextFiscalYear.months}" var="month">
+						var monthJSON = '{!month.JSONString}';
+						fiscalYearMonths.push(monthJSON);
+					</apex:repeat>
+
+					disableFiscalExtendBtn();
+
+                    extendFiscalPeriod(fiscalYearMonths[0], 0, fiscalYearMonths.length);
+				}
+
+				// recursive function that is first triggered from extendAllFiscalPeriods
+				// and then re-triggered for each subsequent Forecasting Period via the remote action callback
+				function extendFiscalPeriod(forecastingPeriod, forecastingPeriodToProcess, forecastingPeriodsLeftToProcess)
+				{
+					startFiscalMonthLoading(forecastingPeriodToProcess+1);
+
+					// count down a month
+					forecastingPeriodsLeftToProcess = forecastingPeriodsLeftToProcess - 1;
+
+					extendFiscalPeriodRemoteAction(forecastingPeriod, forecastingPeriodToProcess, forecastingPeriodsLeftToProcess,
+						function(forecastingPeriodToProcessCB, forecastingPeriodsLeftToProcessCB)
+						{
+							finishFiscalMonthLoading(forecastingPeriodToProcessCB);
+
+							if (forecastingPeriodsLeftToProcessCB > 0)
+							{
+								extendFiscalPeriod(fiscalYearMonths[forecastingPeriodToProcessCB], forecastingPeriodToProcessCB, forecastingPeriodsLeftToProcessCB);
+							}
+							else
+							{
+								// depending on the number of Calendars we may now need to create
+								// the calendar periods in a separate operation
+								if (calendarIds.length > calendarThreshold)
+								{
+									calendarCounter = 0;
+									extendFiscalCalendarTimePeriods(calendarCounter);
+								}
+								else
+								{
+							    	enableFiscalExtendBtn();
+								}
+							}
+						}
+					);
+				}
+
+				function extendFiscalPeriodRemoteAction(forecastingPeriod, forecastingPeriodToProcess, forecastingPeriodsLeftToProcess, callback)
+				{
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ReferenceDataLoad.ExtendFiscalPeriod}',
+				       		forecastingPeriod,
+				      			function(result, event)
+				      			{
+				             		if (event.status)
+						            {
+						             	callback(forecastingPeriodToProcess + 1, forecastingPeriodsLeftToProcess);
+						         	}
+						         	else if (event.type === 'exception')
+						         	{
+										alert(event.message);
+						             	enableFiscalExtendBtn();
+						         	}
+						         	else
+						         	{
+										alert(event.message);
+						             	enableFiscalExtendBtn();
+						         	}
+					         	},
+					         	{escape: true, buffer: false, timeout: 120000});
+			    }
+
+				function extendFiscalCalendarTimePeriods(calendarCounter)
+				{
+					if (calendarCounter < calendarIds.length)
+					{
+						disableFiscalExtendBtn();
+
+						var calendarId = calendarIds[calendarCounter];
+
+						extendCalendarFiscalPeriod(calendarId, fiscalYearMonths[0], 0, fiscalYearMonths.length);
+					}
+					else
+					{
+						enableFiscalExtendBtn();
+					}
+				}
+
+				// recursive function that is first triggered from extendFiscalCalendarTimePeriods
+				// and then re-triggered for each subsequent month via the remote action callback
+				function extendCalendarFiscalPeriod(calendarId, forecastingPeriod, forecastingPeriodToProcess, forecastingPeriodsLeftToProcess)
+				{
+					startFiscalMonthLoading(forecastingPeriodToProcess+1);
+
+					// count down a month
+					forecastingPeriodsLeftToProcess = forecastingPeriodsLeftToProcess - 1;
+
+					extendCalendarFiscalPeriodRemoteAction(calendarId, forecastingPeriod, forecastingPeriodToProcess, forecastingPeriodsLeftToProcess,
+						function(forecastingPeriodToProcessCB, forecastingPeriodsLeftToProcessCB)
+						{
+							finishFiscalMonthLoading(forecastingPeriodToProcessCB);
+
+							if (forecastingPeriodsLeftToProcessCB > 0)
+							{
+								extendCalendarFiscalPeriod(calendarId, fiscalYearMonths[forecastingPeriodToProcessCB], forecastingPeriodToProcessCB, forecastingPeriodsLeftToProcessCB);
+							}
+							else
+							{
+								// if there are calendars left to go
+								if(calendarIds.length > calendarCounter)
+								{
+									calendarCounter += 1;
+									extendFiscalCalendarTimePeriods(calendarCounter);
+								}
+								else
+								{
+									enableFiscalExtendBtn();
+								}
+							}
+						}
+					);
+				}
+
+				function extendCalendarFiscalPeriodRemoteAction(calendarId, forecastingPeriod, forecastingPeriodToProcess, forecastingPeriodsLeftToProcess, callback)
+				{
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ReferenceDataLoad.ExtendFiscalCalendarPeriod}',
+				       		calendarId, forecastingPeriod,
+				      			function(result, event)
+				      			{
+				             		if (event.status)
+						            {
+						             	callback(forecastingPeriodToProcess + 1, forecastingPeriodsLeftToProcess);
+						         	}
+						         	else if (event.type === 'exception')
+						         	{
+										alert(event.message);
+						             	enableFiscalExtendBtn();
+						         	}
+						         	else
+						         	{
+										alert(event.message);
+						             	enableFiscalExtendBtn();
+						         	}
+					         	},
+					         	{escape: true, buffer: false, timeout: 120000});
+			    }
+
+			    function showReloading(selector)
+			    {
+			    	jQuery(selector).css('display' ,'inline-block');
+			    }
+
+   			    function hideReloading(selector)
+			    {
+			    	jQuery(selector).hide();
+			    }
+
+			    function disableExtendBtn()
+			    {
+					jQuery('#extendTimePeriodsBtn').prop('disabled', true).addClass('btnDisabled');
+					jQuery('#extendTimePeriodsBtn').prop('value', 'Extending...');
+					jQuery('#LoadingPanel').css('display','block');
+			    }
+
+			    function enableExtendBtn()
+			    {
+					jQuery('#extendTimePeriodsBtn').prop('value', '{!JSENCODE($Label.ExtendButton)}');
+					jQuery('#extendTimePeriodsBtn').prop('disabled', false).removeClass('btnDisabled');
+					jQuery('#LoadingPanel').css('display','none');
+			    }
+
+			    function disableFiscalExtendBtn()
+			    {
+					jQuery('#extendFiscalPeriodBtn').prop('disabled', true).addClass('btnDisabled');
+					jQuery('#extendFiscalPeriodBtn').prop('value', 'Extending...');
+			    }
+
+			    function enableFiscalExtendBtn()
+			    {
+					jQuery('#extendFiscalPeriodBtn').prop('value', '{!JSENCODE($Label.ExtendButton)}');
+			    }
+
+			    function startFiscalMonthLoading(fiscalPeriodNum)
+			    {
+					jQuery('#fiscalLoadingPanel' + fiscalPeriodNum).css('display','block');
+					jQuery('#fiscalLoadingPanelComplete' + fiscalPeriodNum).css('display','none');
+       			}
+
+			    function finishFiscalMonthLoading(fiscalPeriodNum)
+			    {
+					jQuery('#fiscalLoadingPanel' + fiscalPeriodNum).css('display','none');
+					jQuery('#fiscalLoadingPanelComplete' + fiscalPeriodNum).css('display','block');
+					jQuery('#trackingPeriodTable' + fiscalPeriodNum).css('display','none');
+       			}
+
+			    function logErrorToScreen(errorMessage)
+			    {
+					jQuery('.ui-progressbar-value').removeClass('tpe-good').addClass('tpe-bad');
+
+			    	logMessageToScreen(errorMessage, 'tpe-err');
+			    	alert(errorMessage);
+			    	logMessageToScreen('Time Period extension abandoned', 'tpe-err');
+			    }
+
+			    function logMessageToScreen(feedbackMessage, styleClass)
+			    {
+			    	jQuery('#logMessages').append('<div ' + (styleClass != undefined && styleClass != null ? 'class="' + styleClass + '"' : '') + '>' + feedbackMessage + '</div>');
+			    }
+
+			    function logInfoMessageToScreen(feedbackMessage, styleClass)
+			    {
+			    	jQuery('#InfoMessages').append('<div ' + (styleClass != undefined && styleClass != null ? 'class="' + styleClass + '"' : '') + '>' + feedbackMessage + '</div>');
+			    }
+
+				var logMessagesElement;
+
+			    jQuery(document).ready(function()
+				{
+					progressbar = jQuery( "#tpe-progressbar" );
+					progressLabel = jQuery( ".tpe-progress-label" );
+
+					progressbar.progressbar({
+				    	value: false,
+				    	change: function() {
+				      		progressLabel.text( progressbar.progressbar( "value" ).toFixed(2) + "%" );
+				    	}
+				  	});
+
+				  	// setup the log message panel to auto scroll
+					logMessagesElement = document.querySelector('#logMessages');
+					// Create an observer and pass it a callback.
+					var observer = new MutationObserver(scrollToBottom);
+					// Tell it to look for new children that will change the height.
+					var config = {childList: true};
+					observer.observe(logMessagesElement, config);
+				});
+
+				function scrollToBottom() {
+					logMessagesElement.scrollTop = logMessagesElement.scrollHeight;
+				}
+				jQuery(window).load(function()
+				{
+					initialiseItems();
+				});
+				function initialiseItems()
+				{
+					SetupDatePicker();
+				}
+				function SetupDatePicker()
+				{
+					//dateFormat: 'yy-mm-dd',
+					jQuery('.kimbleDatePicker').datepicker({
+							dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+							showOtherMonths: true,
+							selectOtherMonths: true,
+							changeMonth: true,
+							changeYear: true});
+				}
+				</script>
+
+				<apex:actionFunction action="{!GetNextTimePeriodDate}" name="getNextTimePeriodDate" rerender="extendFromInput" oncomplete=""/>
+			</apex:form>
+		</apex:define>
+</apex:composition>
+
+</apex:page>

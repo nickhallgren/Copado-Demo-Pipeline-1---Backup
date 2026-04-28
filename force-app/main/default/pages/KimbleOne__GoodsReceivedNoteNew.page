@@ -1,0 +1,105 @@
+<apex:page standardController="KimbleOne__GoodsReceivedNote__c" extensions="KimbleOne.GoodsReceivedNoteNewController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__GoodsReceivedNote__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu"></apex:define> 
+    
+    <apex:define name="Content">
+    	<apex:form id="TheForm" enctype="multipart/form-data">
+    	<div id="pageErrors">
+    		<apex:pageMessages escape="False" />
+		</div>
+		<apex:pageBlock title="{!$Label.kimbleone__createlabel} {!$Label.kimbleone__goodsreceivednoteheading}">
+			<apex:pageBlockButtons location="bottom">
+           		<apex:commandButton action="{!Cancel}" value="{!$Label.kimbleone__cancel}" rendered="{!TheGoodsReceivedNoteCreationWizard.CanCancel}"/>
+           		<apex:commandButton action="{!TheGoodsReceivedNoteCreationWizard.GoPrevious}" value="{!$Label.kimbleone__previous}" rendered="{!TheGoodsReceivedNoteCreationWizard.CanGoPrevious}"/>
+            	<apex:commandButton action="{!TheGoodsReceivedNoteCreationWizard.GoNext}" value="{!TheGoodsReceivedNoteCreationWizard.NextLabel}" rendered="{!TheGoodsReceivedNoteCreationWizard.CanGoNext}"/>
+            </apex:pageBlockButtons>
+			
+			<!-- EnterSupplierOrPODetailsStep -->
+			<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__findrequisitionlinesbyponumberorsupplierheading}"  columns="1" rendered="{!TheGoodsReceivedNoteCreationWizard.CurrentStep.StepName == 'FindSupplierOrPO'}">
+           		<apex:inputField value="{!TheGoodsReceivedNoteCreationWizard.Find.KimbleOne__SupplierPurchaseOrder__c}"/>
+           			
+           		<apex:inputField value="{!TheGoodsReceivedNoteCreationWizard.Find.KimbleOne__SupplierAccount__c}" />
+           
+		    </apex:pageBlockSection>
+		    
+		    <apex:pageBlockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__goodsreceivednotedetailsheading}"  columns="2" rendered="{!TheGoodsReceivedNoteCreationWizard.CurrentStep.StepName == 'EnterGoodsReceivedNoteDetails'}">
+		    	
+		    	<apex:outputField value="{!KimbleOne__GoodsReceivedNote__c.KimbleOne__SupplierAccount__c}" />
+		    	
+		    	<apex:outputField rendered="{!TheGoodsReceivedNoteCreationWizard.Find.KimbleOne__SupplierPurchaseOrder__c != NULL}" value="{!TheGoodsReceivedNoteCreationWizard.Find.KimbleOne__SupplierPurchaseOrder__c}" />
+		    	
+		    	<apex:pageBlockSectionItem rendered="{!TheGoodsReceivedNoteCreationWizard.Find.KimbleOne__SupplierPurchaseOrder__c == NULL}">
+					<apex:outputLabel />	
+					<apex:outputText />
+				</apex:pageBlockSectionItem>
+		    	
+		    	<apex:inputField required="false" value="{!KimbleOne__GoodsReceivedNote__c.Name}" />
+		    	
+		    	<apex:pageBlockSectionItem >
+			    	<apex:outputLabel value="{!$Label.kimbleone__file}" for="file"/>
+			        <apex:inputFile value="{!TheGoodsReceivedNoteCreationWizard.GoodsReceivedNoteAttachment.body}" filename="{!TheGoodsReceivedNoteCreationWizard.GoodsReceivedNoteAttachment.name}" id="file"/>
+			    </apex:pageBlockSectionItem>
+		    
+		    	<apex:inputField required="false" value="{!KimbleOne__GoodsReceivedNote__c.KimbleOne__ReceiptDate__c}" styleClass="kimbleDatePicker" />
+		    	
+		    	<apex:inputField required="false" value="{!KimbleOne__GoodsReceivedNote__c.KimbleOne__ReceiptNotes__c}" style="width:350px"/>
+		    	
+		    </apex:pageBlockSection>
+		    
+		    <apex:pageblockSection id="TheMatchingRequisitionLines" collapsible="false" showheader="true" title="{!$Label.kimbleone__matchingrequisitionlinesheading}"  columns="1" rendered="{!TheGoodsReceivedNoteCreationWizard.CurrentStep.StepName == 'EnterGoodsReceivedNoteDetails'}">
+		    	<apex:pageBlockTable value="{!TheGoodsReceivedNoteCreationWizard.TheMatchingRequisitionLines}" var="line">
+					<apex:column value="{!line.KimbleOne__SupplierRequisition__c}" />
+					<apex:column value="{!line.SupplierRequisition__r.KimbleOne__SupplierPurchaseOrder__c}" />
+					<apex:column value="{!line.KimbleOne__LineNumber__c}" />
+					<apex:column value="{!line.Name}" width="340px"/>
+					<apex:column value="{!line.KimbleOne__UnitAmount__c}" />
+					<apex:column value="{!line.KimbleOne__RequisitionedUnits__c}" />
+					<apex:column value="{!line.KimbleOne__NetAmount__c}" />
+					<apex:column value="{!line.KimbleOne__RemainingUnits__c}" />
+					<apex:column headervalue="{!$Label.kimbleone__goodsreceivednotereceivedunitslabel}">
+						<apex:inputField required="false" value="{!TheGoodsReceivedNoteCreationWizard.TheGoodsReceiptAllocationMap[line.Id].ReceivedUnits__c}" />
+					</apex:column>
+
+				</apex:pageBlockTable>
+		    </apex:pageblockSection>
+		    
+		    <apex:outputPanel rendered="{!TheGoodsReceivedNoteCreationWizard.HasFinished}">
+                 <script>
+		                //alert('{!JSENCODE(RedirectLocation)}');
+		                safeNavigateToSForceURL('{!JSENCODE(RedirectLocation)}');
+		          </script>
+	               	   
+           	</apex:outputPanel>
+  		   
+		</apex:pageBlock>
+		
+		</apex:form>
+		<style>
+		.mainTitle {white-space:nowrap;}
+		</style>
+
+		<script>
+			jQuery(window).load(function(){
+				initialiseItems();
+			});
+			function initialiseItems()
+			{
+				SetupDatePicker();
+			}
+			function SetupDatePicker()
+			{
+				//dateFormat: 'yy-mm-dd',
+				jQuery('.kimbleDatePicker').datepicker({
+						dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+						showOtherMonths: true,
+						selectOtherMonths: true,
+						changeMonth: true,
+						changeYear: true});
+			}
+		</script>
+
+	</apex:define>
+</apex:composition>
+
+</apex:page>

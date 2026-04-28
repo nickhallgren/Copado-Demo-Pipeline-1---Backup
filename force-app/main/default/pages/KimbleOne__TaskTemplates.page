@@ -1,0 +1,4384 @@
+<apex:page standardController="KimbleOne__Product__c" extensions="KimbleOne.TaskTemplatesController" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu"> 
+	<c:Menu MenuContextType="ProductDefinition" MenuContextId="{!KimbleOne__Product__c.Id}" MenuContextName="{!KimbleOne__Product__c.Name}"/>
+</apex:define>
+
+<apex:define name="Content">
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryTimePicker, 'jquery.timepicker.min.js')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQueryTimePicker, 'jquery.timepicker.css')}"/>	
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+    <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+
+<div class="work-item-templates-container">
+	<div id="data-loading"><i class="fa fa-circle-o-notch fa-spin"></i></div>
+
+	<div class="toolbar-container">
+		<div class="toolbar">
+			<div id="toolbar-buttons">
+				<a class="toolbar-button grid-view-btn button-left addTaskButton" title="{!$Label.Add} {!$ObjectType.Task__c.Label}" href="#"><i class="fa fa-plus"></i></a><a data-floating-dropdown="#add-button-floating-dropdown" class="toolbar-button grid-view-btn button-right addButton" title="{!$Label.Add}" href="#"><i class="fa fa-caret-down"></i></a>
+				<a id="deleteTaskButton" title="{!$Label.Delete}" class="grid-view-btn toolbar-button prevent-for-milestone" href="#"><i class="fa fa-trash-o"></i></a>
+				<a id="outdentButton" title="{!$Label.Outdent}" class="grid-view-btn toolbar-button button-left prevent-for-milestone" href="#" ><i class="fa fa-outdent"></i></a><a id="indentButton" title="{!$Label.Indent}" class="toolbar-button grid-view-btn prevent-for-milestone button-right" href="#"><i class="fa fa-indent"></i></a>
+				<a id="linkItemsButton" title="{!$Label.LinkItemsMessage}" class="grid-view-btn toolbar-button button-left" href="#"><i class="fa fa-link"></i></a><a id="unlinkItemsButton" title="{!$Label.UnLinkItems}" class="toolbar-button grid-view-btn button-right" href="#"><i class="fa fa-chain-broken"></i></a>
+				<a id="saveButton" title="{!$Label.Save}" class="toolbar-button" href="#"><i class="fa fa-save"></i></a>
+				<apex:outputPanel layout="none" rendered="{!ShowPlanner}">
+				<a id="plannerButton" title="Planner View" class="toolbar-button button-right" href="#"><i class="fa fa-columns"></i></a><a id="listButton" title="List View" class="toolbar-button button-left" href="#"><i class="fa fa-list-ul"></i></a>
+				</apex:outputPanel>
+			</div>
+   		</div>
+   		
+		<div id="add-button-floating-dropdown" class="floating-dropdown floating-dropdown-relative" style="margin-top:1px">
+			<ul class="floating-dropdown-menu">
+				<li><a href="#" class="addTaskButton">{!$ObjectType.Task__c.Label}</a></li>
+				<li><a href="#" class="addMilestoneButton">{!$ObjectType.Milestone__c.Label}</a></li>
+				<apex:outputPanel layout="none" rendered="{!EnableIterations}">
+				<li class="dropdown-separator"></li>
+				<li><a href="#" class="addPlanWorkItemButton">{!$ObjectType.KimbleOne__WorkItem__c.Label}</a></li>
+				<li><a href="#" class="addIterationButton">{!$Label.Iteration}</a></li>
+				<li><a href="#" id="addIterationsButton">{!$Label.kimbleone__additerations}</a></li>
+				</apex:outputPanel>				 
+				<li class="dropdown-separator"></li>
+				<li><a href="#" id="addTasksFromExternal"><apex:outputText value="{!$Label.kimbleone__addtasksfrommsplabel}"/></a></li>
+			</ul>
+		</div>   		
+	</div>
+
+	<div class="work-items-container planner-view-item">
+		<div class="backlog-container">
+		</div>
+		<div class="all-iterations-container" style="position:relative;">
+			<div class="dragging-scroll scroll-left" style="left: 0px; bottom: 0px;top: 0px;width: 30px;"></div>
+			<div class="dragging-scroll scroll-right" style="right: 0px;bottom: 0px;top: 0px;width: 30px;"></div>
+			<div class="iterations-container">
+			</div>
+		</div>
+	</div>
+	
+	<apex:pageBlock id="trackingPlanTemplatePB">
+	<div id="grid-header-container" class="grid-view-item">
+		<table id="template-tasks" class="tasks-grid-table list" border="0" cellpadding="0" cellspacing="0">
+			<colgroup>
+				<col style="width:50px;"/><!-- # -->
+				<col style="width:315px;"/><!-- Name -->
+				<col style="width:100px;"/><!-- Start -->
+				<col style="width:100px;"/><!-- End  -->
+				<col class="ignore-non-bus-days" style="width:80px;"/><!-- Include Non Business Days indicator -->
+				<col style="width:90px;"/><!-- Assigned Resources -->
+				<col style="width:90px;"/><!-- Effort -->
+				<col style="width:90px;" class="effort-units-col hidden-item"/><!-- Average Effort Insight -->
+				<col style="width:90px;"/><!-- Fixed Effort -->
+				<col style="width:90px;"/><!-- Predecessors -->
+				<col style="width:100px;"/><!-- Task Category -->
+				
+			</colgroup>
+			<thead>
+			<tr class="headerRow">
+				<th rowspan="2" class="position">#</th>
+				<th class="headerRow"><h2>{!$ObjectType.TaskTemplate__c.Label}</h2></th>
+				<th rowspan="2" style="text-align:center">{!$ObjectType.TaskTemplate__c.Fields.StartDateOffset__c.Label}</th>	
+				<th rowspan="2" style="text-align:center">{!$ObjectType.TaskTemplate__c.Fields.EndDateOffset__c.Label}</th>
+				<th class="ignore-non-bus-days" rowspan="2" style="text-align:center">{!$ObjectType.PlanTask__c.Fields.IncludeNonBusinessDays__c.Label}</th>	
+				<th rowspan="2" style="text-align:center">{!$ObjectType.Resource__c.LabelPlural}</th>
+				<th rowspan="2" style="text-align:center">{!$Label.TotalEffort} (<apex:outputText value="{!ResourcedActivityTemplate.UsageUnitType__r.KimbleOne__Suffix__c}"/>)</th>
+				<th rowspan="2" style="text-align:center" class="effort-units-col hidden-item">{!$Label.AverageTotal}</th>
+				<th class="fixedEffort" rowspan="2" style="text-align:center">{!$ObjectType.TaskTemplate__c.Fields.IsFixedEffort__c.Label}</th>
+				<th class="taskEffort" rowspan="2" style="text-align:center">{!$ObjectType.TaskTemplate__c.Fields.Effort__c.Label}</th>
+				<th rowspan="2" style="text-align:center">{!$Label.Predecessors}</th>
+				<th rowspan="2">{!$ObjectType.TaskTemplate__c.Fields.TaskCategory__c.Label}</th>												
+			</tr>
+			<tr class="headerRow">
+				<th style="background-color:white;"><input id="task-search" type="text" size="1"  autocomplete="off"/></th>
+			</tr>
+			</thead>
+			<tbody></tbody>
+		</table>  
+	</div>
+	
+	<div class="grid-view-item">
+		<div id="EditTaskContainer" style="display:none">
+			<div class="ionTabs" id="edit-task-tabs" data-name="edit-tasks-group" >
+				<ul class="ionTabs__head task">
+					<li class="ionTabs__tab" data-target="task-details">{!$Label.DetailsLabel}</li>
+					<li class="ionTabs__tab" data-target="task-work-items">{!$ObjectType.KimbleOne__WorkItem__c.LabelPlural}</li>
+					<li class="ionTabs__tab" data-target="task-resources">{!$ObjectType.Resource__c.LabelPlural}</li>
+					<li class="ionTabs__tab" data-target="task-predecessors">{!$Label.Predecessors}</li>
+					<li class="ionTabs__tab" data-target="task-advanced-details">{!$Label.AdvancedHeading}</li>
+				</ul>
+				<div class="ionTabs__body" style="width:640px; height:300px;">
+					<div class="ionTabs__item" data-name="task-details">
+						<table cellpadding="0" cellspacing="0" border="0" id="edit-task" class="tasks-grid-table">
+							<tr style="height: 30px;">
+								<td class="edit-label">{!$ObjectType.TaskTemplate__c.Label}</td>
+								<td colspan="3"><input type="text" id="edit-name" style="width:305px"/></td>
+							</tr>
+							<tr style="height: 30px;">
+								<td class="edit-label">{!$ObjectType.TaskTemplate__c.Fields.StartDateOffset__c.Label}</td>
+								<td><input type="text" id="edit-start-date-offset"  style="width:90px"/></td>
+							</tr>
+							<tr style="height: 30px;">
+								<td class="edit-label">{!$ObjectType.TaskTemplate__c.Fields.EndDateOffset__c.Label}</td>
+								<td><input type="text" id="edit-end-date-offset"  style="width:90px"/></td>
+								<td class="edit-label">{!$ObjectType.TaskTemplate__c.Fields.Effort__c.Label}</td>
+								<td><input type="text" id="edit-effort"  style="width:90px"/></td>
+							</tr>
+							<apex:outputPanel layout="none" rendered="{!EnableTaskStartEndTime}">
+							<tr style="height: 30px;">
+								<td class="edit-label">{!$ObjectType.TaskTemplate__c.Fields.StartTime__c.Label}</td>
+								<td><input type="text" id="edit-start-time" class="kimbleTimePicker"  style="width:90px"/></td>
+							</tr>
+							<tr style="height: 30px;">
+								<td class="edit-label">{!$ObjectType.TaskTemplate__c.Fields.EndTime__c.Label}</td>
+								<td><input type="text" id="edit-end-time" class="kimbleTimePicker"  style="width:90px"/></td>
+							</tr>
+							</apex:outputPanel>
+							<tr style="height: 30px;">
+								<td class="edit-label">{!$ObjectType.TaskTemplate__c.Fields.IsFixedEffort__c.Label}</td>
+								<td><input type="checkbox" id="edit-fixed"/></td>
+							</tr>
+							<tr style="height: 30px;">
+								<td class="edit-label">{!$ObjectType.TaskTemplate__c.Fields.CalendarShowAs__c.Label}</td>
+								<td>
+									<select id="edit-calendar-show-as">
+										<option value=""></option>
+										<apex:repeat value="{!CalendarOptions}" var="cal">
+											<option value="{!cal.Id}"><apex:outputText value="{!cal.Name}"/></option>
+										</apex:repeat>
+									</select>
+								</td>
+							</tr>
+							<tr style="height: 30px;">
+								<td class="edit-label">{!$ObjectType.TaskTemplate__c.Fields.TaskCategory__c.Label}</td>
+								<td>
+									<select id="edit-catgeory">
+										<option value=""></option>
+										<apex:repeat value="{!TaskCategories}" var="cat">
+											<option value="{!cat.Id}"><apex:outputText value="{!cat.Name}"/></option>
+										</apex:repeat>
+									</select>
+								</td>
+							</tr>
+				   
+						</table>
+					</div>
+					<div class="ionTabs__item" data-name="task-work-items">
+						<div id="task-work-items-container" style="height: 258px;overflow-y: auto;background-color: #FFF;margin-bottom: 5px;">
+						</div>
+					</div>
+					<div class="ionTabs__item" data-name="task-resources">
+						<table id="resource-assignments-head" border="0" cellpadding="0" cellspacing="0" class="tasks-grid-table list">
+						<colgroup>
+							<col style="width:30px;"/>
+							<col style="width:250px;"/>
+							<col style="width:100px;"/>
+							
+						</colgroup>
+						<thead>
+						<tr class="headerRow" style="height:31px;">
+							<th></th>
+							<th class="headerRow"><h2>{!$ObjectType.ActivityAssignment__c.Fields.Resource__c.Label}</h2></th>
+							<th style="text-align: center;">{!$Label.TotalEffort} (<apex:outputText value="{!ResourcedActivityTemplate.UsageUnitType__r.KimbleOne__Suffix__c}"/>)</th>	
+							<th></th>
+						</tr>							
+						</thead>
+						</table>
+						
+						<div style="height: 258px;overflow-y: auto;background-color: #FFF;margin-bottom: 5px;">
+							<table id="resource-assignments-body" border="0" cellpadding="0" cellspacing="0" class="tasks-grid-table list">
+							<colgroup>
+								<col style="width:30px;"/>
+								<col style="width:250px;"/>
+								<col style="width:100px;"/>
+							</colgroup>
+							<tbody>
+														
+							</tbody>
+							</table>
+						</div>
+					</div>
+					<div class="ionTabs__item" data-name="task-predecessors">
+						<table id="predecessors-head" border="0" cellpadding="0" cellspacing="0" class="tasks-grid-table list">
+						<colgroup>
+							<col style="width:40px;"/><!-- Delete -->
+							<col style="width:280px;"/><!-- Task Name -->
+							<col style="width:140px;"/><!-- Type -->
+							<col style="width:50px;"/><!-- Lag -->
+						</colgroup>
+						<thead>
+						<tr class="headerRow"  style="height:31px;">
+							<th><a class="toolbar-button" style="padding: 3px 7px 3px 7px;" href="#" id="addPredecessorButton" title="{!$Label.Add} {!$ObjectType.PlanItemDependency__c.Fields.PlanItemPredecessor__c.Label}"><i class="fa fa-plus"></i></a></th>
+							<th class="headerRow"><h2>{!$ObjectType.PlanItemDependency__c.Fields.PlanItemPredecessor__c.Label}</h2></th>
+							<th>{!$ObjectType.PlanItemDependency__c.Fields.DependencyType__c.Label}</th>
+							<th>{!$ObjectType.PlanItemDependency__c.Fields.Lag__c.Label}</th>
+						</tr>							
+						</thead>
+						</table>
+						
+						<div style="height: 200px;overflow-y: auto;background-color: #FFF;margin-bottom: 5px;">
+							<table id="predecessors-body" border="0" cellpadding="0" cellspacing="0" class="tasks-grid-table list">
+							<colgroup>
+								<col style="width:40px;"/><!-- Delete -->
+								<col style="width:280px;"/><!-- Task Name -->
+								<col style="width:140px;"/><!-- Type -->
+								<col style="width:50px;"/><!-- Lag -->
+							</colgroup>
+							<tbody>
+												
+							</tbody>
+							</table>
+						</div>
+					</div>
+					<div class="ionTabs__item" data-name="task-advanced-details">
+						<table cellpadding="0" cellspacing="0" border="0" id="edit-task-advanced" class="tasks-grid-table">
+							<tr style="height: 30px;">
+								<td class="edit-label">{!$ObjectType.PlanTask__c.Fields.PlanItemConstraintType__c.Label}</td>
+								<td>
+									<select id="edit-constraint-type" class="task-edit-input">
+										<apex:repeat value="{!PlanItemConstraintTypes}" var="constraintType">
+											<option value="{!constraintType.Id}"><apex:outputText value="{!constraintType.Name}"/></option>
+										</apex:repeat>
+									</select>
+								</td>
+							</tr>
+							<tr style="height: 30px;">
+								<td class="edit-label">{!$ObjectType.PlanTask__c.Fields.IncludeNonBusinessDays__c.Label}</td>
+								<td><input type="checkbox" id="edit-task-ignore-non-bus-days" class="task-edit-input" style="width:90px"/></td>
+							</tr>
+							<tr style="height: 30px;" class="edit-milestone-visibility-row">
+								<td class="edit-label">{!$ObjectType.TaskTemplate__c.Fields.VisibilityLevel__c.Label}</td>
+								<td>
+									<select id="edit-task-visibility">
+										<apex:repeat value="{!TaskVisibilityLevels}" var="visibilityLevel">
+											<option value="{!visibilityLevel.Value}"><apex:outputText value="{!visibilityLevel.label}"/></option>
+										</apex:repeat>
+									</select>
+								</td>
+							</tr>						
+						</table>
+					</div>
+					<div class="ionTabs__preloader"></div>
+				</div>
+			</div>
+			<div style="text-align:center;">
+				<input id="TaskOkButton" class="btn" type="button" value="{!$Label.Ok}" />
+				<input class="btn" type="button" value="{!$Label.Cancel}" onclick="hideModalBoxy();"/>
+			</div>
+		</div>
+			
+		<div id="EditMilestoneContainer" style="display:none">
+			<div class="ionTabs" id="edit-milestone-tabs" data-name="edit-milestones-group">
+				<ul class="ionTabs__head milestone">
+					<li class="ionTabs__tab" data-target="milestone-details">{!$Label.DetailsLabel}</li>
+					<li class="ionTabs__tab" data-target="milestone-predecessors">{!$Label.Predecessors}</li>
+					<li class="ionTabs__tab" data-target="milestone-advanced-details">{!$Label.AdvancedHeading}</li>
+				</ul>
+				<div class="ionTabs__body" style="width:529px; height:260px;">
+					<div class="ionTabs__item" data-name="milestone-details">
+						<table cellpadding="0" cellspacing="0" border="0" id="edit-milestone">						
+							<tr style="height: 30px;">
+								<td class="edit-label">{!$ObjectType.MilestoneTemplate__c.Label}</td>
+								<td><input type="text" id="edit-name" style="width:242px"/></td>
+							</tr>
+							<tr style="height: 30px;">
+								<td class="edit-label">{!$ObjectType.MilestoneTemplate__c.Fields.MilestoneDateOffset__c.Label}</td>
+								<td><input type="text" id="edit-milestone-date-offset"  style="width:90px"/></td>
+							</tr>
+															
+						</table>
+					</div>
+					<div class="ionTabs__item" data-name="milestone-predecessors">
+						<table id="predecessors-head" border="0" cellpadding="0" cellspacing="0" class="tasks-grid-table list">
+						<colgroup>
+							<col style="width:40px;"/><!-- Delete -->
+							<col style="width:200px;"/><!-- Task Name -->
+							<col style="width:100px;"/><!-- Type -->
+							<col style="width:44px;"/><!-- Lag -->
+						</colgroup>
+						<thead>
+						<tr class="headerRow"  style="height:31px;">
+							<th><a class="toolbar-button" style="padding: 3px 7px 3px 7px;" href="#" id="addPredecessorButton" title="{!$Label.Add} {!$ObjectType.PlanItemDependency__c.Fields.PlanItemPredecessor__c.Label}"><i class="fa fa-plus"></i></a></th>
+							<th class="headerRow"><h2>{!$ObjectType.PlanItemDependency__c.Fields.PlanItemPredecessor__c.Label}</h2></th>
+							<th>{!$ObjectType.PlanItemDependency__c.Fields.DependencyType__c.Label}</th>
+							<th>{!$ObjectType.PlanItemDependency__c.Fields.Lag__c.Label}</th>
+						</tr>							
+						</thead>
+						</table>
+						
+						<div style="height: 200px;overflow-y: auto;background-color: #FFF;margin-bottom: 5px;">
+							<table id="predecessors-body" border="0" cellpadding="0" cellspacing="0" class="tasks-grid-table list">
+							<colgroup>
+								<col style="width:40px;"/><!-- Delete -->
+								<col style="width:200px;"/><!-- Task Name -->
+								<col style="width:100px;"/><!-- Type -->
+								<col style="width:44px;"/><!-- Lag -->
+							</colgroup>
+							<tbody>
+												
+							</tbody>
+							</table>
+						</div>
+					</div>
+					<div class="ionTabs__item" data-name="milestone-advanced-details">
+						<table cellpadding="0" cellspacing="0" border="0" id="edit-milestone-advanced">
+							<tr style="height: 30px;">
+								<td class="edit-label">{!$ObjectType.PlanMilestone__c.Fields.PlanItemConstraintType__c.Label}</td>
+								<td>
+									<select id="edit-milestone-constraint-type" class="milestone-edit-input">
+										<apex:repeat value="{!PlanItemConstraintTypes}" var="constraintType">
+											<option value="{!constraintType.Id}"><apex:outputText value="{!constraintType.Name}"/></option>
+										</apex:repeat>
+									</select>
+								</td>
+							</tr>
+							<tr style="height: 30px;">
+								<td class="edit-label">{!$ObjectType.PlanMilestone__c.Fields.IncludeNonBusinessDays__c.Label}</td>
+								<td><input type="checkbox" id="edit-milestone-ignore-non-bus-days" class="task-edit-input" style="width:90px"/></td>
+							</tr>
+							<tr style="height: 30px;">
+								<td class="edit-label">{!$ObjectType.PlanMilestone__c.Fields.IsCompletedByPredecessorTasks__c.Label}</td>
+								<td><input type="checkbox" id="edit-milestone-completed-by-tasks" class="task-edit-input" style="width:90px"/></td>
+							</tr>
+							<tr style="height: 30px;" class="edit-milestone-visibility-row">
+								<td class="edit-label">{!$ObjectType.MilestoneTemplate__c.Fields.VisibilityLevel__c.Label}</td>
+								<td>
+									<select id="edit-milestone-visibility">
+										<apex:repeat value="{!PlanningMilestoneVisibilityLevels}" var="visibilityLevel">
+											<option value="{!visibilityLevel.Value}"><apex:outputText value="{!visibilityLevel.label}"/></option>
+										</apex:repeat>
+									</select>
+								</td>
+							</tr>							
+						</table>
+					</div>
+					<div class="ionTabs__preloader"></div>
+				</div>
+			</div>
+			<div style="text-align:center;">
+				<input id="MilestoneOkButton" class="btn" type="button" value="{!$Label.Ok}" />
+				<input class="btn" type="button" value="{!$Label.Cancel}" onclick="hideModalBoxy();"/>
+			</div>
+		</div>
+			
+		<div id="AddTasksFromExternalContainer" style="display:none">
+			<table cellpadding="0" cellspacing="0" border="0" id="add-tasks-from-external">
+				<tr>
+					<td class="overview-label">Paste Task Data below:</td>
+				</tr>
+				<tr style="height: 30px;">
+					<td><textarea id="externalTaskPasteArea" rows="20" cols="80"></textarea></td>
+				</tr>
+			</table>
+			<div style="text-align:center;">
+				<input id="AddExternalTasksOkButton" class="btn" type="button" value="{!$Label.Ok}" />
+				<input class="btn" type="button" value="{!$Label.Cancel}" onclick="hideModalBoxy();"/>
+			</div>
+		</div>
+		
+		<div id="AddIterationsContainer" style="display:none">
+			<table cellpadding="0" cellspacing="0" border="0" id="add-iterations">
+				<tr style="height: 30px;">
+					<td class="edit-label"><apex:outputText value="{!$Label.kimbleone__iterationname}"/></td>
+					<td><input id="addIterationsName" value="{!$Label.kimbleone__iteration}"/></td>
+				</tr>
+				<tr style="height: 30px;">
+					<td class="edit-label"><apex:outputText value="{!$Label.kimbleone__iterationduration}"/></td>
+					<td><input id="addIterationsDuration" value="10"/></td>
+				</tr>
+				<tr style="height: 30px;">
+					<td class="edit-label"><apex:outputText value="{!$Label.kimbleone__numberofiterations}"/></td>
+					<td><input id="addIterationsQuantity" value="1"/></td>
+				</tr>
+			</table>
+			<div style="text-align:center;">
+				<input id="AddIterationsOkButton" class="btn" type="button" value="{!$Label.Ok}" />
+				<input class="btn" type="button" value="{!$Label.Cancel}" onclick="hideModalBoxy();"/>
+			</div>
+		</div>
+	</div>
+	</apex:pageBlock>
+</div>
+
+<style>
+	#data-loading {
+		text-align: center;
+		font-size: 200px;
+		padding: 50px;
+		color: #d3d3d3;
+		position: absolute;
+		width: 91%;
+		filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+		-moz-opacity: 0.7;
+		-khtml-opacity: 0.7;
+		opacity: 0.7;
+		z-index: 1000;
+		background-color: #fff;
+		height: calc(100% - 100px);
+	}
+	a.toolbar-button {
+		display: inline-block;
+		padding: 6px 10px 6px 10px;
+		background-color: white;
+		margin-right: 4px;
+		border: 1px solid #ccc;
+		border-radius: 2px;
+	}
+	a.toolbar-button.active-toolbar-button {
+		color: white;
+		background-color: #888;
+	}
+	.toolbar-container {
+		position: relative;
+		background-color: #f8f8f8;
+		padding: 6px;
+		margin-bottom: 5px;
+	}
+	.toolbar-container.sticky {
+		position: fixed;
+		top: 0;
+		z-index: 999;
+		margin-top: 5px;		
+	}	
+	.toolbar {
+		display: table;'
+		width: 100%;
+	}
+	div#toolbar-buttons {
+		display: table-cell;
+		position: relative;
+		width: 900px;
+	}
+	a#listButton, 
+	a#plannerButton {
+		float: right;
+	}	
+	a.toolbar-button:hover {
+		text-decoration: none;
+		color: white;
+		background-color: #1A9EFF;
+	}
+	a.toolbar-button.button-left {
+		border-top-right-radius: 0px;
+		border-bottom-right-radius: 0px;
+		margin-right: 0px;
+	}
+	a.toolbar-button.button-right {
+		border-top-left-radius: 0px;
+		border-left: 0;
+		border-bottom-left-radius: 0px;
+	}
+	a.toolbar-button .fa {
+		font-size: 14px;
+	}
+	a.toolbar-button.disabled {
+		background-color: #ccc;
+		color: darkgray;
+		cursor:initial;
+	}
+	a.toolbar-button.disabled:hover {
+		background-color: #ccc;
+		color: darkgray;
+	}
+	.floating-dropdown-menu li.dropdown-separator {
+		border-top: 1px dashed #bbb;
+	}		
+	th.position {
+		text-align: right;
+		padding-right: 6px !important;
+	}
+	td.startDateOffset input, td.endDateOffset input, td.taskEffort input {
+		width: 46px;
+		text-align: center;
+		background-color: rgba(0, 0, 0, 0) !important;
+		border: 0 !important;
+		cursor: text;
+		height: 100%;
+	}
+	span.fixed-constraint {
+		color: #2196F3 !important
+	}
+	span.constraint-ind {
+		color: #dedede; 
+		margin-right: 10px;
+		font-size: 14px;
+		cursor: pointer;
+		display: block;
+		float: left;
+		margin-left: 1px;
+	}
+	span.fa.constraint-ind.fa-thumb-tack.fixed-constraint {
+		margin-right: 12px;
+		margin-left: 3px;
+	}
+	th.taskEffort, td.taskEffort {
+		display: none;
+	}		
+	.dependency-line {position: absolute;background-color:#dedede;z-index:-1}
+	.dependency-arrow {position: absolute; color:#bbb}
+	
+	tr[category-name="Green"] .position {
+	background-color: #34b27d;
+	color:white !important;
+	}
+	tr[category-name="Yellow"] .position {
+	background-color: #dbdb57;
+	color:white !important;
+	}
+	tr[category-name="Orange"] .position {
+	background-color: #e09952;
+	color:white !important;
+	}
+	tr[category-name="Red"] .position {
+	background-color: #cb4d4d;
+	color:white !important;
+	}
+	tr[category-name="Purple"] .position {
+	background-color: #93c;
+	color:white !important;
+	}
+	tr[category-name="Blue"] .position {
+	background-color: #4d77cb;
+	color:white !important;
+	}
+	
+	#grid-header-container {
+		min-height: 300px;
+	}
+	tr.planItem.Iteration .itemName input {
+		font-size: 12px;
+		font-weight: bold;
+	}
+	tr.planItem.Iteration,
+	tr.backlog-row {
+		background-color: #ededed;
+		border-bottom: 2px solid #fff;
+	}
+	tr.backlog-row {
+		font-size: 12px;
+		font-weight: bold;
+	}
+	.work-item[item-status='NotStarted'] {
+		border-right-color: #AFAFAF;
+	}
+	.work-item[item-status='InProgress'] {
+		border-right-color: #E58E1A;
+	}
+	.work-item[item-status='Completed'] {
+		border-right-color: #008852;
+	}
+	input.work-item-name {
+		padding: 0px;
+		border: none;
+		width: 700px;
+		height:15px;
+		line-height:15px;
+		resize:none;
+		overflow:hidden;
+	}
+	.work-item-templates-container {
+		position: relative;
+		min-height: 380px;
+	}
+	.work-items-container .backlog-container,
+	.work-items-container .all-iterations-container {
+		display: inline-flex;
+	}
+	.all-iterations-container {
+		vertical-align: top;
+		width: 300px;
+	}
+	.work-items-container .iterations-container {
+		display: -webkit-box;
+		display: -ms-flexbox;
+		display: flex;
+		overflow-x: auto;
+	}
+	.iteration-container {
+		position: relative;
+	}
+	.iteration-container.backlog {
+		width: 300px;
+	}
+	#task-work-items-container {
+	    position: relative;
+	}	
+	.iteration-container,
+	#task-work-items-container {
+		min-width: 300px;
+		margin-right: 10px;
+		margin-bottom: 5px;
+	}
+	.iteration-container ul,
+	#task-work-items-container ul {
+		grid-style: none;
+		margin: 0;
+		max-height: calc(100% - 74px);
+		overflow-y: auto;
+ 	}
+	.iteration-container > *,
+	#task-work-items-container > * {
+		background-color: #e2e4e6;
+		color: #333;
+		padding: 0 10px;
+	}
+	.iteration-container ul li,
+	#task-work-items-container ul li {
+		background-color: #fff;
+		padding: 10px 10px 10px 25px;
+		border-radius: 3px;
+		box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+		margin-left: auto;
+	}
+	.iteration-container ul li:not(:last-child),
+	#task-work-items-container ul li:not(:last-child) {
+		margin-bottom: 8px;
+	}
+	.selectable {
+		cursor: pointer;
+	}
+	.selectable:hover {
+		background-color: #e3f3ff;
+	}
+	.work-items-footer {
+		line-height: 36px;
+		border-bottom-left-radius: 4px;
+		border-bottom-right-radius: 4px;
+		color: #888;
+		position: relative;
+	}
+	.iteration-units-total,
+	.task-units-total {
+        position: absolute;
+	    right: 2px;
+	    font-size: 18px;
+	    font-weight: bold;
+	    top: 3px;
+	}
+	.iteration-units-type,
+	.task-units-type {
+	    position: absolute;
+	    top: 24px;
+	    right: 0px;
+	    font-size: 8px;
+	}	
+	.work-items-header {
+		line-height: 36px;
+		font-size: 16px;
+		font-weight: bold;
+		border-top-left-radius: 4px;
+		border-top-right-radius: 4px;
+	}
+	.iteration-action-ind {
+		color: #888;
+		font-size: 16px;
+		cursor: pointer;
+		margin-right: 5px;
+	}
+	.add-work-item, .add-task-work-item {
+		cursor: pointer;
+		display: inline;
+	}
+	.iteration-action-ind:hover, .add-work-item:hover, .add-task-work-item:hover {
+		color: black;
+	}
+	ul.work-items {
+		min-height: 48px;
+	}
+	.work-item {
+		border-right-style: solid;
+		border-right-width: 10px;
+		border-bottom-left-radius: 2px !important;
+		border-top-left-radius: 2px !important;
+		position: relative;
+	}
+	.iteration-name {
+		font-size: 16px;
+		font-weight: bold;
+		padding: 0px;
+		height: 36px;
+		border: none;
+		background-color: #e2e4e6;
+		width: 242px;
+		position: relative;
+	}
+	.work-item-name, .work-item-units {
+		padding: 0px;
+		border: none;
+	}
+	.work-items-header:hover .iteration-name {
+		background-color: white;
+	}
+	
+	textarea.work-item-name {
+		width: 450px;
+		height:15px;
+		line-height:15px;
+		min-width: 204px;
+		max-width: 450px;
+/* 		transition: width 0.25s; */
+		resize:none;
+		overflow:hidden;
+	}
+	.iteration-container textarea.work-item-name {
+	    min-width: 190px !important;
+	    max-width: 190px !important;
+    }
+	.work-item-actions i:hover {
+		color: black;
+	}
+	input.work-item-units {
+        width: 32px;
+	    text-align: center;
+	    padding: 0px;
+	    border: none;
+	    position: absolute;
+	    right: 5px;
+	    font-size: 16px;
+	    top: 4px;
+	}
+	.work-item-unit-type {
+	    position: absolute;
+	    right: 6px;
+	    font-size: 8px;
+	    top: 25px;
+	}	
+	.work-item-actions {
+		position: absolute;
+		left: 6px;
+		top: 2px;
+		font-size: 14px;
+		color: #888;
+		cursor: pointer;
+	}
+	.work-item-actions i {
+		display: block;
+		margin-top: 2px;
+	}
+	ul {
+		list-style-type: none;
+	}
+	/* grid view */
+	body {
+		-webkit-touch-callout: none;
+		-webkit-user-select: none;
+		-khtml-user-select: none;
+		-moz-user-select: none;
+		-ms-user-select: none;
+		user-select: none;
+	}
+	.bPageBlock {
+	    border: none !important;
+	}
+	.pbBody {
+	    margin: 0px !important;
+	}
+	#container {
+		position: relative;
+	}
+	.ui-layout-center,
+	.ui-layout-west {
+		padding: 0;
+	}
+	table#add-tasks-from-external {
+		margin-bottom: 6px;
+	}
+	#template-tasks,
+	#resource-assignments-head,
+	#resource-assignments-body,
+	#predecessors-head,
+	#predecessors-body,
+	#task-work-items-head,
+	#task-work-items-body {
+		width: auto;
+		table-layout: fixed;
+		border-collapse: collapse;
+		width: 0;
+		padding: 0;
+		overflow: hidden;
+	}
+	#template-tasks th,
+	#template-tasks td {
+		overflow: hidden;
+		white-space: nowrap;
+	}
+	#task-search {
+		border: 0;
+		background-image: url({!URLFOR($Resource.TaskGanttIcons, 'search.png')});
+		padding-left: 25px;
+		width: 100%;
+		height: 20px;
+		background-position: 5px 50%;
+		background-repeat: no-repeat no-repeat;
+	}
+	.itemName,
+	.work-item-name {
+		display: inline-block;
+ 		width: 100%;
+	}
+	.itemName input[type="text"] {
+		border: 0;
+		margin: 0;
+		background-color: transparent;
+	}
+	.startDateOffset input[type="text"] {
+		border: 0;
+		margin: 0;
+		background-color: transparent;
+		width: 30px;
+		text-align: center;
+	}
+	.endDateOffset input[type="text"] {
+		border: 0;
+		margin: 0;
+		background-color: transparent;
+		width: 30px;
+		text-align: center;
+	}
+	.startDateOffset,
+	.endDateOffset,
+	.baselineEffort,
+	.averageEffort,
+	.totalEffort,
+	.pctComplete,
+	.fixedEffort,
+	.taskEffort,
+	.ignore-non-bus-days {
+		text-align: center;
+	}
+	.ignore-non-bus-days,
+	.fixedEffort {
+		white-space: normal !important;
+		width: 76px !important;
+	}
+	.indent {
+		display: inline-block;
+		width: 8px;
+		height: 8px;
+		margin-right: 4px;
+	}
+	.planItem.branch {
+		font-weight: bold;
+	}
+	.branch .indent {
+		cursor: pointer;
+		background-image: url({!URLFOR($Resource.TaskGanttIcons, 'arrows.gif')});
+	}
+	.branch.expanded .indent {
+		background-image: url({!URLFOR($Resource.TaskGanttIcons, 'arrows.gif')});
+	}
+	.branch input[type="text"] {
+		font-weight: bold;
+	}
+	.Task.branch input[type="checkbox"] {
+		display:none;
+	}
+	.planItem[level="1"] .indent {
+		margin-left: 10px;
+	}
+	.planItem[level="2"] .indent {
+		margin-left: 20px;
+	}
+	.planItem[level="3"] .indent {
+		margin-left: 30px;
+	}
+	.planItem[level="4"] .indent {
+		margin-left: 40px;
+	}
+	.planItem[level="5"] .indent {
+		margin-left: 50px;
+	}
+	.planItem[level="6"] .indent {
+		margin-left: 60px;
+	}
+	.planItem[level="7"] .indent {
+		margin-left: 70px;
+	}
+	.planItem[level="8"] .indent {
+		margin-left: 80px;
+	}
+	.planItem[level="9"] .indent {
+		margin-left: 90px;
+	}
+	.planItem[level="10"] .indent {
+		margin-left: 100px;
+	}
+	.planItem[level="11"] .indent {
+		margin-left: 110px;
+	}
+	.planItem[level="12"] .indent {
+		margin-left: 120px;
+	}
+	.planItem[level="13"] .indent {
+		margin-left: 130px;
+	}
+	.planItem[level="14"] .indent {
+		margin-left: 140px;
+	}
+	.planItem[level="15"] .indent {
+		margin-left: 150px;
+	}
+	.planItem[level="16"] .indent {
+		margin-left: 160px;
+	}
+	.planItem[level="17"] .indent {
+		margin-left: 170px;
+	}
+	.planItem[level="18"] .indent {
+		margin-left: 180px;
+	}
+	.planItem[level="19"] .indent {
+		margin-left: 190px;
+	}
+	.planItem[level="20"] .indent {
+		margin-left: 200px;
+	}
+	.input-date {
+		background-color: rgba(0,
+		0,
+		0,
+		0) !important;
+		border: 0 !important;
+		cursor: pointer;
+	}
+	.work-item.not-selected,
+	.work-item.not-selected .work-item-name {
+	    background-color: #ccc;
+	}
+	.planItem.selected {
+		background-color: #DFE8F6 !important;
+	}
+	.task-row-header,
+	.work-item-row-header {
+		text-align: right !important;
+		padding-right: 6px !important;
+		height:23px;
+	}
+	td.t-nme {
+		position: relative;
+	}
+	.work-items-ind {
+		font-weight: initial;
+		font-size: 12px;
+		position: absolute;
+		right: 4px;
+		top: 3px;
+		cursor: pointer;
+	    padding: 2px;
+	    color: #428BCA;		
+	}
+	.wi-add-details {
+	    margin-top: 15px;
+	    display: none;
+	}
+	.wi-add-details.detail-edit-mode {
+	    display: block;
+	}
+	/* Make select2 dropdowns look like conventional dropdowns */
+	a.select2-choice {
+	    height: 18px !important;
+	    line-height: 18px !important;
+	    background-image: none !important;
+	    border-radius: 0px !important;
+	    color: black !important;
+	    padding-left: 4px !important;
+	}
+	.select2-choice div {
+	    border-left: none !important;
+	}
+	.owner-selector-container {
+		position: inherit;
+		top: 55px;
+		width: 240px;
+		display: inline-table;
+		padding-top: 8px;
+	}
+	input.owner-selector-input {
+		border: none;
+		height: 14px;
+		font-size: 100%;
+		padding-left: 20px;
+		margin-left: 10px;
+		border-radius: 4px;
+		width: 180px;
+	}
+	.owner-selector-container label {
+		display: table-cell;
+		vertical-align: middle;
+ 		width: 5%;
+ 		padding-right: 5px;
+	}
+	.clear-button {
+		visibility: hidden;
+		position: relative;
+		font-size: 14px;
+		top: 2px;
+		right: 32px;
+		color: #aaa;
+		cursor: pointer;
+	}
+	.ti-owner-details div {
+	    font-size: 14px;
+	    font-weight: normal;
+	    margin-bottom: 1px;
+	}
+	.ti-owner-details {
+	    text-align: right;
+	  	display: none;
+		margin-top: 8px;
+	}
+	.task-owner-name {
+	    font-size: 11px !important;
+	    padding: 8px 0px 0px 12px;
+	    text-align: right;
+	}
+	.owner-ind {
+		font-size: 15px;
+		color: #afafaf;
+		position: absolute;
+    	top: 10px;
+    	right: 40px;
+	 }		
+	tr.selected .work-items-ind {
+	    background-color: #dfe8f6 !important;
+	}		
+	tr.backlog-row .work-items-ind,
+	tr.Iteration .work-items-ind {
+	    background-color: #ededed;
+	}	
+	tr.Task:not(.Iteration) .work-items-ind {
+	    background-color: #fff;
+	}	
+	.draggable {
+		cursor:pointer;
+	}
+	.task-dragging {
+		border: 1px dotted #3172d7;
+		padding: 7px 11px 8px 11px;
+		font-weight: bold;
+		background-color: lightblue;
+		width: 241px;
+		text-align: left;
+		color:#4a4a56;
+	}
+	/*Task Matching*/
+	
+	.task-match {
+		display: table-row !important;
+	}
+	.task-filter {
+		display: none;
+	}
+	.task-filter.branch .indent {
+		background:none;
+	}
+	.tree-node-drop {
+		border-top: 4px solid #008000;
+	}
+	.tree-node.new .task-row-header,
+	.tree-node.new .work-item-row-header {
+		background-color: #33cc33;
+		color:white;
+	}
+	.input-effort {
+		width: 50px;
+	}
+	.assignedResources {
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		cursor:pointer;
+	}
+	input:focus {
+		outline: 0 !important;
+	}
+	.relative {
+		position:relative;
+	}
+	td.edit-label {
+		color: #4a4a56;
+		font-weight: bold;
+		font-size: 11px;
+		text-align: right;
+		padding-right: 8px;
+		padding-left:30px;
+	}
+	
+	div[id$='trackingPlanTemplatePB'] {
+		background-color: #fff !important;
+		border: none !important;
+	}
+	.dragging-scroll {position:absolute;z-index:999999999}
+
+	.template-effort-insight-ind
+	{
+		color: #428BCA;
+		font-size: 22px;
+		margin-right: 5px;
+	}
+	td.effort-units-col div:not(.hidden-item) {
+		display: inline-block !important;
+		vertical-align: middle;
+	}
+	.template-effort-insight-qtip .qtip-content {
+		font-size: 12px;
+	}
+	.numeric-val {
+	    text-align: right;
+ 	}
+	.toolbar-button.has-changes {
+		background-color: rgba(255, 165, 0, 0.55) !important;
+	}
+</style>
+
+<script>
+
+	var planItems = {};
+	var planWorkItems = [];
+	var planPredecessors = {};
+	var planSuccessors = {};
+	var planResources = [];
+	var deletedItems = {};
+	
+	// grid or planner
+	var viewMode = 'grid';
+	
+	//TODO127: replace with controller vars
+	var newWorkItemStatus = 'NotStarted';
+	var inProgressWorkItemStatus = 'InProgress';
+	var completedWorkItemStatus = 'Completed';
+	
+	var enableWorkItems = <apex:outputText value="{!EnableWorkItems}"/>;
+	var theWorkItemUnitType = '<apex:outputText value="{!WorkItemUnitType}"/>';
+	var enableOwners = <apex:outputText value="{!EnableOwnersWorkItems}"/>;
+
+	var unitTypeEnumToSuffixMap = {};
+	<apex:outputText value="unitTypeEnumToSuffixMap={!UnitTypeEnumToSuffixJson};" rendered="{!!ISBLANK(UnitTypeEnumToSuffixJson)}"/>
+	
+	var l = {};
+	l['Backlog'] = '<apex:outputText value="{!$Label.kimbleone__unassignedworkitems}"/>';
+	l['AddWorkItem'] = '<apex:outputText value="{!$Label.kimbleone__addworkitem}"/>';
+	l['WorkItem'] = '<apex:outputText value="{!$ObjectType.KimbleOne__WorkItem__c.Label}"/>';
+	l['WorkItems'] = '<apex:outputText value="{!$ObjectType.KimbleOne__WorkItem__c.LabelPlural}"/>';
+	l['NewItem'] = '<apex:outputText value="{!$Label.kimbleone__newplanitem}"/>';
+	l['NewWorkItemUnnamed'] = '<apex:outputText value="{!$Label.kimbleone__newworkitemunnamed}"/>';
+
+	l['NotStarted'] = '<apex:outputText value="{!$Label.kimbleone__notstartedlabel}"/>';
+	l['InProgress'] = '<apex:outputText value="{!$Label.kimbleone__inprogresslabel}"/>';
+	l['Completed'] = '<apex:outputText value="{!$Label.kimbleone__complete}"/>';
+	
+	l['Owner']= '<apex:outputText value="{!$Label.kimbleone__ownerlabel}"/>';
+	l['None'] = '<apex:outputText value="{!$Label.kimbleone__none}"/>';
+	l['RemoveOwner'] = '<apex:outputText value="{!$Label.kimbleone__removeownerhover}"/>';
+	
+	var productId = '<apex:outputText value="{!KimbleOne__Product__c.Id}"/>';
+
+	// TODO127 - configuration setting
+	var defaultIterationDuration = 10;
+	
+	var newTaskDefaultPlanItemConstraintType;
+	<apex:outputText value="newTaskDefaultPlanItemConstraintType='{!JSINHTMLENCODE(DefaultPlanItemConstraintType)}';" rendered="{!!ISBLANK(DefaultPlanItemConstraintType)}"/>
+	
+	var newTaskDefaultVisibilityLevel;
+	<apex:outputText value="newTaskDefaultVisibilityLevel='{!JSINHTMLENCODE(DefaultTaskVisibilityLevel)}';" rendered="{!!ISBLANK(DefaultTaskVisibilityLevel)}"/>
+	
+	var newPlanningMilestoneDefaultVisibilityLevel;
+	<apex:outputText value="newPlanningMilestoneDefaultVisibilityLevel='{!JSINHTMLENCODE(DefaultPlanningMilestoneVisibilityLevel)}';" rendered="{!!ISBLANK(DefaultPlanningMilestoneVisibilityLevel)}"/>
+	
+	var newMilestoneDefaultIsCompletedByPredecessorTasks;
+	<apex:outputText value="newMilestoneDefaultIsCompletedByPredecessorTasks='{!DefaultMilestoneIsCompletedByTask}';"/>
+	
+	<apex:outputPanel layout="none" rendered="{!!ISBLANK(TaskCategoriesJson)}">
+		taskCategoryMap = kimble.parseJSON("{!JSENCODE(TaskCategoriesJson)}");
+	</apex:outputPanel>
+	
+	var theActivityAssignments = {};
+	<apex:outputPanel layout="none" rendered="{!!ISBLANK(ActivityAssignmentsJson)}">
+		theActivityAssignments = kimble.parseJSON("{!JSENCODE(ActivityAssignmentsJson)}");
+	</apex:outputPanel>
+
+	var planItemConstraintIdToEnumMap = kimble.parseJSON("{!JSENCODE(PlanItemConstraintTypeIdToEnumJson)}");
+	var planItemConstraintIdToNameMap = kimble.parseJSON("{!JSENCODE(PlanItemConstraintTypeIdToNameJson)}");
+	var planItemConstraintEnumToIdMap = kimble.parseJSON("{!JSENCODE(PlanItemConstraintTypeEnumToIdJson)}");
+
+	jQuery(window).ready(function () {
+		var salesforceHeaderFooterHeight = jQuery('.work-items-container').offset().top;
+		jQuery('.work-items-container, .iterations-container, .backlog-container').height(jQuery(window).height() - salesforceHeaderFooterHeight);
+		
+		jQuery(window).resize(function() {
+			jQuery('.work-items-container, .iterations-container, .backlog-container').height(jQuery(window).height() - salesforceHeaderFooterHeight);
+			jQuery('.all-iterations-container').width(jQuery('.work-items-container').width() - jQuery('.backlog-container').width() - 5);
+		});
+	});
+
+	jQuery(window).load(function(){
+		getPlan();
+	});
+
+	function initialisePlannerActions()
+	{
+		initialiseHandlers();
+		initialisePlannerDragAndDrop();
+		sizeTextAreas();
+	}
+	
+	function initialiseHandlers()
+	{	
+		jQuery(document).off('click', '.add-work-item').on('click', '.add-work-item', addWorkItemClick);
+		jQuery(document).off('click', '#saveButton').on('click', '#saveButton', saveClick);
+		jQuery(document).off('click', '.edit-work-item').on('click', '.edit-work-item', editWorkItemClick);
+		jQuery(document).off('click', '.del-work-item').on('click', '.del-work-item', deleteWorkItemClick);
+		
+		jQuery(document).off('click', '.selectable').on('click', '.selectable', selectWorkItem);
+
+		jQuery(document).off('click', '#listButton').on('click', '#listButton', showGrid);
+		jQuery(document).off('click', '#plannerButton').on('click', '#plannerButton', showPlanner);
+		
+		jQuery(document).off('keydown', '.work-item-name').on('keydown', '.work-item-name', workItemChange);
+		jQuery(document).off('keydown', '.work-item-units').on('keydown', '.work-item-units', workItemChange);
+		
+		jQuery(document).off('change', '.iteration-name').on('change', '.iteration-name', iterationNameChange);
+		jQuery(document).off('change', '.work-item-units').on('change', '.work-item-units', workItemUnitsChange);
+		
+		if(enableOwners) {
+			jQuery(document).off('mouseover', 'i.owner-ind[owner-detail="on"]').on('mouseover', 'i.owner-ind[owner-detail="on"]', showOwner);
+			jQuery(document).off('click', 'i.owner-ind[owner-detail="on"]').on('click', 'i.owner-ind[owner-detail="on"]', editWorkItemClick);
+			jQuery(document).off('mouseleave', 'li.owner-on[node-id]').on('mouseleave', 'li.owner-on[node-id]', hideOwner);		
+		}
+	}
+	
+	function scrollLeft()
+	{
+		jQuery('.iterations-container').scrollLeft(jQuery('.iterations-container').scrollLeft() - 20);
+	}
+
+	function scrollRight()
+	{
+		jQuery('.iterations-container').scrollLeft(jQuery('.iterations-container').scrollLeft() + 20);
+	};
+	
+	function initialisePlannerDragAndDrop()
+	{
+		jQuery('.dragging-scroll').hide();
+		
+		jQuery('.dragging-scroll').hover(function(){
+			var scroller;
+			
+			if (jQuery(this).hasClass('scroll-left'))
+				scroller = setInterval( scrollLeft, 30 );
+			if (jQuery(this).hasClass('scroll-right'))
+				scroller = setInterval( scrollRight, 30 );
+			
+			$(this).data('scroller', scroller);
+			},
+			function(){
+				var scroller = $(this).data('scroller');
+				clearInterval( scroller );
+			}
+		);
+		
+		if(jQuery('.work-items').data('ui-sortable')) jQuery('.work-items').sortable('destroy');
+		
+		jQuery.widget("ui.fixedSortable", jQuery.ui.sortable, {
+				_init: function () {
+					this.element.data("sortable", this.element.data("fixedSortable"));
+					return jQuery.ui.sortable.prototype._init.apply(this, arguments);
+				},
+				_create:function() {
+					var result = jQuery.ui.sortable.prototype._create.apply(this, arguments);
+					this.containerCache.sortable = this;
+					return result;
+				},
+				_intersectsWithPointer: function (item) {
+					if(this.positionAbs.left <= 318 && !item.instance.element.parent().hasClass("backlog")) return false;
+					return jQuery.ui.sortable.prototype._intersectsWithPointer.apply(this, arguments);
+				},
+				_intersectsWith: function(containerCache) {
+					if(this.positionAbs.left <= 318 && !containerCache.sortable.element.parent().hasClass("backlog")) return false;
+					return jQuery.ui.sortable.prototype._intersectsWith.apply(this, arguments);
+				}
+		});
+
+
+		jQuery('.work-items').fixedSortable({
+			connectWith: '.work-items',
+			cancel : '.work-item-actions, .status-select, textarea, input',
+			tolerance: "pointer",
+			receive: function(e,ui) {
+				var originalParent = jQuery('.iteration-container[node-id="' + ui.item.attr('parent-node-id') + '"]');
+
+				ui.item.attr('parent-node-id', jQuery(e.target).closest('.iteration-container').attr('node-id'));
+
+				if(theWorkItemUnitType != '')
+				{
+					calculateIterationUnitsTotal(jQuery(e.target).closest('.iteration-container'));
+					calculateIterationUnitsTotal(originalParent);
+				}
+				planChanged();
+			},
+			start:function(e,ui){jQuery('.dragging-scroll').show();},
+			stop: function( e, ui ) {jQuery('.dragging-scroll').hide();planChanged();}
+		}).disableSelection();
+		
+		/*
+		jQuery('.work-items').sortable({
+			connectWith: '.work-items',
+			cancel : '.work-item-actions, .status-select, textarea, input',
+			containment:'.iterations-container',
+			tolerance: "pointer",
+			over: function(e, ui) {
+				jQuery(ui.sender).data('ui-sortable').scrollParent = jQuery(e.target);
+			},
+			receive: function( e, ui ) {
+				var originalParent = jQuery('.iteration-container[node-id="' + ui.item.attr('parent-node-id') + '"]');
+
+				ui.item.attr('parent-node-id', jQuery(e.target).closest('.iteration-container').attr('node-id'));
+
+				if(theWorkItemUnitType != '')
+				{
+					calculateIterationUnitsTotal(jQuery(e.target).closest('.iteration-container'));
+					calculateIterationUnitsTotal(originalParent);
+				}
+				planChanged();
+			},
+			stop: function( e, ui ) {
+				planChanged();
+			}
+		}).disableSelection();*/
+		
+	}
+	
+	function sizeTextAreas()
+	{
+		jQuery.each(jQuery('.work-item textarea'), function (i, theTextArea)
+		{
+			jQuery(this).height(1);
+			var totalHeight = jQuery(this).prop('scrollHeight') - parseInt(jQuery(this).css('padding-top')) - parseInt(jQuery(this).css('padding-bottom'));
+			jQuery(this).height(totalHeight);
+		});
+	}
+	
+	function initialiseGridActions()
+	{
+		//jQuery('.toolbar').css('display', 'table');
+		
+		jQuery(document).off('click', '.addTaskButton').on('click', '.addTaskButton', addTaskClick);
+		jQuery(document).off('click', '.addMilestoneButton').on('click', '.addMilestoneButton', addMilestoneClick);
+		jQuery(document).off('click', '.addIterationButton').on('click', '.addIterationButton', addIterationClick);
+		jQuery(document).off('click', '#addIterationsButton').on('click', '#addIterationsButton', addIterationsClick);
+		jQuery(document).off('click', '.addPlanWorkItemButton').on('click', '.addPlanWorkItemButton', addPlanWorkItemClick);
+		jQuery(document).off('click', '#addTasksFromExternal').on('click', '#addTasksFromExternal', addTasksFromExternalClick);
+		
+		jQuery(document).off('click', '#deleteTaskButton').on('click', '#deleteTaskButton', deleteTaskClick);
+		jQuery(document).off('click', '#outdentButton').on('click', '#outdentButton', outdentClick);
+		jQuery(document).off('click', '#indentButton').on('click', '#indentButton', indentClick);
+		jQuery(document).off('click', '#linkItemsButton').on('click', '#linkItemsButton', linkItemsClick);
+		jQuery(document).off('click', '#unlinkItemsButton').on('click', '#unlinkItemsButton', unlinkItemsClick);
+		jQuery(document).off('click', '#saveButton').on('click', '#saveButton', saveClick);
+		
+		jQuery(document).off('click', '#listButton').on('click', '#listButton', showGrid);
+		jQuery(document).off('click', '#plannerButton').on('click', '#plannerButton', showPlanner);
+		
+		jQuery(document).off('click', '.work-items-ind').on('click', '.work-items-ind', jumpToWorkItemsClick);
+		
+		jQuery('#task-search').keyup(function (e) {
+		
+			jQuery('.task-match').removeClass('task-match');
+			
+			if (jQuery('#task-search').val() == '')
+			{
+				jQuery('.tree-node').removeClass('task-filter');
+				jQuery('#indentButton, #outdentButton').removeClass('disabled');	
+			}
+			else //apply filter
+			{
+				//find all matching tasks 
+				jQuery('.tree-node').addClass('task-filter'); //hides all nodes and removes ability to drag drop / indent etc..
+	
+				var searchTermLC = jQuery('#task-search').val().toLowerCase();
+				
+				jQuery.each(jQuery('.tree-node input[value]').filter(function() {
+					return this.value.toLowerCase().includes(searchTermLC);
+				}), function(i, row){
+					addFilterMatch(jQuery(row).closest('tr'));
+				});
+				
+				jQuery.each(jQuery('.tree-node .assignedResources:contains("' + jQuery('#task-search').val() + '")'), function(i, row){
+					addFilterMatch(jQuery(row).closest('tr'));
+				});
+				
+				jQuery('#indentButton, #outdentButton').addClass('disabled');
+			}
+		
+		});
+		
+		jQuery(document).off('click', 'tr[node-id]').on('click', 'tr[node-id]', itemRowClick);
+		
+		initialiseGridDragAndDrop();		
+	}
+
+	jQuery(document).keydown(function(event){
+		if(event.which == "17") cntrlOn = true;
+		if(event.which == "16") shiftOn = true;
+	});
+	
+	jQuery(document).keyup(function(event){
+		if(event.which == "17") cntrlOn = false;
+		if(event.which == "16") shiftOn = false;
+	});
+	
+// commented as flickers on the 13th row!
+/*	var $window = jQuery(window),
+		$stickyToolbar = jQuery('.toolbar-container'),
+		stickyToolbarTop = $stickyToolbar.offset().top;
+	
+	$window.scroll(function() {
+		$stickyToolbar.toggleClass('sticky', $window.scrollTop() > stickyToolbarTop);
+	});
+*/
+	
+	function addFilterMatch(task)
+	{
+		task.addClass('task-match');
+		if(task.attr('parent-node-id') != null) addFilterMatch(jQuery('[node-id="' + task.attr('parent-node-id') + '"]'));
+	}
+
+	var cntrlOn = false;
+	var shiftOn = false;
+	
+	function itemRowClick(e)
+	{
+		if(viewMode == 'planner') return;
+		
+		var row = jQuery(this);
+		
+		if(!cntrlOn && !shiftOn)
+		{
+			row.siblings().removeClass("selected");
+		}
+		
+		row.toggleClass('selected');
+		
+		if(shiftOn)
+		{
+			var rowsBetweenSelected = jQuery('[node-id].selected:first').closest('tr').nextUntil('[node-id].selected:last');
+			
+			jQuery.each(rowsBetweenSelected, function(i, thePlanItemRow) {
+				jQuery(thePlanItemRow).addClass('selected');
+			});
+		}
+		
+		// disable the link/unlink options if any summary tasks are selected
+		if(jQuery('.branch.selected').length > 0)
+		{
+			jQuery('.prevent-for-summary').addClass('disabled');
+		}
+		else
+		{
+			jQuery('.prevent-for-summary').removeClass('disabled');
+		}
+	
+		var revenueMilestoneSelected = false;
+		var lockedItemSelected = false;
+		
+		jQuery.each(jQuery('tr.selected'), function(i, thePlanItemRow) {
+			if(jQuery(thePlanItemRow).data('planItem') == undefined)
+			{
+				lockedItemSelected = true;
+			}
+			else
+			{
+				if(jQuery(thePlanItemRow).data('planItem').MilestoneType == 'Revenue')
+				{
+					revenueMilestoneSelected = true;
+					lockedItemSelected = true;
+				}
+				if(jQuery(thePlanItemRow).data('planItem').CanDelete == false) lockedItemSelected = true;
+				
+				if(jQuery(thePlanItemRow).data('planItem').WorkItems != undefined && jQuery(thePlanItemRow).data('planItem').WorkItems.length) lockedItemSelected = true;
+			}
+		});	
+		
+		if(revenueMilestoneSelected)
+		{
+			jQuery('.prevent-for-milestone').addClass('disabled');
+		}
+		else
+		{
+			jQuery('.prevent-for-milestone').removeClass('disabled');
+		}
+		
+		if(lockedItemSelected)
+		{
+			jQuery('#deleteTaskButton').addClass('disabled');
+		}
+		else
+		{
+			jQuery('#deleteTaskButton').removeClass('disabled');
+		}
+	}
+	
+	function jumpToWorkItemsClick()
+	{
+		//TODO127: which behaviour do we want - jump to planner for those that use it or always a user action?
+		//var goToPlanner = jQuery(this).closest('tr').hasClass('backlog-row') || jQuery(this).closest('tr').hasClass('Iteration') || jQuery(this).closest('tr').hasClass('backlog-row');
+		var goToPlanner = jQuery(this).closest('tr').hasClass('backlog-row');
+
+		if(goToPlanner)
+		{
+			var iterationId = jQuery(this).closest('tr.Iteration').attr('node-id');
+			showPlanner();
+			jQuery('.iteration-container[node-id="' + iterationId + '"').find('.iteration-name').focus().select();
+		}
+		else
+		{
+			// task work items are defined in the task popup
+			var taskId = jQuery(this).closest('tr').attr('node-id');
+			initialiseEditTaskPopup(taskId, 'task-work-items');
+		}
+	}
+	
+	function linkItemsClick()
+	{
+		if (jQuery(this).hasClass('disabled')) return;
+		toggleWorking('#linkItemsButton');
+	
+		// take each selected row and create a Finish->Start dep for each
+		var firstPlanItemRow;
+		var previousPlanItemRow;
+		
+		jQuery.each(jQuery('[node-id].selected:not(.branch)'), function (i, thePlanItemRow){
+			
+			if(firstPlanItemRow == null)
+			{
+				firstPlanItemRow = thePlanItemRow;
+			}
+			else
+			{
+				// if the parent is a planning milestone then we create a Start->Start dependency, otherwise Finish->Start
+				var dependencyType = 'FinishStart';
+				
+				var taskPredecessor = {PlanItemId:jQuery(previousPlanItemRow).attr('node-id'), Type:dependencyType};
+				// don't connect tasks which would result in a circular dependency
+				if(!createsCircularDependency(taskPredecessor.PlanItemId, [jQuery(thePlanItemRow).attr('node-id')]))
+				{
+					taskPredecessor.TaskId = taskPredecessor.PlanItemId;
+					if(planPredecessors[jQuery(thePlanItemRow).attr('node-id')] == undefined) planPredecessors[jQuery(thePlanItemRow).attr('node-id')] = {};
+					planPredecessors[jQuery(thePlanItemRow).attr('node-id')][taskPredecessor.PlanItemId] = taskPredecessor;
+	
+					// we must also add the parent to the taskSuccessor array
+					var taskSuccessor = {PlanItemId:jQuery(previousPlanItemRow).attr('node-id'), Type:dependencyType};
+					taskSuccessor.TaskId = jQuery(thePlanItemRow).attr('node-id');
+					if(planSuccessors[taskSuccessor.PlanItemId] == undefined) planSuccessors[taskSuccessor.PlanItemId] = {};
+					planSuccessors[taskSuccessor.PlanItemId][jQuery(thePlanItemRow).attr('node-id')] = taskSuccessor;
+					
+					jQuery(thePlanItemRow).find('.predecessors').text(getPredecessors(planPredecessors[jQuery(thePlanItemRow).attr('node-id')]));
+				}
+			}
+				
+			previousPlanItemRow = thePlanItemRow;
+		});
+		
+		toggleWorking('#linkItemsButton');
+	}
+
+   	function addTaskClick(obj, IsSummary)
+	{
+		if (jQuery(this).hasClass('disabled')) return;
+
+		var selectedTask = getSelectedItem();
+		
+		if (selectedTask.length == 0)
+		{
+			var newTask = {Id:getUniqueId(), Name: '', TypeEnum:'Task', Assignments:{}, IsSummary: IsSummary, CanDelete:true, Level:0, IsNew:true, Position:jQuery('#template-tasks tr').length};
+	
+			newTask.ConstraintTypeId = newTaskDefaultPlanItemConstraintType;
+			newTask.IncludeNonBusinessDays = false;
+			newTask.StartOffset = 0;
+			newTask.EndOffset = 0;
+			newTask.VisibilityLevelId = newTaskDefaultVisibilityLevel;
+	
+			newTask.StartDateOffset = 0;
+			newTask.EndDateOffset = 1;
+			
+			var taskRow;
+	
+			taskRow = getPlanItemHtml(newTask);
+			taskRow.insertBefore(jQuery('#template-tasks>tbody>#lastRow'));
+	
+			taskRow.find('.itemName input').focus().select();
+			
+			taskRow.click();
+		}
+		else
+		{
+			jQuery.each(selectedTask, function (i, thePlanItemRow)
+			{	
+				var newTask = {Id:getUniqueId(), Name:'', TypeEnum:'Task', Assignments:{}, CanDelete:true, IsNew:true, Position:jQuery('#template-tasks tr').length};
+	
+				newTask.ConstraintTypeId = newTaskDefaultPlanItemConstraintType;
+				newTask.IncludeNonBusinessDays = false;
+				newTask.StartOffset = 0;
+				newTask.EndOffset = 0;
+				newTask.VisibilityLevelId = newTaskDefaultVisibilityLevel;
+	
+				newTask.StartDateOffset = 0;
+				newTask.EndDateOffset = 1;
+				
+				var taskRow;
+	
+				newTask.ParentId = (jQuery(thePlanItemRow).hasClass('Iteration') ? jQuery(thePlanItemRow).attr('node-id') : jQuery(thePlanItemRow).attr('parent-node-id'));
+				newTask.Level = new Number(jQuery(thePlanItemRow).attr('level')) + (jQuery(thePlanItemRow).hasClass('Iteration') ? 1 : 0);
+				taskRow = getPlanItemHtml(newTask);
+				
+				taskRow.insertAfter(jQuery(thePlanItemRow));
+				
+				updateSequences();
+	
+				taskRow.find('.itemName input').focus().select();
+				
+				taskRow.click();
+			});
+		}
+		
+		initialiseGridDragAndDrop();
+		
+		planChanged();
+		
+		jQuery(window).resize();		
+	}
+
+   	function addPlanWorkItemClick(obj)
+	{
+		showPlanner();
+		jQuery('.iteration-container[node-id="' + productId + '"').find('.add-work-item').click();
+		//selectWorkItem(jQuery(jQuery('.last-added')[0]));
+	}
+
+	function addIterationsClick(obj)
+	{
+		if (jQuery(this).hasClass('disabled')) return;
+		initialiseAddIterationsPopup();
+	}
+	
+   	function addIterationClick(obj, IsSummary, iterationName, duration)
+	{
+		if (jQuery(this).hasClass('disabled')) return;
+		
+		if(iterationName == undefined) iterationName = '';
+		if(duration == undefined) duration = defaultIterationDuration;
+
+		// TODO 127: what should be the task constraint type for Iterations?
+		newIterationDefaultPlanItemConstraintType = newTaskDefaultPlanItemConstraintType;
+		
+		var selectedItem = getSelectedItem();
+		
+		if (selectedItem.length == 0)
+		{
+			var newIteration = {Id:getUniqueId(), Name: iterationName, TypeEnum:'Task', Assignments:{}, IsIteration: true, CanDelete:true, Level:0, IsNew:true, Position:jQuery('#template-tasks tr').length, WorkItems: []};
+	
+			newIteration.ConstraintTypeId = newIterationDefaultPlanItemConstraintType;
+			newIteration.IncludeNonBusinessDays = false;
+			newIteration.StartOffset = 0;
+			newIteration.EndOffset = 0;
+			newIteration.VisibilityLevelId = newTaskDefaultVisibilityLevel;
+
+			newIteration.StartDateOffset = 0;
+			newIteration.EndDateOffset = duration;
+			
+			var iterationRow;
+	
+			iterationRow = getPlanItemHtml(newIteration);
+			iterationRow.insertBefore(jQuery('#template-tasks>tbody>#lastRow'));
+	
+			iterationRow.find('.itemName input').focus().select();
+			
+			iterationRow.click();
+		}
+		else
+		{
+			jQuery.each(selectedItem, function (i, thePlanItemRow)
+			{	
+				var newIteration = {Id:getUniqueId(), Name:iterationName, TypeEnum:'Task', Assignments:{}, IsIteration: true, CanDelete:true, Level:0, IsNew:true, Position:jQuery('#template-tasks tr').length, WorkItems: []};
+	
+				newIteration.ConstraintTypeId = newIterationDefaultPlanItemConstraintType;
+				newIteration.IncludeNonBusinessDays = false;
+				newIteration.StartOffset = 0;
+				newIteration.EndOffset = 0;
+				newIteration.VisibilityLevelId = newTaskDefaultVisibilityLevel;
+
+				newIteration.StartDateOffset = 0;
+				newIteration.EndDateOffset = duration;
+				
+				var iterationRow;
+	
+				newIteration.ParentId = jQuery(thePlanItemRow).attr('parent-node-id');
+				// TODO127: we should consider iterations always being level 0 which can then be overriden if needed
+				newIteration.Level = 0; //new Number(jQuery(thePlanItemRow).attr('level'));
+				iterationRow = getPlanItemHtml(newIteration);
+				
+				iterationRow.insertAfter(jQuery(thePlanItemRow));
+				
+				// if the predessor is a iteration then add a dependency to it
+				if(jQuery(thePlanItemRow).hasClass('Iteration'))
+				{
+					var dependencyType = 'FinishStart';
+					
+					var taskPredecessor = {PlanItemId:jQuery(thePlanItemRow).attr('node-id'), Type:dependencyType};
+					taskPredecessor.TaskId = taskPredecessor.PlanItemId;
+					if(planPredecessors[jQuery(iterationRow).attr('node-id')] == undefined) planPredecessors[jQuery(iterationRow).attr('node-id')] = {};
+					planPredecessors[jQuery(iterationRow).attr('node-id')][taskPredecessor.PlanItemId] = taskPredecessor;
+	
+					// we must also add the parent to the taskSuccessor array
+					var taskSuccessor = {PlanItemId:jQuery(thePlanItemRow).attr('node-id'), Type:dependencyType};
+					taskSuccessor.TaskId = jQuery(iterationRow).attr('node-id');
+					if(planSuccessors[taskSuccessor.PlanItemId] == undefined) planSuccessors[taskSuccessor.PlanItemId] = {};
+					planSuccessors[taskSuccessor.PlanItemId][jQuery(iterationRow).attr('node-id')] = taskSuccessor;
+					
+					jQuery(iterationRow).find('.predecessors').text(getPredecessors(planPredecessors[jQuery(iterationRow).attr('node-id')]));
+				}
+				
+				updateSequences();
+	
+				iterationRow.find('.itemName input').focus().select();
+				
+				iterationRow.click();
+			});
+		}
+		
+		initialiseGridDragAndDrop();
+		
+		planChanged();
+		
+		jQuery(window).resize();		
+	}
+
+	function addMilestoneClick(obj)
+	{
+		if (jQuery(this).hasClass('disabled')) return;
+		
+		var selectedItem = getSelectedItem();
+		
+		if (selectedItem.length == 0)
+		{	
+			var newMilestone = {Id:getUniqueId(), IsComplete:false, Name:'', TypeEnum:'Milestone', MilestoneType:'Planning', CanDelete:true, Level:0, IsNew:true, Position:jQuery('#template-tasks tr').length};
+			
+			var row;
+		
+			newMilestone.ConstraintTypeId = newTaskDefaultPlanItemConstraintType;
+			newMilestone.IncludeNonBusinessDays = false;
+			newMilestone.IsCompletedByPredecessorTasks = newMilestoneDefaultIsCompletedByPredecessorTasks;
+			newMilestone.VisibilityLevelId = newPlanningMilestoneDefaultVisibilityLevel;
+			
+			newMilestone.StartDateOffset = 0;
+			newMilestone.EndDateOffset = 0;
+					
+			row = getPlanItemHtml(newMilestone);
+			row.insertBefore(jQuery('#template-tasks>tbody>#lastRow'));
+	
+			row.find('.itemName input').focus().select();
+			row.click();
+		}
+		else
+		{
+			jQuery.each(selectedItem, function (i, thePlanItemRow)
+			{
+				var newMilestone = {Id:getUniqueId(), IsComplete:false, Name:'', TypeEnum:'Milestone', MilestoneType:'Planning', CanDelete:true, Level:0, IsNew:true, Position:jQuery('#template-tasks tr').length};
+				
+				var row;
+				newMilestone.ConstraintTypeId = newTaskDefaultPlanItemConstraintType;
+				newMilestone.IncludeNonBusinessDays = false;
+				newMilestone.IsCompletedByPredecessorTasks = newMilestoneDefaultIsCompletedByPredecessorTasks;
+				newMilestone.VisibilityLevelId = newPlanningMilestoneDefaultVisibilityLevel;
+				
+				newMilestone.StartDateOffset = 0;
+				newMilestone.EndDateOffset = 0;
+			
+				newMilestone.ParentId = jQuery(thePlanItemRow).attr('parent-node-id');
+				newMilestone.Level = new Number(jQuery(thePlanItemRow).attr('level'));
+
+				row = getPlanItemHtml(newMilestone);
+				
+				row.insertAfter(jQuery(thePlanItemRow));
+				
+				updateSequences();
+	
+				row.find('.itemName input').focus().select();
+				row.click();
+	
+			});
+		}
+		
+		initialiseGridDragAndDrop();
+		
+		planChanged();
+		
+		jQuery(window).resize();
+	}	
+	
+	function unlinkItemsClick()
+	{
+		if (jQuery(this).hasClass('disabled')) return;
+
+		toggleWorking('#unlinkItemsButton');
+	
+		// take each selected row and remove any dep on each
+		var firstPlanItemRow;
+		var previousPlanItemRow;
+		
+		jQuery.each(jQuery('[node-id].selected:not(.branch)'), function (i, thePlanItemRow){
+			
+			if(firstPlanItemRow == null)
+			{
+				firstPlanItemRow = thePlanItemRow;
+			}
+			else
+			{
+				var taskPredecessor = {PlanItemId:jQuery(previousPlanItemRow).attr('node-id'), Type:'FinishStart'};
+				taskPredecessor.TaskId = taskPredecessor.PlanItemId;
+				if(planPredecessors[jQuery(thePlanItemRow).attr('node-id')] == undefined) planPredecessors[jQuery(thePlanItemRow).attr('node-id')] = {};
+				delete planPredecessors[jQuery(thePlanItemRow).attr('node-id')][taskPredecessor.PlanItemId];
+	
+				// we must also remove the parent to the taskSuccessor array
+				var taskSuccessor = {PlanItemId:jQuery(previousPlanItemRow).attr('node-id'), Type:'FinishStart'};
+				taskSuccessor.TaskId = jQuery(thePlanItemRow).attr('node-id');
+				if(planSuccessors[taskSuccessor.PlanItemId] == undefined) planSuccessors[taskSuccessor.PlanItemId] = {};
+				delete planSuccessors[taskSuccessor.PlanItemId][jQuery(thePlanItemRow).attr('node-id')];
+				
+				jQuery(thePlanItemRow).find('.predecessors').text(getPredecessors(planPredecessors[jQuery(thePlanItemRow).attr('node-id')]));
+			}
+				
+			previousPlanItemRow = thePlanItemRow;
+		});
+	
+		toggleWorking('#unlinkItemsButton');
+	}
+	
+	function addTasksFromExternalClick()
+	{
+		if (jQuery(this).hasClass('disabled')) return;
+		initialiseAddExternalTasksPopup();
+	}
+	
+	function initialiseAddExternalTasksPopup()
+	{
+		initialiseModalBoxy('#AddTasksFromExternalContainer','<apex:outputText value="{!$Label.kimbleone__addtasksfrommsplabel}"/>');
+				
+		jQuery('#AddExternalTasksOkButton').off('click');
+		
+		jQuery('#AddExternalTasksOkButton').on('click' , function() {
+			
+			jQuery('#toolbar-buttons>a').addClass('disabled');
+	
+			receivedPastedTasks(jQuery('#externalTaskPasteArea').val());
+			
+			jQuery('#toolbar-buttons>a').removeClass('disabled');
+			
+			hideModalBoxy();
+		});
+		
+		showModalBoxy();
+	}
+
+	function receivedPastedTasks(theText)
+	{
+		jQuery('tr.selected').removeClass('selected');
+	
+		// filter out any MS project day/day?/days/days? attributes on the duration column values
+		var theFilteredText = theText.replace(/ {0,1}days{0,1}\?{0,1}/g, '');
+		var newTaskLines = theFilteredText.split(/[\r\n]+/);
+	
+		var levelParentIds = {};
+		
+		jQuery.each(newTaskLines, function(i){
+			var newTaskParts = newTaskLines[i].split("\t");
+			
+			// defined format for MSP paste is
+			//OutlineLevel<tab>Summary<tab>Task Name<tab>Duration
+			
+			// TODO125: validate the structure
+			
+			if(newTaskParts.length > 1)
+			{
+				if(newTaskParts[2] != '')
+				{
+					// if the duration = 0 then create as a planning milestone, otherwise a task
+					if(newTaskParts[3] == "0")
+					{
+						addMilestoneClick(null);
+					}
+					else
+					{
+						addTaskClick(null, newTaskParts[1]=='Yes');
+					}
+	
+					jQuery('.itemName input:last').closest('tr').attr('level', kimble.replaceNull(kimble.parseNumber(newTaskParts[0],0),1)-1);
+					
+					if(newTaskParts[1]=='Yes')
+					{
+						levelParentIds[kimble.replaceNull(kimble.parseNumber(newTaskParts[0],0),1)-1] = jQuery('.itemName input:last').closest('tr').attr('node-id');
+						jQuery('.itemName input:last').closest('tr').addClass('branch expanded');
+						jQuery('.itemName input:last').closest('tr').data('planItem').IsSummary = true;
+					}
+					
+					if(kimble.parseNumber(newTaskParts[0], 0) > 0)
+					{
+						// this isn't a root task so find the correct parent for this level
+						jQuery('.itemName input:last').closest('tr').attr('parent-node-id', levelParentIds[kimble.replaceNull(kimble.parseNumber(newTaskParts[0],0),1)-2]);
+					}
+	
+					jQuery('.itemName input:last').val(newTaskParts[2]);
+					jQuery('.itemName input:last').closest('tr').data('planItem').Name = newTaskParts[2];
+					if(newTaskParts[1]!='Yes') jQuery('.duration input:last').val(newTaskParts[3]).change();
+	
+					jQuery('.itemName input:last').closest('tr').removeClass('selected');
+				}
+			}
+		});
+	}
+
+	function initialiseAddIterationsPopup()
+	{
+		initialiseModalBoxy('#AddIterationsContainer','<apex:outputText value="{!$Label.kimbleone__additerations}"/>');
+
+		jQuery('#addIterationsDuration').val(defaultIterationDuration);
+				
+		jQuery('#AddIterationsOkButton').off('click');
+		
+		jQuery('#AddIterationsOkButton').on('click' , function() {
+			
+			jQuery('#toolbar-buttons>a').addClass('disabled');
+	
+			addIterations(jQuery('#addIterationsName').val(), parseInt(jQuery('#addIterationsDuration').val()), parseInt(jQuery('#addIterationsQuantity').val()));
+			
+			jQuery('#toolbar-buttons>a').removeClass('disabled');
+			
+			hideModalBoxy();
+		});
+		
+		showModalBoxy();
+	}
+	
+	function addIterations(name, duration, quantity)
+	{
+		for(var counter=0;counter<quantity;counter++)
+		{
+			addIterationClick(null, false, name + ' ' + (counter + 1), duration);
+		}
+	}
+	
+   	function getGridPlanItemObject(itemRow)
+	{
+		var row = jQuery(itemRow);
+		
+		var planItem;
+		
+		if(row.hasClass('backlog-row') || row.hasClass('backlog'))
+		{
+			planItem = {Id:row.attr('node-id'), Name:getItemName(row), IsSummary:false, IsIteration:false, IsNew:false};
+			planItem.WorkItems = planWorkItems;
+		}
+		else
+		{
+			planItem = {Id:row.attr('node-id'), TypeEnum:row.attr('type-enum'), Position:row.index()+1, Name:getItemName(row), ParentId:row.attr('parent-node-id'), IsSummary:row.hasClass('branch'), IsIteration:row.hasClass('Iteration'), Level:row.attr('level'), IsNew:row.hasClass('new'), StartDateOffset:null, EndDateOffset:null};
+			
+			if (planItem.TypeEnum == 'Task')
+			{
+				var task = row.data('planItem');
+				planItem.IsFixedEffort = (planItem.IsIteration ? false : row.find('.fixedEffort input').prop('checked'));
+				planItem.Effort = kimble.parseNumber(kimble.replaceValue(row.find('.taskEffort input').val(), ''));
+				planItem.TaskCategoryId = row.attr('categoryid');
+				planItem.CalendarShowAsId = row.attr('calendar-show-as');
+				planItem.StartTime = row.attr('start-time');
+				planItem.EndTime = row.attr('end-time');
+				planItem.Notes = task.Notes;
+				planItem.Assignments = row.data('assignments');
+				planItem.WorkItems = task.WorkItems; 
+				if (planItem.TaskCategoryId == '') planItem.TaskCategoryId = null;
+				if (planItem.CalendarShowAsId == '') planItem.CalendarShowAsId = null;
+			}
+			else
+			{
+				var milestone = row.data('planItem');
+				planItem.MilestoneType = milestone.MilestoneType;
+				planItem.Notes = milestone.Notes;
+				planItem.IsComplete = milestone.IsComplete;
+				planItem.IsCompletedByPredecessorTasks = milestone.IsCompletedByPredecessorTasks;
+				
+				// trim out any display suffix information
+				if(milestone.NameSuffix != undefined && milestone.NameSuffix != null && milestone.NameSuffix != '')
+				{
+					planItem.Name = planItem.Name.replace(milestone.NameSuffix, '');
+					planItem.NameSuffix = milestone.NameSuffix;
+				}
+			}
+
+			if(planItem.TypeEnum == 'Task' || planItem.MilestoneType == 'Planning') planItem.VisibilityLevelId = row.attr('visibilityLevelId');
+	
+			planItem.ConstraintTypeId = row.attr('constrainttypeid');
+			planItem.IncludeNonBusinessDays = row.find('.ignore-non-bus-days input').prop('checked');
+	
+			planItem.StartOffset = kimble.parseNumber(row.find('.duration').attr('start-offset'), '0.##');
+			planItem.EndOffset = kimble.parseNumber(row.find('.duration').attr('end-offset'), '0.##');
+			
+			
+			planItem.StartDateOffset = kimble.parseNumber(kimble.replaceValue(row.find('.startDateOffset input').val(), ''));
+			planItem.EndDateOffset = kimble.parseNumber(kimble.replaceValue(row.find('.endDateOffset input').val(), ''));
+		}
+		
+		return planItem;
+	}
+	
+	function initialiseEditTaskPopup(taskId, tab)
+	{
+		var taskRow = jQuery('[node-id="' + taskId + '"]');
+		
+		var task = getGridPlanItemObject(taskRow);
+
+		var isBacklogRow = taskRow.hasClass('backlog-row');
+		var showDetails = !isBacklogRow;
+		var showWorkItems = enableWorkItems || task.IsIteration;
+		var showAssignments = !isBacklogRow;
+		var showDependencies = !isBacklogRow;
+		var showAdvanced = !isBacklogRow;
+				
+		if(task.IsSummary) return;
+		
+		initialiseModalBoxy('#EditTaskContainer','Task - ' + task.Name);
+		
+		//details panel
+		if(showDetails)
+		{
+			jQuery('li[data-target="task-details"]').show();
+
+			var detailsPanel = jQuery('#edit-task');
+			detailsPanel.find('#edit-name').val(task.Name);
+			detailsPanel.find('#edit-start-date-offset').val(safeFormatNumber(task.StartDateOffset));
+			detailsPanel.find('#edit-end-date-offset').val(safeFormatNumber(task.EndDateOffset));
+			detailsPanel.find('#edit-effort').val(safeFormatNumber(task.Effort));
+			detailsPanel.find('#edit-fixed').prop('checked', task.IsFixedEffort);
+			detailsPanel.find('#edit-calendar-show-as').val(task.CalendarShowAsId);
+			detailsPanel.find('#edit-catgeory').val(task.TaskCategoryId);
+			detailsPanel.find('#edit-start-time').val(task.StartTime);
+			detailsPanel.find('#edit-end-time').val(task.EndTime);
+		}
+		else
+		{
+			jQuery('li[data-target="task-details"]').hide();
+		}
+		
+		// Work Items
+		if(showWorkItems)
+		{
+			jQuery('li[data-target="task-work-items"]').show();
+			
+			var workItemsPanel = jQuery('#task-work-items-container');
+			workItemsPanel.empty();
+			workItemsPanel.attr('task-id', taskId);
+			workItemsPanel.append(getTaskWorkItemsHtml(task));
+			jQuery(document).off('click', '.add-task-work-item').on('click', '.add-task-work-item', addTaskWorkItemClick);
+			jQuery(document).off('click', '.edit-work-item').on('click', '.edit-work-item', editWorkItemClick);
+			jQuery(document).off('click', '.del-work-item').on('click', '.del-work-item', deleteTaskWorkItemClick);
+			jQuery(document).off('keydown', '.work-item-name').on('keydown', '.work-item-name', workItemChange);
+			jQuery(document).off('keydown', '.work-item-units').on('keydown', '.work-item-units', workItemChange);
+			jQuery(document).off('change', '.work-item-units').on('change', '.work-item-units', taskWorkItemUnitsChange);
+
+			if(enableOwners) {
+				jQuery(document).off('mouseover', 'i.owner-ind[owner-detail="on"]').on('mouseover', 'i.owner-ind[owner-detail="on"]', showOwner);
+				jQuery(document).off('click', 'i.owner-ind[owner-detail="on"]').on('click', 'i.owner-ind[owner-detail="on"]', editWorkItemClick);
+				jQuery(document).off('mouseleave', 'li.owner-on[node-id]').on('mouseleave', 'li.owner-on[node-id]', hideOwner);
+			}
+		
+			initialisePlannerDragAndDrop();
+			initialiseResourceSelector();
+		}
+		else
+		{
+			jQuery('li[data-target="task-work-items"]').hide();
+		}
+		
+		//Assignments
+		if(showAssignments)
+		{
+			jQuery('li[data-target="task-resources"]').show();
+
+			var assignmentsBody = jQuery('#resource-assignments-body tbody').empty();
+			var taskAssignments = taskRow.data('assignments');
+			var added = {};
+			if (taskAssignments == null) taskAssignments = {};
+			
+			jQuery.each(Object.keys(taskAssignments), function (i, key) {
+				var arow = getTaskAssignmentRow(taskId, theActivityAssignments[key] ,taskAssignments[key]);
+				arow.appendTo(assignmentsBody);
+				added[key] = true;
+			});
+								
+			jQuery.each(Object.keys(theActivityAssignments), function (i, key) {
+				if (added[key] == true) return true;
+				var arow = getTaskAssignmentRow(taskId, theActivityAssignments[key] ,null);
+				arow.appendTo(assignmentsBody);
+			});
+		}
+		else
+		{
+			jQuery('li[data-target="task-resources"]').hide();
+		}
+				
+		//Predecessors
+		if(showDependencies)
+		{
+			jQuery('li[data-target="task-predecessors"]').show();
+			
+			var predecessors = planPredecessors[taskId];
+			var predecessorsBody = jQuery('#EditTaskContainer #predecessors-body tbody').empty();										
+			if (predecessors != null)
+			{
+				jQuery.each(Object.keys(predecessors), function (i, key) {
+					var arow = getPredecessorsHtml(taskId, predecessors[key]);
+					arow.appendTo(predecessorsBody);
+					arow.find('#predecessor-select').val(key);
+					arow.find('#predecessor-type-select').val(predecessors[key].Type);								
+				});
+			}
+			jQuery('#EditTaskContainer #predecessors-head').find('#addPredecessorButton').off('click');
+			jQuery('#EditTaskContainer #predecessors-head').find('#addPredecessorButton').on('click', function(){
+				var arow = getPredecessorsHtml(taskId, {});
+				arow.appendTo(predecessorsBody);
+				arow.find('#predecessor-select').val(null);
+			});
+		}
+		else
+		{
+			jQuery('li[data-target="task-predecessors"]').hide();
+		}
+		
+		//Advanced
+		if(showAdvanced)
+		{
+			jQuery('li[data-target="task-advanced-details"]').show();
+
+			var advancedPanel = jQuery('#edit-task-advanced');
+			advancedPanel.find('#edit-constraint-type').val(task.ConstraintTypeId);
+			advancedPanel.find('#edit-task-ignore-non-bus-days').prop('checked', task.IncludeNonBusinessDays);
+			advancedPanel.find('#edit-task-visibility').val(task.VisibilityLevelId);
+		}
+		else
+		{
+			jQuery('li[data-target="task-advanced-details"]').hide();
+		}		
+
+		if(jQuery('li[data-target="task-details"]:visible').length && jQuery('li[data-target="task-advanced-details"]:visible').length)
+		{
+			var detailsPanel = jQuery('#edit-task');
+			var advancedPanel = jQuery('#edit-task-advanced');
+			
+			detailsPanel.find('#edit-start-date-offset').off('change');
+			detailsPanel.find('#edit-start-date-offset').on('change', function(event)
+			{
+				var planItemConstraintEnum = planItemConstraintIdToEnumMap[advancedPanel.find('#edit-constraint-type').val()];
+				
+				// if either the start or end date have changed that means we are forcing into either the :
+				//	- Start No Earlier Than or 
+				//	- Finish No Earlier Than constraint type. 		
+				// i.e. it's a shortcut for entering the constraint date and changing the type - this is inline with MSProject
+				// track this change before we process the mode
+				// note we only do this if not manuallyscheduling
+				if(planItemConstraintEnum != 'ManuallyScheduled' && planItemConstraintEnum != undefined && planItemConstraintEnum != '')
+				{
+					// new start date becomes the constraint date and mode switches
+					planItemConstraintEnum = 'StartNoEarlierThan';
+					advancedPanel.find('#edit-constraint-type').val(planItemConstraintEnumToIdMap[planItemConstraintEnum]);
+				}
+			});
+		}
+
+		jQuery.ionTabs.setTab("edit-tasks-group", tab);
+		
+		jQuery('#TaskOkButton').off('click');
+		
+		jQuery('#TaskOkButton').on('click' , function() {
+			
+			//Details
+			if(jQuery('li[data-target="task-details"]:visible').length)
+			{
+				task.Name = detailsPanel.find('#edit-name').val();
+				task.StartDateOffset = kimble.parseNumber(detailsPanel.find('#edit-start-date-offset').val(), '0.##');
+				task.EndDateOffset = kimble.parseNumber(detailsPanel.find('#edit-end-date-offset').val(), '0.##');
+				task.Effort = kimble.parseNumber(detailsPanel.find('#edit-effort').val(), '0.##');
+				task.IsFixedEffort = detailsPanel.find('#edit-fixed').prop('checked');
+				task.CalendarShowAsId = detailsPanel.find('#edit-calendar-show-as').val();
+				task.TaskCategoryId = detailsPanel.find('#edit-catgeory').val();
+				task.StartTime = detailsPanel.find('#edit-start-time').val();
+				task.EndTime = detailsPanel.find('#edit-end-time').val();
+			}
+
+			// work items
+			if(jQuery('li[data-target="task-work-items"]:visible').length)
+			{
+				var workItemContainer = jQuery('#task-work-items-container');
+				task.WorkItems = getTaskWorkItems(workItemContainer);
+			}			
+
+			//Assignments
+			if(jQuery('li[data-target="task-resources"]:visible').length)
+			{
+				task.Assignments = {};
+				
+				jQuery.each(jQuery('#resource-assignments-body tbody tr td input:checked'), function (i, inp) {
+					
+					var assignmentRow = jQuery(inp).closest('tr');
+					var taskAssignment = {ActivityAssignmentId:assignmentRow.prop('id'), BaselineEffort:0};
+					taskAssignment.BaselineEffort = (kimble.parseNumber(assignmentRow.find('#baselineEffort').val(), '0.##') != null ? kimble.parseNumber(assignmentRow.find('#baselineEffort').val(), '0.##') : '0.00' );
+					task.Assignments[assignmentRow.prop('id')] = taskAssignment;
+				});
+			}
+
+			//Predecessors
+			if(jQuery('li[data-target="task-predecessors"]:visible').length)
+			{
+				planPredecessors[taskId] = {};
+				
+				jQuery.each(jQuery('#EditTaskContainer #predecessors-body tbody tr'), function (i, row) {
+					var r = jQuery(row);
+					var taskPredecessor = {PlanItemId:r.find('#predecessor-select').val(), Type:r.find('#predecessor-type-select').val()};
+					if (taskPredecessor.PlanItemId == null) return true;					
+					taskPredecessor.TaskId = taskPredecessor.PlanItemId;
+					taskPredecessor.Lag = (r.find('#predecessor-lag-input').val() == 'undefined' ? null : kimble.parseNumber(r.find('#predecessor-lag-input').val(), '0.##')); 
+					planPredecessors[taskId][taskPredecessor.PlanItemId] = taskPredecessor;
+					
+					// we must also add the parent to the taskSuccessor array
+					var taskSuccessor = {PlanItemId:r.find('#predecessor-select').val(), Type:r.find('#predecessor-type-select').val(), Lag:(r.find('#predecessor-lag-input').val() == 'undefined' ? 0 : kimble.parseNumber(r.find('#predecessor-lag-input').val(), '0.##'))};
+					if (taskSuccessor.PlanItemId == null) return true;
+					taskSuccessor.TaskId = taskId;
+					if(planSuccessors[taskSuccessor.PlanItemId] == undefined) planSuccessors[taskSuccessor.PlanItemId] = {};
+					planSuccessors[taskSuccessor.PlanItemId][taskId] = taskSuccessor;
+				});
+				
+				// remove any deleted predecessors from the planSuccessors collection
+				jQuery.each(jQuery('#EditTaskContainer #predecessors-body tbody tr.deleted-predecessor'), function (i, row) {
+					var r = jQuery(row);
+					// we must also add the parent to the taskSuccessor array
+					var taskSuccessor = {PlanItemId:r.find('#predecessor-select').val(), Type:r.find('#predecessor-type-select').val()};
+					if (taskSuccessor.PlanItemId == null) return true;
+					
+					taskSuccessor.TaskId = taskId;
+					if(planSuccessors[taskSuccessor.PlanItemId] != undefined)
+					{
+						delete planSuccessors[taskSuccessor.PlanItemId][taskId];
+					}
+				});
+			}
+			
+			//Advanced
+			if(jQuery('li[data-target="task-advanced-details"]:visible').length)
+			{
+				task.ConstraintTypeId = advancedPanel.find('#edit-constraint-type').val();
+				
+				//asap and alap should override the offset
+				if(planItemConstraintIdToEnumMap[task.ConstraintTypeId] == 'AsSoonAsPossible'
+					|| planItemConstraintIdToEnumMap[task.ConstraintTypeId] == 'AsLateAsPossible')
+				{
+					// TODO125: we shouldn't be using this as a general offset, instead introduce constraint offset?
+					task.StartDateOffset = null;
+				}
+				
+				task.IncludeNonBusinessDays = advancedPanel.find('#edit-task-ignore-non-bus-days').prop('checked');
+				
+				task.VisibilityLevelId = advancedPanel.find('#edit-task-visibility').val();
+			}
+							
+			taskRow.replaceWith(getPlanItemHtml(task));
+			
+			if (taskRow.attr('parent-node-id') != '')
+			{
+				updateItemDates(jQuery('[node-id="' + taskRow.attr('parent-node-id') + '"]'));
+				updateTaskEffort(jQuery('[node-id="' + taskRow.attr('parent-node-id') + '"]'));
+			}
+			
+			planChanged();
+			
+			refreshDependencies();
+			
+			hideModalBoxy();
+		
+		});
+		
+		jQuery('.kimbleTimePicker').timepicker({ 'timeFormat': 'H:i' });
+		
+		showModalBoxy();
+	}
+	
+	function updateTaskEffort(task)
+	{
+		var baselineEffort = 0;
+		
+		jQuery.each(jQuery('[parent-node-id="' + task.attr('node-id') + '"]'), function (i, child) {
+			baselineEffort += jQuery(child).find('.baselineEffort').parseNumber({format:"0.##", locale:kimble.locale}).valueOf();
+		});
+		
+		task.find('.baselineEffort').text(jQuery.formatNumber(baselineEffort, {format: "0.##", locale:kimble.locale, isFullLocale:false}));
+		
+		if (task.attr('parent-node-id') != null)
+			updateTaskEffort(jQuery('[node-id="' + task.attr('parent-node-id') + '"]'));
+	}
+	
+	function getTaskAssignmentRow(taskId, assignment, task)
+	{
+		var tr = '<tr style="height: 34px;" task-id="' + taskId + '" id="' + assignment.Id + '">';
+		tr += '<td><input class="checkbox" type="checkbox" ' + (task != null ? 'checked' : '' ) + ' ' + (task != null && (task.BaselineEffort > 0 || task.ExpendedEffort > 0) ? 'disabled' : '' ) + '/></td>';
+		
+		tr += '<td>' + assignment.ResourceName + '<br/> ' + kimble.replaceNull(assignment.RoleName, '') + '</td>';
+		
+		tr += '<td style="text-align: center;"><input id="baselineEffort" type="text" class="input-effort" style="display:' + (task == null ? 'none' : '' ) + '" value="' + (task != null && task.BaselineEffort != null ? jQuery.formatNumber(task.BaselineEffort, {format: "0.##", locale:kimble.locale, isFullLocale:false}) : '') + '"/></td>';	
+		
+		tr += '</tr>';
+		
+		var row = jQuery(tr);
+		
+		row.find('.checkbox').change(function(e){
+			//add / remove task assignment from task data
+			
+			var inp = jQuery(this);
+			var task = inp.closest('tr');
+			
+			if (inp.prop('checked'))
+			{
+				task.find('.input-effort').show();
+			}
+			else
+			{
+				task.find('.input-effort').hide().val('');
+			}
+			
+		});
+		
+		return row;
+	}
+	
+	function refreshPlanItemRowFormatting(planItemRow)
+	{
+		traceAction('Refreshing Plan Item Row Format: ' + planItemRow.attr('node-id'));
+		
+		// refresh the constraint indicator on the row
+		var planItem = getGridPlanItemObject(planItemRow);
+		jQuery(planItemRow).find('.constraint-ind').replaceWith(getConstraintHtml(planItemRow.attr('constrainttypeid'), planItem.IncludeNonBusinessDays));
+		
+		if (!planItem.IsSummary)
+		{
+			if(planItem.TypeEnum == 'Task')
+			{
+				jQuery(planItemRow).find('.constraint-ind').click(function () {
+					initialiseEditTaskPopup(planItem.Id, 'task-advanced-details');
+				});
+			}
+			else if(planItem.TypeEnum == 'Milestone')
+			{
+				jQuery(planItemRow).find('.constraint-ind').click(function () {
+					initialiseEditMilestonePopup(planItem.Id, 'milestone-advanced-details');
+				});			
+			}
+		}
+	}
+			
+	function getPredecessors(predecessors)
+	{
+		var a = [];
+		
+		jQuery.each(Object.keys(predecessors), function (i, key) {
+			var typeSummary = '';
+			
+			switch (predecessors[key].Type)
+			{
+				case 'FinishStart':
+					// default so we don't highlight
+				break;
+				case 'StartStart':
+					typeSummary = 'SS';
+				break;
+				case 'FinishFinish':
+					typeSummary = 'FF';
+				break;
+				case 'StartFinish':
+					typeSummary = 'SF';
+				break;
+			}			
+			a.push((jQuery('[node-id="' + key + '"]').index() + 1) + typeSummary);
+		});
+		
+		return a.join('; ');
+	}
+	
+	function getPredecessorsHtml(planItemId, predecessor)
+	{
+		var tr = '<tr><td><a class="toolbar-button" href="#" id="deletePredecessorButton" style="padding: 3px 7px 3px 7px;" ><i class="fa fa-trash-o"></i></a></td>';
+		
+		tr += '<td><select style="width:175px;white-space:nowrap;" id="predecessor-select">';
+		
+		jQuery.each(jQuery('.tree-node:not(".branch"):not([node-id="' + planItemId + '"])'), function (i, n) {
+			var node = jQuery(n);
+			// don't allow a task to be selected if if would create a cyclic dependency
+			if(!createsCircularDependency(node.attr('node-id'), [planItemId]))
+			{
+				tr += '<option value="' + node.attr('node-id') + '">' + (node.index() + 1) +  ' : ' + getItemName(node) + '</option>';
+			}
+		});
+		
+		tr += '</select></td>';
+		
+		tr += '<td><select id="predecessor-type-select">';
+		tr += '<option value="FinishStart">{!$Label.Finish} -&gt; {!$Label.Start}</option>';
+		tr += '<option value="StartStart">{!$Label.Start} -&gt; {!$Label.Start}</option>';
+		tr += '<option value="FinishFinish">{!$Label.Finish} -&gt; {!$Label.Finish}</option>';
+		tr += '<option value="StartFinish">{!$Label.Start} -&gt; {!$Label.Finish}</option>';
+		tr += '</td>';
+
+		tr += '<td><input style="width: 50px;" id="predecessor-lag-input" value="' + (predecessor.Lag == undefined ? '' : safeFormatNumber(kimble.replaceNull(predecessor.Lag,''))) + '">';
+		tr += '</td>';
+		
+		tr += '</tr>';
+		
+		var row = jQuery(tr)
+		
+		row.find('#deletePredecessorButton').click(function () {
+			jQuery(this).closest('tr').remove();
+		});
+		
+		return row;
+	}
+	
+	function initialiseEditMilestonePopup(milestoneId, tab)
+	{
+		var milestoneRow = jQuery('[node-id="' + milestoneId + '"]');
+		var milestone = getGridPlanItemObject(milestoneRow);
+		
+		initialiseModalBoxy('#EditMilestoneContainer','Milestone - ' + milestone.Name);
+			
+		jQuery.ionTabs.setTab("edit-milestones-group", tab);
+		
+		//details
+		var detailsPanel = jQuery('#edit-milestone');
+		// TODO128 there should be no issue in editing the revenue milestone information
+		// but review what we want to enable as for instance amount should be readonly
+		if (milestone.MilestoneType == 'Planning')
+		{
+			detailsPanel.find('input, textarea').prop('disabled', false);
+			jQuery('#EditMilestoneContainer').addClass('Planning');
+			jQuery('#EditMilestoneContainer').removeClass('Revenue');
+		}
+		else
+		{
+			detailsPanel.find('input, textarea').prop('disabled', true);
+			jQuery('#EditMilestoneContainer').removeClass('Planning');
+			jQuery('#EditMilestoneContainer').addClass('Revenue');
+		}
+			
+		detailsPanel.find('#edit-name').val(milestone.Name);
+		if(milestone.NameSuffix != undefined)
+			detailsPanel.find('#edit-name').attr('data-suffix', milestone.NameSuffix);
+		else
+			detailsPanel.find('#edit-name').removeAttr('data-suffix');
+			
+		detailsPanel.find('#edit-milestone-date').val((milestone.StartDate == null ? '' : kimble.formatDate(milestone.StartDate)));
+		detailsPanel.find('#edit-milestone-date-offset').val(safeFormatNumber(milestone.StartDateOffset));
+		
+		//Predecessors
+		var predecessors = planPredecessors[milestoneId];
+		var predecessorsBody = jQuery('#EditMilestoneContainer #predecessors-body tbody').empty();										
+		if (predecessors != null)
+		{
+			jQuery.each(Object.keys(predecessors), function (i, key) {
+				var arow = getPredecessorsHtml(milestoneId, predecessors[key]);
+				arow.appendTo(predecessorsBody);
+				arow.find('#predecessor-select').val(key);
+				arow.find('#predecessor-type-select').val(predecessors[key].Type);								
+			});
+		}
+		jQuery('#EditMilestoneContainer #predecessors-head').find('#addPredecessorButton').off('click');
+		jQuery('#EditMilestoneContainer #predecessors-head').find('#addPredecessorButton').on('click', function(){
+			var arow = getPredecessorsHtml(milestoneId, {});
+			arow.appendTo(predecessorsBody);
+			arow.find('#predecessor-select').val(null);
+		});
+		
+		//Advanced
+		var advancedPanel = jQuery('#edit-milestone-advanced');
+		advancedPanel.find('#edit-milestone-constraint-type').val(milestone.ConstraintTypeId);
+		advancedPanel.find('#edit-milestone-ignore-non-bus-days').prop('checked', milestone.IncludeNonBusinessDays);
+		advancedPanel.find('#edit-milestone-completed-by-tasks').prop('checked', milestone.IsCompletedByPredecessorTasks);
+		
+		advancedPanel.find('#edit-milestone-visibility').val(milestone.VisibilityLevelId);
+		
+		detailsPanel.find('#edit-milestone-date-offset').off('change');
+		detailsPanel.find('#edit-milestone-date-offset').on('change', function(event)
+		{
+			var planItemConstraintEnum = planItemConstraintIdToEnumMap[advancedPanel.find('#edit-milestone-constraint-type').val()];
+			
+			// if either the start or end date have changed that means we are forcing into either the :
+			//	- Start No Earlier Than or 
+			//	- Finish No Earlier Than constraint type. 		
+			// i.e. it's a shortcut for entering the constraint date and changing the type - this is inline with MSProject
+			// track this change before we process the mode
+			// note we only do this if not manuallyscheduling
+			if(planItemConstraintEnum != 'ManuallyScheduled' && planItemConstraintEnum != undefined && planItemConstraintEnum != '')
+			{
+				// new start date becomes the constraint date and mode switches
+				planItemConstraintEnum = 'StartNoEarlierThan';
+				advancedPanel.find('#edit-milestone-constraint-type').val(planItemConstraintEnumToIdMap[planItemConstraintEnum]);
+			}
+		});
+					
+		jQuery('#MilestoneOkButton').off('click');
+		
+		jQuery('#MilestoneOkButton').on('click' , function() {
+		
+			milestone.Name = detailsPanel.find('#edit-name').val() + (detailsPanel.find('#edit-name').attr('data-suffix') != undefined && detailsPanel.find('#edit-name').attr('data-suffix') != '' ? detailsPanel.find('#edit-name').attr('data-suffix') : '');
+						
+			milestone.StartDateOffset = kimble.parseNumber(detailsPanel.find('#edit-milestone-date-offset').val(), '0.##');
+			milestone.EndDateOffset = 0;
+			
+			//Predecessors
+			planPredecessors[milestoneId] = {};
+			
+			jQuery.each(jQuery('#EditMilestoneContainer #predecessors-body tbody tr'), function (i, row) {
+				var r = jQuery(row);
+				var taskPredecessor = {PlanItemId:r.find('#predecessor-select').val(), Type:r.find('#predecessor-type-select').val()};
+				if (taskPredecessor.PlanItemId == null) return true;
+				taskPredecessor.MilestoneId = taskPredecessor.PlanItemId;
+				taskPredecessor.Lag = (r.find('#predecessor-lag-input').val() == 'undefined' ? null : kimble.parseNumber(r.find('#predecessor-lag-input').val(), '0.##')); 
+				planPredecessors[milestoneId][taskPredecessor.PlanItemId] = taskPredecessor;
+			});
+			
+			//Advanced
+			milestone.ConstraintTypeId = advancedPanel.find('#edit-milestone-constraint-type').val();
+			milestone.VisibilityLevelId = advancedPanel.find('#edit-milestone-visibility').val();
+			
+			//asap and alap should override the offset
+			if(planItemConstraintIdToEnumMap[milestone.ConstraintTypeId] == 'AsSoonAsPossible'
+				|| planItemConstraintIdToEnumMap[milestone.ConstraintTypeId] == 'AsLateAsPossible')
+			{
+				// TODO125: we shouldn't be using this as a general offset, instead introduce constraint offset?
+				milestone.StartDateOffset = null;
+			}
+			
+			milestone.IncludeNonBusinessDays = advancedPanel.find('#edit-milestone-ignore-non-bus-days').prop('checked');
+			milestone.IsCompletedByPredecessorTasks = advancedPanel.find('#edit-milestone-completed-by-tasks').prop('checked');
+			
+			milestoneRow.replaceWith(getPlanItemHtml(milestone));
+			planChanged();
+			refreshDependencies();
+			hideModalBoxy();
+		});
+		
+		showModalBoxy();
+	}
+
+	function getPredecessorPlanItemObject(predecessorsItem)
+	{
+		var predecessorItem;
+		
+		if(predecessorsItem.TaskId != null && predecessorsItem.TaskId != '')
+		{
+			var predecessorTaskRow = jQuery('[node-id="' + predecessorsItem.TaskId + '"]');
+			predecessorItem = getGridPlanItemObject(predecessorTaskRow);
+		}
+		else if(predecessorsItem.MilestoneId != null && predecessorsItem.MilestoneId != '')
+		{
+			var predecessorMilestoneRow = jQuery('[node-id="' + predecessorsItem.MilestoneId + '"]');
+			predecessorItem = getGridPlanItemObject(predecessorMilestoneRow);
+		}
+		
+		return predecessorItem;
+	}
+	
+
+	function createsCircularDependency(nodeId, taskParams)
+	{
+		var circularDependencyFound = false;
+		
+		var currentItemId = taskParams[0];
+		
+		var optionTaskPredecessors = planPredecessors[nodeId];
+		
+		if (optionTaskPredecessors != null)
+		{
+			for(var counter = 0; counter < Object.keys(optionTaskPredecessors).length; counter++)
+			{
+				var key = Object.keys(optionTaskPredecessors)[counter];
+				var theOptionTaskPredecessor = optionTaskPredecessors[key];
+				
+				if(theOptionTaskPredecessor != null)
+				{
+					if(key != null && key == currentItemId)
+					{
+						circularDependencyFound = true;
+						break;
+					}
+					else
+					{
+						// this isn't a circular task, recurse to ensure that none of it's own parents create a loop too
+						if(createsCircularDependency(key, [currentItemId]))
+						{
+							circularDependencyFound = true;
+							break;
+						}
+					}
+				}
+				else
+				{
+					// the direct predecessor isn't a circular dependency but we must check the predecessor of this predecessor
+					if(createsCircularDependency(key, [currentItemId]))
+					{
+						circularDependencyFound = true;
+						break;
+					}
+				}
+				
+			}
+		}
+
+		return circularDependencyFound;
+	}
+	function updateItemDates(parentItem)
+	{
+		/*var earliest;
+		var latest;
+		
+		jQuery.each(jQuery('[parent-node-id="' + parentItem.attr('node-id') + '"]'), function (i, child){
+			var childItem = jQuery(child);
+			
+			var start = childItem.find('.startDateOffset').text();
+			if (start != null && (earliest == null || start.valueOf() < earliest.valueOf()))
+				earliest = start;
+			
+			var end = childItem.find('.endDateOffset').text();
+			if (end != null && (latest == null || end.valueOf() > latest.valueOf())) 
+				latest = end;
+		});
+		
+		if (earliest != null) parentItem.find('.startDateOffset').text(earliest);
+		
+		if (latest != null) parentItem.find('.endDateOffset').text(latest);
+		
+		if (parentItem.attr('parent-node-id') != '')
+		{
+			updateItemDates(jQuery('[node-id="' + parentItem.attr('parent-node-id') + '"]'));
+		}*/
+	}
+	
+	var deletingNodeIds = {};
+	
+	function deleteTaskClick(obj)
+	{
+		if (jQuery(this).hasClass('disabled')) return;
+		toggleWorking('#deleteTaskButton');
+		var selectedTask = getSelectedItem();
+		
+		if (selectedTask.length == 0) return;
+		
+		jQuery.each(selectedTask, function (i, thePlanItemRow)
+		{
+			var taskId = jQuery(thePlanItemRow).attr('node-id');
+			
+			deletingNodeIds[taskId] = 1;
+		});
+		
+		jQuery.each(selectedTask, function (i, thePlanItemRow)
+		{
+			var taskId = jQuery(thePlanItemRow).attr('node-id');
+			
+			if ((jQuery(thePlanItemRow).data('planItem') != undefined 
+					&& jQuery(thePlanItemRow).data('planItem').CanDelete != undefined 
+					&& !jQuery(thePlanItemRow).data('planItem').CanDelete)) return;
+			
+			deleteTask(jQuery(thePlanItemRow));
+		});
+	
+		deletingNodeIds = {};
+		
+		planChanged();
+		toggleWorking('#deleteTaskButton');
+	}
+	
+	function deleteTask(item)
+	{
+		var taskId = item.attr('node-id');
+		
+		if (!item.hasClass('new'))
+			deletedItems[taskId] = taskId;
+		
+		jQuery.each(jQuery('.tree-node[parent-node-id="' + taskId + '"]'), function (i, child) {
+			if ((jQuery(child).data('planItem') != undefined 
+					&& jQuery(child).data('planItem').CanDelete != undefined 
+					&& !jQuery(child).data('planItem').CanDelete))
+			{
+				// we can't delete this item but the parent is being deleted so we must disconnect
+				jQuery(child).attr('parent-node-id','');
+				jQuery(child).attr('level', parseInt(jQuery(child).attr('level')) - 1);
+				jQuery(child).find('indent').remove();
+			}
+			else
+			{
+				deleteTask(jQuery(child));	
+			}
+		});
+		
+		var parentItem = jQuery('[node-id="' + item.attr('parent-node-id') + '"]');
+		
+		item.remove();
+		
+		if (parentItem.length != 0)
+		{
+			if (jQuery('[parent-node-id="' + parentItem.attr('node-id') + '"]').length == 0)
+				parentItem.removeClass('branch');
+			
+			updateItemDates(parentItem);
+		}
+		
+		// if this task has dependencies then we need to get them to recalc their dates
+		var theTaskDependencies = planSuccessors[taskId];
+		delete planSuccessors[taskId];
+	
+		if(theTaskDependencies != undefined)
+		{
+			// first remove it from the planDependencies
+			jQuery.each(theTaskDependencies, function(i, planItem) {
+				delete planPredecessors[i][taskId];
+			});
+		}
+		jQuery('[gantt-id="' + item.attr('node-id') + '"]').remove();
+		
+		// finally remove the planItem
+		delete planItems[taskId];
+	}
+	
+	function indentClick(obj)
+	{
+		if (jQuery(this).hasClass('disabled')) return;
+		
+		toggleWorking('#indentButton');
+		
+		var selectedItem = getSelectedItem();
+		
+		if (selectedItem.length == 0)
+		{
+			toggleWorking('#indentButton');
+			return;
+		}
+		
+		jQuery.each(selectedItem, function (i, thePlanItemRow)
+		{
+			indent(jQuery(thePlanItemRow));
+		});
+		
+		refreshDependencies();
+	
+		toggleWorking('#indentButton');
+	}
+	
+	function indent(item)
+	{
+		//with-in scope
+		var siblings = item.prevAll('[parent-node-id="' + item.attr('parent-node-id') + '"]');
+		
+		if (siblings.length == 0) return null;
+		
+		var parentItem = jQuery(siblings[0]);
+		
+		//if parent is detailed item then return
+		if (parentItem.hasClass('detail')) return;
+		
+		item.attr('parent-node-id',parentItem.attr('node-id'));
+		
+		setLevel(item, new Number(item.attr('level')) + 1);
+		
+		if(!parentItem.hasClass('Iteration'))
+		{
+			parentItem.addClass('branch').addClass('expanded');
+			
+			updateItemDates(parentItem);
+		}
+		planChanged();
+	}
+	
+	function outdentClick(obj)
+	{
+		toggleWorking('#outdentButton');
+	
+		if (jQuery(this).hasClass('disabled')) return;
+		
+		var selectedItem = getSelectedItem();
+		
+		if (selectedItem.length == 0 || selectedItem.attr('level') == "0")
+		{
+			toggleWorking('#outdentButton');
+			return;
+		}
+		
+		jQuery.each(selectedItem, function (i, thePlanItemRow)
+		{
+			outdent(jQuery(thePlanItemRow));
+		});
+		
+		refreshDependencies();
+	
+		toggleWorking('#outdentButton');
+	}
+	
+	function outdent(item)
+	{
+		//decrement my level and make my parent my grandparent
+		var parentItem = jQuery('[node-id="' + item.attr('parent-node-id') + '"]');
+		
+		if (parentItem.length == 0) return;
+		
+		item.attr('parent-node-id', parentItem.attr('parent-node-id'));
+		
+		if(!parentItem.hasClass('Iteration'))
+		{
+			if (jQuery('[parent-node-id="' + parentItem.attr('node-id') + '"]').length == 0)
+				parentItem.removeClass('branch');
+			else
+				parentItem.addClass('branch').addClass('expanded');
+			
+			updateItemDates(parentItem);
+		}
+		
+		setLevel(item, new Number(item.attr('level')) - 1);
+		
+		//move all other siblings (and their children) above me
+		var siblings = jQuery('[parent-node-id="' + parentItem.attr('node-id') + '"]');
+		
+		jQuery.each(siblings, function (i, sibling)
+		{
+			//move me and my children
+			moveItemBefore(jQuery(sibling), item);
+		});
+		
+		updateSequences();
+		
+		planChanged();
+	}
+	
+	function moveItemBefore(taskToMove, beforeTask)
+	{
+		taskToMove.insertBefore(beforeTask);
+		
+		jQuery.each(jQuery('[parent-node-id="' + taskToMove.attr('node-id') + '"]'), function (i, child)
+		{
+			moveItemBefore(jQuery(child), beforeTask);
+		});
+	}
+	
+	function getSelectedItem()
+	{
+		return jQuery('tr.selected');
+	}
+	
+	function setLevel(item, level)
+	{
+		item.attr('level',level);
+		
+		jQuery.each(jQuery('[parent-node-id="' + item.attr('node-id') + '"]'), function (i, child) {
+			setLevel(jQuery(child), new Number(level).valueOf() + 1);
+		});
+	}
+	
+	function updateSequences()
+	{
+		jQuery.each(jQuery('span.position-num'), function (i, pos) {
+			var p = jQuery(pos);
+			p.text(p.parent().parent().index() + 1);
+		});
+	}			
+
+	function initialiseActions()
+	{
+		if(viewMode == 'planner')
+		{
+			initialisePlannerActions();
+		}
+		else
+		{
+			initialiseGridActions();
+		}	
+	}
+
+	function showPlanner()
+	{
+		viewMode = 'planner';
+		processGridViewChanges();
+		refreshPlan();
+	}
+
+	function showGrid()
+	{
+		viewMode = 'grid';
+		processIterationWorkItemChanges();
+		refreshPlan();
+	}
+
+	function refreshPlan()
+	{
+		if(viewMode == 'planner')
+		{
+			drawPlannerView();
+		}
+		else
+		{
+			drawGridView();
+		}	
+
+		initialiseActions();
+		initialiseInsights();
+	}
+	
+	function emptyExisting()
+	{
+		jQuery('.work-items-container .backlog-container').empty();
+		jQuery('.work-items-container .iterations-container').empty();
+		
+		jQuery('#template-tasks>tbody').empty();		
+	}
+
+	function drawPlannerView()
+	{
+		emptyExisting();
+		
+		jQuery('.grid-view-item').hide();
+		jQuery('.grid-view-btn').addClass('disabled');
+		jQuery('.planner-view-item').show();
+		jQuery('.planner-view-btn').removeClass('disabled');
+		
+		jQuery('.work-items-container .backlog-container').append(getIterationHtml({Id: productId, Name: l['Backlog'], WorkItems: planWorkItems}, 'backlog'));
+		
+		var iterationCounter = 0;
+		jQuery.each(Object.keys(planItems).sort(sortPlanItems(planItems)), function (k, id)
+		{
+			var planItem = planItems[id];
+			
+			if(planItem.IsIteration)
+			{
+				jQuery(getIterationHtml(planItem, (iterationCounter == 0 ? 'first-iteration' : ''))).appendTo('.work-items-container .iterations-container').data('planItem', planItem);
+			
+				iterationCounter += 1;
+			}
+		});
+
+		var salesforceHeaderFooterHeight = jQuery('.work-items-container').offset().top;		
+		jQuery('.work-items-container, .iterations-container, .backlog-container').height(jQuery(window).height() - salesforceHeaderFooterHeight);
+		jQuery('.all-iterations-container').width(jQuery('.work-items-container').width() - jQuery('.backlog-container').width() - 5);
+		
+		jQuery('#listButton').removeClass('active-toolbar-button');
+		jQuery('#plannerButton').addClass('active-toolbar-button');	
+		
+		initialiseResourceSelector();
+	}	
+
+	function drawGridView()
+	{
+		emptyExisting();
+
+		jQuery('.grid-view-item').show();
+		jQuery('.grid-view-btn').removeClass('disabled');
+		jQuery('.planner-view-item').hide();
+		jQuery('.planner-view-btn').addClass('disabled');
+					
+		jQuery('<tr id="lastRow"><td colspan="11">').appendTo(jQuery('#template-tasks>tbody'));
+
+		if(planWorkItems != undefined && planWorkItems.length) {
+			var itmRow = getPlanWorkItemContainer();
+			itmRow.insertBefore(jQuery('#template-tasks>tbody>#lastRow'));
+		}
+
+		jQuery.each(Object.keys(planItems).sort(sortPlanItems(planItems)), function (k, id) { 
+			
+			var itm = planItems[id];
+			
+			var itmRow = getPlanItemHtml(itm, {selected:false, expanded:true, visible:true});
+		
+			itmRow.insertBefore(jQuery('#template-tasks>tbody>#lastRow'));
+		});
+		
+		jQuery.each(jQuery('.branch').get().reverse(), function (i, task) {updateTaskEffort(jQuery(task))});
+		
+		refreshDependencies();
+			
+		jQuery.ionTabs("#edit-task-tabs", {type: "none"});
+	
+		jQuery.ionTabs("#edit-milestone-tabs", {type: "none"});
+
+		jQuery('#listButton').addClass('active-toolbar-button');
+		jQuery('#plannerButton').removeClass('active-toolbar-button');
+	}
+	
+	function getPlanWorkItemContainer()
+	{
+		var indent = '<span class="indent"/>';
+		
+		var tr = '<tr node-id="' + productId + '" class="backlog-row">';
+		
+		tr += '<td class="task-row-header"><span class="position-num"></span></td>';
+		
+		tr += '<td class="t-nme">' + indent + '<div class="itemName">' + l['Backlog'];
+			
+		var workItemHtml = '';
+		var workItemLabel = planWorkItems.length + ' ' + (planWorkItems.length == 1 ? l['WorkItem'] : l['WorkItems']);
+		workItemHtml += '<div class="work-items-ind" title="' + workItemLabel + '"><i class="fa fa-list-ul"></i></div>';
+		
+		tr += workItemHtml + '</div></td>';
+		
+		tr += '<td colspan="8"></td>';
+		tr += '</tr>';
+		
+		return jQuery(tr);
+	}
+
+	function getPlanItemHtml(planItem)
+	{
+		var indent = '<span class="indent"/>';
+		
+		var itemType = planItem.TypeEnum;
+		
+		var itemClass = 'tree-node planItem ' + itemType + ' ' + (planItem.IsNew ? 'new ':'') + (planItem.IsSummary ? 'branch expanded ': (planItem.IsIteration ? 'Iteration ':''));
+		
+		var tr = '<tr node-id="' + planItem.Id + '" type-enum="' + planItem.TypeEnum + '" parent-node-id="' + (planItem.ParentId==null?'':planItem.ParentId) + '" class="' + itemClass + '" level="' + planItem.Level + '" constrainttypeid="' + planItem.ConstraintTypeId + '" visibilityLevelId="' + planItem.VisibilityLevelId + '">';
+		
+		if (planItem.Position == null) planItem.Position = jQuery('#template-tasks>tbody>tr:not(.backlog-row)').length;
+		
+		var constraintHtml = (!planItem.IsSummary ? getConstraintHtml(planItem.ConstraintTypeId, planItem.IncludeNonBusinessDays) : '');
+		tr += '<td class="task-row-header">' + constraintHtml + '<span class="position-num draggable">' + planItem.Position + '</></td>';
+		
+		//TODO127 - inline task add button
+		
+		tr += '<td class="t-nme">' + indent + '<div class="itemName">';
+			
+		if (planItem.TypeEnum == 'Milestone' && planItem.MilestoneType != 'Planning')
+		{
+			if (planItem.MilestoneValue != null)
+			{
+				var suffix = ' (' + planItem.CurrencyISOCode + ' ' + kimble.formatNumber(planItem.MilestoneValue,'#,##0.00' ) + ')';
+				if(planItem.Name.indexOf(suffix, planItem.Name.length - suffix.length) === -1)
+				{
+					planItem.Name += suffix;
+					planItem.NameSuffix = suffix;
+				}
+			}
+			
+			tr += planItem.Name;
+		}
+		else
+		{
+			tr += '<input type="text" value="' + planItem.Name + '" style="width:100%;"/>';
+		}
+
+		var workItemHtml = '';
+
+		if(planItem.IsIteration || planItem.WorkItems != undefined && planItem.WorkItems.length > 0)
+		{
+			var workItemLabel = planItem.WorkItems.length + ' ' + (planItem.WorkItems.length == 1 ? l['WorkItem'] : l['WorkItems']);
+			workItemHtml += '<div class="work-items-ind" title="' + workItemLabel + '"><i class="fa fa-list-ul"></i></div>';
+		}
+		
+		tr += workItemHtml + '</div></td>';
+		
+		tr += ('<td class="startDateOffset dateOffset"><input type="text" min="0" class="input-date-offset task-inline-input" type="text" value="' + kimble.replaceNull(safeFormatNumber(planItem.StartDateOffset),'') + '" /></td>');
+		tr += ('<td class="endDateOffset duration"><input type="text" min="1" class="input-date-offset task-inline-input" type="text" value="' + kimble.replaceNull(safeFormatNumber(planItem.EndDateOffset),'') + '" /></td>');
+		tr += ('<td class="ignore-non-bus-days"><input disabled type="checkbox" ' + (planItem.IncludeNonBusinessDays ? 'checked' : '') + '/></td>');
+		
+		if(planItem.TypeEnum == 'Task')
+		{
+			if (planItem.IsSummary)
+				tr += '<td></td>';
+			else
+				tr += '<td class="assignedResources"></td>';
+			
+			var baselineEffort = 0;
+			
+			if (planItem.Assignments != null)
+			{
+				jQuery.each(Object.keys(planItem.Assignments), function (i, key){
+					baselineEffort += kimble.replaceNull(planItem.Assignments[key].BaselineEffort,0);
+				});
+			}
+				
+			tr += '<td class="baselineEffort">' + jQuery.formatNumber(baselineEffort, {format: "0.##", locale:kimble.locale, isFullLocale:false}) + '</td>';
+			tr += '<td class="averageEffort effort-units-col hidden-item">';
+			if (!planItem.IsSummary)
+			{
+                tr += '<div tsk-t-id="' + planItem.Id + '" class="template-effort-insight-ind hidden-item fa fa-lightbulb-o"></div>';
+                tr += '<div tsk-t-id="' + planItem.Id + '" class="template-avg-effort hidden-item">-</div>';
+			}
+			tr += '</td>';
+			tr += '<td class="fixedEffort"><input disabled type="checkbox" ' + (planItem.IsFixedEffort?'checked':'') + ' /></td>';
+			tr += ('<td class="taskEffort"><input type="text" min="1" class="input-date-offset task-inline-input" type="text" value="' + kimble.replaceNull(safeFormatNumber(planItem.Effort),'') + '" /></td>');		
+		}
+		else
+		{
+			tr += '<td></td><td></td>';
+							
+			tr += '<td></td>';
+		}
+		
+		tr += '<td class="predecessors"></td>';
+		
+		tr += '<td class="category"></td>';
+		tr += '</tr>';
+		
+		var row = jQuery(tr);
+		
+		if (planItem.TaskCategoryId != null)
+		{
+				var catName = taskCategoryMap[planItem.TaskCategoryId];
+				if(catName == null) catName = '';
+				row.find('.category').text(catName);
+				row.attr('categoryId', planItem.TaskCategoryId);
+				row.attr('category-name', catName);
+		}
+		
+		row.attr('calendar-show-as', planItem.CalendarShowAsId);
+		row.attr('start-time',planItem.StartTime);
+		row.attr('end-time',planItem.EndTime);
+		
+		row.data('planItem', planItem);
+		
+		row.data('assignments', planItem.Assignments || {});
+		
+		//data
+		if (planItem.Assignments != null && Object.keys(planItem.Assignments).length > 0)
+		{
+			row.addClass('detail');
+			
+			var initials = getInitials(planItem.Assignments);
+			row.find('.assignedResources').text(initials).attr('title', initials);
+		}
+		
+		if (planItem.TypeEnum == 'Milestone')
+		{
+			row.addClass('detail');
+		}
+		
+		if(planItem.IsSummary) 
+		{
+			row.find('.input-date-offset').prop('disabled', true);
+		}
+		
+		row.find('.startDateOffset input').change(startDateOffsetChange);
+		row.find('.endDateOffset input').change(endDateOffsetChange);
+
+		//Actions / events
+		row.find('.itemName').prop('title', planItem.Name);
+		row.find('.itemName input').blur(itemNameChange);
+		
+		row.find('.indent').click(toggleTreeNode);
+		
+		// we only need to add these handlers if the browser does not support the number type
+		row.find('.duration input.task-inline-input, .taskEffort input.task-inline-input').keyup(function(e){
+			if(e.keyCode == 38)
+			{
+				// up arrow - add a day
+				var theValue = kimble.parseNumber(jQuery(this).val(), '0.##');
+				jQuery(this).val(theValue + 1).change();
+			}
+			if(e.keyCode == 40) 
+			{
+				// down arrow - remove a day
+				var theValue = kimble.parseNumber(jQuery(this).val(), '0.##');
+				jQuery(this).val(theValue - 1).change();
+			}
+		});
+		
+		row.find('.itemName input').keydown(function(e){
+			// enter in the task name should create a new task if we are entering a new task
+			if(jQuery(this).closest('tr').hasClass('new') && jQuery(this).closest('tr').hasClass('Task') && e.keyCode == 13)
+			{
+				e.preventDefault();
+				e.stopPropagation();
+				
+				if(jQuery(this).closest('tr').hasClass('Iteration'))
+				{
+					addIterationClick(jQuery(this).closest('tr'));
+				}
+				else
+				{
+					addTaskClick(jQuery(this).closest('tr'));
+				}
+			}
+		});
+		
+		row.find('.duration input.task-inline-input').keydown(function(e){
+			// tab out of the end date should create a new task if we are entering a new task
+			if(jQuery(this).closest('tr').hasClass('new') && jQuery(this).closest('tr').hasClass('Task') && e.keyCode == 9)
+			{
+				e.preventDefault();
+				e.stopPropagation();
+				addTaskClick(jQuery(this).closest('tr'));
+			}
+		});
+		
+		row.find('.dateOffset input.task-inline-input').keyup(function(e){
+			if(e.keyCode == 38)
+			{
+				// up arrow - add a day
+				var entryDate = kimble.parseDate(jQuery(this).val(), false);
+				var ignoreNBD = jQuery(this).closest('tr').find('.ignore-non-bus-days input').prop('checked');
+				
+				jQuery(this).val(kimble.formatDate(calculateNextDate(ignoreNBD, entryDate))).change();
+			}
+			if(e.keyCode == 40) 
+			{
+				// down arrow - remove a day
+				// up arrow - add a day
+				var entryDate = kimble.parseDate(jQuery(this).val(), false);
+				var ignoreNBD = jQuery(this).closest('tr').find('.ignore-non-bus-days input').prop('checked');
+				
+				jQuery(this).val(kimble.formatDate(calculatePreviousDate(ignoreNBD, entryDate))).change();
+			}
+		});
+	
+		row.find('.task-inline-input').change(function(event)
+		{		
+			// get a handle on the changed row
+			var planItemRow = jQuery(this).closest('tr');
+			var planItem = getGridPlanItemObject(planItemRow);
+	
+			var planItemConstraintEnum = planItemConstraintIdToEnumMap[planItemRow.attr('constrainttypeid')];
+				
+			if(planItemConstraintEnum != 'ManuallyScheduled')
+			{
+				if(jQuery(event.target).parent().hasClass('dateOffset'))
+				{
+					planItemConstraintEnum = 'StartNoEarlierThan';
+					planItemRow.attr('constrainttypeid', planItemConstraintEnumToIdMap[planItemConstraintEnum]);
+					
+				}
+			}
+
+			refreshPlanItemRowFormatting(planItemRow);
+		});
+
+		if (!planItem.IsSummary && planItem.TypeEnum == 'Task')
+		{
+			row.find('.constraint-ind').click(function () {
+				initialiseEditTaskPopup(planItem.Id, 'task-advanced-details');
+			});
+			
+			row.find('.position-num, .category').click(function () {
+				initialiseEditTaskPopup(planItem.Id, 'task-details');
+			});
+			
+			row.find('.itemName input').dblclick(function() {
+				initialiseEditTaskPopup(planItem.Id, 'task-details');
+			});
+			
+			row.find('.assignedResources').click(function () {
+				initialiseEditTaskPopup(planItem.Id, 'task-resources');
+			});
+			
+			row.find('.predecessors').click(function () {
+				initialiseEditTaskPopup(planItem.Id, 'task-predecessors');
+			});
+		}
+		
+		if(planItem.TypeEnum == 'Milestone')
+		{
+			row.find('.constraint-ind').click(function () {
+				initialiseEditMilestonePopup(planItem.Id, 'milestone-advanced-details');
+			});
+			
+			row.find('.itemName').dblclick(function() {
+				initialiseEditMilestonePopup(planItem.Id, 'milestone-details');
+			});
+			
+			row.find('.position-num').click(function () {
+				initialiseEditMilestonePopup(planItem.Id, 'milestone-details');
+			});
+			
+			row.find('.predecessors').click(function () {
+				initialiseEditMilestonePopup(planItem.Id, 'milestone-predecessors');
+			});
+		}
+		
+		return row;		
+	}	
+
+	function getConstraintHtml(constraintType, ignoreNBD)
+	{		
+		var constraintHtml = '';
+		var titleText = planItemConstraintIdToNameMap[constraintType];
+		var constraintIndClass = 'constraint-ind';
+	
+		var calendarIcon = (ignoreNBD ? 'fa-calendar-o' : 'fa-calendar');
+		
+		if(planItemConstraintIdToEnumMap[constraintType] == 'AsSoonAsPossible'
+			|| planItemConstraintIdToEnumMap[constraintType] == 'AsLateAsPossible')
+		{
+			constraintIndClass += ' ' + calendarIcon;
+		}
+		else if(planItemConstraintIdToEnumMap[constraintType] == 'ManuallyScheduled'
+			|| constraintType == undefined)
+		{
+			constraintIndClass += ' fa-thumb-tack fixed-constraint';
+		}
+		else if(planItemConstraintIdToEnumMap[constraintType] == 'MustStartOn' 
+			|| planItemConstraintIdToEnumMap[constraintType] == 'StartNoEarlierThan'
+			|| planItemConstraintIdToEnumMap[constraintType] == 'StartNoLaterThan'
+			|| planItemConstraintIdToEnumMap[constraintType] == 'MustFinishOn'
+			|| planItemConstraintIdToEnumMap[constraintType] == 'FinishNoEarlierThan'
+			|| planItemConstraintIdToEnumMap[constraintType] == 'FinishNoLaterThan')
+		{
+			constraintIndClass += ' ' + calendarIcon + ' fixed-constraint';
+		}
+		
+		if(ignoreNBD) titleText += ' (' + kimble.labels['ignore-nbd'] + ')';
+		
+		constraintHtml += '<span class="fa ' + constraintIndClass + '" title="' + titleText + ' "/>';
+		
+		return constraintHtml;
+	}
+
+	function initialiseGridDragAndDrop()
+	{
+		jQuery('.ui-draggable').draggable('destroy');
+		
+		jQuery('.draggable').draggable({
+					revert:'invalid', 
+					helper: function( event ) {
+						return jQuery('<div class="task-dragging">' + jQuery(this).text() + ' : ' + getItemName(jQuery(this).closest('tr')) + '</div>');
+		  			},
+					scroll:true,
+					appendTo:'#draggable-container'});
+		
+		jQuery('.ui-droppable').droppable('destroy');
+	
+		jQuery('#template-tasks>tbody>tr:not(.backlog-row)').droppable({
+					hoverClass: 'tree-node-drop', 
+					accept: function(draggable) {
+						  	var draggableRow = draggable.closest('tr');
+							var thisRow = jQuery(this);
+							
+							if(!draggableRow.hasClass('tree-node')) return false;
+							
+							if (draggableRow.attr('node-id') == thisRow.attr('node-id')) return false;
+							
+							if (draggableRow.next().attr('node-id') == thisRow.attr('node-id')) return false;
+							
+							return true;
+						  },
+					drop: function(event, ui) {
+						
+						var rowToMove = ui.draggable.closest('tr');
+						
+						var previousParentId = rowToMove.attr('parent-node-id');
+						
+						moveItemBefore(rowToMove, jQuery(this));
+						
+						var previousRow = rowToMove.prevAll(':visible:first');
+						
+						if (previousRow.length == 0) 
+						{
+							rowToMove.attr('parent-node-id','');
+							setLevel(rowToMove, 0);						
+						}
+						else
+						{
+							rowToMove.attr('parent-node-id', previousRow.attr('parent-node-id'));
+							
+							if (previousRow.hasClass('branch') && previousRow.hasClass('expanded')) //make me a child
+							{
+								rowToMove.attr('parent-node-id', previousRow.attr('node-id'));
+								setLevel(rowToMove, (new Number (previousRow.attr('level')) + 1).valueOf());
+							}
+							else // make me a sibling
+							{
+								rowToMove.attr('parent-node-id', previousRow.attr('parent-node-id'));
+								if (rowToMove.attr('level') !=  previousRow.attr('level')) setLevel(rowToMove, previousRow.attr('level'));
+							}
+							
+							//refresh previous parent (may no longer be a parent)
+							if (previousParentId != '' && jQuery('[parent-node-id="' + previousParentId + '"]').length == 0)
+								jQuery('[node-id="' + previousParentId + '"]').removeClass('branch');						
+						}
+						
+						updateSequences();
+						
+						planChanged();
+						
+						jQuery('.tree-node-drop').removeClass('tree-node-drop');
+					}
+				});
+	}	
+
+	function getIterationHtml(theIteration, iterationClass)
+	{
+		var html = '';
+				
+		html += '<div node-id="' + theIteration.Id + '" class="iteration-container' + (iterationClass != undefined ? ' ' + iterationClass : '') + '">';
+
+		var iterationNameHtml = (iterationClass != 'backlog' ? '<input class="iteration-name" value="' + theIteration.Name + '"/>' : theIteration.Name);  
+		html += '<div class="work-items-header">' + iterationNameHtml + '</div>';
+		
+		var workItemCount = theIteration.WorkItems.length;
+		
+		var actualUnits = 0;
+		var forecastUnits = 0;
+		var remainingUnits = 0;
+		html += '<ul class="work-items">';
+		for(var counter = 0; counter < workItemCount; counter++)
+		{
+			var theWorkItem = theIteration.WorkItems[counter];
+			html += getWorkItemHtml(theWorkItem, theWorkItemUnitType);
+
+			if(theWorkItemUnitType == 'Point' || theWorkItemUnitType == 'Item')
+			{
+				remainingUnits += (theWorkItem.RemainingUnits == undefined ? 0 : theWorkItem.RemainingUnits);
+			}			
+		}
+		html += '</ul>';
+		
+		html += '<div class="work-items-footer">'
+		html += '<div class="add-work-item"><span class="fa fa-plus-square iteration-action-ind"></span><span class="add-work-item-label">' + l['AddWorkItem'] + '</span></div>';
+		html += '</div>';
+		
+		var workItemUnitsHtml = '';
+		if(theWorkItemUnitType == 'Point' || theWorkItemUnitType == 'Item')
+		{
+			workItemUnitsHtml += '<div class="iteration-units-total">' + formatNumberNat2DP(remainingUnits) + '</div>';
+			workItemUnitsHtml += '<div class="iteration-units-type">' + unitTypeEnumToSuffixMap[theWorkItemUnitType] + '</div>';
+		}
+		html += workItemUnitsHtml;
+				
+		html += '</div>';
+		
+		return html;
+	}
+
+	function getTaskWorkItemsHtml(theTask)
+	{
+		var html = '';
+		
+		html += '<div class="work-items-header">' + l['WorkItems'] + '</div>';
+		
+		var workItemCount = (theTask.WorkItems != undefined ? theTask.WorkItems.length : 0);
+
+		var actualUnits = 0;
+		var forecastUnits = 0;
+		var remainingUnits = 0;		
+		html += '<ul class="work-items task-work-items">';
+		for(var counter = 0; counter < workItemCount; counter++)
+		{
+			var theWorkItem = theTask.WorkItems[counter];
+			html += getWorkItemHtml(theWorkItem, theWorkItemUnitType);
+
+			if(theWorkItemUnitType == 'Point' || theWorkItemUnitType == 'Item')
+			{
+				remainingUnits += (theWorkItem.RemainingUnits == undefined ? 0 : theWorkItem.RemainingUnits);
+			}			
+		}
+		html += '</ul>';
+		
+		html += '<div class="work-items-footer">';
+		html += '<div class="add-task-work-item"><span class="fa fa-plus-square iteration-action-ind"></span><span class="add-task-work-item-label">' + l['AddWorkItem'] + '</span></div>';
+		html += '</div>';
+
+		var workItemUnitsHtml = '';
+		if(theWorkItemUnitType == 'Point' || theWorkItemUnitType == 'Item')
+		{
+			workItemUnitsHtml += '<div class="task-units-total">' + formatNumberNat2DP(remainingUnits) + '</div>';
+			workItemUnitsHtml += '<div class="task-units-type">' + unitTypeEnumToSuffixMap[theWorkItemUnitType] + '</div>';
+		}
+		html += workItemUnitsHtml;
+			
+		return html;
+	}
+
+	function getWorkItemHtml(theWorkItem, workItemUnitType)
+	{
+		planResources = [];
+		for(var x in theActivityAssignments) {
+			planResources.push({id: theActivityAssignments[x].Id, text: theActivityAssignments[x].ResourceName + (theActivityAssignments[x].RoleName != undefined && theActivityAssignments[x].RoleName != '' ? ' - ' + theActivityAssignments[x].RoleName : '')});
+		}
+		var html = '';
+		
+		var itemIsDeleted = (theWorkItem.WorkItemTemplateId in deletedItems); 
+
+		var workItemHeaderHtml = '<textarea maxlength="80" class="work-item-name" placeholder="' + l['NewItem'] + '">' + (theWorkItem.Name != undefined && theWorkItem.Name != '' ? theWorkItem.Name : '') + '</textarea>';
+		if(enableOwners) workItemHeaderHtml +='<i class="fa fa-user owner-ind" owner-detail="on" title="" style="visibility:' + (theWorkItem.ActivityAssignmentTemplateId != null ? 'visible' : 'hidden')+';" ></i>';
+		
+		var workItemUnitsHtml = '';
+		if(workItemUnitType == 'Point' || workItemUnitType == 'Item')
+		{
+			workItemUnitsHtml += '<input class="work-item-units" value="' + (theWorkItem.RemainingUnits == undefined ? 0 : formatNumberNat2DP(theWorkItem.RemainingUnits)) + '"/>';
+			workItemUnitsHtml += '<div class="work-item-unit-type">' + unitTypeEnumToSuffixMap[workItemUnitType] + '</div>';
+		}
+		workItemHeaderHtml += workItemUnitsHtml;
+		
+		var additionalDetailsHtml = '';
+		if(enableOwners) {
+			additionalDetailsHtml += '<div class="wi-add-details">';	
+			additionalDetailsHtml += '<div class="owner-selector-container"><label for="owner-selector-input">' + l['Owner'] + ':</label>'
+			additionalDetailsHtml += '<input class="owner-selector-input" placeholder="' + (theWorkItem.ActivityAssignmentTemplateId != undefined && theWorkItem.ActivityAssignmentTemplateId != null && planResources.filter(function(x){return x.id == theWorkItem.ActivityAssignmentTemplateId})[0] != undefined ? planResources.filter(function(x){return x.id == theWorkItem.ActivityAssignmentTemplateId})[0].text : l['None']) + '"/>';
+			additionalDetailsHtml += '<i class="clear-button fa fa-times"' + (theWorkItem.ActivityAssignmentTemplateId != undefined && theWorkItem.ActivityAssignmentTemplateId != null && planResources.filter(function(x){return x.id == theWorkItem.ActivityAssignmentTemplateId})[0] != undefined ? 'style="visibility:visible;" title="' + l['RemoveOwner'] + '"' : '')+'></i></div>';
+			additionalDetailsHtml += '</div>';
+		}		
+		var actionsHtml = '<div class="work-item-actions">'
+		actionsHtml += '<i class="fa fa-pencil-square-o edit-work-item"></i>';
+		actionsHtml += '<i class="fa fa-trash del-work-item"></i>';
+		actionsHtml += '</div>';
+		
+		var workItemClass = 'work-item selectable';
+		var ownerDetails = '';
+		if(enableOwners) ownerDetails = '<div class="ti-owner-details" title=""><div class="task-owner-name">' + l['Owner'] + ': ' + (theWorkItem.ActivityAssignmentTemplateId != null ? (planResources.filter(function(x){return x.id == theWorkItem.ActivityAssignmentTemplateId})[0] != undefined ? planResources.filter(function(x){return x.id == theWorkItem.ActivityAssignmentTemplateId})[0].text : l['None']) : l['None'] )+ '</div></div>';
+		
+		html += '<li node-id="' + theWorkItem.WorkItemTemplateId + '" parent-node-id="' + (theWorkItem.TaskTemplateId != null ? theWorkItem.TaskTemplateId : productId) + '" item-status="' + theWorkItem.Status + '" title="' + l[theWorkItem.Status] + '" class="' + workItemClass + (theWorkItem.IsNew ? ' new last-added' : '') + '">' + workItemHeaderHtml + additionalDetailsHtml + actionsHtml + ownerDetails + '</li>';
+		
+		return html;
+	}
+	
+	function initialiseResourceSelector()
+	{
+		if(!enableOwners) return;
+		
+		planResources = [];
+		for(var x in theActivityAssignments) {
+			planResources.push({id: theActivityAssignments[x].Id, text: theActivityAssignments[x].ResourceName + (theActivityAssignments[x].RoleName != undefined && theActivityAssignments[x].RoleName != '' ? ' - ' + theActivityAssignments[x].RoleName : '')});
+		}
+					
+		jQuery('.owner-selector-input').select2({
+			//minimumInputLength: 2,
+			multiple: false,
+			data: planResources,
+			initSelection : function (element, callback) {
+				var data = {id: element.val(), text: element.attr('data-name')};
+				callback(data);
+			},
+			 escapeMarkup: function(text) {return text;}
+		});
+		
+		intitialiseResourceSelectorActions();		
+	}
+	
+	function initialiseResourceSelectorNewItem(item)
+	{
+		if(!enableOwners) return;
+		
+		planResources = [];
+		for(var x in theActivityAssignments) {
+			planResources.push({id: theActivityAssignments[x].Id, text: theActivityAssignments[x].ResourceName + (theActivityAssignments[x].RoleName != undefined && theActivityAssignments[x].RoleName != '' ? ' - ' + theActivityAssignments[x].RoleName : '')});
+		}
+		
+		jQuery(item).last().parent().find('.owner-selector-input').select2({
+			//minimumInputLength: 2,
+			multiple: false,
+			data: planResources,
+			initSelection : function (element, callback) {
+				var data = {id: element.val(), text: element.attr('data-name')};
+				callback(data);
+			},
+			 escapeMarkup: function(text) {return text;}
+		});
+		
+		intitialiseResourceSelectorActions();
+	}
+		
+	function intitialiseResourceSelectorActions() 
+	{
+		jQuery('.owner-selector-input').on("select2-selecting", function(e) {
+			$(this).closest('.owner-selector-container').find('.clear-button').css('visibility', 'visible');
+			$(this).closest('li').find('.owner-ind').css('visibility', 'visible');
+			$(this).closest('li').find('.task-owner-name').text(l['Owner'] + ': ' + e.object.text);
+			planChanged(true);
+		});
+		
+		jQuery('.clear-button').on('click', function() {
+			$(this).closest('.owner-selector-container').find('span').text(l['None']); 
+			$(this).css('visibility', 'hidden');
+			$(this).closest('li').find('.owner-ind').css('visibility', 'hidden');
+			$(this).closest('li').find('.task-owner-name').text(l['Owner'] + ': ' + l['None']);
+			planChanged(true);	
+		});
+	}
+	
+	
+	function getNewWorkItemObject(parentTaskId)
+	{
+		var theWorkItem = {WorkItemTemplateId: getUniqueId(), IsNew: true, Status: newWorkItemStatus, TaskTemplateId: parentTaskId, ProductId: productId};
+		
+		return theWorkItem;
+	}
+	
+	function addWorkItemClick(e, triggerWorkItem)
+	{
+		var thisItem = (triggerWorkItem == undefined ? jQuery(this) : jQuery(triggerWorkItem));
+		
+		var parentTaskId = (thisItem.closest('.iteration-container').hasClass('backlog') ? productId : thisItem.closest('.iteration-container').attr('node-id'));
+
+		var targetWorkItems = (triggerWorkItem == undefined ? thisItem.closest('.iteration-container').find('.work-items') : thisItem.closest('.work-items'));
+
+		var taskRow = jQuery('[node-id="' + parentTaskId + '"]');
+		var parentTask = getGridPlanItemObject(taskRow);
+				
+		var newItemObject = getNewWorkItemObject(parentTaskId);
+		
+		if(triggerWorkItem != undefined)
+		{
+			jQuery(triggerWorkItem).after(getWorkItemHtml(newItemObject, theWorkItemUnitType));
+		}
+		else
+		{
+			targetWorkItems.append(getWorkItemHtml(newItemObject, theWorkItemUnitType));
+		}
+		
+		var newItem = targetWorkItems.find('.work-item.last-added textarea');
+		newItem.focus().select();
+		
+		initialiseResourceSelectorNewItem(newItem);
+	}
+	
+	function addTaskWorkItemClick(e, triggerWorkItem)
+	{
+		var thisItem = (triggerWorkItem == undefined ? jQuery(this) : jQuery(triggerWorkItem));
+		
+		var parentTaskId = thisItem.closest('#task-work-items-container').attr('task-id');
+
+		var targetWorkItems = (triggerWorkItem == undefined ? thisItem.closest('#task-work-items-container').find('.work-items') : thisItem.closest('.work-items'));
+
+		var taskRow = jQuery('[node-id="' + parentTaskId + '"]');
+		var parentTask = getGridPlanItemObject(taskRow);
+			
+		var newItemObject = getNewWorkItemObject(parentTaskId);
+		
+		if(triggerWorkItem != undefined)
+		{
+			jQuery(triggerWorkItem).after(getWorkItemHtml(newItemObject, theWorkItemUnitType));
+		}
+		else
+		{
+			targetWorkItems.append(getWorkItemHtml(newItemObject, theWorkItemUnitType));
+		}
+		
+		var newItem = targetWorkItems.find('.work-item.last-added textarea');
+		newItem.focus().select();
+		
+		initialiseResourceSelectorNewItem(newItem);
+	}
+	
+	function selectWorkItem(e)
+	{
+		/*if(!cntrlOn) jQuery('.work-item.selected').removeClass('selected');
+		jQuery(this).closest('.work-item').addClass('selected').removeClass('not-selected');
+		jQuery('.work-item:not(.selected)').addClass('not-selected');*/
+	}
+	
+	function editWorkItemClick(e)
+	{
+		e.preventDefault();
+		
+		var theItem = jQuery(this).closest('.work-item');
+		
+		if(enableOwners) {
+			theItem.find('.ti-owner-details').hide();
+			theItem.removeClass('owner-on');
+		}
+		 theItem.find('.edit-work-item').toggleClass('detail-edit-mode');
+		
+		theItem.find('.wi-add-details').toggleClass('detail-edit-mode',  theItem.find('.edit-work-item').hasClass('detail-edit-mode'));
+	
+	/*	jQuery.each(theItem.find('.wi-add-details textarea'), function (i, theTextArea)
+		{
+			jQuery(this).height(1);
+			var totalHeight = jQuery(this).prop('scrollHeight') - parseInt(jQuery(this).css('padding-top')) - parseInt(jQuery(this).css('padding-bottom'));
+			jQuery(this).height(totalHeight);
+		});*/
+	}
+
+	function deleteTaskWorkItemClick(e)
+	{
+		var theItem = jQuery(this).closest('.work-item');
+		var theTask = jQuery('#task-work-items-container');
+		
+		if (!theItem.hasClass('new'))
+			deletedItems[theItem.attr('node-id')] = theItem.attr('node-id');
+			
+		theItem.remove();
+		
+		calculateTaskUnitsTotal(theTask);
+		
+		planChanged();
+	}	
+
+	function deleteWorkItemClick(e)
+	{
+		var theItem = jQuery(this).closest('.work-item');
+		var theIteration = theItem.closest('.iteration-container');
+		
+		if (!jQuery(this).closest('.work-item').hasClass('new'))
+			deletedItems[theItem.attr('node-id')] = theItem.attr('node-id');
+			
+		theItem.remove();
+		
+		calculateIterationUnitsTotal(theIteration);
+		
+		planChanged();
+	}
+	
+	function calculateIterationUnitsTotal(theIteration)
+	{
+		var theTotal = 0;
+		jQuery.each(theIteration.find('.work-item-units'), function (i, item){
+			theTotal += kimble.parseNumber(jQuery(item).val());
+		});
+		theIteration.find('.iteration-units-total').text(formatNumberNat2DP(theTotal));
+	}
+
+	function calculateTaskUnitsTotal(theTask)
+	{
+		var theTotal = 0;
+		jQuery.each(theTask.find('.work-item-units'), function (i, item){
+			theTotal += kimble.parseNumber(jQuery(item).val());
+		});
+		theTask.find('.task-units-total').text(formatNumberNat2DP(theTotal));
+	}	
+
+	function processIterationWorkItemChanges()
+	{
+		jQuery.each(jQuery('.iteration-container.backlog'), function (i, thePlanItem)
+		{
+			var planItem = jQuery(thePlanItem);
+			planWorkItems = getPlanItemWorkItems(planItem);
+		});
+
+		jQuery.each(jQuery('.iteration-container:not(.backlog)'), function (i, thePlanItem)
+		{
+			var planItem = jQuery(thePlanItem);
+			var item = getPlannerPlanItemObject(planItem);
+			
+			if(item != undefined) planItems[item.Id] = item;
+		});
+	}
+	
+	function processGridViewChanges(obj)
+	{
+		jQuery.each(jQuery('.tree-node'), function (i, itemRow) {
+			
+			var row = jQuery(itemRow);
+			var item = getGridPlanItemObject(row);
+			if (item.ParentId == '')
+				item.FullName = item.Name;
+			else
+				item.FullName = jQuery('[node-id="' + item.ParentId + '"]').data('planItem').FullName + ' > ' + item.Name;
+			
+			row.data('planItem', item);
+			
+			planItems[item.Id] = item;
+		});
+	}
+
+	function saveClick(obj)
+	{
+		if (jQuery(this).hasClass('disabled')) return;
+		
+		processGridViewChanges();
+		processIterationWorkItemChanges();
+		
+		savePlan();
+	}
+	
+	function getPlannerPlanItemObject(planItem)
+	{
+		var planItemData = jQuery(planItem).data('planItem');
+		
+		planItemData.WorkItems = getPlanItemWorkItems(planItem);
+		
+		return planItemData;
+	}
+
+	function getTaskWorkItems(taskWorkItemContainer)
+	{
+		var theWorkItems = [];
+		
+		jQuery(taskWorkItemContainer).find('.work-items li:not(.deleted)').each(function(index) {
+			var theWorkItem = jQuery(this);
+
+			var workItemName = (theWorkItem.find('.work-item-name').val() != undefined && theWorkItem.find('.work-item-name').val() != '' ? theWorkItem.find('.work-item-name').val() : l['NewWorkItemUnnamed']);
+			if(theWorkItemUnitType != '') var workItemRemainingUnits = (theWorkItem.find('.work-item-units').val() != undefined && theWorkItem.find('.work-item-units').val() != '' ? kimble.parseNumber(theWorkItem.find('.work-item-units').val()) : 0);
+
+			var theWorkItemObject = {Name: workItemName, Status: theWorkItem.attr('item-status'), ProductId: productId};
+			
+			if(theWorkItemUnitType != '') theWorkItemObject.RemainingUnits = workItemRemainingUnits;
+			if(enableOwners && theWorkItem.find('.owner-selector-input').find('span').text() != l['None']) {theWorkItemObject.ActivityAssignmentTemplateId = planResources.filter(function(x){return x.text == theWorkItem.find('.owner-selector-input').find('span').text()})[0].id;}
+			
+			theWorkItemObject.TaskTemplateId = theWorkItem.attr('parent-node-id');
+			if(!theWorkItem.hasClass('new')) theWorkItemObject.WorkItemTemplateId = theWorkItem.attr('node-id');
+			theWorkItemObject.IsNew = theWorkItem.hasClass('new');
+			theWorkItemObject.Position = index + 1; 
+			
+			theWorkItems.push(theWorkItemObject);
+		});
+		
+		return theWorkItems;
+	}
+		
+	function getPlanItemWorkItems(planItem)
+	{
+		var theWorkItems = [];
+		
+		jQuery(planItem).find('.work-items li:not(.deleted)').each(function(index) {
+			var theWorkItem = jQuery(this);
+
+			var workItemName = (theWorkItem.find('.work-item-name').val() != undefined && theWorkItem.find('.work-item-name').val() != '' ? theWorkItem.find('.work-item-name').val() :l['NewWorkItemUnnamed']);
+			if(theWorkItemUnitType != '') var workItemRemainingUnits = (theWorkItem.find('.work-item-units').val() != undefined && theWorkItem.find('.work-item-units').val() != '' ? kimble.parseNumber(theWorkItem.find('.work-item-units').val()) : 0);
+			
+			var theWorkItemObject = {Name: workItemName, Status: theWorkItem.attr('item-status'), ProductId: productId};
+			
+			if(theWorkItemUnitType != '') theWorkItemObject.RemainingUnits = workItemRemainingUnits;
+			if(enableOwners && theWorkItem.find('.owner-selector-input').find('span').text() != l['None']) {theWorkItemObject.ActivityAssignmentTemplateId = planResources.filter(function(x){return x.text == theWorkItem.find('.owner-selector-input').find('span').text()})[0].id;}
+			
+			if(!theWorkItem.closest('.iteration-container').hasClass('backlog')) theWorkItemObject.TaskTemplateId = theWorkItem.attr('parent-node-id');
+			if(!theWorkItem.hasClass('new')) theWorkItemObject.WorkItemTemplateId = theWorkItem.attr('node-id');
+			theWorkItemObject.IsNew = theWorkItem.hasClass('new');
+			theWorkItemObject.Position = index + 1; 
+			
+			theWorkItems.push(theWorkItemObject);
+		});
+		
+		return theWorkItems;
+	}
+	
+	function workItemChange(e)
+	{
+		// enter to create a new work item
+		if(jQuery(this).parent('.work-item').hasClass('new') && e.keyCode == 13)
+		{
+			e.preventDefault();
+			e.stopPropagation();
+			jQuery('.last-added').removeClass('last-added');
+			
+			//TDOD127 consolidate
+			if(jQuery(this).closest('.work-items').hasClass('task-work-items'))
+			{
+				addTaskWorkItemClick(e, jQuery(this).closest('.work-item'));
+			}
+			else
+			{
+				addWorkItemClick(e, jQuery(this).closest('.work-item'));
+			}
+		}
+		if(!jQuery(this).parent('.work-item').hasClass('new') && e.keyCode == 13)
+		{
+			e.preventDefault();
+			e.stopPropagation();
+		}
+		else if(jQuery(this).hasClass('work-item-name'))
+		{
+			jQuery(this).height(1);
+			var totalHeight = jQuery(this).prop('scrollHeight') - parseInt(jQuery(this).css('padding-top')) - parseInt(jQuery(this).css('padding-bottom'));
+			jQuery(this).height(totalHeight);
+		}
+	}
+	
+	function showOwner()
+	{
+		var theNode = jQuery(this).closest('li[node-id]');
+		if(!jQuery('.task-list-container').hasClass('drag-active') && !theNode.find('.wi-add-details').hasClass('detail-edit-mode'))
+		{	
+			theNode.addClass('owner-on');
+			theNode.find('.ti-owner-details').slideDown();
+		}
+	}
+	
+	function hideOwner()
+	{
+		var theNode = jQuery(this).closest('li[node-id]');
+		theNode.removeClass('owner-on');
+		theNode.find('.ti-owner-details').slideUp();
+	}
+	
+	function iterationNameChange()
+	{
+		jQuery(this).closest('.iteration-container').data('planItem').Name = jQuery(this).val();
+		planChanged();
+	}
+
+	function workItemUnitsChange(e)
+	{
+		calculateIterationUnitsTotal(jQuery(this).closest('.iteration-container'));
+		planChanged();
+	}
+	
+	function taskWorkItemUnitsChange(e)
+	{
+		calculateTaskUnitsTotal(jQuery('#task-work-items-container'));
+		planChanged();
+	}
+
+	function itemNameChange(e)
+	{
+		var planItem = jQuery(this).closest('tr');
+		
+		var newName = planItem.find('.itemName input').val();
+
+		planItem.find('.itemName').prop('title', newName);
+
+		var obj = planItem.data('planItem');
+
+		if (newName != obj.Name) planChanged();
+	}
+
+	function startDateOffsetChange(e)
+	{
+		var planItem = jQuery(this).closest('tr');
+		
+		var newVal = planItem.find('.startDateOffset input').val();
+
+		var obj = planItem.data('planItem');
+
+		if (newVal != obj.StartDateOffset) planChanged();
+	}
+	
+	function endDateOffsetChange(e)
+	{
+		var planItem = jQuery(this).closest('tr');
+		
+		var newVal = planItem.find('.endDateOffset input').val();
+		var obj = planItem.data('planItem');
+		
+		if (newVal != obj.EndDateOffset) planChanged();
+	}
+	
+	function planChanged()
+	{
+		jQuery(window).off('.has-changes').on('beforeunload.has-changes', function(){
+			return "{!$Label.UnsavedChangesHeading}" + "\n\n" + "{!$Label.UnsavedChangesMessage}";
+		});
+
+		jQuery('.effort-units-col').toggleClass('hidden-item', jQuery('.template-effort-insight-ind:not(.hidden-item)').length == 0);
+
+		jQuery('#saveButton').addClass('has-changes');
+	}
+	
+	function toggleTreeNode(e)
+	{
+		var row = jQuery(this).closest('tr');
+		
+		if (!(row.hasClass('branch') || row.hasClass('Iteration'))) return;
+		
+		if (row.hasClass('expanded'))
+		{
+			//remove class expanded and hide all my children and grandchildren
+			row.removeClass('expanded');
+			hideNode(row);
+		}
+		else
+		{
+			row.addClass('expanded');
+			showNode(row);
+		}
+		
+	}
+	
+	function refreshDependencies()
+	{
+		jQuery.each(Object.keys(planPredecessors), function (i, successor) {
+		    
+		    var lagText = '';
+		    
+		    if(Object.keys(planPredecessors[successor]).length)
+		    {
+				lagText = planPredecessors[successor][Object.keys(planPredecessors[successor])[Object.keys(planPredecessors[successor]).length - 1]].Lag;
+				var daysLabel = '<apex:outputText value="{!$Label.kimbleone__daysheading}"/>';	
+						
+				if(lagText != undefined && lagText != 0)
+				{
+					if(lagText > 0) lagText = ' +' + safeFormatNumber(kimble.replaceNull(lagText,'')) + ' ' + daysLabel;
+					else if(lagText < 0) lagText = ' ' + safeFormatNumber(kimble.replaceNull(lagText,'')) + ' ' + daysLabel;
+				}
+				else if (lagText == 0 || lagText == null || lagText == undefined)
+				{
+					lagText = '';
+				}
+      		}
+        	
+		    jQuery('[node-id="' + successor + '"]').find('.predecessors').text(getPredecessors(planPredecessors[successor]) + lagText);
+		});
+	}
+	
+	function showNode(node)
+	{
+		jQuery.each(jQuery('[parent-node-id="' + node.attr('node-id') + '"]'), function (i, child) {
+			var childNode = jQuery(child);
+			childNode.show();
+			if (childNode.hasClass('expanded'))
+				showNode(childNode);
+		});
+		
+		jQuery(window).resize();
+	}
+	
+	function hideNode(node)
+	{
+		jQuery.each(jQuery('[parent-node-id="' + node.attr('node-id') + '"]'), function (i, child) {
+			var childNode = jQuery(child);
+			childNode.hide();
+			hideNode(childNode);
+		});
+		
+		jQuery(window).resize();
+	}
+
+	function getOffsetValue(offsetAttrVal)
+	{
+		return parseFloat(offsetAttrVal);
+	}	
+
+	function getItemName(item)
+	{
+		if (item.find('.itemName input').length == 1)
+			return item.find('.itemName input').val();
+		else
+			return item.find('.itemName').text();
+	}
+	
+   	function getInitials(taskAssignments)
+	{
+		var initials = '';
+		jQuery.each(Object.keys(taskAssignments), function (i, key) {
+			if (i > 0) initials += ', ';
+			
+			jQuery.each(theActivityAssignments[key].ResourceName.split(' '), function (j, s) {
+				initials += s.substring(0,1);
+			});
+			
+		});
+		return initials;
+	}
+
+	function getUniqueId()
+	{
+		  // Math.random should be unique because of its seeding algorithm.
+		  // Convert it to base 36 (numbers + letters), and grab the first 9 characters
+		  // after the decimal.
+		  return '__' + Math.random().toString(36).substr(2, 9);
+	}
+
+	function safeFormatNumber(originalValue)
+	{
+		var returnVal = originalValue;
+		
+		if(originalValue != null && originalValue != undefined && originalValue != '')
+			returnVal = jQuery.formatNumber(originalValue, {format: "0.##", locale:kimble.locale, isFullLocale:false});
+		
+		return returnVal;
+	}
+	
+	function formatNumberNat2DP(theVal)
+	{
+		var formattedVal = '0';
+		if(theVal != undefined && theVal != '') formattedVal = theVal;
+		formattedVal = kimble.formatNumber(formattedVal, "#.##");
+		
+		return (formattedVal != undefined && formattedVal != '' ? formattedVal : '0'); 
+	}
+	
+   	function sortPlanItems(source)
+	{
+		return function(a, b) {
+			var posA = source[a]['Position'];
+			if (posA == null) return 1;
+			
+			var posB = source[b]['Position'];
+			if (posB == null) return -1;
+			
+			return posA - posB;
+		}
+	}
+	
+	function getPlan()
+	{
+		togglePageWorking(true);
+
+		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TaskTemplatesController.GetTemplatePlan}',
+				productId,
+				function(result, event)
+				{
+					if (event.status) 
+					{
+						planItems = result.ThePlanItems;
+						planWorkItems = result.ThePlanWorkItems;
+						planPredecessors = result.ThePlanPredecessors;
+						planSuccessors = result.ThePlanSuccessors;
+
+						deletedItems = {};
+
+						jQuery(window).off('.has-changes');
+
+						refreshPlan();
+					} 
+					else if (event.type === 'exception') 
+					{
+						alert(event.message);
+					} 
+					else 
+					{
+						alert(event.message);
+					}
+					togglePageWorking(false);
+			}, 
+			{escape: true, timeout: 60000}
+		);
+	}
+
+	function savePlan()
+	{	   
+		togglePageWorking(true);
+
+		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TaskTemplatesController.SaveTemplatePlan}',
+				productId, planWorkItems, planItems, planPredecessors, deletedItems,
+				function(result, event){		  
+					if (event.status) 
+					{
+						planItems = result.ThePlanItems;
+						planWorkItems = result.ThePlanWorkItems;
+						planPredecessors = result.ThePlanPredecessors;
+						planSuccessors = result.ThePlanSuccessors;
+
+						deletedItems = {};
+
+						jQuery(window).off('.has-changes');
+						jQuery('#saveButton').removeClass('has-changes');
+
+						refreshPlan();														  
+					} 
+					else if (event.type === 'exception') 
+					{
+						alert(event.message);
+					} 
+					else 
+					{
+						alert(event.message);
+					}
+					togglePageWorking(false);
+			}, 
+			{escape: true, timeout: 60000}
+		);
+	}
+	
+	function toggleWorking(selector)
+	{
+		jQuery(selector).find('i').toggleClass('fa-link').toggleClass('fa-circle-o-notch fa-spin');
+	}
+
+	function togglePageWorking(working)
+	{
+		jQuery('#data-loading').toggle(working);
+		jQuery('#toolbar-buttons>a').toggleClass('disabled', working);
+	}
+	
+	var inlineTaskTemplateEffortInsightLabel = '<apex:outputText value="{!$Label.kimbleone__tasktemplateeffortinsightnarrative}"/>';
+
+	var templateInsights = {};
+
+	function initialiseInsights()
+	{
+		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TaskTemplatesController.GetTaskTemplateInsights}',
+				'<apex:outputText value="{!KimbleOne__Product__c}"/>',
+				function(result, event){
+					if (event.status)
+					{
+						templateInsights = result;
+
+						overlayInsights();
+					}
+					else if (event.type === 'exception')
+					{
+						alert(event.message);
+					}
+					else
+					{
+						alert(event.message);
+					}
+			},
+			{escape: true, timeout: 60000}
+		);
+	}
+
+	function overlayInsights()
+	{
+		if(Object.keys(templateInsights).length > 0)
+		{
+			jQuery('.template-effort-insight-ind').each(function () {
+				refreshTemplateEffortInsight(jQuery(this));
+			});
+
+			jQuery('.effort-units-col').toggleClass('hidden-item', jQuery('.template-effort-insight-ind:not(.hidden-item)').length == 0);
+		}
+	}
+
+	function formatNumericValue(theValue, dispFormat)
+	{
+		theValue = (theValue == undefined || theValue == null || theValue == '' ? '0' : theValue);
+
+		return kimble.formatNumber(theValue, (dispFormat == undefined ? '#,##0' : dispFormat));
+	}
+
+	function refreshTemplateEffortInsight(obj)
+	{
+		var templateId = obj.attr('tsk-t-id');
+		var theInsightInd = jQuery('.template-effort-insight-ind[tsk-t-id="' + templateId + '"');
+		var theAvgUnitsDisp = jQuery('.template-avg-effort[tsk-t-id="' + templateId + '"');
+
+		if(templateInsights != undefined && templateInsights[templateId] != undefined)
+		{
+			var theInsight = templateInsights[templateId];
+			var instanceCountDisplay = formatNumericValue(theInsight.InstanceCount);
+			var avgEffort = formatNumericValue(theInsight.AvgEffort, '#,##0.00');
+			var minEffort = formatNumericValue(theInsight.MinEffort, '#,##0.##');
+			var maxEffort = formatNumericValue(theInsight.MaxEffort, '#,##0.##');
+
+			var theTooltip = inlineTaskTemplateEffortInsightLabel.format(instanceCountDisplay, avgEffort, minEffort, maxEffort);
+			theInsightInd.attr('title', theTooltip);
+			theInsightInd.qtip('destroy', true);
+			theInsightInd.qtip({
+				position: {
+					adjust: { method: 'flip flip'},
+					viewport: $(window)
+				},
+				style: {
+					classes: 'template-effort-insight-qtip qtip-light qtip-shadow qtip-rounded'
+				}
+			});
+			theInsightInd.removeClass('hidden-item');
+			theInsightInd.fadeOut(500).fadeIn(500);
+			theAvgUnitsDisp.text(avgEffort).removeClass('hidden-item');
+		}
+		else
+		{
+			theInsightInd.addClass('hidden-item');
+			theAvgUnitsDisp.removeClass('hidden-item').text('-');
+		}
+	}
+
+</script>
+
+
+<style>
+	/* Ion.Tabs
+	// css version 1.0.0
+	// by Denis Ineshin | ionden.com
+	// ===================================================================================================================*/
+	
+	/* =====================================================================================================================
+	// Ion.Tabs: Base */
+	.ionTabs {
+		position: relative;
+	}
+	.ionTabs__head {
+		position: relative; display: block;
+		list-style-type: none;
+		margin: 0; padding: 0;
+		z-index: 1;
+	}
+	.ionTabs__head:before, .ionTabs__head:after {content: ""; display: table;}
+	.ionTabs__head:after {clear: both;}
+	.ionTabs__head {zoom: 1;}
+
+	 .ionTabs__tab {
+		 position: relative;
+		 display: block; float: left;
+		 list-style-type: none;
+		 background: none;
+		 margin: 0; padding: 0;
+		 cursor: pointer;
+	 }
+	 .ionTabs__tab.ionTabs__tab_state_active {
+		 cursor: default;
+	 }
+
+	.ionTabs__body {
+		position: relative;
+		z-index: 2;
+	}
+	.ionTabs__item {
+		position: relative;
+		display: none;
+	}
+	 .ionTabs__item.ionTabs__item_state_active {
+		 display: block;
+	 }
+	.ionTabs__preloader {
+		position: relative;
+	}
+	.ionTabs {
+		margin: 0 0 8px;
+	}
+	.ionTabs__head {
+		border-bottom: 1px solid #cecece;
+	}
+	.ionTabs__tab {
+		font-size: 11px; line-height: 13px;
+		background: #ededed;
+		border: 1px solid #cecece;
+		border-bottom: none;
+		padding: 7px 25px 7px;
+		margin-right: 10px;
+		color: #484848;
+		margin-top: 10px;
+		text-align: center;
+		min-width: 50px;
+	}
+	.ionTabs__tab:hover {
+		background: #e5e5e5;
+	}
+	.ionTabs__tab.ionTabs__tab_state_active {
+		top: 7px;
+		margin-top: 0;
+		padding: 5px 25px 11px;
+		background: #fff;
+		color: #4a4a56;
+		border-top-color: #d71410;
+		border-bottom: 1px solid #fff;
+	}
+	.ionTabs__body {
+		background: #fff;
+		border: 1px solid #cecece;
+		border-top: none;
+	}
+
+	.ionTabs__item {
+		padding: 8px 6px;
+	}
+	.tasks-grid-table {
+		width: 100% !important;
+	}	
+	.ionTabs__preloader {
+		height: 50px;
+		background: url(../img/preloader-flat.gif) no-repeat 25px 50%;
+	}
+	ul.ionTabs__head.task li.ionTabs__tab_state_active {
+		border-top: 2px solid  #3172d7;
+		font-weight:bold;
+	}
+	ul.ionTabs__head.reporting-milestone li.ionTabs__tab_state_active {
+		border-top: 2px solid #34b27d;
+		font-weight:bold;
+	}
+	#EditMilestoneContainer .ionTabs__tab_state_active {
+		border-top: 2px solid gold;
+		font-weight:bold;
+	}
+	#EditMilestoneContainer.Planning .ionTabs__tab_state_active {
+		border-top: 2px solid #34b27d;
+		font-weight:bold;
+	}
+	#EditMilestoneContainer.Revenue .edit-milestone-visibility-row {
+		display: none;
+	}
+</style>
+<script>
+// Ion.Tabs
+// version 1.0.2 Build: 17
+// https://github.com/IonDen/ion.tabs
+(function(a,w,g,n){if(!a.ionTabs){var h={},q={},k={},b,d,r,v=a(g),t=function(){try{if(g.localStorage&&null!==g.localStorage)return{save:function(b,a){"object"===typeof a&&(a=JSON.stringify(a));try{localStorage.setItem(b,a)}catch(c){"QUOTA_EXCEEDED_ERR"===c&&(localStorage.clear(),localStorage.setItem(b,a))}},load:function(a){try{return JSON.parse(localStorage.getItem(a))}catch(b){return localStorage.getItem(a)}},del:function(a){localStorage.removeItem(a)}}}catch(b){return{save:function(){return null},load:function(){return null},del:function(){return null}}}return null}(),u=function(a){this.container=a};u.prototype={init:function(){var c=this.container,m=c.find(".ionTabs__tab"),d=c.find(".ionTabs__item"),s=c.find(".ionTabs__preloader"),l,f=c.data("name"),e;m.each(function(){l=a(this);e="Button__"+f+"__"+l.data("target");l.prop("id",e)});d.each(function(){l=a(this);e="Tab__"+f+"__"+l.data("name");l.prop("id",e)});m.on("click.ionTabs",function(b){b.preventDefault();s[0].style.display="block";p(a(this).data("target"))});var p=function(c){c=decodeURIComponent(c);e="#Button__"+f+"__"+c;a(e).addClass("ionTabs__tab_state_active").siblings().removeClass("ionTabs__tab_state_active");e="#Tab__"+f+"__"+c;a(e).addClass("ionTabs__item_state_active").siblings().removeClass("ionTabs__item_state_active");s[0].style.display="none";var d;k[f]=c;b="tabs";for(d in k)k.hasOwnProperty(d)&&(b+="|"+encodeURIComponent(d)+":"+encodeURIComponent(k[d]));"hash"===h.type&&(n.hash=b);"storage"===h.type&&t.save(n.hostname+"__ionTabsPosition",b);v.trigger("ionTabsChange",{group:f,tab:c,tabId:e});if("function"===typeof h.onChange)h.onChange({group:f,tab:c,tabId:e})};k[f]?p(k[f]):p(m.eq(0).data("target"));this.setTab=function(a){p(a)}}};a.ionTabs=function(c,m){if(c){var g;h=a.extend({type:"hash",onChange:null},m);"hash"===h.type&&(b=n.hash);"storage"===h.type&&(b=t.load(n.hostname+"__ionTabsPosition"));if(b){b=b.split("|");if(1<b.length)for(d=1;d<b.length;d+=1)r=b[d].split(":"),k[decodeURIComponent(r[0])]=decodeURIComponent(r[1]);b=""}a(c).each(function(){g=a(this);var b=encodeURIComponent(g.data("name"));q[b]=new u(g);q[b].init()})}};a.ionTabs.setTab=function(a,b){q[a].setTab(b)}}})(jQuery,document,window,location);
+</script>
+
+</apex:define>
+
+</apex:composition>
+</apex:page>

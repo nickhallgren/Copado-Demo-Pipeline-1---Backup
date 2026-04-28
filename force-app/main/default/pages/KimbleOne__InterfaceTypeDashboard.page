@@ -1,0 +1,1128 @@
+<apex:page standardController="KimbleOne__InterfaceRun__c" recordSetVar="runs" extensions="KimbleOne.InterfaceTypeDashboardController,KimbleOne.TooltipsController" sidebar="false">
+
+    <apex:composition template="KimbleOne__SiteMaster">
+        <apex:define name="Menu">
+            <c:Menu DefaultHelpPage="ReferenceData.html" MenuContextName="{!$ObjectType.KimbleOne__InterfaceType__c.Label} {!$Label.kimbleone__dashboard}" />
+        </apex:define>
+
+        <apex:define name="Content">
+
+            <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+
+            <!-- Kimble Guidance -->
+            <apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+            <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+            <apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+                <apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/InterfaceTypeDashboardNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+                <apex:outputPanel layout="none" rendered="{!ResourceHomeTipOverrideEnabled}">
+                    <apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+                </apex:outputPanel>
+            </apex:outputPanel>
+            <apex:form >
+                <apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+                <div style="display:none;" kimble-tip="null"></div>
+            </apex:form>
+
+            <script>
+            /* Tooltips */
+            var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+            var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+            var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+            var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+            var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+            var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+
+            function initialisePageTips()
+            {
+                initialiseTips();
+            }
+
+            function updateTipsConfigSetting(newTipSetting)
+            {
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+                    newTipSetting,
+                        function(result, event){
+                            if (event.status)
+                            {
+                                var data = {};
+                                data.results = result;
+                                loadGuidance();
+                            }
+                            else
+                            {
+                                alert(event.message);
+                            }
+                        },
+                    {escape: false, timeout: 60000}
+                    );
+            }
+
+
+            </script>
+
+            <div class="dashboard-container">
+
+                <table id="interface-type-list" border="0" cellpadding="0" cellspacing="0" class="list" width="100%">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>{!$ObjectType.InterfaceType__c.Label}</th>
+                            <th class="tip-top" kimble-tip="DateLabel">{!$Label.DateLabel}</th>
+                            <th colspan="2" class="col-align-center">{!$Label.ConfigurationSetting10}</th>
+                            <th colspan="2" class="col-align-center">{!$Label.ConfigurationSetting11}</th>
+                        </tr>
+                        <tr>
+                            <th></th>
+                            <th></th>
+                            <th></th>
+                            <th class="col-align-center">{!$Label.GenericLabel13}</th>
+                            <th class="col-align-center">{!$Label.Failed}</th>
+                            <th class="col-align-center">{!$Label.GenericLabel13}</th>
+                            <th class="col-align-center">{!$Label.Failed}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <apex:repeat value="{!TheInterfaceTypes}" var="interfaceType">
+                            <tr class="refreshing interface-type-row" context-id="{!JSENCODE(interfaceType.Id)}" context-name="{!JSENCODE(interfaceType.Name)}" context-type="{!JSENCODE(interfaceType.Enum__c)}">
+                                <td class="icon">
+                                    <div>
+                                        <i class="fa fa-spinner fa-spin"></i>
+                                        <apex:outputPanel layout="none" rendered="{!interfaceType.KimbleOne__Enum__c = 'OutboundInterfaceRun'}"><i class="fa fa-cloud-download"></i></apex:outputPanel>
+                                        <apex:outputPanel layout="none" rendered="{!interfaceType.KimbleOne__Enum__c != 'OutboundInterfaceRun'}"><i class="fa fa-cloud-upload"></i></apex:outputPanel>
+                                    </div>
+                                </td>
+                                <td class="type-name"><apex:outputText value="{!interfaceType.Name}"/></td>
+                                <td><div class="last-run-date">-</div></td>
+                                <td class="stat-pill"><div class="pending queued-pending col-align-center tip-top" kimble-tip="{!IF(interfaceType.Enum__c = 'OutboundInterfaceRun', '', 'InboundPeparingPending')}" kimble-tip-extended-text="{!IF(interfaceType.Enum__c = 'OutboundInterfaceRun', '', 'InboundPeparingPendingExtendedText')}">-</div></td>
+                                <td class="stat-pill"><div class="failed preparing-failed col-align-center detail-link tip-top" kimble-tip="{!IF(interfaceType.Enum__c = 'OutboundInterfaceRun', 'OutboundFailed', 'InboundPreparingFailed')}" kimble-tip-extended-text="{!IF(interfaceType.Enum__c = 'OutboundInterfaceRun', '', 'InboundPreparingFailedExtendedText')}">-</div></td>
+                                <td class="stat-pill"><div class="pending completing-pending col-align-center detail-link tip-top" kimble-tip="{!IF(interfaceType.Enum__c = 'OutboundInterfaceRun', 'OutboundCompletingPending', 'InboundCompletingPending')}">-</div></td>
+                                <td class="stat-pill"><div class="failed completing-failed col-align-center detail-link tip-top" kimble-tip="{!IF(interfaceType.Enum__c = 'OutboundInterfaceRun', 'OutboundCompletingFailed', 'InboundCompletingFailed')}">-</div></td>
+                            </tr>
+                        </apex:repeat>
+                    </tbody>
+                </table>
+
+                <div id="edit-line-popup" style="display:none;">
+                    <apex:pageBlock >
+                        <apex:pageBlockButtons location="bottom">
+                            <apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__InterfaceRunLine__c.updateable}">
+                                <input type="button" class="btn" value="{!$Label.Save}" onclick="saveLineRawData();"/>
+                                <input type="button" class="btn" value="{!$Label.Cancel}" onclick="hideStackedModalBoxy()"/>
+                            </apex:outputPanel>
+                        </apex:pageBlockButtons>
+
+                        <textarea id="line-raw-data" style="width: 500px; height: 150px;">
+
+                        </textarea>
+
+                    </apex:pageBlock>
+                </div>
+
+                <div id="interface-type-popup" style="display:none;">
+                    <apex:pageBlock >
+                        <apex:pageBlockButtons location="top">
+                            <apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__InterfaceRunLine__c.updateable}">
+                                <input type="button" class="btn tip-top" kimble-tip="IgnoreButton" value="{!$Label.IgnoreLink}" onclick="ignoreSelected()"/>
+                                <input type="button" class="btn tip-top" kimble-tip="RetryButton" value="{!$Label.Retry}" onclick="retrySelected()"/>
+                            </apex:outputPanel>
+                            <input type="button" class="btn" value="{!$Label.Cancel}" onclick="hideModalBoxy()"/>
+                        </apex:pageBlockButtons>
+                    <div class="header"></div>
+
+                    <div id="lines-container" style="width:1000px;max-height:500px;overflow-y:auto;">
+                    <table id="lines-table" class="list kimble-enhanced-table " style="white-space:nowrap;" border="0" cellpadding="0" cellspacing="0">
+                        <thead>
+                        <tr class="headerRow">
+                            <th style="width:22px;"><input type="checkbox" id="select-all-checkbox"/></th>
+                            <th class="context-header sortable" kimble-tip="CompletionContext" style="width:110px;display:none">{!$Label.ConfigurationSetting17}</th>
+                            <th style="width:225px;" class="sortable tip-top" kimble-tip="ErrorMessage">{!$ObjectType.InterfaceRunLine__c.fields.ErrorMessage__c.Label}</th>
+                            <th style="width:400px;" class="sortable tip-top" kimble-tip="RawData">{!$ObjectType.InterfaceRunLine__c.fields.RawData__c.Label}</th>
+                            <th style="width:110px;" class="sortable">{!$ObjectType.InterfaceRunLine__c.fields.ExternalRequestId__c.Label}</th>
+                            <th style="width:86px;" class="sortable">{!$ObjectType.InterfaceRunLine__c.fields.CreatedDate.Label}</th>
+                            <th style="width:106px;" class="inbound-log-col tip-top" kimble-tip="InboundLog">{!$ObjectType.InterfaceRunLine__c.fields.Log__c.Label}</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+
+                        </tbody>
+                    </table>
+                    </div>
+                    </apex:pageBlock>
+                </div>
+
+                <div id="exports-preparing-failed-popup" style="display:none;">
+                    <apex:pageBlock >
+                        <apex:pageBlockButtons location="top">
+                            <apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__OutboundInterfaceRun__c.deletable}">
+                                <input id="delete-selected-exports-btn" type="button" class="btn tip-top" kimble-tip="DeleteButton" value="{!$Label.MobileWebDeleteSelected}" onclick="deleteSelectedExports()"/>
+                            </apex:outputPanel>
+                            <input type="button" class="btn" value="{!$Label.Cancel}" onclick="hideModalBoxy()"/>
+                        </apex:pageBlockButtons>
+                        <div class="header"></div>
+
+                        <div style="width:1000px;max-height:500px;overflow-y:auto;">
+                            <table id="exports-preparing-failed-table" class="list kimble-enhanced-table " border="0" cellpadding="0" cellspacing="0">
+                                <thead>
+                                <tr class="headerRow">
+                                    <th style="width:22px;"><input type="checkbox" id="exports-preparing-failed-all-checkbox"/></th>
+                                    <th style="width:120px;" class="sortable" >{!$ObjectType.OutboundInterfaceRun__c.fields.Name.Label}</th>
+                                    <th style="width:86px;" class="sortable">{!$ObjectType.OutboundInterfaceRequest__c.fields.CreatedDate.Label}</th>
+                                    <th style="width:360px;" >{!$ObjectType.InterfaceRunLine__c.fields.ErrorMessage__c.Label}</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+
+                                </tbody>
+                            </table>
+                        </div>
+                    </apex:pageBlock>
+                </div>
+
+                <div id="exports-pending-popup" style="display:none;">
+                    <apex:pageBlock >
+                        <apex:pageBlockButtons location="top">
+                            <apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__OutboundInterfaceRun__c.deletable}">
+                                <input id="delete-selected-btn" type="button" class="btn tip-top" kimble-tip="DeleteButton" value="{!$Label.MobileWebDeleteSelected}" onclick="deleteSelected()"/>
+                            </apex:outputPanel>
+                            <input type="button" class="btn" value="{!$Label.Cancel}" onclick="hideModalBoxy()"/>
+                        </apex:pageBlockButtons>
+                        <div class="header"></div>
+
+                        <div style="width:1000px;max-height:500px;overflow-y:auto;">
+                            <table id="exports-pending-table" class="list kimble-enhanced-table " border="0" cellpadding="0" cellspacing="0">
+                                <thead>
+                                <tr class="headerRow">
+                                    <th style="width:22px;">
+                                        <input type="checkbox" id="exports-pending-all-checkbox"/>
+                                    </th>
+                                    <th style="width:200px;" class="sortable">{!$ObjectType.OutboundInterfaceRequest__c.fields.InterfaceSource__c.Label}</th>
+                                    <th style="width:120px;" class="sortable tip-top" kimble-tip="ContextId">{!$ObjectType.OutboundInterfaceRequest__c.fields.ContextId__c.Label}</th>
+                                    <th style="width:200px;" class="sortable tip-top" kimble-tip="ObjectName">{!$label.ObjectNameHeading}</th>
+                                    <th style="width:86px;" class="sortable">{!$ObjectType.OutboundInterfaceRequest__c.fields.CreatedDate.Label}</th>
+                                    <th style="width:106px;" class="tip-top" kimble-tip="OutboundLog">{!$ObjectType.OutboundInterfaceRequest__c.fields.Log__c.Label}</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+
+                                </tbody>
+                            </table>
+                        </div>
+                    </apex:pageBlock>
+                </div>
+
+                <div id="exports-failed-popup" style="display:none;">
+                    <apex:pageBlock >
+                        <apex:pageBlockButtons location="top">
+                            <apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__OutboundInterfaceRequest__c.updateable}">
+                                <input id="remove-selected-btn" type="button" class="btn tip-top" kimble-tip="RemoveButton" kimble-tip-extended-text="RemoveButtonExtendedText" value="{!$Label.Remove}" onclick="removeSelected()"/>
+                            </apex:outputPanel>
+                            <input type="button" class="btn" value="{!$Label.Cancel}" onclick="hideModalBoxy()"/>
+                        </apex:pageBlockButtons>
+                        <div class="header"></div>
+
+                        <div style="width:1000px;max-height:500px;overflow-y:auto;">
+                            <table id="exports-failed-table" class="list kimble-enhanced-table " border="0" cellpadding="0" cellspacing="0">
+                                <thead>
+                                <tr class="headerRow">
+                                    <th style="width:22px;"><input type="checkbox" id="exports-failed-all-checkbox"/></th>
+                                    <th style="width:200px;" class="sortable">{!$ObjectType.OutboundInterfaceRequest__c.fields.InterfaceSource__c.Label}</th>
+                                    <th style="width:120px;" class="sortable">{!$ObjectType.OutboundInterfaceRequest__c.fields.OutboundInterfaceRun__c.Label}</th>
+                                    <th style="width:120px;" class="sortable" kimble-tip="ContextId">{!$ObjectType.OutboundInterfaceRequest__c.fields.ContextId__c.Label}</th>
+                                    <th style="width:160px;" class="sortable" kimble-tip="ObjectName">{!$label.ObjectNameHeading}</th>
+                                    <th style="width:110px;" class="sortable">{!$ObjectType.OutboundInterfaceRequest__c.fields.ExternalId__c.Label}</th>
+                                    <th style="width:86px;" class="sortable">{!$ObjectType.OutboundInterfaceRequest__c.fields.CreatedDate.Label}</th>
+                                    <th style="width:106px;" kimble-tip="OutboundLog">{!$ObjectType.OutboundInterfaceRequest__c.fields.Log__c.Label}</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+
+                                </tbody>
+                            </table>
+                        </div>
+                    </apex:pageBlock>
+                </div>
+            </div>
+
+            <script>
+
+            var lineErrorField = '{!$ObjectType.InterfaceRunLine__c.fields.ErrorMessage__c.Name}';
+            var lineLogField = '{!$ObjectType.InterfaceRunLine__c.fields.Log__c.Name}';
+            var lineRawDataField = '{!$ObjectType.InterfaceRunLine__c.fields.RawData__c.Name}';
+            var lineEnumField = '{!$ObjectType.InterfaceRunLine__c.fields.Status__c.RelationshipName}.{!$ObjectType.ReferenceData__c.fields.Enum__c.Name}';
+            var lineRunField = '{!$ObjectType.InterfaceRunLine__c.fields.InterfaceRun__c.Name}';
+            var lineRunCreatedField = '{!$ObjectType.InterfaceRunLine__c.fields.InterfaceRun__c.RelationshipName}.CreatedDate';
+            var lineCreatedField = 'CreatedDate';
+            var lineExternalRequestIdField = '{!$ObjectType.InterfaceRunLine__c.fields.ExternalRequestId__c.Name}';
+
+            var exportSourceField = '{!$ObjectType.OutboundInterfaceRequest__c.fields.InterfaceSource__c.RelationshipName}.Name';
+            var exportContextIdField = '{!$ObjectType.OutboundInterfaceRequest__c.fields.ContextId__c.Name}';
+            var exportCreatedDateField = 'CreatedDate';
+            var exportLogField = '{!$ObjectType.OutboundInterfaceRequest__c.fields.Log__c.Name}';
+            var exportExternalIdField = '{!$ObjectType.OutboundInterfaceRequest__c.fields.ExternalId__c.Name}';
+            var exportRunIdField = '{!$ObjectType.OutboundInterfaceRequest__c.fields.OutboundInterfaceRun__c.Name}';
+            var exportRunNameField = '{!$ObjectType.OutboundInterfaceRequest__c.fields.OutboundInterfaceRun__c.RelationshipName}.Name';
+            var exportRawDataField = '{!$ObjectType.OutboundInterfaceRequest__c.fields.RawData__c.Name}';
+
+            var theSelectedInterfaceTypeId;
+
+            jQuery(window).load(function(){
+
+                jQuery.each(jQuery('.interface-type-row'), function(i, obj) {
+                    var id = jQuery(obj).attr('context-id');
+                    var cardType = jQuery(obj).attr('context-type');
+
+                    if (cardType != 'OutboundInterfaceRun') {
+                        refreshInboundCardContentsRemoteAction(id);
+                    }
+                    else {
+                        refreshOutboundCardContentsRemoteAction(id);
+                    }
+                });
+
+                jQuery(document).off('click', '.interface-type-row:not([context-type="OutboundInterfaceRun"]) .preparing-failed').on('click', '.interface-type-row:not([context-type="OutboundInterfaceRun"]) .preparing-failed', function(){
+                    initialiseModalBoxy('#interface-type-popup', jQuery(this).closest('.interface-type-row').attr('context-name'));
+
+                    getImportingInterfaceRunLinesRemoteAction(jQuery(this).closest('.interface-type-row').attr('context-id'), true);
+
+                });
+
+                jQuery(document).off('click', '.interface-type-row:not([context-type="OutboundInterfaceRun"]) .completing-failed').on('click', '.interface-type-row:not([context-type="OutboundInterfaceRun"]) .completing-failed', function(){
+                    initialiseModalBoxy('#interface-type-popup', jQuery(this).closest('.interface-type-row').attr('context-name'));
+
+                    getCompletingInterfaceRunLinesRemoteAction(jQuery(this).closest('.interface-type-row').attr('context-id'));
+
+                });
+
+                jQuery(document).off('click', '.interface-type-row[context-type="OutboundInterfaceRun"] .queued-pending').on('click', '.interface-type-row[context-type="OutboundInterfaceRun"] .queued-pending', function(){
+                    initialiseModalBoxy('#exports-pending-popup', jQuery(this).closest('.interface-type-row').attr('context-name'));
+
+                    getPendingExportRequestsRemoteAction(jQuery(this).closest('.interface-type-row').attr('context-id'));
+
+                });
+
+                jQuery(document).off('click', '.interface-type-row[context-type="OutboundInterfaceRun"] .preparing-failed').on('click', '.interface-type-row[context-type="OutboundInterfaceRun"] .preparing-failed', function(){
+                    initialiseModalBoxy('#exports-preparing-failed-popup', jQuery(this).closest('.interface-type-row').attr('context-name'));
+
+                    getFailedExportsRemoteAction(jQuery(this).closest('.interface-type-row').attr('context-id'), true);
+
+                });
+
+                jQuery(document).off('click', '.interface-type-row[context-type="OutboundInterfaceRun"] .completing-failed').on('click', '.interface-type-row[context-type="OutboundInterfaceRun"] .completing-failed', function(){
+                    initialiseModalBoxy('#exports-failed-popup', jQuery(this).closest('.interface-type-row').attr('context-name'));
+
+                    getFailedExportRequestsRemoteAction(jQuery(this).closest('.interface-type-row').attr('context-id'));
+
+                });
+
+                jQuery(document).off('click','.edit-line').on('click', '.edit-line', function(){
+                    initialiseStackedModalBoxy('#edit-line-popup', jQuery(this).closest('.interface-type-row').attr('context-name'));
+
+                    jQuery('#line-raw-data').val(jQuery('#' + jQuery(this).attr('line-id')).closest('tr').find('.raw-data').text());
+                    jQuery('#line-raw-data').attr('line-id', jQuery(this).attr('line-id'));
+
+                    showStackedModalBoxy();
+                });
+
+                jQuery('#select-all-checkbox').change(function(){
+                    var checked = jQuery(this).prop('checked');
+                    jQuery('#lines-table tbody tr:visible input[type="checkbox"]').prop('checked', checked);
+                });
+
+                jQuery('#exports-pending-all-checkbox').change(function(){
+                    var checked = jQuery(this).prop('checked');
+                    jQuery('#exports-pending-table tbody tr:visible input[type="checkbox"]').prop('checked', checked);
+                });
+
+                jQuery('#exports-failed-all-checkbox').change(function(){
+                    var checked = jQuery(this).prop('checked');
+                    jQuery('#exports-failed-table tbody tr:visible input[type="checkbox"]').prop('checked', checked);
+                });
+
+                jQuery('#interface-type-list').enhancedTable();
+                jQuery('#lines-table').enhancedTable();
+                jQuery('#exports-pending-table').enhancedTable();
+                jQuery('#exports-failed-table').enhancedTable();
+                jQuery('#exports-preparing-failed-table').enhancedTable();
+
+                jQuery(document).off('click','.log-text').on('click', '.log-text', function(event) {
+                    var j = jQuery(this);
+
+                    //destroy all first
+                    j.qtip('destroy', true);
+
+                    j.qtip({
+                        content: {
+                            text: function(event, api) {
+
+                                return '<div class="log-container">' + j.text() + '</div>';
+                            },
+                            title: { button: true }
+                        },
+                        position: {
+                            my: 'left center',
+                            at: 'right center',
+                            viewport: jQuery(document)
+                        },
+                        show: {
+                            solo:true,
+                            event: 'click', // Use the same event type as above
+                            ready: true, // Show immediately - important!
+                        },
+                        hide: {
+                            event: 'unfocus'
+                        },
+                        style: {
+                            classes: 'qtip-light qtip-shadow qtip-rounded',
+                        }
+                    });
+                });
+
+                initialisePageTips();
+            });
+
+            function ignoreSelected()
+            {
+                var lines = jQuery('#lines-table tbody tr:visible input[type="checkbox"]:checked');
+
+                if (lines.length == 0) return;
+
+                jQuery('#interface-type-popup .btn').prop('disabled', true);
+
+                var linesArray = [];
+
+                jQuery.each(lines, function(i, line) {
+                   linesArray.push(line.id);
+                });
+
+                ignoreLinesRemoteAction(theSelectedInterfaceTypeId, linesArray);
+            }
+
+            function retrySelected()
+            {
+                var lines = jQuery('#lines-table tbody tr:visible input[type="checkbox"]:checked');
+
+                if (lines.length == 0) return;
+
+                jQuery('#interface-type-popup .btn').prop('disabled', true);
+
+                var linesArray = [];
+
+                jQuery.each(lines, function(i, line) {
+                   linesArray.push(line.id);
+                });
+
+                retryLinesRemoteAction(theSelectedInterfaceTypeId, linesArray);
+            }
+
+            function retryLinesRemoteAction(interfaceTypeId, lines) {
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InterfaceTypeDashboardController.RetryLines}',
+                    interfaceTypeId, lines,
+                        function(result, event){
+                            if (event.status) {
+
+                                //redirect to job to process items or refresh this list!
+                                if (result != null)
+                                {
+                                    safeRedirectToSForceURL('{!$Page.AsyncJobMonitor}?batchid=' + result  + '&title=Retrying&redirecturl={!$Page.InterfaceTypeDashboard}');
+                                }
+                                else
+                                {
+                                    jQuery('#interface-type-popup .btn').prop('disabled', false);
+                                    refreshInboundCardContentsRemoteAction(interfaceTypeId);
+                                    hideModalBoxy();
+                                }
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                console.log(event.message);
+                            }
+                            else
+                            {
+                                console.log(event.message);
+                            }
+                            },
+                            {escape: false, timeout: 60000}
+                        );
+            }
+
+            function ignoreLinesRemoteAction(interfaceTypeId, lines) {
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InterfaceTypeDashboardController.IgnoreLines}',
+                    interfaceTypeId, lines,
+                        function(result, event){
+                            if (event.status) {
+
+                                //redirect to job to process items or refresh this list!
+                                if (result != null)
+                                {
+                                    safeRedirectToSForceURL('{!$Page.AsyncJobMonitor}?batchid=' + result  + '&title=Ignoring&redirecturl={!$Page.InterfaceTypeDashboard}');
+                                }
+                                else
+                                {
+                                    jQuery('#interface-type-popup .btn').prop('disabled', false);
+                                    refreshInboundCardContentsRemoteAction(interfaceTypeId);
+                                    hideModalBoxy();
+                                }
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                console.log(event.message);
+                            }
+                            else
+                            {
+                                console.log(event.message);
+                            }
+                            },
+                            {escape: false, timeout: 60000}
+                        );
+            }
+
+            function buildInterfaceRunLineTable(theLines, allowLineEdit)
+            {
+                jQuery('#lines-table tbody').empty();
+                jQuery('#select-all-checkbox').prop('checked', false);
+                jQuery('.context-header').hide();
+
+                var html = '';
+
+                theLines.forEach(function(line){
+                   html += '<tr class="dataRow">';
+                   var editLineHtml = '';
+                   if (allowLineEdit) {
+                       editLineHtml = '<i class="fa fa-pencil edit-line" line-id="' + line.Id +'"></i>';
+                   }
+
+                   html += '<td><input id="' + line.Id + '" type="checkbox"/></td>';
+                   html += '<td><div class="long-text">' + getFieldValue(line, lineErrorField) + '</div></td>';
+                   html += '<td>' + editLineHtml + '<div class="long-text raw-data">' + getFieldValue(line, lineRawDataField) + '</div></td>';
+                   html += '<td><div class="long-text">' + getFieldValue(line, lineExternalRequestIdField) + '</div></td>';
+                   html += '<td><div class="long-text">' + kimble.formatDate(kimble.UTCStringFromMilliseconds(getFieldValue(line, lineRunCreatedField))) + '</div></td>';
+                   html += '<td><div class="long-text log-text">' + getFieldValue(line, lineLogField) + '</div></td>';
+
+                   html += '</tr>';
+                });
+
+                jQuery('#lines-table tbody').append(html);
+
+                jQuery("#lines-table").colResizable({
+                    liveDrag:true,
+                    gripInnerHtml:"<div class='grip'></div>",
+                    draggingClass:"dragging",
+                    resizeMode:'fit',
+                    disabledColumns: [0]});
+            }
+
+            function buildInterfaceRunLineTableWithContext(theLines, showContext)
+            {
+                jQuery('#lines-table tbody').empty();
+                jQuery('#select-all-checkbox').prop('checked', false);
+
+                var html = '';
+
+                if (showContext) {
+                    jQuery('.context-header').show();
+                }
+                else {
+                    jQuery('.context-header').hide();
+                }
+
+                theLines.forEach(function(line){
+                   html += '<tr class="dataRow">';
+                   html += '<td><input id="' + line.TheLine.Id + '" type="checkbox"/></td>';
+                   if (showContext) html += '<td><div class="long-text">' + line.Context + '</div></td>';
+                   html += '<td><div class="long-text">' + getFieldValue(line.TheLine, lineErrorField) + '</div></td>';
+                   html += '<td><div class="long-text">' + getFieldValue(line.TheLine, lineRawDataField) + '</div></td>';
+                   html += '<td><div class="long-text">' + getFieldValue(line.TheLine, lineExternalRequestIdField) + '</div></td>';
+                   html += '<td><div class="long-text">' + kimble.formatDate(kimble.UTCStringFromMilliseconds(getFieldValue(line.TheLine, lineRunCreatedField))) + '</div></td>';
+                   html += '<td><div class="long-text log-text">' + getFieldValue(line.TheLine, lineLogField) + '</div></td>';
+
+                   html += '</tr>';
+                });
+
+                jQuery('#lines-table tbody').append(html);
+
+                jQuery("#lines-table").colResizable({
+                    liveDrag:true,
+                    gripInnerHtml:"<div class='grip'></div>",
+                    draggingClass:"dragging",
+                    resizeMode:'fit',
+                    disabledColumns: [0]});
+            }
+
+            function getFieldValue(a, fieldPath)
+            {
+               var flds = fieldPath.split('.');
+
+               var val = a;
+
+               for (var i=0;i<flds.length;i++)
+               {
+                   if (val != null) val = val[flds[i]];
+               }
+
+               return val == null ? '' : val;
+            }
+
+            function buildExportsPendingTable(result)
+            {
+                jQuery('#exports-pending-table tbody').empty();
+                jQuery('#exports-pending-all-checkbox').prop('checked', false);
+
+                var html = '';
+
+                result.TheExports.forEach(function(r){
+                   html += '<tr class="dataRow">';
+                   html += '<td><input id="' + r.Id + '" type="checkbox"/>';
+
+                   if (getFieldValue(r, exportRawDataField) != '') {
+                       html += '<i class="fa fa-file-text-o" />';
+                   }
+
+                   html += '</td>';
+                   html += '<td><div class="long-text">' + getFieldValue(r, exportSourceField) + '</div></td>';
+                   html += '<td><div class="long-text">' + getFieldValue(r, exportContextIdField) + '</div></td>';
+                   html += '<td><div class="long-text"><a href="/' + getFieldValue(r, exportContextIdField) + '">' + result.ObjectNamesMap[getFieldValue(r, exportContextIdField)] + '</a></div></td>';
+                   html += '<td><div class="long-text">' + kimble.formatDate(kimble.UTCStringFromMilliseconds(getFieldValue(r, exportCreatedDateField))) + '</div></td>';
+                   html += '<td><div class="long-text log-text">' + getFieldValue(r, exportLogField) + '</div></td>';
+
+                   html += '</tr>';
+                });
+
+                jQuery('#exports-pending-table tbody').append(html);
+
+                jQuery("#exports-pending-table").colResizable({
+                    liveDrag:true,
+                    gripInnerHtml:"<div class='grip'></div>",
+                    draggingClass:"dragging",
+                    resizeMode:'fit',
+                    disabledColumns: [0]});
+            }
+
+            function buildFailedExportsTable(result) {
+                jQuery('#exports-preparing-failed-table tbody').empty();
+                jQuery('#exports-preparing-failed-all-checkbox').prop('checked', false);
+
+                var html = '';
+
+                result.forEach(function(r){
+                   html += '<tr class="dataRow">';
+                   html += '<td><input id="' + r.TheRun.Id + '" type="checkbox"/></td>';
+                   html += '<td><div class="long-text"><a href="/' + r.TheRun.Id + '">' + getFieldValue(r.TheRun, 'Name') + '</a></div></td>';
+                   html += '<td><div class="long-text">' + kimble.formatDate(kimble.UTCStringFromMilliseconds(getFieldValue(r.TheRun, exportCreatedDateField))) + '</div></td>';
+                   html += '<td><div class="long-text log-text">' + r.ErrorMessage + '</div></td>';
+
+                   html += '</tr>';
+                });
+
+                jQuery('#exports-preparing-failed-table tbody').append(html);
+
+                jQuery("#exports-preparing-failed-table").colResizable({
+                    liveDrag:true,
+                    gripInnerHtml:"<div class='grip'></div>",
+                    draggingClass:"dragging",
+                    resizeMode:'fit',
+                    disabledColumns: [0]});
+            }
+
+            function buildExportsFailedTable(result)
+            {
+                jQuery('#exports-failed-table tbody').empty();
+                jQuery('#exports-failed-all-checkbox').prop('checked', false);
+
+                var html = '';
+
+                result.TheExports.forEach(function(r){
+                   html += '<tr class="dataRow">';
+                   html += '<td><input id="' + r.Id + '" type="checkbox"/></td>';
+                   html += '<td><div class="long-text">' + getFieldValue(r, exportSourceField) + '</div></td>';
+                   html += '<td><div class="long-text">' + getFieldValue(r, exportRunNameField) + '</div></td>';
+                   html += '<td><div class="long-text">' + getFieldValue(r, exportContextIdField) + '</div></td>';
+                   html += '<td><div class="long-text"><a href="/' + getFieldValue(r, exportContextIdField) + '">' + result.ObjectNamesMap[getFieldValue(r, exportContextIdField)] + '</a></div></td>';
+                   html += '<td><div class="long-text">' + getFieldValue(r, exportExternalIdField) + '</div></td>';
+                   html += '<td><div class="long-text">' + kimble.formatDate(kimble.UTCStringFromMilliseconds(getFieldValue(r, exportCreatedDateField))) + '</div></td>';
+                   html += '<td><div class="long-text log-text">' + getFieldValue(r, exportLogField) + '</div></td>';
+
+                   html += '</tr>';
+                });
+
+                jQuery('#exports-failed-table tbody').append(html);
+
+                jQuery("#exports-failed-table").colResizable({
+                    liveDrag:true,
+                    gripInnerHtml:"<div class='grip'></div>",
+                    draggingClass:"dragging",
+                    resizeMode:'fit',
+                    disabledColumns: [0]});
+            }
+
+            function getFailedExportsRemoteAction(interfaceTypeId) {
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InterfaceTypeDashboardController.GetFailedExports}',
+                    interfaceTypeId,
+                        function(result, event){
+                            if (event.status) {
+
+                                theSelectedInterfaceTypeId = interfaceTypeId;
+                                buildFailedExportsTable(result);
+
+                                showModalBoxy();
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                console.log(event.message);
+                            }
+                            else
+                            {
+                                console.log(event.message);
+                            }
+                            },
+                            {escape: false, timeout: 60000}
+                        );
+            }
+
+            function getFailedExportRequestsRemoteAction(interfaceTypeId) {
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InterfaceTypeDashboardController.GetFailedExportRequests}',
+                    interfaceTypeId,
+                        function(result, event){
+                            if (event.status) {
+
+                                theSelectedInterfaceTypeId = interfaceTypeId;
+                                buildExportsFailedTable(result);
+
+                                showModalBoxy();
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                console.log(event.message);
+                            }
+                            else
+                            {
+                                console.log(event.message);
+                            }
+                            },
+                            {escape: false, timeout: 60000}
+                        );
+            }
+
+            function getPendingExportRequestsRemoteAction(interfaceTypeId) {
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InterfaceTypeDashboardController.GetPendingExportRequests}',
+                    interfaceTypeId,
+                        function(result, event){
+                            if (event.status) {
+
+                                theSelectedInterfaceTypeId = interfaceTypeId;
+                                buildExportsPendingTable(result);
+
+                                showModalBoxy();
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                console.log(event.message);
+                            }
+                            else
+                            {
+                                console.log(event.message);
+                            }
+                            },
+                            {escape: false, timeout: 60000}
+                        );
+            }
+
+            function getCompletingInterfaceRunLinesRemoteAction(interfaceTypeId)
+            {
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InterfaceTypeDashboardController.GetCompletingInterfaceRunLines}',
+                    interfaceTypeId,
+                        function(result, event){
+                            if (event.status) {
+
+                                theSelectedInterfaceTypeId = interfaceTypeId;
+                                buildInterfaceRunLineTableWithContext(result.TheLines, result.ShowContext);
+                                showModalBoxy();
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                console.log(event.message);
+                            }
+                            else
+                            {
+                                console.log(event.message);
+                            }
+                            },
+                            {escape: false, timeout: 60000}
+                        );
+            }
+
+            function getImportingInterfaceRunLinesRemoteAction(interfaceTypeId, allowLineEdit)
+            {
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InterfaceTypeDashboardController.GetImportingInterfaceRunLines}',
+                    interfaceTypeId,
+                        function(result, event){
+                            if (event.status) {
+
+                                theSelectedInterfaceTypeId = interfaceTypeId;
+                                buildInterfaceRunLineTable(result, allowLineEdit);
+                                showModalBoxy();
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                console.log(event.message);
+                            }
+                            else
+                            {
+                                console.log(event.message);
+                            }
+                            },
+                            {escape: false, timeout: 60000}
+                        );
+            }
+
+            function refreshInboundCardContentsRemoteAction(interfaceTypeId)
+            {
+                //TODO
+                jQuery('.cardContainer[context-id="' + interfaceTypeId + '"] .card').toggleClass('refreshing');
+                jQuery('.cardContainer[context-id="' + interfaceTypeId + '"] .card').show();
+
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InterfaceTypeDashboardController.RefreshInboundCardContents}',
+                    interfaceTypeId,
+                        function(result, event){
+                            if (event.status) {
+                                jQuery('.cardContainer[context-id="' + interfaceTypeId + '"] .card').toggleClass('refreshing');
+
+                                if (result == null)
+                                {
+                                    jQuery('.cardContainer[context-id="' + interfaceTypeId + '"] .card').hide();
+                                }
+                                else
+                                {
+                                    updateInterfaceTypeRow(interfaceTypeId, result);
+                                }
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                errorCardContents(interfaceTypeId, event.message);
+                            }
+                            else
+                            {
+                                errorCardContents(interfaceTypeId, event.message);
+                            }
+                            },
+                            {escape: false, timeout: 60000, buffer: false}
+                        );
+            }
+
+            function refreshOutboundCardContentsRemoteAction(interfaceTypeId)
+            {
+                jQuery('.cardContainer[context-id="' + interfaceTypeId + '"] .card').toggleClass('refreshing');
+                jQuery('.cardContainer[context-id="' + interfaceTypeId + '"] .card').show();
+
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InterfaceTypeDashboardController.RefreshOutboundCardContents}',
+                    interfaceTypeId,
+                        function(result, event){
+                            if (event.status) {
+                                jQuery('.cardContainer[context-id="' + interfaceTypeId + '"] .card').toggleClass('refreshing');
+
+                                if (result == null)
+                                {
+                                    jQuery('.cardContainer[context-id="' + interfaceTypeId + '"] .card').hide();
+                                }
+                                else
+                                {
+                                    updateInterfaceTypeRow(interfaceTypeId, result);
+                                }
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                errorCardContents(interfaceTypeId, event.message);
+                            }
+                            else
+                            {
+                                errorCardContents(interfaceTypeId, event.message);
+                            }
+                            },
+                            {escape: false, timeout: 60000, buffer: false}
+                        );
+            }
+
+            function updateInterfaceTypeRow(interfaceTypeId, interfaceStatus) {
+                var tr = jQuery('#interface-type-list tr[context-id="' + interfaceTypeId + '"]');
+
+                tr.find('.last-run-date').text(interfaceStatus.LastRunDateTime == null ? '-' : kimble.formatDateTime(interfaceStatus.LastRunDateTime));
+
+                if (interfaceStatus.ImportingPendingCount != null){
+                    tr.find('.queued-pending').text(kimble.formatNumber(interfaceStatus.ImportingPendingCount, '#,##0')).toggleClass('highlight', interfaceStatus.ImportingPendingCount > 0).addClass('with-val');
+                    tr.find('.preparing-failed').text(kimble.formatNumber(interfaceStatus.ImportingFailedCount, '#,##0')).toggleClass('highlight', interfaceStatus.ImportingFailedCount > 0).addClass('with-val');
+                    if (interfaceStatus.ImportingFailedCount > 0) tr.find('.completing-failed').parent().attr('search-term', '{!$Label.Failed}');
+                } else {
+                    tr.find('.queued-pending').addClass('detail-link').text(kimble.formatNumber(interfaceStatus.PendingCount, '#,##0')).toggleClass('highlight', interfaceStatus.PendingCount > 0).addClass('with-val');
+                    tr.find('.preparing-failed').text(kimble.formatNumber(interfaceStatus.FailedGenerationCount, '#,##0')).toggleClass('highlight', interfaceStatus.FailedGenerationCount > 0).addClass('with-val');
+                }
+                
+                if (interfaceStatus.FailedCount > 0) {
+                    tr.find('.completing-failed').text(kimble.formatNumber(interfaceStatus.FailedCount, '#,##0')).toggleClass('highlight', interfaceStatus.FailedCount > 0).addClass('with-val');
+                    tr.find('.completing-failed').parent().attr('search-term', '{!$Label.Failed}');
+                }
+
+                tr.toggleClass('refreshing');
+            }
+
+            function saveLineRawData() {
+                saveLineRawDataRemoteAction(jQuery('#line-raw-data').attr('line-id'),jQuery('#line-raw-data').val());
+            }
+
+            function saveLineRawDataRemoteAction(itemId, rawData){
+                jQuery('#edit-line-popup .btn').prop('disabled', true);
+
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InterfaceTypeDashboardController.UpdateLineRawDataAndRetry}',
+                    itemId, rawData,
+                        function(result, event){
+                            if (event.status) {
+
+                               //redirect to job to process items or refresh this list!
+                                if (result != null)
+                                {
+                                    safeRedirectToSForceURL('{!$Page.AsyncJobMonitor}?batchid=' + result  + '&title=Retrying&redirecturl={!$Page.InterfaceTypeDashboard}');
+                                }
+                                else
+                                {
+                                    jQuery('#edit-line-popup .btn').prop('disabled', false);
+                                    refreshInboundCardContentsRemoteAction(interfaceTypeId);
+                                    hideStackedModalBoxy();
+                                }
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                console.log(event.message);
+                            }
+                            else
+                            {
+                                console.log(event.message);
+                            }
+                            },
+                            {escape: false, timeout: 60000}
+                        );
+            }
+
+            function deleteSelectedExports() {
+                var exports = jQuery('#exports-preparing-failed-table tbody tr:visible input[type="checkbox"]:checked');
+
+                if (exports.length == 0) return;
+
+                jQuery('#exports-preparing-failed-popup .btn').prop('disabled', true);
+
+                var exportsArray = [];
+
+                jQuery.each(exports, function(i, line) {
+                   exportsArray.push(line.id);
+                });
+
+                deleteExportsRemoteAction(theSelectedInterfaceTypeId, exportsArray);
+            }
+
+            function deleteExportsRemoteAction(interfaceTypeId, items) {
+                jQuery('#exports-preparing-failed-popup .btn').prop('disabled', true);
+
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InterfaceTypeDashboardController.DeleteExports}',
+                    interfaceTypeId, items,
+                        function(result, event){
+                            if (event.status) {
+
+                               jQuery('#exports-preparing-failed-popup .btn').prop('disabled', false);
+                               refreshOutboundCardContentsRemoteAction(interfaceTypeId);
+                               hideModalBoxy();
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                console.log(event.message);
+                            }
+                            else
+                            {
+                                console.log(event.message);
+                            }
+                            },
+                            {escape: false, timeout: 60000}
+                        );
+            }
+
+            function deleteSelected() {
+                var exports = jQuery('#exports-pending-table tbody tr:visible input[type="checkbox"]:checked');
+
+                if (exports.length == 0) return;
+
+                jQuery('#exports-pending-popup .btn').prop('disabled', true);
+
+                var exportsArray = [];
+
+                jQuery.each(exports, function(i, line) {
+                   exportsArray.push(line.id);
+                });
+
+                deleteExportRequestsRemoteAction(theSelectedInterfaceTypeId, exportsArray);
+            }
+
+            function deleteExportRequestsRemoteAction(interfaceTypeId, items){
+                jQuery('#exports-pending-popup .btn').prop('disabled', true);
+
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InterfaceTypeDashboardController.DeleteExportRequests}',
+                    interfaceTypeId, items,
+                        function(result, event){
+                            if (event.status) {
+
+                               jQuery('#exports-pending-popup .btn').prop('disabled', false);
+                               refreshOutboundCardContentsRemoteAction(interfaceTypeId);
+                               hideModalBoxy();
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                console.log(event.message);
+                            }
+                            else
+                            {
+                                console.log(event.message);
+                            }
+                            },
+                            {escape: false, timeout: 60000}
+                        );
+            }
+
+            function removeSelected() {
+                var exports = jQuery('#exports-failed-table tbody tr:visible input[type="checkbox"]:checked');
+
+                if (exports.length == 0) return;
+
+                jQuery('#exports-failed-popup .btn').prop('disabled', true);
+
+                var exportsArray = [];
+
+                jQuery.each(exports, function(i, line) {
+                   exportsArray.push(line.id);
+                });
+
+                removeExportRequestsRemoteAction(theSelectedInterfaceTypeId, exportsArray);
+            }
+
+            function removeExportRequestsRemoteAction(interfaceTypeId, items){
+                jQuery('#exports-failed-popup .btn').prop('disabled', true);
+
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InterfaceTypeDashboardController.FlagRequestsForExport}',
+                    interfaceTypeId, items,
+                        function(result, event){
+                            if (event.status) {
+
+                               jQuery('#exports-failed-popup .btn').prop('disabled', false);
+                               refreshOutboundCardContentsRemoteAction(interfaceTypeId);
+                               hideModalBoxy();
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                console.log(event.message);
+                            }
+                            else
+                            {
+                                console.log(event.message);
+                            }
+                            },
+                            {escape: false, timeout: 60000}
+                        );
+            }
+
+            function errorCardContents(interfaceTypeId, message)
+            {
+
+            }
+
+            </script>
+
+            <style>
+                .col-align-center {
+                    text-align: center;
+                }
+
+                .interface-type-row .fa {
+                    font-size:18px;
+                }
+
+                .fa-spin{display:none;}
+                .refreshing .fa-spin {
+                    display: inline-block;
+                }
+
+                .refreshing .fa-cloud-upload, .refreshing .fa-cloud-download {display:none;}
+                .edit-line {cursor:pointer;}
+
+                .long-text {
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    padding-left:6px;
+                    display: inline-block;
+                }
+                .JColResizer {
+                    height:28px !important;
+                }
+                .JCLRgrip {height:28px !important;}
+
+                .request-count {display:none;}
+                .detail-link.highlight:hover {
+                    transform: scale(1.3);
+                }
+                table#interface-type-list {
+                    padding: 12px;
+                }
+                tr.interface-type-row:hover {
+                    background-color: #e3feff;
+                }
+                td.type-name {
+                    font-size: 16px;
+                }
+                td.icon {
+                    text-align: center;
+                }
+                .detail-link.highlight {cursor:pointer;}
+
+                td.stat-pill {
+                    width: 100px;
+                }
+                .stat-pill div {
+                    border-radius: 4px;
+                    font-size: 16px;
+                    text-align: center;
+                    padding: 7px;
+                }
+                .stat-pill div.with-val:not(.highlight) {
+                    background-color: #d6d6d6;
+                    color: black;
+                }
+                .stat-pill div.pending.highlight {
+                    background-color: orange;
+                    color: white;
+                }
+                .stat-pill div.failed.highlight {
+                    background-color: red;
+                    color: white;
+                }
+                .log-container {
+                    white-space: pre-line;
+                    max-height: 120px;
+                    overflow-y: auto;
+                    line-height: 2;
+                    width: 420px;
+                    font-family: monospace;
+                    padding-left: 6px;
+                    padding-bottom: 6px;
+                }
+
+                .log-text{cursor:pointer;}
+
+                .qtip-default {
+                    max-width: 440px;
+                }
+                .fa-file-text-o {
+                    font-size: 12px;
+                    position: relative;
+                    top: -2px;
+                }
+            </style>
+
+        </apex:define>
+    </apex:composition>
+
+</apex:page>

@@ -1,0 +1,911 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.DeliveryGroupOperationsHomeController" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+	<c:Menu DefaultHelpPage="OperationsDashboard.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryGroup__c.Id}" MenuContextName="{!KimbleOne__DeliveryGroup__c.Name}" />
+
+</apex:define>
+     
+<apex:define name="Content">
+	
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__jQueryBarGraph, 'jqBarGraph.1.1.min.js')}"/>   
+	
+	<apex:pageBlock title="{!$Label.kimbleone__deliveryengagementoperationsheading}">
+		
+	<apex:form >
+		
+	<apex:outputPanel id="resourcedActivitySummaryData">
+	
+	<apex:pageMessages escape="false"/>
+	
+	<br/>
+	<apex:actionStatus id="ResourcedActivityListLoadingStatus">
+		<apex:facet name="start">
+			<div id="loadingIndicatorOuterContainer" class="loadingIndicator">
+				<div id="loadingIndicatorInnerContainer">
+					<img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+				</div>
+			</div>
+		</apex:facet>
+	</apex:actionStatus>
+	<apex:outputPanel id="ResourcedActivityTimeHeaderPanel">
+	<table cellpadding="0" cellspacing="0" border="0">
+		<tr height="173px" >
+			<td class="centerAlignDataCell" width="340px" style="background-color:#FFF">
+
+ 				<apex:selectRadio id="rdoPeriodMode" styleClass="centerAlignTable" onclick="togglePeriodMode()" value="{!PeriodMode}">
+            		<apex:selectOptions value="{!PeriodModes}"/>
+            	</apex:selectRadio>
+
+				<span>			
+					<apex:outputLink value="#" onclick="goPreviousPeriod()" title="{!$Label.kimbleone__previousperiod}">
+						<apex:image url="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'PreviousButtonSquare.png')}" alt="{!$Label.kimbleone__previousperiod}" />
+					</apex:outputLink>
+					<span class="periodLabel">&nbsp;<span class="periodLabelHeading">&nbsp;&nbsp;{!$ObjectType.TimePeriod__c.Label}:&nbsp;</span>{!JSENCODE(PeriodName)}&nbsp;&nbsp;&nbsp;</span>
+					<span class="selectable"><apex:inputText styleClass="datepicker" style="width:0px;border:0px; margin:0px; padding:0px;" value="{!GoDate.KimbleOne__InputDate__c}" onchange="moveToDate()" /></span>
+					
+					<apex:outputLink value="#" onclick="goNextPeriod()" title="{!$Label.kimbleone__nextperiod}">
+						<apex:image url="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'NextButtonSquare.png')}" alt="{!$Label.kimbleone__nextperiod}" />
+					</apex:outputLink>
+				</span>
+				<p/>
+				<span class="periodLabel">{<apex:outputField value="{!PeriodStartDate.KimbleOne__InputDate__c}"/>&nbsp;-&nbsp;<apex:outputField value="{!PeriodEndDate.KimbleOne__InputDate__c}"/>}</span>
+
+ 				<apex:selectRadio id="rdoViewMode" styleClass="centerAlignTable" onclick="toggleTimeExpense()" value="{!DisplayMode}">
+            		<apex:selectOptions value="{!DisplayModes}"/>
+            	</apex:selectRadio>
+            
+			</td>
+			<td width="6px"></td>
+			
+			<apex:outputpanel layout="none" rendered="{!DisplayMode = DisplayModeTime}">
+				<td id="" width="504px" valign="top" class="graphText" style="background-color:#FFF">				
+					<div id="divForTimeEntrySummaryGraph" class="graphText"></div>
+				</td>
+			</apex:outputpanel>
+			<apex:outputpanel layout="none" rendered="{!DisplayMode = DisplayModeExpense}">
+				<td width="395px" valign="top" class="graphText" style="background-color:#FFF">
+					<div id="divForExpenseEntrySummaryGraph" class="graphText"></div>
+				</td>
+			</apex:outputpanel>
+			
+			<td width="6px"></td>
+			
+			<apex:outputpanel layout="none" rendered="{!DisplayMode = DisplayModeTime}">
+				<td width="167px" valign="top" class="graphText" style="background-color:#FFF">	
+					<div id="divForTimeInvoicingSummaryGraph" class="graphText"></div>				
+				</td>
+			</apex:outputpanel>
+			<apex:outputpanel layout="none" rendered="{!DisplayMode = DisplayModeExpense}">
+				<td width="195px" valign="top" class="graphText" style="background-color:#FFF">	
+					<div id="divForExpenseInvoicingSummaryGraph" class="graphText"></div>
+				</td>
+			</apex:outputpanel>
+		</tr>
+	</table>
+	
+	<script>
+		var timeEntrySummaryData = jQuery.parseJSON('<apex:outputText value="{!JSENCODE(TheTimeEntrySummaryJson)}"/>');
+		var timeInvoicingSummaryData = jQuery.parseJSON('<apex:outputText value="{!JSENCODE(TheTimeInvoicingSummaryJson)}"/>');
+		
+		var businessUnitGroupId = '<apex:outputText value="{!BusinessUnitGroupId}"/>';
+		var periodStartDateUTC = '<apex:outputText value="{!PeriodStartDateUTC}"/>';
+		var removeUsageStartDateUTC = '<apex:outputText value="{!RemoveUsagePeriodStartDateUTC}"/>';
+		var periodEndDateUTC = '<apex:outputText value="{!PeriodEndDateUTC}"/>';
+		var removeUsageEndDateUTC = '<apex:outputText value="{!RemoveUsagePeriodEndDateUTC}"/>';
+	</script>
+	
+	</apex:outputPanel>
+	<br/>
+	
+	<apex:outputpanel rendered="{!DisplayMode = DisplayModeTime}">
+	<apex:outputpanel layout="none" rendered="{!ShowRemoveUsage}">
+		<div id="deleteAllUsageWorking" class="Processing"></div>
+		<input id="deleteAllUsageButton" type="button" value="{!$Label.RemoveAllUsageButton}" onclick="deleteAllAssignmentUsage();"/>
+		<apex:outputpanel layout="none" rendered="{!!ISBLANK(RemoveUsageMessage)}">
+			<i class="fa fa-info-circle" title="{!JSENCODE(RemoveUsageMessage)}"></i>
+		</apex:outputpanel>
+	</apex:outputpanel>
+															
+	<table id="timeSummaryTable" class="list" border="0" cellpadding="0" cellspacing="0">
+		<colgroup>
+			<col style="width: 27px;"/> 
+			<col style="width: 170px;"/>
+			<col style="width: 76px;"/>
+			<col style="width: 70px;"/>
+
+			<col style="width: 85px;"/>
+			<col style="width: 85px;"/>
+			<col style="width: 85px;"/>
+			<col style="width: 85px;"/>
+			<col style="width: 85px;"/>
+			<col style="width: 85px;"/>
+			<col style="width: 85px;"/>
+			<col style="width: 85px;"/>
+		</colgroup>
+		<thead>
+			<tr class="headerRow">
+				<th colspan="2" class="headerRow"></th>
+				<th colspan="2" class="headerRow"></th>
+					
+				<th colspan="6" class="headerRow" style="text-align: center;"><h2>{!$Label.TimeEntryHeading} ({!JSENCODE(DisplayUnitType.Suffix__c)})</h2></th>
+				<th colspan="2" class="headerRow" style="text-align: center;"><h2>{!$Label.TimeInvoicingHeading} ({!JSENCODE(DisplayUnitType.Suffix__c)})</h2></th>
+			</tr>
+
+			<tr class="headerRow">
+				<th class="headerRow">
+					<span class="columnLabel"></span>
+				</th>
+	                											
+				<th class="headerRow ui-resizable sortable">
+	            	<span class="columnLabel"><h2>{!$ObjectType.KimbleOne__Resource__c.Fields.Name.Label} &amp; {!$ObjectType.ActivityAssignment__c.Fields.ActivityRole__c.Label}</h2></span>
+	            </th>
+	             
+	            <th class="headerRow ui-resizable">{!$ObjectType.ActivityAssignment__c.Fields.StartDate__c.Label}</th>
+				<th class="headerRow ui-resizable">{!$Label.EndDateLabel}</th>
+					
+				<th class="headerRow ui-resizable">{!$Label.ExpectedHoursGraphHeading}</th>
+				<th class="headerRow ui-resizable">{!$Label.DeliveryGroupHomeRemaining}</th>
+				<th class="headerRow ui-resizable">{!$Label.ApprovalStatusDraftLabel}</th>
+				<th class="headerRow ui-resizable">{!$Label.Rejected}</th>
+				<th class="headerRow ui-resizable">{!$Label.PendingApprovalHoursGraphHeading}</th>	
+				<th class="headerRow ui-resizable">{!$Label.Approved}</th>	
+				<th class="headerRow ui-resizable">{!$Label.InvoiceableHeading}</th>	
+				<th class="headerRow ui-resizable">{!$Label.InvoicedLabel}</th>
+			</tr>
+		</thead>
+		<tbody>		
+			<apex:repeat value="{!ResourcedActivities}" var="theResourcedActivity">		
+				<apex:variable value="{!ResourcedActivityTimeEntryStatisticsMap[theResourcedActivity.Id]}" var="theResourcedActivityTimeEntryStatistics"/>
+				<apex:variable value="{!ResourcedActivityTimeInvoicingStatisticsMap[theResourcedActivity.Id]}" var="theResourcedActivityTimeInvoicingStatistics"/>											
+				<tr id="resourceActivityHeader" class="groupDataRow" title="{!$Label.ClickToHideAssignmentsMessage}" resourcedActivityId="{!JSENCODE(theResourcedActivity.Id)}">
+					<td colspan="4" class="groupDataRowHideCell"><img class="groupDataRowCollapsed" src="/s.gif"/>{!$Label.Activity}:&nbsp;{!JSENCODE(theResourcedActivity.Name)}</td>
+						
+					<td class="dataCell rightAlignDataCell"><apex:outputField id="activityExpectedUsage" value="{!theResourcedActivityTimeEntryStatistics.formattedForecastP3Usage.InputDecimal__c}" /></td>
+					<td class="dataCell rightAlignDataCell"><apex:outputField id="activityRemainingUsage" value="{!theResourcedActivityTimeEntryStatistics.formattedRemainingP3Usage.InputDecimal__c}" /></td>
+					<td class="dataCell rightAlignDataCell">
+						<apex:outputLink value="#" onclick="changeView('{!ShowTimeDetails}', '{!ApprovalStatusDraft}', 'true', '{!JSENCODE(theResourcedActivity.Id)}')" title="{!$Label.kimbleone__viewlistlabel}">
+							<apex:outputField value="{!theResourcedActivityTimeEntryStatistics.formattedDraftTime.InputDecimal__c}" />
+						</apex:outputLink>
+					</td>
+					<td class="dataCell rightAlignDataCell">
+						<apex:outputLink value="#" onclick="changeView('{!ShowTimeDetails}', '{!ApprovalStatusRejected}', 'true', '{!JSENCODE(theResourcedActivity.Id)}')" title="{!$Label.kimbleone__viewlistlabel}">
+							<apex:outputField value="{!theResourcedActivityTimeEntryStatistics.formattedRejectedTime.InputDecimal__c}" />
+						</apex:outputLink>
+					</td>
+					<td class="dataCell rightAlignDataCell">
+						<apex:outputLink value="#" onclick="changeView('{!ShowTimeDetails}', '{!ApprovalStatusReadyForApproval}', 'true', '{!JSENCODE(theResourcedActivity.Id)}')" title="{!$Label.kimbleone__viewlistlabel}">
+							<apex:outputField value="{!theResourcedActivityTimeEntryStatistics.formattedReadyForApprovalTime.InputDecimal__c}" />
+						</apex:outputLink>
+					</td>
+					<td class="dataCell rightAlignDataCell">
+						<apex:outputLink value="#" onclick="changeView('{!ShowTimeDetails}', '{!ApprovalStatusApproved}', 'true', '{!JSENCODE(theResourcedActivity.Id)}')" title="{!$Label.kimbleone__viewlistlabel}">
+							<apex:outputField value="{!theResourcedActivityTimeEntryStatistics.formattedActualUsage.InputDecimal__c}"/>
+						</apex:outputLink>
+					</td>
+					<td class="dataCell rightAlignDataCell"><apex:outputField value="{!theResourcedActivityTimeInvoicingStatistics.formattedInvoiceableTime.InputDecimal__c}"/></td>
+					<td class="dataCell rightAlignDataCell"><apex:outputField value="{!theResourcedActivityTimeInvoicingStatistics.formattedInvoicedTime.InputDecimal__c}"/></td>							
+				</tr>
+		
+				<apex:repeat value="{!SortedAssignmentsMap[theResourcedActivity.Id]}" var="theActivityAssignment">
+					<apex:variable value="{!ResourcedActivityDetailsMap[theResourcedActivity.Id][theActivityAssignment.Id]}" var="theAssignmentOperationalView"/>				
+					<apex:variable value="{!theAssignmentOperationalView.TheActivityAssignment}" var="theAssignment"/>
+					<apex:variable value="{!theActivityAssignment.StartDate__c <= PeriodEndDate.KimbleOne__InputDate__c && theActivityAssignment.ForecastP3EndDate__c >= PeriodStartDate.KimbleOne__InputDate__c}" var="thisPeriod"/>
+					<apex:outputPanel layout="none" rendered="{!thisPeriod && (theAssignmentOperationalView.TheTimeEntryStatistics.hasValues || theAssignmentOperationalView.TheTimeInvoicingStatistics.hasValues)}">
+					<tr class="dataRow" 
+									resourcedActivityId="{!JSENCODE(theAssignment.ResourcedActivityOperatedWith__r.Id)}"
+									assignmentId="{!JSENCODE(theAssignment.Id)}"
+									parentAssignmentId="{!IF(theAssignment.ActivityAssignment__c != null, JSENCODE(theAssignment.ActivityAssignment__c), '')}">
+																					
+						<td style="padding-left: 0px; padding-right: 0px;" class="actions-cell">
+							<apex:outputLink value="#" styleclass="removeForecast" onclick="removeForecastUsage('{!JSENCODE(theAssignment.Id)}',this);" title="{!$Label.kimbleone__removeforecastusagelabel}" rendered="{!ShowRemoveUsage && theAssignment.ActivityAssignmentType__r.Enum__c != 'AppliedModel'}">
+									<i class="fa fa-times"></i>
+							</apex:outputLink>
+						</td>
+						<td class="dataCell {!IF(theAssignment.ActivityAssignment__c != null, 'childAssignmentIndentedCell', '')}" >
+							<apex:outputpanel rendered="{!OR(theAssignment.ActivityAssignmentType__r.Enum__c = 'ResourcedParent', theAssignment.ActivityAssignmentType__r.Enum__c = 'AppliedModel')}" styleclass="{!IF(OR(theAssignment.ActivityAssignmentType__r.Enum__c = 'ResourcedParent', theAssignment.ActivityAssignmentType__r.Enum__c = 'AppliedModel'), 'parentAssignmentDataRow', '')} {!IF(theAssignment.ActivityAssignment__c != null, 'childAssignmentDataRow', '')}">
+								<img class="parentAssignmentDataRowTwisterExpanded" src="/s.gif"/>
+							</apex:outputpanel>
+							
+							<apex:outputField value="{!theAssignment.Resource__c}"/>
+							<p/><apex:outputText value="{!theAssignment.ActivityRole__r.Name}"/>
+						</td>
+						
+						<td class="dataCell rightAlignDataCell">
+							<apex:outputField value="{!theAssignment.StartDate__c}"/>
+						</td>
+						<td class="dataCell rightAlignDataCell">
+							<apex:outputField value="{!theAssignment.ForecastP3EndDate__c}"/>
+						</td>
+						
+						<td class="dataCell rightAlignDataCell">
+							<!-- There is no forecast at this level if this is a child assignment -->
+							<apex:outputField id="expectedUsage" value="{!theAssignmentOperationalView.TheTimeEntryStatistics.formattedForecastP3Usage.InputDecimal__c}" />
+							
+						</td>
+						<td class="dataCell rightAlignDataCell">
+							<apex:outputField id="remainingUsage" styleclass="{!IF(ISBLANK(theAssignment.ActivityAssignment__c),'includeInRollup','')}" value="{!theAssignmentOperationalView.TheTimeEntryStatistics.formattedRemainingP3Usage.InputDecimal__c}"/>
+						</td>
+						<td class="dataCell rightAlignDataCell"><apex:outputField value="{!theAssignmentOperationalView.TheTimeEntryStatistics.formattedDraftTime.InputDecimal__c}" /></td>
+						<td class="dataCell rightAlignDataCell"><apex:outputField value="{!theAssignmentOperationalView.TheTimeEntryStatistics.formattedRejectedTime.InputDecimal__c}" /></td>
+						<td class="dataCell rightAlignDataCell"><apex:outputField value="{!theAssignmentOperationalView.TheTimeEntryStatistics.formattedReadyForApprovalTime.InputDecimal__c}" /></td>
+						<td class="dataCell rightAlignDataCell"><apex:outputField value="{!theAssignmentOperationalView.TheTimeEntryStatistics.formattedActualUsage.InputDecimal__c}"/></td>
+						<td class="dataCell rightAlignDataCell"><apex:outputField value="{!theAssignmentOperationalView.TheTimeInvoicingStatistics.formattedInvoiceableTime.InputDecimal__c}"/></td>
+						<td class="dataCell rightAlignDataCell"><apex:outputField value="{!theAssignmentOperationalView.TheTimeInvoicingStatistics.formattedInvoicedTime.InputDecimal__c}"/></td>							
+					</tr>
+					</apex:outputPanel>
+				</apex:repeat>
+			</apex:repeat>
+		</tbody>
+	</table>
+
+	<script>
+		function setupSummaryCharts() {
+			setupTimeSummaryCharts();
+		}
+		
+	</script>
+	</apex:outputpanel>
+
+	<apex:outputpanel rendered="{!DisplayMode = DisplayModeExpense}">																
+	<table id="expenseSummaryTable" class="list" border="0" cellpadding="0" cellspacing="0">
+		<colgroup>
+			<col style="width: 27px;"/>
+			<col style="width: 317px;"/>
+
+			<col style="width: 100px;"/>
+			<col style="width: 100px;"/>
+			<col style="width: 100px;"/>
+			<col style="width: 100px;"/>
+			<col style="width: 100px;"/>
+			<col style="width: 100px;"/>
+		</colgroup>
+		<thead>
+			<tr class="headerRow">
+				<th colspan="2" class="headerRow"></th>
+				
+				<th colspan="4" class="headerRow" style="text-align: center;"><h2>{!$Label.ExpenseEntryHeading} ({!DeliveryGroupCurrencyIsoCode})</h2></th>
+				<th colspan="2" class="headerRow" style="text-align: center;"><h2>{!$Label.ExpenseInvoicingHeading} ({!DeliveryGroupInvoicingCurrencyIsoCode})</h2></th>
+			</tr>
+
+			<tr class="headerRow">
+				<th class="headerRow">
+					<span class="columnLabel"></span>
+				</th>
+	                											
+				<th class="headerRow ui-resizable sortable">
+	            	<span class="columnLabel"><h2>{!$ObjectType.KimbleOne__Resource__c.Fields.Name.Label}</h2></span>
+	            </th>
+	             						
+				<th class="headerRow ui-resizable">{!$Label.ApprovalStatusDraftLabel}</th>
+				<th class="headerRow ui-resizable">{!$Label.Rejected}</th>
+				<th class="headerRow ui-resizable">{!$Label.PendingApprovalHoursGraphHeading}</th>	
+				<th class="headerRow ui-resizable">{!$Label.Approved}</th>	
+				<th class="headerRow ui-resizable">{!$Label.InvoiceableHeading}</th>	
+				<th class="headerRow ui-resizable">{!$Label.InvoicedLabel}</th>
+			</tr>
+		</thead>
+		<tbody>		
+			<apex:repeat value="{!ResourcedActivities}" var="theResourcedActivity">		
+				<apex:variable value="{!ResourcedActivityExpenseEntryStatisticsMap[theResourcedActivity.Id]}" var="theResourcedActivityExpenseEntryStatistics"/>
+				<apex:variable value="{!ResourcedActivityExpenseInvoicingStatisticsMap[theResourcedActivity.Id]}" var="theResourcedActivityExpenseInvoicingStatistics"/>
+				<apex:outputPanel layout="none" rendered="{!theResourcedActivityExpenseEntryStatistics.hasValues}">
+				<tr id="resourceActivityHeader" class="groupDataRow" title="{!$Label.ClickToHideResourcesMessage}" resourcedActivityId="{!JSENCODE(theResourcedActivity.Id)}">
+					<td colspan="2" class="groupDataRowHideCell"><img class="groupDataRowCollapsed" src="/s.gif"/>{!$ObjectType.ResourcedActivity__c.Label}: {!JSENCODE(theResourcedActivity.Name)}</td>
+						
+					<td class="dataCell rightAlignDataCell">
+						<apex:outputLink value="#" onclick="changeView('{!ShowExpenseDetails}', '{!JSENCODE(ApprovalStatusDraft)}', 'true', '{!JSENCODE(theResourcedActivity.Id)}')" title="{!$Label.kimbleone__viewlistlabel}">
+							<apex:outputField value="{!theResourcedActivityExpenseEntryStatistics.formattedDraftExpense.InputDecimal__c}" />
+						</apex:outputLink>
+					</td>
+					<td class="dataCell rightAlignDataCell">
+						<apex:outputLink value="#" onclick="changeView('{!ShowExpenseDetails}', '{!JSENCODE(ApprovalStatusRejected)}', 'true', '{!JSENCODE(theResourcedActivity.Id)}')" title="{!$Label.kimbleone__viewlistlabel}">
+							<apex:outputField value="{!theResourcedActivityExpenseEntryStatistics.formattedRejectedExpense.InputDecimal__c}" />
+						</apex:outputLink>
+					</td>
+					<td class="dataCell rightAlignDataCell">
+						<apex:outputLink value="#" onclick="changeView('{!ShowExpenseDetails}', '{!ApprovalStatusReadyForApproval}', 'true', '{!JSENCODE(theResourcedActivity.Id)}')" title="{!$Label.kimbleone__viewlistlabel}">
+							<apex:outputField value="{!theResourcedActivityExpenseEntryStatistics.formattedReadyForApprovalExpense.InputDecimal__c}" />
+						</apex:outputLink>
+					</td>
+					<td class="dataCell rightAlignDataCell">
+						<apex:outputLink value="#" onclick="changeView('{!ShowExpenseDetails}', '{!ApprovalStatusApproved}', 'true', '{!JSENCODE(theResourcedActivity.Id)}')" title="{!$Label.kimbleone__viewlistlabel}">
+							<apex:outputField value="{!theResourcedActivityExpenseEntryStatistics.formattedActualExpense.InputDecimal__c}"/>
+						</apex:outputLink>
+					</td>
+					<td class="dataCell rightAlignDataCell"><apex:outputField value="{!theResourcedActivityExpenseInvoicingStatistics.formattedInvoiceableExpense.InputDecimal__c}"/></td>
+					<td class="dataCell rightAlignDataCell"><apex:outputField value="{!theResourcedActivityExpenseInvoicingStatistics.formattedInvoicedExpense.InputDecimal__c}"/></td>							
+				</tr>
+				</apex:outputPanel>
+				<apex:repeat value="{!ResourcesMap[theResourcedActivity.Id]}" var="theResource">
+					<apex:variable value="{!ResourcedActivityDetailsMap[theResourcedActivity.Id][theResource.Id]}" var="theResourceOperationalView"/>				
+					
+					<apex:outputPanel layout="none" rendered="{!theResourceOperationalView.TheExpenseEntryStatistics.hasValues || theResourceOperationalView.TheExpenseInvoicingStatistics.hasValues}">				
+					<tr class="dataRow hiddenDataRow" resourcedActivityId="{!JSENCODE(theResourcedActivity.Id)}">												
+						<td style="padding-left: 0px; padding-right: 0px;"></td>
+						<td class="dataCell"><apex:outputField value="{!theResource.Name}"/></td>
+						
+						<td class="dataCell rightAlignDataCell"><apex:outputField value="{!theResourceOperationalView.TheExpenseEntryStatistics.formattedDraftExpense.InputDecimal__c}" /></td>
+						<td class="dataCell rightAlignDataCell"><apex:outputField value="{!theResourceOperationalView.TheExpenseEntryStatistics.formattedRejectedExpense.InputDecimal__c}" /></td>
+						<td class="dataCell rightAlignDataCell"><apex:outputField value="{!theResourceOperationalView.TheExpenseEntryStatistics.formattedReadyForApprovalExpense.InputDecimal__c}" /></td>
+						<td class="dataCell rightAlignDataCell"><apex:outputField value="{!theResourceOperationalView.TheExpenseEntryStatistics.formattedActualExpense.InputDecimal__c}"/></td>
+						<td class="dataCell rightAlignDataCell"><apex:outputField value="{!theResourceOperationalView.TheExpenseInvoicingStatistics.formattedInvoiceableExpense.InputDecimal__c}"/></td>
+						<td class="dataCell rightAlignDataCell"><apex:outputField value="{!theResourceOperationalView.TheExpenseInvoicingStatistics.formattedInvoicedExpense.InputDecimal__c}"/></td>							
+					</tr>
+					</apex:outputPanel>
+				</apex:repeat>
+			</apex:repeat>
+		</tbody>
+	</table>
+
+	<script>
+		var expenseEntrySummaryData = jQuery.parseJSON('<apex:outputText value="{!JSENCODE(TheExpenseEntrySummaryJson)}"/>');
+		var expenseInvoicingSummaryData = jQuery.parseJSON('<apex:outputText value="{!JSENCODE(TheExpenseInvoicingSummaryJson)}"/>');
+		
+		function setupSummaryCharts() {
+			setupExpenseSummaryCharts();
+		}
+	</script>
+	</apex:outputpanel>
+
+	<apex:actionFunction action="{!TrackingPeriodChange}" name="moveToDate" rerender="resourcedActivitySummaryData, ViewLoadingStatus" status="ResourcedActivityListLoadingStatus" oncomplete="initialiseScreen();"/>
+	<apex:actionFunction action="{!GoPreviousPeriod}" name="goPreviousPeriod" rerender="resourcedActivitySummaryData, ViewLoadingStatus" status="ResourcedActivityListLoadingStatus" oncomplete="initialiseScreen();"/>
+	<apex:actionFunction action="{!GoNextPeriod}" name="goNextPeriod" rerender="resourcedActivitySummaryData, ViewLoadingStatus" status="ResourcedActivityListLoadingStatus" oncomplete="initialiseScreen();"/>
+
+	<apex:actionFunction action="{!ChangeView}" name="changeView" rerender="ViewLoadingStatus" status="ResourcedActivityListLoadingStatus">
+		<apex:param name="viewName" value="" />
+		<apex:param name="selectedApprovalStatus" value=""/>
+		<apex:param name="restrictViewScope" value="" />
+		<apex:param name="resourcedActivityId" value="" />
+	</apex:actionFunction>
+
+	<apex:actionFunction action="{!ChangeDisplayMode}" name="toggleTimeExpense" rerender="resourcedActivitySummaryData, ViewLoadingStatus" status="ResourcedActivityListLoadingStatus" oncomplete="initialiseScreen();"></apex:actionFunction>
+	<apex:actionFunction action="{!ChangePeriodMode}" name="togglePeriodMode" rerender="resourcedActivitySummaryData, ViewLoadingStatus" status="ResourcedActivityListLoadingStatus" oncomplete="initialiseScreen();"></apex:actionFunction>
+	
+	<apex:actionFunction action="{!RefreshGraphView}" name="refreshGraphView" rerender="ResourcedActivityTimeHeaderPanel" oncomplete="initialiseScreen();"></apex:actionFunction>
+
+	</apex:outputPanel>
+
+	<br/>
+	
+	<apex:actionStatus id="ViewLoadingStatus">
+		<apex:facet name="stop">
+		
+		<apex:outputPanel id="TheViews" rendered="{!TheSelectedView != ''}">
+
+			<!-- Time Detail Panels (different panel for draft versus other status values since we have to show different details) -->
+			<apex:outputPanel layout="none" rendered="{!TheSelectedView = ShowTimeDetails && TheTargetApprovalStatus == ApprovalStatusDraft}">
+							
+				<apex:pageBlockSection collapsible="false" columns="1" title="{!$Label.kimbleone__drafttimesheetsheading}" />
+				<apex:pageBlockTable value="{!ThePagedDraftTimesheets.TheRecords}" var="entry">
+   					<apex:column headerValue="{!$ObjectType.KimbleOne__Resource__c.Fields.Name.Label}">
+           				<apex:outputLink value="/{!entry.ResourceId}"><apex:outputText value="{!entry.ResourceName}"/></apex:outputLink>
+           			</apex:column> 
+           			<apex:column value="{!entry.ResourcedActivityName}" headerValue="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.Name.Label}"/> 
+           			<apex:column headerValue="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__EntryUnits__c.Label}">
+           				<apex:outputField value="{!entry.EntryUnits.KimbleOne__InputDecimal__c}"/><apex:outputText value=" {!entry.UsageUnitType}"/>
+           			</apex:column>
+				</apex:pageBlockTable>            
+            
+	            <div style="float:left; margin-top:15px;">
+					<apex:outputText value="{!ThePagedDraftTimesheets.CurrentPageDescription}"/>
+				</div>
+				<div style="float: right; margin-right: 15px; margin-top:15px;">
+					    	<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPreviousPage}" rerender="TheViews" rendered="{!ThePagedDraftTimesheets.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+					    	<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedDraftTimesheets.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+					    	&nbsp;|&nbsp;
+					    	<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNextPage}" rerender="TheViews" rendered="{!ThePagedDraftTimesheets.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+					    	<apex:outputText styleclass="greyedLink" rendered="{!!ThePagedDraftTimesheets.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+				</div>
+				<div style="clear:both;"></div>
+			</apex:outputPanel>
+							
+			<apex:outputPanel layout="none" rendered="{!TheSelectedView = ShowTimeDetails && TheTargetApprovalStatus != ApprovalStatusDraft}">
+				<apex:pageBlockSection collapsible="false" columns="1" title="{!$ObjectType.KimbleOne__Timesheet__c.LabelPlural}" />
+			
+				<apex:pageBlockTable value="{!TheTimeDetails.TheRecords}" var="theTime">
+	     			<apex:column headerValue="{!$ObjectType.KimbleOne__Timesheet__c.Fields.Name.Label}">
+		      	   	<apex:outputLink value="/{!theTime.Id}">
+			      	   	<apex:outputText value="{!theTime.Resource__r.Name} - " />
+			      		<apex:outputText value="{!theTime.ResourcedActivity__r.Name}"/> 		
+			      	
+			      		<apex:variable var="Counter" value="{!1}"/>
+			      		<apex:repeat value="{!theTime.TimeEntries__r}" var="entry">
+			      			<apex:outputText value=" ({!entry.TimePeriod__r.Name}" rendered="{!(Counter == 1)}"/>
+			      			<apex:outputText value="    --   {!entry.TimePeriod__r.Name} )"  rendered="{!(Counter == theTime.TimeEntries__r.size)}"/>
+			      			<apex:variable var="Counter" value="{!Counter+1}"/>
+			      		</apex:repeat>
+		      		</apex:outputLink>
+		      		</apex:column> 
+		      		<apex:column value="{!theTime.KimbleOne__Resource__c}" headerValue="{!$ObjectType.KimbleOne__Resource__c.Fields.Name.Label}"/> 
+		      		<apex:column value="{!theTime.ResourcedActivity__r.Name}"  headerValue="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.Name.Label}"/> 
+		      		<apex:column value="{!theTime.KimbleOne__Approver1User__c}" headerValue="{!$ObjectType.KimbleOne__Timesheet__c.Fields.KimbleOne__Approver1User__c.Label}"/>
+		      		<apex:column value="{!theTime.KimbleOne__Approver2User__c}" headerValue="{!$ObjectType.KimbleOne__Timesheet__c.Fields.KimbleOne__Approver2User__c.Label}"/>
+		        </apex:pageBlockTable>
+	           
+	            <div style="float:left; margin-top:15px;">
+					<apex:outputText value="{!TheTimeDetails.CurrentPageDescription}"/>
+				</div>
+				<div style="float: right; margin-right: 15px; margin-top:15px;">
+					    	<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPreviousPage}" rerender="TheViews" rendered="{!TheTimeDetails.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+					    	<apex:outputText styleclass="greyedLink" rendered="{!!TheTimeDetails.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+					    	&nbsp;|&nbsp;
+					    	<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNextPage}" rerender="TheViews" rendered="{!TheTimeDetails.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+					    	<apex:outputText styleclass="greyedLink" rendered="{!!TheTimeDetails.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+				</div>
+				<div style="clear:both;"></div>
+			</apex:outputPanel>
+			
+			<!-- Expense Detail Panel -->	
+			<apex:outputPanel layout="none" rendered="{!TheSelectedView = ShowExpenseDetails}">
+				<apex:pageBlockSection collapsible="false" columns="1" title="{!$ObjectType.KimbleOne__ExpenseClaim__c.LabelPlural}" />
+			
+				<apex:pageBlockTable value="{!TheExpenseDetails.TheRecords}" var="theExpense">
+	     			<apex:column headerValue="{!$ObjectType.KimbleOne__ExpenseClaim__c.Fields.Name.Label}">
+		      	   		<apex:outputLink value="/{!theExpense.ExpenseClaimId}">
+			      	   		<apex:outputText value="{!theExpense.ExpenseClaimName}" />
+		      			</apex:outputLink>
+		      		</apex:column> 
+		      		<apex:column value="{!theExpense.ResourcedActivityName}"  headerValue="{!$ObjectType.KimbleOne__ResourcedActivity__c.Fields.Name.Label}"/> 
+		      		<apex:column value="{!theExpense.ResourceName}" headerValue="{!$ObjectType.KimbleOne__Resource__c.Fields.Name.Label}"/> 
+		      		<apex:column value="{!theExpense.TotalNetAmount.KimbleOne__InputDecimal__c}"  headerValue="{!$Label.kimbleone__totalnetamtheader}"/> 
+		      		<apex:column value="{!theExpense.TotalExpenseRevenue.KimbleOne__InputDecimal__c}" headerValue="{!$ObjectType.KimbleOne__ExpenseClaim__c.Fields.KimbleOne__TotalExpenseRevenue__c.Label}"/>
+		        </apex:pageBlockTable>
+	           
+	            <div style="float:left; margin-top:15px;">
+					<apex:outputText value="{!TheExpenseDetails.CurrentPageDescription}"/>
+				</div>
+				<div style="float: right; margin-right: 15px; margin-top:15px;">
+					    	<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoPreviousPage}" rerender="TheViews" rendered="{!TheExpenseDetails.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+					    	<apex:outputText styleclass="greyedLink" rendered="{!!TheExpenseDetails.CanGoPrevious}" value="{!$Label.kimbleone__previouspagelink}"/>
+					    	&nbsp;|&nbsp;
+					    	<apex:commandLink style="color: #015BA7;text-decoration: none;" action="{!GoNextPage}" rerender="TheViews" rendered="{!TheExpenseDetails.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+					    	<apex:outputText styleclass="greyedLink" rendered="{!!TheExpenseDetails.CanGoNext}" value="{!$Label.kimbleone__nextpagelink}"/>
+				</div>
+				<div style="clear:both;"></div>
+			</apex:outputPanel>
+		</apex:outputPanel>
+	
+	</apex:facet>
+	</apex:actionStatus>
+	</apex:form>
+	</apex:pageBlock>
+	<script>
+		
+		var queuedUsage = new Array();
+		
+		function deleteAllAssignmentUsage()
+		{
+			startWorking();
+			
+			queuedUsage = jQuery('.removeForecast');
+			
+			if (queuedUsage.length == 0) return;
+			
+			queuedUsage.splice(0,1)[0].click();			
+		}
+		
+		function removeForecastUsage(assignmentId, obj)
+		{
+   			var assignmentRowObj = jQuery('tr[assignmentid="' + assignmentId + '"]');
+   			assignmentRowObj.find('td.actions-cell').addClass('Processing');
+   			assignmentRowObj.find('a.removeForecast').hide();
+   			
+   			var assignmentExpectedObj = assignmentRowObj.find('[id$="expectedUsage"]');
+   			var assignmentRemainingObj = assignmentRowObj.find('[id$="remainingUsage"]');
+   			
+   			var resourcedActivityId = assignmentRowObj.attr('resourcedactivityid')
+   			
+   			var activityExpectedObj = jQuery('tr[resourcedactivityid="' + resourcedActivityId + '"]').find('[id$="activityExpectedUsage"]');
+   			var activityRemainingObj = jQuery('tr[resourcedactivityid="' + resourcedActivityId + '"]').find('[id$="activityRemainingUsage"]');
+   			
+   			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupOperationsHomeController.RemoveForecastUsage}',
+	       		assignmentId, businessUnitGroupId, periodStartDateUTC, periodEndDateUTC, removeUsageStartDateUTC, removeUsageEndDateUTC, resourcedActivityId,
+	      			function(result, event){          
+	             		if (event.status) 
+			            {			            	
+			            	assignmentExpectedObj.text(jQuery.formatNumber(result.Expected, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+			            	assignmentExpectedObj.effect('highlight',2000);
+			            	
+			            	assignmentRemainingObj.text(jQuery.formatNumber(result.Remaining, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+			            	assignmentRemainingObj.effect('highlight',2000);
+			            	
+			            	activityExpectedObj.text(jQuery.formatNumber(result.TotalExpected, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+			            	activityExpectedObj.effect('highlight',2000);
+			            	
+			            	activityRemainingObj.text(jQuery.formatNumber(result.TotalRemaining, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+			            	activityRemainingObj.effect('highlight',2000);
+			            	
+				   			assignmentRowObj.find('td.actions-cell').removeClass('Processing');
+				   			assignmentRowObj.find('a.removeForecast').show();
+			            	
+			            	if (queuedUsage.length == 0)
+			            	{
+			            		refreshGraphView();
+			            		stopWorking();
+			            		return;
+			            	}
+			            			
+							queuedUsage.splice(0,1)[0].click();
+							
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+				   			assignmentRowObj.find('td.actions-cell').removeClass('Processing');
+				   			assignmentRowObj.find('a.removeForecast').show();
+			         	}		         	
+	         	}, 
+	         	{escape: true, timeout: 60000}
+	     	);
+		}
+		
+		function startWorking()
+		{
+			jQuery('#deleteAllUsageButton').hide();
+			jQuery('#deleteAllUsageWorking').show();
+		}		
+
+		function stopWorking()
+		{
+			jQuery('#deleteAllUsageButton').show();
+			jQuery('#deleteAllUsageWorking').hide();
+		}		
+		
+		jQuery(window).load(function() {
+			initialiseScreen();
+		});
+				
+		function initialiseScreen() {
+			setupDatePicker();
+			setupGridBehaviours();
+			setupSummaryCharts();
+			
+			jQuery('#deleteAllUsageButton').show();
+			jQuery('.fa-info-circle').qtip();
+		}
+						
+		function setupTimeSummaryCharts() {
+			// time entry summary		 	
+		 	var timeEntryGraphData = new Array(
+		   		 [timeEntrySummaryData.formattedForecastP3Usage.{!JSENCODE(NamespacePrefix)}InputDecimal__c,'{!JSENCODE($Label.ExpectedHoursGraphHeading)}','#BBB'],
+		   		 [timeEntrySummaryData.formattedRemainingP3Usage.{!JSENCODE(NamespacePrefix)}InputDecimal__c,'{!JSENCODE($Label.DeliveryGroupHomeRemaining)}','#F0BB75'],
+		   		 [timeEntrySummaryData.formattedDraftTime.{!JSENCODE(NamespacePrefix)}InputDecimal__c,'<a href="javascript:void(0)" onclick="changeView(\'{!JSENCODE(ShowTimeDetails)}\', \'{!JSENCODE(ApprovalStatusDraft)}\')">{!$Label.DraftHoursGraphHeading}</a>','#729BC7'],
+		   		 [timeEntrySummaryData.formattedRejectedTime.{!JSENCODE(NamespacePrefix)}InputDecimal__c,'<a href="javascript:void(0)" onclick="changeView(\'{!JSENCODE(ShowTimeDetails)}\', \'{!JSENCODE(ApprovalStatusRejected)}\')">{!$Label.Rejected}</a>','#B42D34'],
+		   		 [timeEntrySummaryData.formattedReadyForApprovalTime.{!JSENCODE(NamespacePrefix)}InputDecimal__c,'<a href="javascript:void(0)" onclick="changeView(\'{!JSENCODE(ShowTimeDetails)}\', \'{!JSENCODE(ApprovalStatusReadyForApproval)}\')">{!$Label.PendingApprovalWithLineBreakHeading}</a>','#E58E1A'],
+		   		 [timeEntrySummaryData.formattedActualUsage.{!JSENCODE(NamespacePrefix)}InputDecimal__c, '<a href="javascript:void(0)" onclick="changeView(\'{!JSENCODE(ShowTimeDetails)}\', \'{!JSENCODE(ApprovalStatusApproved)}\')">{!$Label.ApprovedHoursGraphHeading}</a>','#008752']);
+		   		 
+		 	$('#divForTimeEntrySummaryGraph').jqBarGraph({ data: timeEntryGraphData,title: '<div class="graphTitle">{!$Label.TotalTimeEntryHeading} ({!JSENCODE(DisplayUnitType.Suffix__c)})</div>', height:150, width:495, animate: false, barSpace: 6}); 
+		 	
+		 	jQuery.each($('div.graphValuedivForTimeEntrySummaryGraph'),function(i,obj){
+		 		$(obj).text($.formatNumber($(obj).text(), {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+		 	});
+		 	
+		 	// time invoicing summary
+		 	var timeInvoicingGraphData = new Array(
+		   		 [timeInvoicingSummaryData.formattedInvoiceableTime.{!JSENCODE(NamespacePrefix)}InputDecimal__c,'Invoiceable','#729BC7'],
+		   		 [timeInvoicingSummaryData.formattedInvoicedTime.{!JSENCODE(NamespacePrefix)}InputDecimal__c,'Invoiced','#008752']);
+		   		 
+		 	$('#divForTimeInvoicingSummaryGraph').jqBarGraph({ data: timeInvoicingGraphData,title: '<div class="graphTitle">{!$Label.TotalTimeInvoicingHeading} ({!JSENCODE(DisplayUnitType.Suffix__c)})</div>', height:150, width:158, animate: false, barSpace: 6}); 
+		 	
+		 	jQuery.each($('div.graphValuedivForTimeInvoicingSummaryGraph'),function(i,obj){
+		 		$(obj).text($.formatNumber($(obj).text(), {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+		 	});		
+		}
+		
+		function setupExpenseSummaryCharts() {
+			// expense entry summary		 	
+		 	var expenseEntryGraphData = new Array(
+		   		 [expenseEntrySummaryData.formattedDraftExpense.{!JSENCODE(NamespacePrefix)}InputDecimal__c,'<a href="javascript:void(0)" onclick="changeView(\'{!JSENCODE(ShowExpenseDetails)}\', \'{!JSENCODE(ApprovalStatusDraft)}\')">{!$Label.DraftHoursGraphHeading}</a>','#729BC7'],
+		   		 [expenseEntrySummaryData.formattedRejectedExpense.{!JSENCODE(NamespacePrefix)}InputDecimal__c,'<a href="javascript:void(0)" onclick="changeView(\'{!JSENCODE(ShowExpenseDetails)}\', \'{!JSENCODE(ApprovalStatusRejected)}\')">{!$Label.Rejected}</a>','#B42D34'],
+		   		 [expenseEntrySummaryData.formattedReadyForApprovalExpense.{!JSENCODE(NamespacePrefix)}InputDecimal__c,'<a href="javascript:void(0)" onclick="changeView(\'{!JSENCODE(ShowExpenseDetails)}\', \'{!JSENCODE(ApprovalStatusReadyForApproval)}\')">{!$Label.PendingApprovalWithLineBreakHeading}</a>','#E58E1A'],
+		   		 [expenseEntrySummaryData.formattedActualExpense.{!JSENCODE(NamespacePrefix)}InputDecimal__c,'<a href="javascript:void(0)" onclick="changeView(\'{!JSENCODE(ShowExpenseDetails)}\', \'{!JSENCODE(ApprovalStatusApproved)}\')">{!$Label.ApprovedHoursGraphHeading}</a>','#008752']);
+		   		 
+		 	$('#divForExpenseEntrySummaryGraph').jqBarGraph({ data: expenseEntryGraphData,title: '<div class="graphTitle">{!$Label.TotalExpenseEntryHeading} ({!DeliveryGroupCurrencyIsoCode})</div>', height:150, width:386, animate: false, barSpace: 7}); 
+		 	
+		 	jQuery.each($('div.graphValuedivForExpenseEntrySummaryGraph'),function(i,obj){
+		 		$(obj).text($.formatNumber($(obj).text(), {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+		 	});
+		 	
+		 	// expense invoicing summary
+		 	var expenseInvoicingGraphData = new Array(
+		   		 [expenseInvoicingSummaryData.formattedInvoiceableExpense.{!JSENCODE(NamespacePrefix)}InputDecimal__c,'Invoiceable','#729BC7'],
+		   		 [expenseInvoicingSummaryData.formattedInvoicedExpense.{!JSENCODE(NamespacePrefix)}InputDecimal__c,'Invoiced','#008752']);
+		   		 
+		 	$('#divForExpenseInvoicingSummaryGraph').jqBarGraph({ data: expenseInvoicingGraphData,title: '<div class="graphTitle">{!$Label.TotalExpenseInvoicingHeading} ({!JSENCODE(DeliveryGroupInvoicingCurrencyIsoCode)})</div>', height:150, width:186, animate: false, barSpace: 6}); 
+		 	
+		 	jQuery.each($('div.graphValuedivForExpenseInvoicingSummaryGraph'),function(i,obj){
+		 		$(obj).text($.formatNumber($(obj).text(), {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+		 	});		
+		}
+		
+		function setupGridBehaviours() {
+	        jQuery(".groupDataRowHideCell").click(function() {
+	        	var theResourcedActivityId = $(this).parent().attr('resourcedActivityId');
+	        	var groupRowIsDisplayed = $(this).parent().find('img').hasClass("groupDataRowExpanded");
+	        	
+	        	// can't just use toggle as that would mean that child assignments that were hidden
+	        	// would appear when hiding the group, instead hide those that are visible if visible
+	        	// or show those that are hidden if not childassignmentrows
+	        	if(groupRowIsDisplayed) {
+	            	jQuery(".dataRow[resourcedActivityId='" + theResourcedActivityId + "']:visible").hide();
+	            }
+	            else {
+	            	jQuery(".dataRow[resourcedActivityId='" + theResourcedActivityId + "']").show();
+					jQuery(".parentAssignmentDataRow[resourcedActivityId='" + theResourcedActivityId + "']").find('img').removeClass('parentAssignmentDataRowTwisterCollapsed').addClass('parentAssignmentDataRowTwisterExpanded');	            	
+	            }
+	            	
+	            jQuery(this).parent().find('img').toggleClass('groupDataRowTwisterExpanded');
+	            jQuery(this).parent().find('img').toggleClass('groupDataRowTwisterCollapsed');            
+            
+	            $(this).parent().find('img').toggleClass('groupDataRowExpanded');
+	            $(this).parent().find('img').toggleClass('groupDataRowCollapsed');
+	        });
+        			        
+	        jQuery(".parentAssignmentDataRow").click(function() {
+	        	var assignmentId = $(this).closest('tr').attr('assignmentId');
+	            jQuery(".dataRow[parentAssignmentId='" + assignmentId + "']").toggle();
+	            jQuery(this).find('img').toggleClass('parentAssignmentDataRowTwisterExpanded');
+	            jQuery(this).find('img').toggleClass('parentAssignmentDataRowTwisterCollapsed');
+	        });
+	    }
+	    
+	    function setupDatePicker() { 			
+			$('.datepicker').datepicker({ 
+					dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true, 
+					selectOtherMonths: true, 
+					buttonText: '{!JSENCODE($Label.OpenTimePeriodDropdownToolTip)}', 
+					buttonImageOnly: true, 
+					buttonImage: '{!URLFOR($Resource.AssignmentImages, 'CalendarButtonSquare.png')}', 
+					showOn: "button",
+					changeMonth: true,
+      				changeYear: true
+			}); 
+		}
+	        
+	</script>		
+	<style>
+	
+	/*
+		assignment table styles
+	*/
+	.dataRow.current-period {
+	    display: table-row;
+	}
+	.dataRow.other-period {
+	    display: none !important;
+	}
+	.nestedDataRow {
+	    height: 15px;
+	}
+	
+	.nestedRowLabel {
+		font-weight:bold;
+	}
+	
+	.rightAlignDataCell {
+		text-align: right;
+		padding-right: 5px;
+	}
+	
+	.rightAlignCell {
+		text-align: right;
+	}
+	
+	.centerAlignDataCell {
+		text-align: center;
+	}
+	
+	.centerAlignTable {
+		margin:auto;
+	}
+	
+	.topAlignDataCell {
+		vertical-align:top;
+	}
+	
+	.columnLabel {
+	    display: inline-block;
+	    width: 100%;
+	}
+	
+	.parentGroupDataRow {
+		font-style:italic;
+		font-weight:bold;
+		background-color: #ccc;
+	}
+	
+	.groupDataRow {
+		font-style:italic;
+		font-weight:bold;
+		background-color: #DDD;
+	}
+	
+	.groupDataRowHideCell:hover {
+		cursor: pointer;
+	}
+	
+	.groupDataRowCollapsed {
+		height: 11px;
+		width: 11px;
+		background: transparent url('/img/alohaSkin/twisty_sprite.png') 0px 0px
+			no-repeat;
+		margin-left: 3px;
+		margin-right: 12px;
+		background-position: 1px -1px;
+	}
+	
+	.groupDataRowExpanded {
+		height: 11px;
+		width: 11px;
+		background: transparent url('/img/alohaSkin/twisty_sprite.png') 0px 0px
+			no-repeat;
+		margin-left: 3px;
+		margin-right: 12px;
+		background-position: 1px -12px;
+	}
+	
+	#timeSummaryTable, #expenseSummaryTable {
+		width: auto;
+		table-layout: fixed;
+	    border-collapse: collapse;
+	    width: 0; /* otherwise Chrome will not increase table size */
+	}
+	
+	#timeSummaryTable th, #timeSummaryTable td, #expenseSummaryTable th, #expenseSummaryTable td {
+	    overflow: hidden;
+	    white-space: nowrap;
+	}
+	
+	.selectable {
+		cursor: pointer;
+	}
+	
+	.parentAssignmentDataRow:hover {
+		cursor: pointer;
+	}
+	
+	.parentAssignmentDataRowTwisterCollapsed {
+		height: 11px;
+		width: 11px;
+		background: transparent url('/img/alohaSkin/twisty_sprite.png') 0px 0px
+			no-repeat;
+		margin-left: 3px;
+		margin-right: 12px;
+		background-position: 1px -1px;
+	}
+	
+	.parentAssignmentDataRowTwisterExpanded {
+		height: 11px;
+		width: 11px;
+		background: transparent url('/img/alohaSkin/twisty_sprite.png') 0px 0px
+			no-repeat;
+		margin-left: 3px;
+		margin-right: 12px;
+		background-position: 1px -12px;
+	}
+	
+	.childAssignmentIndentedCell {
+	padding-left: 30px !important;
+	}
+	
+	.childAssignmentDataRow {
+		font-style:italic;
+	}
+
+	/*
+		loading panel
+	*/
+	
+	.loadingIndicator {
+	   width: -moz-calc(100% - 247px);
+	   width: -webkit-calc(100% - 247px);
+	   width: calc(100% - 247px);
+	   height: -moz-calc(100% - 174px);
+	   height: -webkit-calc(100% - 174px);
+	   height: calc(100% - 174px);
+	   font-weight: bold;
+	   font-size: 16px;
+	   position:absolute;
+	   text-align:center;
+	   /* IE filter */
+	   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+	   -moz-opacity:0.7;    /* Mozilla extension */
+	   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+	   opacity:0.7; /* CSS3 */
+	   z-index:1000;
+	   background-color:white;
+	}
+	
+	.loadingIndicator img {
+		margin-right:9px;
+	}
+	
+	#loadingIndicatorInnerContainer { 
+		position:absolute; 
+		top:10%;
+		height:10em; 
+		width:100%;
+	}
+	
+	/*
+		Summary Graph
+	*/
+
+	.graphText {font-size: 10px;white-space: nowrap;font-weight: bold;color: #4A4A56;}
+	.graphTitle {font-size: 12px;white-space: nowrap;font-weight: bold;color: #4A4A56;margin-top:4px;margin-bottom:4px;}
+	.graphLabeldivForTimeEntrySummaryGraph{height:29px;}
+	.graphLabeldivForTimeInvoicingSummaryGraph{height:29px;}
+	.graphLabeldivForExpenseEntrySummaryGraph{height:29px;}
+	.graphLabeldivForExpenseInvoicingSummaryGraph{height:29px;}
+
+	#graphHolder1divForTimeInvoicingSummaryGraph .graphTitle {
+		display: inline-block;
+		text-overflow: ellipsis;
+		width: 155px;
+		overflow: hidden;
+		white-space: normal;
+	}
+	div[id^='graphLabel'] a {
+		display: inline-block;
+		text-overflow: ellipsis;
+		width: 70px;
+		overflow: hidden;
+		white-space: normal;
+	}
+
+	.periodLabel {
+		font-size:16px;
+		position: relative;
+		top: -10px;
+	}
+	
+	.periodLabelHeading {
+		font-size:16px;
+		font-weight:bold;
+	}
+	.Processing 
+	{
+		background-image: url('{!URLFOR($Resource.JobImages, 'running16.gif')}') !important;
+		background-repeat:no-repeat !important;
+	}
+	td.actions-cell {
+	    width: 26px;
+	    height: 40px;
+	}
+	td.Processing {
+	    background-position-x: 8px;
+	    background-position-y: 16px;
+	}
+	a.removeForecast {
+	    font-size: 16px;
+	    padding-left: 8px;
+	}
+	div#deleteAllUsageWorking {
+	    height: 14px;
+	    display: none;
+	    width: 18px;
+	    padding: 2px;
+	}
+	.fa.fa-info-circle {
+		color: #428BCA;
+		font-size: 15px;
+		padding-left: 4px;
+	}
+	table[id$="rdoPeriodMode"] {
+	    margin-bottom: 14px;
+	}
+	table[id$="rdoViewMode"] {
+	    margin-top: 6px;
+	}
+	</style>
+	
+	
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

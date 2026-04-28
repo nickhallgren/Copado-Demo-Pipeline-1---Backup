@@ -1,0 +1,116 @@
+<apex:page standardController="KimbleOne__Product__c" extensions="KimbleOne.CreditTemplatesController" sidebar="false">
+
+	<apex:composition template="KimbleOne__SiteMaster">
+		<apex:define name="Menu">
+			<c:Menu MenuContextType="ProductDefinition" MenuContextId="{!KimbleOne__Product__c.Id}" MenuContextName="{!KimbleOne__Product__c.Name}"/>
+		</apex:define>
+		<apex:define name="Content">
+			<apex:outputPanel id="CreditTemplatesMainPanel">
+				<apex:form >
+					<apex:pageBlock id="CreditTemplateDetailPanel">
+						<apex:pageBlockButtons rendered="{!theCreditTemplates.size == 0}">
+							<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__CreditTemplate__c.createable}">
+								<apex:outputPanel layout="none" rendered="{!KimbleOne__Product__c.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsCreditGenerated__c}">
+									<input class="btn" type="button"
+											onclick="initialiseModalBoxy('#CreditTemplatesPopup', '{!JSENCODE($Label.New)} {!$ObjectType.CreditTemplate__c.label}');newCreditTemplate()"
+											value="{!$Label.New} {!$ObjectType.CreditTemplate__c.label}" />
+								</apex:outputPanel>	
+							</apex:outputPanel>
+						</apex:pageBlockButtons>
+						<apex:pageBlockTable value="{!theCreditTemplates}" var="aCreditTemplate">
+							<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+								<apex:outputPanel rendered="{!$ObjectType.KimbleOne__CreditTemplate__c.updateable}">
+									<apex:outputLink value="#" onclick="initialiseModalBoxy('#CreditTemplatesPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__CreditTemplate__c.label}');editCreditTemplate('{!JSINHTMLENCODE(aCreditTemplate.id)}', '{!aCreditTemplate.Id}')">{!$Label.kimbleone__edit}</apex:outputLink>
+								</apex:outputPanel>
+	           					&nbsp; | &nbsp;
+								<apex:commandLink onclick="var d = confirmDelete();if(!d) return;"
+									action="{!deleteCreditTemplate}" rendered="{!$ObjectType.KimbleOne__CreditTemplate__c.deletable}"
+									reRender="CreditTemplatesMainPanel">{!$Label.kimbleone__delete}
+									<apex:param name="ctId" value="{!aCreditTemplate.Id}" />
+								</apex:commandLink>
+							</apex:column>
+							<apex:column headerValue="{!$ObjectType.KimbleOne__Credit__c.Fields.Name.Label}">
+								<apex:outputField value="{!aCreditTemplate.name}" />
+							</apex:column>
+							<apex:column headerValue="{!$ObjectType.KimbleOne__CreditTemplate__c.Fields.KimbleOne__CreditValue__c.Label}">
+								<apex:outputField value="{!aCreditTemplate.KimbleOne__CreditValue__c}" />
+							</apex:column>
+							<apex:column headerValue="{!$ObjectType.KimbleOne__CreditTemplate__c.Fields.KimbleOne__CreditUnits__c.Label}" rendered="{!HasUnits}">
+								<apex:outputField value="{!aCreditTemplate.KimbleOne__CreditUnits__c}" />
+							</apex:column>
+							<apex:column headerValue="{!$ObjectType.KimbleOne__CreditTemplate__c.Fields.KimbleOne__UnitValue__c.Label}" rendered="{!HasUnits}">
+								<apex:outputField value="{!aCreditTemplate.KimbleOne__UnitValue__c}" />
+							</apex:column>
+						</apex:pageBlockTable>
+					</apex:pageBlock>
+					
+					<apex:actionFunction action="{!newCreditTemplate}"
+						name="newCreditTemplate"
+						rerender="CreditTemplatesPopupPanel"
+						oncomplete="showModalBoxy();" >
+					</apex:actionFunction>
+					
+					<apex:actionFunction action="{!editCreditTemplate}"
+						name="editCreditTemplate"
+						rerender="CreditTemplatesPopupPanel"
+						oncomplete="showModalBoxy();">
+					</apex:actionFunction>
+				</apex:form>
+			</apex:outputPanel>
+			
+			<div id="CreditTemplatesPopup" style="display: none">
+				<apex:outputPanel id="CreditTemplatesPopupPanel">
+					<apex:form >
+						<apex:pageBlock >
+	
+							<div id="CreditTemplatesPopupErrors">
+								<apex:pageMessages escape="false"/>
+							</div>
+							<apex:pageBlockButtons location="bottom">
+								<apex:commandButton action="{!upsertCreditTemplate}"
+									value="{!$Label.kimbleone__save}"
+									oncomplete="hideModalBoxyWithErrorCheck('#CreditTemplatesPopupErrors')"
+									reRender="CreditTemplatesPopupPanel, CreditTemplatesMainPanel" />
+								<input class="btn" type="button" onclick="hideModalBoxy();"
+									value="{!$Label.Cancel}" />
+							</apex:pageBlockButtons>
+
+							<apex:pageblockSection collapsible="false" showheader="false" columns="2">
+								<apex:pageBlockSectionItem >
+									<apex:outputLabel >{!$ObjectType.KimbleOne__Credit__c.Fields.Name.Label}</apex:outputLabel>
+									<apex:inputfield value="{!CreditTemplate.Name}" required="true" />
+								</apex:pageBlockSectionItem>
+								<apex:pageBlockSectionItem />
+								<apex:pageBlockSectionItem rendered="{!!HasUnits}">
+									<apex:outputLabel >{!$ObjectType.KimbleOne__CreditTemplate__c.Fields.KimbleOne__CreditValue__c.Label} {!JSINHTMLENCODE(CreditTemplate.CurrencyIsoCode)}</apex:outputLabel>
+									<apex:inputField id="inputCreditValue" styleclass="MilestoneValueTextEdit" value="{!CreditTemplate.KimbleOne__CreditValue__c}" required="true"/>
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem rendered="{!HasUnits}">
+									<apex:outputLabel >{!$ObjectType.KimbleOne__CreditTemplate__c.Fields.KimbleOne__CreditUnits__c.Label}</apex:outputLabel>
+									<apex:actionRegion >
+										<apex:inputfield value="{!CreditTemplate.KimbleOne__CreditUnits__c}" required="true" >
+											<apex:actionSupport event="onchange" action="{!RecalculateCreditValue}" rerender="CreditValue" />
+										</apex:inputfield>
+									</apex:actionRegion>
+								</apex:pageBlockSectionItem>
+								<apex:pageBlockSectionItem rendered="{!HasUnits}">
+									<apex:outputLabel >{!$ObjectType.KimbleOne__CreditTemplate__c.Fields.KimbleOne__UnitValue__c.Label} {!JSINHTMLENCODE(CreditTemplate.CurrencyIsoCode)}</apex:outputLabel>
+									<apex:actionRegion >
+										<apex:inputfield value="{!CreditTemplate.KimbleOne__UnitValue__c}" required="true">
+											<apex:actionSupport event="onchange" action="{!RecalculateCreditValue}" rerender="CreditValue" />
+										</apex:inputfield>
+									</apex:actionRegion>
+								</apex:pageBlockSectionItem>
+								<apex:outputField id="CreditValue" value="{!CreditTemplate.KimbleOne__CreditValue__c}" rendered="{!HasUnits}" />
+							</apex:pageblockSection>
+
+						</apex:pageBlock>
+					</apex:form>
+				</apex:outputPanel>
+			</div>
+			
+		</apex:define>
+	</apex:composition>
+	
+</apex:page>

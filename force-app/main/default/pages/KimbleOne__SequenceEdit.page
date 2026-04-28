@@ -1,0 +1,162 @@
+<apex:page standardController="KimbleOne__Sequence__c" extensions="KimbleOne.SequenceEditController" sidebar="false">
+    
+	<apex:composition template="KimbleOne__SiteMaster">
+		<apex:define name="Content">
+			
+			<apex:pageMessages />
+			<apex:form id="formId">
+                <apex:actionFunction name="saveactionFunc" action="{!saveSequence}">
+                </apex:actionFunction>
+				<apex:pageBlock id="pageblockId">
+					<apex:pageblockSection collapsible="false" showheader="false" columns="2">
+						<apex:inputField value="{!KimbleOne__Sequence__c.Name}"/>
+						<apex:pageBlockSectionItem >
+							<apex:outputText value="{!$ObjectType.KimbleOne__Sequence__c.Fields.KimbleOne__Enum__c.Label}" />
+							<apex:selectList id="enumSelectId" size="1" value="{!selectedEnumVal}" styleclass="EnumListVal">
+                                <apex:actionSupport event="onchange"  reRender="pageblockId,errorid" oncomplete="getReferenceData();"/>
+                                <apex:selectOptions value="{!EnumSelectionValues}">
+                                </apex:selectOptions>
+                            </apex:selectList>
+                        </apex:pageBlockSectionItem>
+                        
+                       
+                        
+                        <!-- NEW END-->
+						
+						<apex:inputField value="{!KimbleOne__Sequence__c.KimbleOne__Prefix__c}"/>
+						
+						 <apex:pageBlockSectionItem rendered="{!OR(selectedEnumVal == 'SupplierInvoiceReferenceCandidate',selectedEnumVal == 'SupplierInvoiceReference')}">
+							<apex:outputText value="{!$Label.kimbleone__context}" />
+                            <apex:selectList id="enumdependentSelectId" size="1" value="{!selectedDependentEnumVal}" styleclass="EnumListVal">
+                                <apex:actionSupport event="onchange"  reRender="pageblockId,errorid" oncomplete="getReferenceData();"/>
+                                <apex:selectOptions value="{!EnumDependentSelectionValues}">
+                                </apex:selectOptions>
+                            </apex:selectList>
+                        </apex:pageBlockSectionItem>
+                        
+						<apex:pageBlockSectionItem rendered="if(!OR(selectedEnumVal == 'SupplierInvoiceReferenceCandidate',selectedEnumVal == 'SupplierInvoiceReference'),
+															if(OR(selectedEnumVal == 'InvoiceReferenceCandidate',selectedEnumVal == 'InvoiceReference',selectedEnumVal == 'InvoiceReferenceInternalCandidate',selectedEnumVal == 'InvoiceReferenceInternal',selectedEnumVal =='CreditNoteReferenceCandidate',selectedEnumVal =='CreditNoteReference'),false,
+															if(OR(selectedEnumVal == 'DeliveryGroupChangeOrder',selectedEnumVal == 'DeliveryElementReference'),false,true)),false)" />
+						
+						 <apex:pageBlockSectionItem rendered="{!OR(selectedEnumVal == 'InvoiceReferenceCandidate',selectedEnumVal == 'InvoiceReference',selectedEnumVal == 'InvoiceReferenceInternalCandidate',selectedEnumVal == 'InvoiceReferenceInternal',selectedEnumVal =='CreditNoteReferenceCandidate',selectedEnumVal =='CreditNoteReference')}">
+                        	<apex:outputText styleClass="businessunitCls" value="{!$ObjectType.KimbleOne__BusinessUnit__c.Label}" />
+                            <apex:outputPanel layout="none" id="businessunitPanel">
+                                <apex:selectList styleclass="BusinessUnit"  size="1">
+                                	<apex:selectOptions value="{!BusinessUnitSelectionValues}" />
+                            	</apex:selectList> 
+                            </apex:outputPanel>
+                        </apex:pageBlockSectionItem>
+                        
+                         <apex:pageBlockSectionItem rendered="{!OR(selectedEnumVal == 'DeliveryGroupChangeOrder',selectedEnumVal == 'DeliveryElementReference')}">
+                            <apex:outputLabel styleClass="deliveryGroupCls" value="{!$ObjectType.KimbleOne__CustomerDeliveryGroup__c.Label}"/>
+                            <apex:outputPanel layout="none">
+                                <apex:outputPanel layout="block">
+                                    <apex:inputText id="deliveryGroupRecId" value="{!deliveryGroupName}"  styleclass="readonly"/>
+                                    <apex:inputHidden id="deliveryGroupRecId_lkid" value="{!deliveryGroupId}"/>
+                                <a href="javascript:openLookup(KimbleLookupPage + '?lkfm=' + jQuery('[id$=\'TheForm\']').attr('id') + '&lknm=' + jQuery('[id$=\'deliveryGroupRecId\']').attr('id') + '&lktp={!$ObjectType.Account.KeyPrefix}&sequenceId={!sequence.Id}&typename=LookupObjectDeliveryGroup',670,'1','&lksrch='+jQuery('[id$=\'deliveryGroupRecId\']').val())" class="kimbleSearch " onclick="setLastMousePosition(event)" ><img src="/s.gif" class="lookupIcon" onblur="this.className = 'lookupIcon';" onfocus="this.className = 'lookupIconOn';" onmouseout="this.className = 'lookupIcon';this.className = 'lookupIcon';" onmouseover="this.className = 'lookupIconOn';this.className = 'lookupIconOn';" /></a>    
+                                </apex:outputPanel>
+                            </apex:outputPanel>
+                        </apex:pageBlockSectionItem>
+                        
+						<apex:inputField value="{!KimbleOne__Sequence__c.KimbleOne__DisplayFormat__c}"/>
+						
+						<apex:pageBlockSectionItem rendered="{!if(!OR(selectedEnumVal == 'SupplierInvoiceReferenceCandidate',selectedEnumVal == 'SupplierInvoiceReference'),
+                        										if(OR(selectedEnumVal == 'InvoiceReferenceCandidate',selectedEnumVal == 'InvoiceReference',selectedEnumVal == 'InvoiceReferenceInternalCandidate',selectedEnumVal == 'InvoiceReferenceInternal',selectedEnumVal =='CreditNoteReferenceCandidate',selectedEnumVal =='CreditNoteReference'),false,
+                        										if(OR(selectedEnumVal == 'DeliveryGroupChangeOrder',selectedEnumVal == 'DeliveryElementReference'),false, true)),false)}" />
+						
+                        <!-- NEW -->
+                        <apex:pageBlockSectionItem rendered="{!AND(selectedDependentEnumVal == 'Resource',OR(selectedEnumVal == 'SupplierInvoiceReferenceCandidate',selectedEnumVal == 'SupplierInvoiceReference'))}">
+                            <apex:outputLabel styleClass="resourcelablecls" value="{!$ObjectType.KimbleOne__Resource__c.Label}"/>
+                            <apex:outputPanel layout="none">
+                                <apex:outputPanel layout="block">
+                                	<apex:outputPanel rendered="{!NOT(sequenceParam == 'RSD')}">
+	                                    <apex:inputText id="resourceId" value="{!resourceName}"  styleclass="readonly" />
+	                                    <a href="javascript:openLookup(KimbleLookupPage + '?lkfm=' + jQuery('[id$=\'TheForm\']').attr('id') + '&lknm=' + jQuery('[id$=\'resourceId\']').attr('id') + '&lktp={!$ObjectType.Resource__c.KeyPrefix}&typename=LookupObjectSupplierResource',670,'1','&lksrch='+jQuery('[id$=\'resourceId\']').val())" class="kimbleSearch " onclick="setLastMousePosition(event)" ><img src="/s.gif" class="lookupIcon" onblur="this.className = 'lookupIcon';" onfocus="this.className = 'lookupIconOn';" onmouseout="this.className = 'lookupIcon';this.className = 'lookupIcon';" onmouseover="this.className = 'lookupIconOn';this.className = 'lookupIconOn';" /></a>
+                                    </apex:outputPanel>
+                                	 <apex:inputHidden id="resourceId_lkid" value="{!resourceId}"/>
+                                	<apex:outputText value="{!resourceName}" rendered="{!sequenceParam == 'RSD'}"/>  
+                                </apex:outputPanel>
+                            </apex:outputPanel>
+                        </apex:pageBlockSectionItem>
+                        
+                        <apex:pageBlockSectionItem rendered="{!AND(selectedDependentEnumVal =='Account',OR(selectedEnumVal == 'SupplierInvoiceReferenceCandidate',selectedEnumVal == 'SupplierInvoiceReference'))}">
+                            <apex:outputLabel styleClass="accountCls" value="{!$ObjectType.Account.Label}"/>
+                            <apex:outputPanel layout="none">
+                                <apex:outputPanel layout="block">
+                                    <apex:inputText id="AccountRecId" value="{!accountName}"  styleclass="readonly"/>
+                                    <apex:inputHidden id="AccountRecId_lkid" value="{!accountId}"/>
+                                    <a href="javascript:openLookup(KimbleLookupPage + '?lkfm=' + jQuery('[id$=\'TheForm\']').attr('id') + '&lknm=' + jQuery('[id$=\'AccountRecId\']').attr('id') + '&lktp={!$ObjectType.Account.KeyPrefix}&typename=LookupObjectSupplierAccount',670,'1','&lksrch='+jQuery('[id$=\'AccountRecId\']').val())" class="kimbleSearch " onclick="setLastMousePosition(event)" ><img src="/s.gif" class="lookupIcon" onblur="this.className = 'lookupIcon';" onfocus="this.className = 'lookupIconOn';" onmouseout="this.className = 'lookupIcon';this.className = 'lookupIcon';" onmouseover="this.className = 'lookupIconOn';this.className = 'lookupIconOn';" /></a>    
+                                </apex:outputPanel>
+                            </apex:outputPanel>
+                        </apex:pageBlockSectionItem>
+                        
+						<apex:inputField value="{!KimbleOne__Sequence__c.KimbleOne__CurrentValue__c}"/>	
+						
+					</apex:pageblockSection>
+                    <apex:pageBlockButtons location="bottom">
+                        <!-- <button type="button" class="btn" onclick="saveFunction('Save'); return false;">{!$Label.Save}</button> -->
+                        <input class="btn"  type="button" onclick="saveFunction('Save'); return false;" value="{!$Label.Save}"/>
+                        <input class="btn" type="button" onclick="redirectPage('{!JSENCODE($ObjectType.Sequence__c.keyPrefix)}', '{!JSENCODE(sequenceParam)}', '{!JSENCODE(resId)}');" value="{!$Label.Cancel}"/>
+                    </apex:pageBlockButtons>
+					<apex:inputText value="{!KimbleOne__Sequence__c.KimbleOne__Enum__c}" style="display:none"  styleclass="Enum"/>
+                    <apex:inputText value="{!KimbleOne__Sequence__c.KimbleOne__ContextId__c}" style="display:none"  styleclass="contextIdcls"/>
+                    <apex:inputText value="{!sObjName}" style="display:none"  styleclass="enumSobjectcls"/>
+				</apex:pageBlock>
+			</apex:form>
+			<script>
+			
+			jQuery(window).load(function (){
+                var enumSobjecVal = jQuery('.enumSobjectcls').val();
+                if(enumSobjecVal == 'Business Unit')
+                {
+                    var vals = jQuery('.Enum').val().split(':');
+                    if(vals[1] != '' || vals[1] != 'undefined')
+                        jQuery('.BusinessUnit').val(vals[1]);
+                }
+			});
+			
+            function saveFunction(action)
+            {
+                
+                var enumVal = jQuery('.EnumListVal').val();
+                var selected='';
+                var contextId='';
+                
+                if($('.resourcelablecls').is(':visible'))
+                   selected = jQuery("[id$=resourceId_lkid]").val();
+                else if($('.businessunitCls').is(':visible'))
+                   selected = jQuery('.BusinessUnit').val();
+                else if($('.accountCls').is(':visible'))
+                    selected = jQuery("[id$=AccountRecId_lkid]").val();   
+                else if($('.deliveryGroupCls').is(':visible'))
+                    selected = jQuery("[id$=deliveryGroupRecId_lkid]").val();    
+                
+                contextId = selected;
+                if(enumVal != '')
+                {
+                	if(selected != '')
+                 		jQuery('.Enum').val(enumVal+':'+selected);
+                 	else
+                 		jQuery('.Enum').val(enumVal);
+                }
+                else
+                jQuery('.Enum').val('');
+                
+                jQuery('.contextIdcls').val(selected);
+                
+                if(action == 'Save')
+                    saveactionFunc();
+            }
+            
+            function redirectPage(sequenceObjectPrefix, RSDPage, resourceId)
+            {
+            	if(RSDPage != '')
+            		window.location.href = '/apex/ResourceSupplierDashboard?id='+resourceId;
+            	else 
+            		window.location.href = '/'+sequenceObjectPrefix;
+            }
+			</script>
+		</apex:define>
+		
+	</apex:composition>
+</apex:page>

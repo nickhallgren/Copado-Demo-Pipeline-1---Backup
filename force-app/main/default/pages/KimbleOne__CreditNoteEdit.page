@@ -1,0 +1,302 @@
+<apex:page standardController="KimbleOne__CreditNote__c" action="{!CheckStatus}"  extensions="KimbleOne.CreditNoteEditController" showHeader="true" sidebar="false" tabStyle="KimbleOne__CreditNote__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+      	<c:Menu DefaultHelpPage="CreateCreditNote.html" MenuContextType="CreditNote" MenuContextId="{!KimbleOne__CreditNote__c.Id}" MenuContextName="{!KimbleOne__CreditNote__c.KimbleOne__Reference__c}"/>
+    </apex:define>
+    
+    <apex:define name="Content">
+    	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+    	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+
+    	<apex:form id="TheForm">
+    	<div id="pageErrors">
+    		<apex:pageMessages escape="False" />
+		</div>
+		
+		<style>
+			/* Credit Note contacts */
+			div.select2-container.find-creditnote-contact a.select2-choice {
+				height: 18px !important;
+				line-height: 18px !important;
+				background-image: none !important;
+				border-radius: 0px !important;
+				color: black !important;
+				padding-left: 4px !important;
+			}
+			div.select2-container.find-creditnote-contact .select2-choice div {
+				border-left: none !important;
+			}
+			td.action-btn {
+			    font-size: 16px;
+			    text-align: center;
+			    cursor: pointer;
+			    width: 18px;
+			}
+			th.primary-cell {
+			    width: 100px;
+			}
+			td.primary-cell {
+			    text-align: center;
+			}
+			.select2-container.find-creditnote-contact {
+			    width: 100% !important;
+			    padding-right: 2px;
+			}
+		</style>
+		
+		<apex:pageBlock title="{!$ObjectType.KimbleOne__CreditNote__c.Label}">
+			<apex:pageblockButtons >
+				<apex:commandButton id="saveCreditNoteBtn" action="{!SaveCreditNote}" onclick="processCreditNoteContacts();" value="{!$Label.kimbleone__save}"/>
+			</apex:pageblockButtons>
+			<apex:pageBlockSection columns="2" title="{!$Label.kimbleone__creditnotedetailsheading}">
+				
+				<apex:outputField value="{!KimbleOne__CreditNote__c.KimbleOne__Account__c}" />
+				
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__Status__c.Label}"></apex:outputLabel>
+					<apex:outputField value="{!KimbleOne__CreditNote__c.Status__r.Name}" />
+				</apex:pageBlockSectionItem> 
+				
+				<apex:outputField value="{!KimbleOne__CreditNote__c.KimbleOne__Invoice__c}" />
+				
+				<apex:inputField value="{!KimbleOne__CreditNote__c.KimbleOne__CreditNoteDate__c}" styleClass="kimbleDatePicker"/>
+				
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__ReasonCode__c.Label}" />
+					<apex:inputText value="{!KimbleOne__CreditNote__c.KimbleOne__ReasonCode__c}" styleclass="kimbledropdown CreditNoteReasonCode"	required="true" />
+				</apex:pageBlockSectionItem>
+				
+				<apex:inputField required="true" value="{!KimbleOne__CreditNote__c.KimbleOne__ReasonDescription__c}" />
+								
+				<apex:outputField value="{!KimbleOne__CreditNote__c.KimbleOne__NetAmount__c}"/>
+
+				<apex:outputField value="{!KimbleOne__CreditNote__c.KimbleOne__GrossAmount__c}"/>
+				
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__TaxAmount__c.Label}"></apex:outputLabel>
+					<apex:outputField value="{!KimbleOne__CreditNote__c.KimbleOne__TaxAmountSum__c}" rendered="{!KimbleOne__CreditNote__c.KimbleOne__TaxAmountSum__c != 0}"/>
+				</apex:pageBlockSectionItem>
+				
+				&nbsp;
+				
+				<apex:inputText value="{!KimbleOne__CreditNote__c.KimbleOne__Contact__c}" styleclass="kimblecustomlookup GetAllAccountContacts {!KimbleOne__CreditNote__c.KimbleOne__Account__c} false true" rendered="{!!ShowMultipleContacts && !UseEnhancedContactLookup}"/>
+
+				<apex:inputField id="enhanced-input-contact" value="{!KimbleOne__CreditNote__c.KimbleOne__Contact__c}" styleclass="kimbleSearch " html-data-typename="AccountContact" rendered="{!!ShowMultipleContacts && UseEnhancedContactLookup}" html-data-filter="{!('Account__c:' + KimbleOne__CreditNote__c.KimbleOne__Account__c)}"/>
+
+				<apex:pageBlockSectionItem rendered="{!ShowMultipleContacts}" >
+					<apex:outputLabel styleClass="billing-contacts-label" value="{!$ObjectType.KimbleOne__BillingContact__c.LabelPlural}"/>
+					<div class="creditnote-contacts-container">
+						<div id="creditnote-contacts">
+						</div>
+					</div>		 	
+				</apex:pageBlockSectionItem>
+								
+				<apex:inputField value="{!KimbleOne__CreditNote__c.KimbleOne__Notes__c}"/>
+				
+			</apex:pageBlockSection>
+			
+			<apex:pageBlockSection columns="2" title="{!$Label.kimbleone__presentationdetailsheading}">
+						
+				<apex:pageBlockSectionItem >
+						<apex:outputText value="{!$ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__CreditNoteTemplate__c.Label}" />
+						<apex:inputText value="{!KimbleOne__CreditNote__c.KimbleOne__CreditNoteTemplate__c}" styleclass="kimblecustomlookup GetCommercialDocumentTemplateList CreditNote true false"/> 
+				</apex:pageBlockSectionItem>
+				
+				<apex:inputField value="{!KimbleOne__CreditNote__c.KimbleOne__CreditNoteContextDescription__c}"/>
+			</apex:pageBlockSection>
+			
+			<apex:pageBlockSection columns="1" title="{!$Label.kimbleone__rejectioncommentsheading}" rendered="{!WasPreviouslyRejected}">
+				<apex:outputField value="{!KimbleOne__CreditNote__c.KimbleOne__ApprovalComments__c}" />
+			</apex:pageBlockSection>
+
+			<apex:inputText styleClass="TheCreditNoteContacts" style="display:none" value="{!TheCreditNoteContactsJson}"/>
+			
+		</apex:pageBlock>
+
+		<script>
+			jQuery(function () {
+				if(jQuery('.creditnote-contacts-container').length) drawCreditNoteContacts();
+			});
+			
+			var invoiceContacts = (jQuery('.TheCreditNoteContacts').val() == '' ? [] : jQuery.parseJSON(jQuery('.TheCreditNoteContacts').val()))
+			var accountId = '<apex:outputText value="{!KimbleOne__CreditNote__c.KimbleOne__Account__c}"/>';
+			
+			var l = {};
+			l['contactname'] = '<apex:outputText value="{!$ObjectType.KimbleOne__BillingContact__c.Fields.Name.Label}"/>';
+			l['primaryind'] = '<apex:outputText value="{!$Label.kimbleone__primarybillingcontact}"/>';
+			l['delete'] = '<apex:outputText value="{!$Label.kimbleone__deletebutton}"/>';
+			
+			function drawCreditNoteContacts()
+			{
+				var html = '';
+				
+				html += '<table class="creditnote-contacts-table list" border="0" cellpadding="0" cellspacing="0">';
+				html += '<tr class="header-row headerRow">';
+				html += '<th class="actions-col"></th>';
+				html += '<th class="creditnote-contact-name-title">' + l['contactname'] + '</th>';
+				html += '<th class="primary-cell">' + l['primaryind'] + '</th>';
+				html += '</tr>';
+				
+				// existing rows
+				for(var invoiceContactCounter = 0; invoiceContactCounter < invoiceContacts.length; invoiceContactCounter++)
+				{
+					var invoiceContact = invoiceContacts[invoiceContactCounter];
+					
+					html += '<tr class="creditnote-contact-row" contactId="' + invoiceContact.ContactId + '">';
+					
+					html += '<td class="remove-creditnote-contact action-btn" title="' + l['delete'] + '"><i class="fa fa-trash"></i></td>';
+					html += '<td class="creditnote-contact-name">' + invoiceContact.ContactName + '</td>';
+					html += '<td class="primary-cell">';
+					html += '<input type="radio" name="primary-creditnote-contacts" ' + (invoiceContact.IsPrimary ? ' checked="checked"' : '') + '/>';
+					html += '</td>';
+		
+					html += '</tr>';			
+				}
+				
+				// new row
+				html += '<tr class="creditnote-contact-row new-creditnote-contact">';
+				
+				html += '<td class="add-creditnote-contact action-btn"></td>';
+				html += '<td class="creditnote-contact-name">';
+				html += '<input type="text" class="find-creditnote-contact"/>';
+				html += '</td>';
+				html += '<td class="primary-cell">';
+				html += '</td>';
+	
+				html += '</tr>';
+				
+				jQuery('#creditnote-contacts').html(html);
+	
+				initialiseCreditNoteContactFind();
+			}
+			
+			function initialiseCreditNoteContactFind()
+			{
+				jQuery('.find-creditnote-contact').select2({
+					//minimumInputLength: 2,
+					multiple: false,
+					placeholder: '<apex:outputText value="{!$Label.kimbleone__defaultnonedropdownentry}"/>',
+					query: function (params) {
+						var find = function() {findCreditNoteContacts(params);};        		
+						find();
+					},
+					initSelection : function (element, callback) {
+					var data = {id: element.val(), text: element.attr('data-name')};
+					callback(data);
+					}
+				});
+				
+				jQuery('.find-creditnote-contact').on("select2-selecting", function(e) {
+					var asPrimary = jQuery('input[name="primary-creditnote-contacts"]').length == 0;
+					var newContact = {ContactId: e.object.id, ContactName: e.object.text, IsPrimary: asPrimary};
+					invoiceContacts.push(newContact);
+					invoiceContacts.sort(sortByCreditNoteContactName);
+					CreditNoteContactChanges = true;
+					drawCreditNoteContacts();
+				});
+				
+				jQuery(document).off('click', '.remove-creditnote-contact').on('click', '.remove-creditnote-contact', removeCreditNoteContact);
+				jQuery(document).off('click', 'input[name="primary-creditnote-contacts"]').on('click', 'input[name="primary-creditnote-contacts"]', setPrimaryContact);
+			}
+			
+			function sortByCreditNoteContactName(a,b)
+		   	{
+		   		return (a.ContactName < b.ContactName) ? -1 : (a.ContactName > b.ContactName) ? 1 : 0; 
+		   	}
+
+			function setPrimaryContact()
+			{
+				var contactId = jQuery(this).closest('.creditnote-contact-row').attr('contactId');
+				
+				for(var invoiceContactCounter = 0; invoiceContactCounter < invoiceContacts.length; invoiceContactCounter++)
+				{
+					var invoiceContact = invoiceContacts[invoiceContactCounter];
+					invoiceContact.IsPrimary = (invoiceContact.ContactId == contactId);
+				}
+			}
+			
+			function removeCreditNoteContact()
+			{
+				var contactId = jQuery(this).closest('.creditnote-contact-row').attr('contactId');
+				
+				jQuery(this).closest('.creditnote-contact-row').remove();
+				
+				for(var invoiceContactCounter = 0; invoiceContactCounter < invoiceContacts.length; invoiceContactCounter++)
+				{
+					var invoiceContact = invoiceContacts[invoiceContactCounter];
+					
+					if(invoiceContact.ContactId == contactId)
+					{
+						invoiceContacts.splice(invoiceContactCounter, 1);
+						break;
+					}
+				}
+				
+				drawCreditNoteContacts();
+			}
+				
+			function findCreditNoteContacts(params)
+			{				
+				var existingCreditNoteContactIds = [];
+				jQuery('.creditnote-contact-row:not(.deleted)').each(function() {existingCreditNoteContactIds.push(jQuery(this).attr('contactId'));});
+			
+				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.CreditNoteEditController.GetApplicableBillingContacts}',
+			      		accountId, existingCreditNoteContactIds, params.term,
+			     			function(result, event){          
+			            		if (event.status) 
+				            {
+				             	var data = {};
+				             	data.results = result;
+				             	params.callback(data);
+				         	} 
+				         	else if (event.type === 'exception') 
+				         	{
+				             	alert(event.message);
+				         	} 
+				         	else 
+				         	{
+				             	alert(event.message);
+				         	}
+			        	}, 
+			        	{escape: false, timeout: 60000}
+			    	);
+			}
+			
+			function processCreditNoteContacts()
+			{
+				if(jQuery('.creditnote-contacts-container').length == 0) return;
+				
+				var theContacts = [];
+				
+				jQuery('.creditnote-contact-row:not(.new-creditnote-contact)').each(function() {
+					var theContact = {ContactId: jQuery(this).attr('contactId'), ContactName: jQuery(this).find('.creditnote-contact-name').text(), IsPrimary: jQuery(this).find('input[name="primary-creditnote-contacts"]:checked').length == 1};
+					theContacts.push(theContact);
+				});
+				
+				jQuery('.TheCreditNoteContacts').val(JSON.stringify(theContacts));
+			}
+
+			jQuery(window).load(function(){
+				initialiseItems();
+			});
+			function initialiseItems()
+			{
+				SetupDatePicker();
+			}
+			function SetupDatePicker()
+			{
+				//dateFormat: 'yy-mm-dd',
+				jQuery('.kimbleDatePicker').datepicker({
+						dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+						showOtherMonths: true,
+						selectOtherMonths: true,
+						changeMonth: true,
+						changeYear: true});
+			}
+		</script>			
+		</apex:form>
+	</apex:define>
+</apex:composition>
+
+</apex:page>

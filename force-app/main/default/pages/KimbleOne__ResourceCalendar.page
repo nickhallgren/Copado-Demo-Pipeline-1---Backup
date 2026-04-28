@@ -1,0 +1,331 @@
+<apex:page sidebar="false" showheader="true" controller="KimbleOne.ResourceCalendarController" tabStyle="MyCalendar__tab">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+	<c:Menu DefaultHelpPage="MyCalendar.html" MenuContextType="{!IF(ISBLANK($CurrentPage.parameters.id), '', 'Resource')}" MenuContextId="{!Resource.Id}" MenuContextName="{!Resource.Name}"/>
+</apex:define>
+    
+<apex:define name="Content">
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__GanttView)}" />
+	<apex:includeScript value="{!URLFOR($Page.KimbleOne__GanttViewJs)}" />
+	<apex:stylesheet value="{!URLFOR($Page.KimbleOne__GanttViewCss)}"/>
+	
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__ActivityAssignmentUsagePattern)}" />
+	
+	<script>
+		var ganttViewStartDate = '{!YEAR(GanttViewProperties.StartDate)}-{!MONTH(GanttViewProperties.StartDate)}-{!DAY(GanttViewProperties.StartDate)}';
+		var ganttViewEndDate = '{!YEAR(GanttViewProperties.EndDate)}-{!MONTH(GanttViewProperties.EndDate)}-{!DAY(GanttViewProperties.EndDate)}';
+								
+		var theGlobalNonBusinessDays = new Object();
+	    <apex:outputText value="theGlobalNonBusinessDays={!GanttViewProperties.GlobalNonBusDaysJson};" rendered="{!!ISBLANK(GanttViewProperties.GlobalNonBusDaysJson)}"/>
+		
+		var theCalendarNonBusinessDays = new Object();
+	    <apex:outputText value="theCalendarNonBusinessDays={!GanttViewProperties.CalendarNonBusDaysJson};" rendered="{!!ISBLANK(GanttViewProperties.CalendarNonBusDaysJson)}"/>
+		
+		var zoomLevel = <apex:outputText value="{!GanttViewProperties.ZoomLevel}"/>;
+		var showAccountInSummary = {!IF(GanttViewProperties.ShowAccountInSummary, 'true','false')};
+		var showNonBusDays = {!IF(GanttViewProperties.ShowNonBusDays, 'true','false')}; 
+		var classificationStyleMap = kimble.parseJSON("{!JSENCODE(GanttViewProperties.TheJsonClassificationsMap)}");
+		var maxRecords = <apex:outputText value="{!GanttViewProperties.MaxRecords}"/>;
+		
+		var resources = kimble.parseJSON("{!JSENCODE(ResourceJson)}");
+		
+		var selfForecastAssignments = {};
+		<apex:outputPanel layout="none" rendered="{!!ISBLANK(SelfForecastAssignmentsJson)}">
+			selfForecastAssignments = kimble.parseJSON("{!JSENCODE(SelfForecastAssignmentsJson)}");
+		</apex:outputPanel>
+		
+		function dummy()
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ResourceCalendarController.Dummy}', function(result, event){},{escape: true});
+		}
+		
+	</script>
+	
+	<apex:pageBlock >
+    		
+    		<div id="container" class="zoom-level-1">
+    		<div id="loadingIndicatorOuterContainer" class="loadingIndicator" style="display:none">
+				<div id="loadingIndicatorInnerContainer">
+					<img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+				</div>
+			</div>
+    		<div id="layout-container"  style="margin-right:18px;">
+    		<div class="ui-layout-west" style="overflow-y: hidden;">
+				<div id="grid-header-container" style="display: inline-block;">
+						<table id="matching-resources-table-head" class="resource-grid-table" border="0" cellpadding="0" cellspacing="0">
+							<colgroup>
+								<col style="width: 215px;"/><!-- Name -->								
+							</colgroup>
+							<thead>
+							<tr class="headerRow" style="height: 52px;background-color: #1797C0;color:white;">
+								<th class="headerRow"><h2 style="padding-left: 31px;">{!$ObjectType.Resource__c.Label}</h2></th>																					
+							</tr>
+							</thead>
+							
+						</table>  
+				</div>
+				<div id="matching-resources-container" style="overflow-y:hidden; display: inline-block;">
+						<table id="matching-resources-table-body" class="resource-grid-table" border="0" cellpadding="0" cellspacing="0">
+							<colgroup>
+								<col style="width: 27px;"/><!-- Action cog -->
+								<col style="width: 188px;"/><!-- Name -->								
+							</colgroup>
+							<tbody></tbody>
+							
+						</table>  
+				</div>
+			</div>
+			
+    		<div id="activity-gantt-layout" class="ui-layout-center" style="overflow: hidden;">
+    			<div id="gantt-container" style="overflow-y: hidden;height: 100%;">
+    		
+					<div id="period-header-container"></div>
+						
+					<div id="matching-gantt-container" style="display: inline-block;overflow-y:hidden;position:relative;">
+						<div id="matching-gantt-lines"></div>					
+					</div>
+				
+				</div>
+				
+			</div><!-- activity-gantt-layout -->
+			
+			</div><!-- layout-container -->
+			
+			<div id="gantt-vertical-scroll-container">
+					<div id="verticalScroll" style="width:100px;display:none;"></div>
+			</div>
+				<div id="footer" >
+					<a class="layer-select fa fa-circle" onclick="jQuery('#layer-menu').fadeToggle();jQuery(this).toggleClass('layer-select-on');">
+						<i class="fa fa-list-ul layer-select-icon"></i>
+					</a>
+					<div id="layer-menu" style="position: absolute;bottom: 40px; right: 14px;">
+						<ul>
+							<li class="assignment-class-0">
+								<div class="layer-menu-item"><apex:outputText value="{!$Label.kimbleone__available}"/></div>
+							</li>
+							<apex:repeat value="{!GanttViewProperties.TheActivityAssignmentClasses}" var="classification">
+								<li id="aggregate-menu-item{!classification.Priority__c}" class="{!classification.StyleClass__c}">
+									<div class="layer-menu-item"><apex:outputText value="{!classification.Name}"/></div>
+								</li>
+							</apex:repeat>
+						</ul>
+					</div>
+					<a class="zoom-out fa fa-minus-circle" onclick="zoomOut()" onmouseover="jQuery('#zoom-level').fadeIn();" onmouseout="jQuery('#zoom-level').fadeOut('slow');"></a>
+					<span id="zoom-level" class="zoom-level-1"></span>
+					<a class="zoom-in fa fa-plus-circle" onclick="zoomIn()" onmouseover="jQuery('#zoom-level').fadeIn();;" onmouseout="jQuery('#zoom-level').fadeOut('slow');"></a>
+				</div>
+			
+			</div><!-- Container -->
+			</apex:pageBlock>
+			
+			<div id="ActivityAssignmentCalendar">
+				<apex:include pageName="{!$Page.ActivityAssignmentCalendar}"/>
+			</div>
+			
+	<script>
+    var enableDragDrop = false;
+    
+    jQuery(window).load(function(){
+    	
+    	jQuery('#layout-container').height(jQuery(window).height() - salesforceHeaderFooterHeight);
+	   	jQuery('#layout-container').layout();
+    	
+    	jQuery('#period-header-container').paintPeriodsHeader(ganttViewStartDate.toDate(), ganttViewEndDate.toDate(), showNonBusDays);
+      	   	
+      	maxGanttSectionHeight = jQuery('#layout-container').height() - jQuery('#period-header-container').height() - jQuery('#demand-gantt-container').height() - scrollbarWidth;
+    	jQuery('#matching-gantt-container, #gantt-vertical-scroll-container, #matching-resources-container').css('max-height', maxGanttSectionHeight);
+    	
+    	jQuery(window).resize(function() {
+    		jQuery('#layout-container').height(jQuery(window).height() - salesforceHeaderFooterHeight);
+    		maxGanttSectionHeight = jQuery('#layout-container').height() - jQuery('#period-header-container').height() - scrollbarWidth;
+    		jQuery('#matching-gantt-container, #gantt-vertical-scroll-container, #matching-resources-container').css('max-height', maxGanttSectionHeight);    	
+    	});
+    	 
+    	repaintResources(resources);
+    	
+    	toggleResource(resources[0].Id);
+    	
+    	jQuery(window).resize();
+    	
+    	jQuery('#gantt-vertical-scroll-container').scroll(function() {
+  			
+  			jQuery('#matching-gantt-container').scrollTo(jQuery('#gantt-vertical-scroll-container').scrollTop());
+  			
+  			jQuery('#matching-resources-container').scrollTo(jQuery('#gantt-vertical-scroll-container').scrollTop());
+  			
+  				jQuery.data(this, "scrollTimer", setTimeout(function() {
+        			refreshViewport();
+    			}, 250));
+  		});
+  		
+  		jQuery.subscribe('kimble.activityassignmentcalendarchange', function(e, data) {
+			//refresh page!
+
+			window.location.href = window.location.href;
+		});
+		
+		jQuery.subscribe('kimble.ganttViewUpdated', function(e){
+			
+			setScrollHeight();			
+		});
+  		
+    }); 
+   	
+   	function getResourceIconAndActionHtml(resource)
+	{
+		return '';
+	}
+   	
+   	//overridden function
+   	function getAssignmentActionHtml(ass)
+	{
+		var actionHtml = '';
+		
+		if (selfForecastAssignments[ass.Id] != null)
+		{
+			var actionHtml = '<a class="action-icon" actionId="' + ass.Id +'"><i class="fa fa-cog fa-2x"></i></a><div id="action-options-' + ass.Id + '" class="toolbar-icons" style="display: none;">';
+			
+			actionHtml += '<a id="schedulingCalendar" class="actionLink" href="javascript:void(0);" onclick="openAssignmentCalendar(\'' + ass.Id + '\');" title="' + kimble.labels['Calendar'] + '"><i class="fa fa-calendar"></i></a>';
+			
+			actionHtml += '</div>';
+		}
+		
+		return actionHtml;	
+	}
+   	
+    </script>
+    		<style> 
+    		/*####################FROM ActivityAssignmentsComponent########################*/   			
+				/*
+	assignment table styles
+*/
+
+.rightAlignDataCell {
+	text-align: right;
+	padding-right: 5px;
+}
+
+.rightAlignCell {
+	text-align: right;
+}
+
+.centerAlignDataCell {
+	text-align: center;
+}
+
+.resource-row-collapsed {
+	height: 11px;
+	width: 11px;
+	background: transparent url('/img/alohaSkin/twisty_sprite.png') 0px 0px
+		no-repeat;
+	margin-left: 3px;
+	margin-right: 12px;
+	background-position: 1px -1px;
+}
+
+.resource-row-expanded {
+	height: 11px;
+	width: 11px;
+	background: transparent url('/img/alohaSkin/twisty_sprite.png') 0px 0px
+		no-repeat;
+	margin-left: 3px;
+	margin-right: 12px;
+	background-position: 1px -12px;
+}
+
+.parentAssignmentDataRow:hover {
+	cursor: pointer;
+}
+
+.parentAssignmentDataRowTwisterCollapsed {
+	height: 11px;
+	width: 11px;
+	background: transparent url('/img/alohaSkin/twisty_sprite.png') 0px 0px
+		no-repeat;
+	margin-left: 3px;
+	margin-right: 12px;
+	background-position: 1px -1px;
+}
+
+.parentAssignmentDataRowTwisterExpanded {
+	height: 11px;
+	width: 11px;
+	background: transparent url('/img/alohaSkin/twisty_sprite.png') 0px 0px
+		no-repeat;
+	margin-left: 3px;
+	margin-right: 12px;
+	background-position: 1px -12px;
+}
+
+.dataRow:hover {
+    background-color: #e7f4f8;
+}
+
+
+.selectedRow, .selectedRow:hover {
+	background-color: #d0eaf2;
+}
+
+.layer-menu-item {
+    background-image: unset;
+    padding-left: 20px;
+}
+#layer-menu li {
+    cursor: unset;
+}
+/*
+	layout control
+*/
+
+.ui-layout-center,.ui-layout-east {
+	padding: 0;
+}
+
+.ui-layout-content {
+	padding: 0px;
+}
+
+/*
+	resizable columns
+*/
+
+.results-grid-table {
+	width: auto;
+	table-layout: fixed;
+    border-collapse: collapse;
+    width: 0; /* otherwise Chrome will not increase table size */
+}
+
+.results-grid-table th, .results-grid-table td { 
+     overflow: hidden;
+     white-space: nowrap;
+} 
+
+.columnLabel {
+    display: inline-block;
+    width: 100%;
+}
+
+/* PAGE OVERRIDDES */
+.gantt-container
+{
+	padding-bottom: 1px;
+	border-bottom: 1px solid #eee;
+	width:100%
+}
+.ui-state-active
+{
+	border:0px;
+}
+
+    		</style>
+	
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

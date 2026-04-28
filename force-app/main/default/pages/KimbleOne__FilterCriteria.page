@@ -1,0 +1,1380 @@
+<apex:page controller="KimbleOne.FilterCriteriaController" sidebar="false">
+    <apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+    <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+
+    <apex:includeScript value="{!URLFOR($Resource.KimbleOne__Handlebars)}" />
+
+    <script id="filters-template" type="text/x-handlebars-template">
+        {{#each Criteria}}
+        <div class="filter-criteria-item" data-config-key="{{ConfigKey}}" data-criteria-index="{{temp.Index}}">
+            <div class="criterion-list-index">{{temp.Index}}</div>
+            <div class="criterion-list-name {{#if temp.IsLocked}}locked-criteria{{/if}}"><!--locked-criteria-->
+                <div class="{{temp.styleClass}}" >
+                    <div class="field-name">{{temp.DisplayName}}</div>
+                    <div class="operator-values">{{temp.DisplayOperator}}
+                        {{#if temp.isLookup}}
+                            <span class="dynamic-lookup" data-ids="{{Value}}">...</span>
+                        {{else}}
+                            {{#if temp.isObject}}
+                                <span class="dynamic-label" data-fld="{{Value}}">...</span>
+                            {{else}}
+                                {{temp.DisplayValue}}
+                            {{/if}}
+                        {{/if}}
+                        </div>
+                </div>
+                <div class="actions">
+                    {{#if temp.IsLocked}}
+                        <i class="fa fa-lock locked-filter-line"/>
+                    {{else}}
+                        <a class="fa fa-times-circle delete-filter-line" title="{!$Label.Delete}" onclick="deleteFilterCriteria('{{temp.Index}}')" ></a>
+                    {{/if}}
+                </div>
+            </div>
+        </div>
+        {{/each}}
+    </script>
+
+    <script id="filter-edit-template" type="text/x-handlebars-template">
+        <div id="filter-edit-container" >
+        <div class="filters-panel filters-panel-region">
+            <div class="filter-row">
+            <span>{!$Label.FieldName}
+            <select id="fieldNameSelect" class="filter-dropdown">
+                {{#each FieldNameOptions}}
+                    <option value="{{value}}" {{#if selected}}selected="selected"{{/if}}>{{text}}</option>
+                {{/each}}
+            </select>
+            <span>
+        </div>
+        {{#if temp.ConfigKey}}
+            <div class="operator-row">
+                <span>{!$Label.Operator}
+                <select class="operator-dropdown">
+                    {{#each OperatorOptions}}
+                        <option value="{{value}}" {{#if selected}}selected="selected"{{/if}}>{{text}}</option>
+                    {{/each}}
+                </select>
+                </span>
+            </div>
+
+            {{#if showTypeField}}
+                <div class="type-row">
+                    <span>{!$Label.TypeLabel}
+                    <select class="type-dropdown">
+                        {{#each TypeOptions}}
+                            <option value="{{id}}">{{text}}</option>
+                        {{/each}}
+                    </select>
+                    </span>
+                </div>
+             {{/if}}
+
+            <div class="value-row">
+                <span>{!$Label.ValueLabel}
+                    {{#if IsObject}}
+                            <select class="object-fields" value="{{Value}}">
+                                {{#each ObjectFields}}
+                                    <option value="{{id}}">{{text}}</option>
+                                {{/each}}
+                            </select>
+                    {{else}}
+                        {{#if Config.IsDynamicLookup}}
+                            <input type="text" class="dynamic-select2" value="{{Value}}" data-criteria-id="{{Config.Id}}"/>
+                        {{else}}
+                            {{#equal Config.DisplayType 'REFERENCE'}}
+                                <select multiple="multiple" class="static-select2" data-value="{{Value}}" data-criteria-id="{{Config.Id}}"/>
+                            {{/equal}}
+                            {{#equal Config.DisplayType 'Dropdown'}}
+                                <select multiple="multiple" class="dropdown-select2" data-value="{{Value}}">
+                                    {{#each Config.DropDownOptions}}
+                                    <option value="{{value}}">{{text}}</option>
+                                {{/each}}
+                                </select>
+                            {{/equal}}
+                            {{#equal Config.DisplayType 'PICKLIST'}}
+                                <select multiple="multiple" class="static-select2" data-value="{{Value}}" data-criteria-id="{{Config.Id}}"/>
+                            {{/equal}}
+                            {{#equal Config.DisplayType 'DATE'}}
+                                <input type="text" class="filter-criteria-date" data-value="{{Value}}"/>
+                            {{/equal}}
+                            {{#equal Config.DisplayType 'BOOLEAN'}}
+                                <input class="filter-checkbox" type="checkbox" {{#if Value}}checked="true"{{/if}}>
+                            {{/equal}}
+                            {{#equal Config.DisplayType 'STRING'}}
+                                <input type="text" class="filter-string" data-value="{{Value}}"/>
+                            {{/equal}}
+                            {{#contains Config.DisplayType 'CURRENCY,DOUBLE,INTEGER,LONG'}}
+                                <input type="text" class="filter-numeric" data-value="{{Value}}"/>
+                            {{/contains}}
+                        {{/if}}
+                    {{/if}}
+                </span>
+            </div>
+        {{/if}}
+        </div>
+        <div class="filter-actions">
+            <input class="filter-popup-btn" style="position: absolute;right: 21px;" type="button" value="{!$Label.MobileWebDone}" onclick="filterEditDoneClick();" />
+        </div>
+        </div>
+
+    </script>
+
+   <div id="filter-criteria-container">
+
+        <div class="filter-header">{!$Label.Edit} {!$Label.Filter}<i onclick="hideFilterPopup();" class="filter-collapse-btn fa fa-angle-double-up" title="{!$Label.Cancel}"></i></div>
+
+        <div id="FilterCriteriaErrors">
+
+        </div>
+
+        <div class="ionTabs" id="filter-tabs" data-name="filter-tabs-group" >
+            <ul class="ionTabs__head">
+                <li class="ionTabs__tab" data-target="filtering">{!$Label.Filters}<div class="clear-filter-popup-btn " title="{!JSENCODE($Label.ClearAllLabel)}"><i class="fa fa-times-circle" onclick="clearAllFilters()"></i></div></li>
+                <li class="ionTabs__tab" data-target="dates">{!$Label.Dates}</li>
+            </ul>
+            <div class="ionTabs__body" >
+                <div class="ionTabs__item" data-name="filtering">
+                    <div id="filter-criteria-list" >
+
+
+                    </div>
+                    <div id="addFilterButton">
+                        <a onClick="addFilter();" class="filter-clickable"><i class="fa fa-plus"  style="padding-right:4px;"></i>{!$Label.Add} {!$Label.Filter}</a>
+                    </div>
+                    <div class="filter-logic-container">
+                        <div id="editFilterLogicButton" class="edit-filter-logic-button">
+                            <a onClick="jQuery('.filter-criteria-edit').show();" class="filter-clickable"><i class="fa fa-pencil" style="padding-right:4px;"></i>{!$Label.Edit} {!$Label.LogicLabel}</a>
+                        </div>
+
+                        <div class="filter-criteria-edit">
+                            <input type="text" class="criteria-logic-unlocked"/>
+                        </div>
+                    </div>
+                </div>
+                <div class="ionTabs__item" data-name="dates">
+                    <div id="date-range">
+                        <div class="filter-heading">{!$Label.DateRangeHeading}</div>
+                        <label class="radio-inline">
+                            <input id="date-fixed" type="radio" name="date-range">{!$Label.FixedDateRange}</input>
+                        </label>
+                        <label class="radio-inline">
+                            <input id="date-rolling" type="radio" name="date-range">{!$Label.RollingDateRange}</input>
+                        </label>
+                        <label class="radio-inline">
+                            <input id="date-none" type="radio" name="date-range">{!$Label.NoneDateRange}</input>
+                        </label>
+                        <div id="fixed-dates">
+                            <div class="filter-heading">{!$Label.FromDate}</div>
+                            <input id="date-from" class="filter-date" type="text"/>
+
+                            <div class="filter-heading">{!$Label.ToDate}</div>
+                            <input id="date-to" class="filter-date" type="text"/>
+                        </div>
+                        <div id="rolling-dates">
+                            <div class="filter-heading">{!$Label.NumberDaysBeforeToday}</div>
+                            <input id="rolling-days-before" type="text"/>
+
+                            <div class="filter-heading">{!$Label.NumberDaysAfterToday}</div>
+                            <input id="rolling-days-after" type="text"/>
+                        </div>
+                    </div>
+                </div>
+                <div class="ionTabs__preloader"></div>
+            </div>
+        </div>
+   </div>
+
+   <div class="update-filter-button" style="text-align: right;padding-right:12px;padding-top:10px">
+        <input type="button" class="filter-popup-btn" onclick="applyButtonClick();" value="{!$Label.ApplyLabel}"/>
+
+        <input class="filter-popup-btn" type="button" onclick="hideFilterPopup();" value="{!$Label.Cancel}" />
+    </div>
+
+    <script>
+        //handlebars templates
+        var handlebarsTemplates = {};
+        var theFilterCriteria;
+        var theCriteriaConfig;
+        var onCriteriaConfigLoaded;
+        var theCurrentFilter;
+        var onApplyHandler;
+        var onCancelHandler;
+
+        jQuery(window).load(function() {
+
+            jQuery.each(jQuery('script[type="text/x-handlebars-template"]:not([partial])'), function (i, s) {
+                handlebarsTemplates[s.id] = Handlebars.compile(s.innerHTML);
+            });
+
+            Handlebars.registerHelper('equal', function(lvalue, rvalue, options) {
+
+                if( lvalue!=rvalue ) {
+                    return options.inverse(this);
+                } else {
+                    return options.fn(this);
+                }
+            });
+
+             Handlebars.registerHelper('contains', function(lvalue, rvalue, options) {
+
+                if( rvalue.indexOf(lvalue) < 0) {
+                    return options.inverse(this);
+                } else {
+                    return options.fn(this);
+                }
+            });
+
+            Handlebars.registerHelper('notEqual', function(lvalue, rvalue, options) {
+
+                if( lvalue==rvalue ) {
+                    return options.inverse(this);
+                } else {
+                    return options.fn(this);
+                }
+            });
+        });
+
+        function initialiseFilterCriteriaConfig(contextTypeId, additionalConfig) {
+            if (theCriteriaConfig == null) {
+                loadCriteriaConfig(contextTypeId, additionalConfig);
+            }
+        }
+
+        function hideFilterPopup() {
+            jQuery('.qtip').qtip('hide', true);
+            if(onCancelHandler != null) onCancelHandler();
+        }
+
+        function applyButtonClick() {
+
+            jQuery('.qtip').qtip('hide', true);
+
+            theFilterCriteria.CriteriaLogic = jQuery('.filter-criteria-edit input').val();
+
+            //remove stuff
+            var invalidIndex;
+
+            theFilterCriteria.Criteria.forEach(function(c) {
+               if (c.FieldPath == null || c.FieldPath == '') invalidIndex = c.temp.Index;
+               if (c.ValueType == null || c.ValueType == '') invalidIndex = c.temp.Index;
+               if (c.Operator == null || c.Operator == '') invalidIndex = c.temp.Index;
+
+               delete c.temp;
+            });
+
+            if (invalidIndex != null) {
+                alert('Criteria ' + invalidIndex + ' is invalid.');
+                return;
+            }
+
+            if (theFilterCriteria.CriteriaLogic != null) {
+                //trim spaces and remove brackets ()
+                var l = theFilterCriteria.CriteriaLogic.trim().replace(/\(/g,'').replace(/\)/g,'');
+                var isValid = true;
+                l.toUpperCase().split(' ').forEach(function(v){
+                    if (v != 'AND' && v != 'OR' && isNaN(v)) {
+                        isValid = false;
+
+                        return;
+                    }
+                });
+
+                if (!isValid) {
+                    alert('Critera logic is invalid');
+                    return;
+                }
+            }
+
+            var dateConfig = theFilterCriteria.DateConfig;
+
+            if (dateConfig != null) {
+                dateConfig.StartDate = null;
+                dateConfig.EndDate = null;
+                dateConfig.DaysBefore = null;
+                dateConfig.DaysAfter = null;
+
+                if (jQuery('#date-fixed').prop('checked'))
+                {
+                    dateConfig.DateRange = 'Fixed';
+                    dateConfig.StartDate = kimble.parseDate(jQuery('#date-from').val());
+                    dateConfig.EndDate = kimble.parseDate(jQuery('#date-to').val());
+                }
+
+                if (jQuery('#date-rolling').prop('checked'))
+                {
+                    dateConfig.DateRange = 'Rolling';
+                    dateConfig.DaysBefore = kimble.parseNumber(jQuery('#rolling-days-before').val());
+                    dateConfig.DaysAfter = kimble.parseNumber(jQuery('#rolling-days-after').val());
+                }
+
+                if (jQuery('#date-none').prop('checked'))
+                {
+                   dateConfig.DateRange = 'None';
+                }
+            }
+            console.log('The returned criteria');
+            console.log(theFilterCriteria);
+
+            jQuery('.update-filter-button input').prop('disabled', true);
+
+            //validate the criteria (AND / OR etc..)
+            validateCriteriaRemoteAction(JSON.stringify(theFilterCriteria), function() {
+                onApplyHandler(theFilterCriteria);
+            });
+        }
+
+        function loadFilterCriteria(theJsonString, oncomplete, onapply, oncancel)
+        {
+            theFilterCriteria = JSON.parse(theJsonString);
+
+            console.log('Loading criteria');
+            console.log(theFilterCriteria);
+
+            var onload = function() {
+                initialiseFilterCriteria();
+
+                if (theFilterCriteria.DateConfig != null) {
+                    //dates
+                    var dateConfig = theFilterCriteria.DateConfig;
+
+                    if (dateConfig.DateRange == null) dateConfig.DateRange = 'None';
+
+                    if (dateConfig.DateRange == 'Fixed') jQuery('#date-fixed').prop('checked', true);
+                    if (dateConfig.DateRange == 'Rolling') jQuery('#date-rolling').prop('checked', true);
+                    if (dateConfig.DateRange == 'None') jQuery('#date-none').prop('checked', true);
+
+                    if (dateConfig.StartDate != null) jQuery('#date-from').val(kimble.formatDate(dateConfig.StartDate));
+                    if (dateConfig.EndDate != null) jQuery('#date-to').val(kimble.formatDate(dateConfig.EndDate));
+                    if (dateConfig.DaysBefore != null) jQuery('#rolling-days-before').val(kimble.formatNumber(dateConfig.DaysBefore,'#'));
+                    if (dateConfig.DaysAfter != null) jQuery('#rolling-days-after').val(kimble.formatNumber(dateConfig.DaysAfter,'#'));
+
+                    jQuery.ionTabs("#filter-tabs", {type: "none"});
+                    jQuery('.filter-date').datepicker({
+                        dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+                        showOtherMonths: true,
+                        selectOtherMonths: true
+                    });
+
+                    jQuery('input[type=radio][name=date-range]').change(function() {
+                        switchDateRange();
+                    });
+
+                    switchDateRange();
+                }
+                else
+                {
+                    jQuery('.ionTabs__head').hide();
+                    jQuery('#filter-criteria-list').parent().show();
+                }
+
+                oncomplete();
+            }
+
+            onApplyHandler = onapply;
+            onCancelHandler = oncancel;
+
+            jQuery(document).off('click','.edit-criteria');
+            jQuery(document).on('click','.edit-criteria', function() {
+                var $o = jQuery(this);
+
+                var index = $o.closest('.filter-criteria-item').data().criteriaIndex;
+                var criterion = theFilterCriteria.Criteria[index-1];
+
+                console.log(criterion);
+
+                theCurrentFilter = JSON.parse(JSON.stringify(criterion));
+
+                initialiseCriterionForEdit();
+
+                showEditCriteriaPopout($o, theCurrentFilter);
+
+            });
+
+            jQuery(document).off('change','#fieldNameSelect');
+            jQuery(document).on('change','#fieldNameSelect', function() {
+
+                var $o = jQuery(this);
+
+                theCurrentFilter.temp.ConfigKey = $o.val();
+                theCurrentFilter.Value = '';
+                theCurrentFilter.ValueType = 'Literal';
+                initialiseCriterionForEdit();
+
+                jQuery('#filter-edit-container').replaceWith(jQuery(handlebarsTemplates['filter-edit-template'].call(this, theCurrentFilter)));
+
+                createEditHooks();
+
+            });
+
+            if (theFilterCriteria.Criteria.length == 0) window.setTimeout(function(){jQuery('#addFilterButton a').click();}, 500);
+
+            if (theCriteriaConfig == null) {// not yet loaded so register with onload event
+                onCriteriaConfigLoaded = onload;
+            } else {
+                onload();
+            }
+        }
+
+        function addFilter() {
+
+            if(theFilterCriteria.Criteria == null) theFilterCriteria.Criteria = [];
+            theFilterCriteria.Criteria.push({temp:{ConfigKey:null, styleClass: 'edit-criteria delete-criteria', isNew: true, DisplayName: '{0} {1}*'.format('{!JSENCODE($Label.New)}','{!JSENCODE($Label.Filter)}')}});
+
+            //always add as AND
+            if (theFilterCriteria.CriteriaLogic == '' || theFilterCriteria.CriteriaLogic == null){
+                theFilterCriteria.CriteriaLogic = '1';
+            } else {
+                theFilterCriteria.CriteriaLogic += ' AND ' + theFilterCriteria.Criteria.length;
+            }
+
+            initialiseFilterCriteria();
+
+            jQuery('.edit-criteria:last').click();
+        }
+
+        function clearAllFilters() {
+            jQuery('.delete-filter-line').click();
+        }
+
+        function deleteFilterCriteria(index) {
+            jQuery('.qtip').qtip('hide', true);
+
+            theFilterCriteria.Criteria.splice(index - 1, 1);
+
+            if (theFilterCriteria.Criteria.length == 0) {
+                theFilterCriteria.CriteriaLogic = '';
+            } else {
+                theFilterCriteria.CriteriaLogic = '1'
+
+                for (var i=1; i<theFilterCriteria.Criteria.length;i++) {
+                    theFilterCriteria.CriteriaLogic += ' AND ' + (i + 1);
+                }
+            }
+
+            initialiseFilterCriteria();
+        }
+
+        function filterEditDoneClick() {
+           //copy theCurrentFilter back into list and replace
+
+            var valType = (theCurrentFilter.showTypeField ? jQuery('.type-dropdown').val() : 'Literal');
+            var operator = jQuery('.operator-dropdown').val()
+
+            if (valType == 'Object') {
+                if (operator == 'IN') operator = '=';
+                if (operator == 'NOT IN') operator = '!=';
+            }
+
+            var c = {temp:{ConfigKey: theCurrentFilter.ConfigKey},
+                     FieldPath: theCurrentFilter.Config.FieldPath,
+		             Operator: operator,
+		             ValueType: valType,
+		             Value: theCurrentFilter.Value,
+		             IncludeIfNull: false,
+		             ExecuteChildQuery: false, //TODO
+		             ChildJoinField: theCurrentFilter.Config.ChildJoinField,
+		             ChildMatchField: theCurrentFilter.Config.ChildMatchField,
+		             ChildObject: theCurrentFilter.Config.ChildObject,
+		             ChildRelationship: theCurrentFilter.Config.ChildRelationship,
+		             ChildCriteria: theCurrentFilter.Config.ChildCriteria};
+
+            theFilterCriteria.Criteria[theCurrentFilter.temp.Index - 1] = c;
+            theCurrentFilter = null;
+
+            jQuery('.qtip').qtip('hide');
+
+            initialiseFilterCriteria();
+        }
+
+        function createEditHooks() {
+
+            jQuery('.object-fields').on('change', function(e){
+                 theCurrentFilter.Value = jQuery(this).val();
+            }).val(theCurrentFilter.Value).change();
+
+            jQuery('.type-dropdown').val(theCurrentFilter.ValueType).on('change', function(e) {
+               theCurrentFilter.ValueType = jQuery(this).val();
+               if (theCurrentFilter.ValueType == 'Literal') {
+                    theCurrentFilter.IsObject = false;
+               }
+               else
+               {
+                    theCurrentFilter.IsObject = true;
+               }
+
+                jQuery('#filter-edit-container').replaceWith(jQuery(handlebarsTemplates['filter-edit-template'].call(this, theCurrentFilter)));
+
+                createEditHooks();
+            });
+
+            jQuery('.filter-checkbox').on('change', function(e){
+                theCurrentFilter.Value = jQuery(this).prop('checked');
+            });
+
+            jQuery.each(jQuery('.filter-criteria-date'), function (i, obj) {
+                var $o = jQuery(obj);
+                $o.datepicker({
+                    dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+                    showOtherMonths: true,
+                    selectOtherMonths: true
+                }).on('change', function(e){
+                    theCurrentFilter.Value = JSON.stringify(kimble.parseDate(jQuery(this).val()));
+                });
+
+                if ($o.data().value != '') $o.val(kimble.formatDate(JSON.parse($o.data().value)));
+            });
+
+            jQuery.each(jQuery('.filter-numeric'), function (i, obj) {
+                var $o = jQuery(obj);
+                $o.on('change', function(e){
+                    theCurrentFilter.Value = kimble.parseNumber(jQuery(this).val());
+                });
+
+                if ($o.data() != null) $o.val(kimble.formatNumber($o.data().value, '#,##0.##'));
+            });
+
+            jQuery.each(jQuery('.filter-string'), function (i, obj) {
+                var $o = jQuery(obj);
+                $o.on('change', function(e){
+                    theCurrentFilter.Value = JSON.stringify(jQuery(this).val());
+                });
+
+                if ($o.data().value != '') $o.val(JSON.parse($o.data().value));
+            });
+
+            jQuery.each(jQuery('.static-select2'), function (i, obj) {
+                var $o = jQuery(obj);
+
+                var val = $o.data().value;
+
+                getLookupValues($o.data().criteriaId, function (result) {
+                    result.forEach(function (o) {
+                        var opt = document.createElement('option');
+                        opt.value = o.id;
+                        opt.innerHTML = o.text;
+                        $o[0].appendChild(opt);
+                        objectNamesMap[o.id] = o.text;
+                    });
+
+                    $o.on('change', function (e) {
+                        theCurrentFilter.Value = JSON.stringify(jQuery(this).val());
+                    }).select2().val(val).trigger('change');
+                })
+            });
+
+            jQuery.each(jQuery('.dropdown-select2'), function (i, obj) {
+                var $o = jQuery(obj);
+
+                var val = $o.data().value;
+
+                $o.on('change', function (e) {
+                        theCurrentFilter.Value = JSON.stringify(jQuery(this).val());
+                    }).select2().val(val).trigger('change');
+            });
+
+           jQuery('.dynamic-select2').on("change", function(e){
+                        theCurrentFilter.Value = JSON.stringify(e.val);
+                     })
+                     .select2({
+                        minimumInputLength: 2,
+                        multiple: true,
+                        query: function (query) {
+                            searchLookupValues(query.element.data().criteriaId, query.term, function(result) {
+                                var data = {};
+			             	    data.results = result;
+
+			             	    result.forEach(function(opt){
+			             	        objectNamesMap[opt.id] = opt.text;
+                                });
+
+			             	    query.callback(data);
+                            });
+
+                        },
+                        initSelection : function (element, callback) {
+
+                            var val = jQuery(element).val();
+
+                            if (val == '' || val == null) return;
+
+                            var ids = JSON.parse(val);
+
+                            jQuery(element).val('');
+
+                            getObjectNames(ids, function(){
+                                 var data = [];
+                                 ids.forEach(function(id){
+                                     data.push({id:id, text:objectNamesMap[id]});
+                                 });
+                                 callback(data)
+                            });
+                        }
+                });
+        }
+
+        function initialiseCriterionForEdit() {
+
+            theCurrentFilter.FieldNameOptions = [];
+
+            if (theCurrentFilter.temp.ConfigKey != null) {
+                theCurrentFilter.Config = theCriteriaConfig.CriteriaMap[theCurrentFilter.temp.ConfigKey];
+            } else {
+                theCurrentFilter.FieldNameOptions.push({value:'', text:'', selected:true});
+            }
+
+            Object.keys(theCriteriaConfig.CriteriaMap).forEach(function(key){
+                var crit = theCriteriaConfig.CriteriaMap[key];
+                if (!crit.IsLocked) {
+                    theCurrentFilter.FieldNameOptions.push({value:key, text:crit.Name, selected:(theCurrentFilter.temp.ConfigKey == key)});
+                }
+            });
+
+            theCurrentFilter.OperatorOptions = [];
+            if (theCurrentFilter.Config != null) {
+                var selected = false;
+                theCurrentFilter.Config.OperatorOptions.forEach(function(opt){
+                    theCurrentFilter.OperatorOptions.push({value:opt.id, text:opt.text, selected:opt.id == theCurrentFilter.Operator});
+
+                    if(opt.id == theCurrentFilter.Operator) selected = true;
+                });
+
+                if (!selected) theCurrentFilter.OperatorOptions[0].selected = true;
+
+                if (theCurrentFilter.Config.DisplayType == 'Dropdown') {
+                    theCurrentFilter.Config.DropDownOptions = [];
+                    theCurrentFilter.Config.DataSource.split(',').forEach(function(o){
+                        theCurrentFilter.Config.DropDownOptions.push({value:o, text:o});
+                    });
+                }
+            }
+
+            theCurrentFilter.IsObject = false;
+            theCurrentFilter.showTypeField = theFilterCriteria.ArgumentObjectType != null;
+            if (theCurrentFilter.showTypeField) {
+                theCurrentFilter.TypeOptions = theCriteriaConfig.TypeOptions;
+
+                if (theCurrentFilter.ValueType == 'Object') theCurrentFilter.IsObject = true;
+
+                theCurrentFilter.ObjectFields = theCriteriaConfig.ObjectFields.sort(sortOptions);
+            }
+        }
+
+        function initialiseFilterCriteria() {
+
+            jQuery('.filter-criteria-edit input').val(theFilterCriteria.CriteriaLogic);
+
+            for (var i=0;i<theFilterCriteria.Criteria.length;i++) {
+                var crit = theFilterCriteria.Criteria[i];
+
+                crit.temp = crit.temp || {};
+
+                crit.temp.Index = i + 1;
+                if (crit.FieldPath != null) {
+                    crit.temp.ConfigKey = crit.FieldPath + (crit.ChildObject || '') + (crit.ChildMatchField || '');
+                }
+
+                var config = theCriteriaConfig.CriteriaMap[crit.temp.ConfigKey];
+
+                if (config != null) {
+                    crit.temp.DisplayName = config.Name;
+
+                    if (config.IsLocked) {
+                        crit.temp.styleClass = 'locked-criteria';
+                        crit.temp.IsLocked = true;
+                    }
+                    else {
+                        crit.temp.styleClass = 'edit-criteria delete-criteria';
+                    }
+
+                    if (crit.ValueType == 'Literal') {
+                        crit.temp.DisplayOperator = getDisplayOperator(config.DisplayType, crit.Operator);
+
+                        if (config.DisplayType == 'REFERENCE') {
+                           crit.temp.isLookup = true;
+                        } else {
+                            crit.temp.DisplayValue = getDisplayValue(config.DisplayType, crit.Value);
+                        }
+                    }
+                    else {//object type
+                        crit.temp.isObject = true;
+                        crit.temp.DisplayOperator = getDisplayOperator('OBJECT', crit.Operator);
+                    }
+                }
+                else if (!crit.temp.isNew){
+                    crit.temp.DisplayName = 'Invalid Criteria';
+                    crit.Operator = '';
+                    crit.Value = '';
+                    crit.temp.styleClass = 'invalid-criteria';
+                }
+            }
+
+            jQuery('#filter-criteria-list').empty();
+
+            jQuery('#filter-criteria-list').append(jQuery(handlebarsTemplates['filters-template'].call(this, theFilterCriteria)));
+
+            loadAllObjectNames();
+            loadAllDynamicLabels();
+        }
+
+        function getDisplayOperator(typ, val) {
+             if (val == '=' || val =='IN')
+                return (typ == 'REFERENCE' || typ == 'STRING' || typ == 'PICKLIST' || typ == 'Dropdown'? 'is':'equals');
+
+             if  (val == '!=' || val =='NOT IN')
+                return (typ == 'REFERENCE' || typ == 'STRING' || typ == 'PICKLIST' || typ == 'Dropdown'? 'is not':'not equals');
+
+             return val;
+        }
+
+        function getDisplayValue(typ, val) {
+            //STRING, DATE, NUMERIC, CHECKBOX
+            try {
+
+                if (typ == 'PICKLIST' || typ == 'Dropdown') {
+                    return JSON.parse(val).join(', ');
+                }
+
+                if (typ == 'DATE') {
+                    return kimble.formatDate(JSON.parse(val));
+                }
+
+                if  ('CURRENCY,DOUBLE,INTEGER,LONG'.indexOf(typ) >= 0){
+                    return kimble.formatNumber(val,'#,##0.##');
+                }
+            }
+            catch(e) {}
+            return val;
+        }
+
+        function showEditCriteriaPopout($o, crit) {
+
+        jQuery('.qtip').qtip('hide', true);
+
+        jQuery('.qtip').qtip('destroy', true);
+
+        $o.parent().qtip({
+            overwrite: true,
+                show: {
+                    solo:true,
+                    event: 'click', // Use the same event type as above
+                    ready: true, // Show immediately - important!
+                },
+                hide: false,
+                style: {
+                    classes: 'qtip-light qtip-shadow'
+                },
+                content: {
+                    button: 'Close',
+                    text: function(event, api) {
+
+                        return jQuery(handlebarsTemplates['filter-edit-template'].call(this, crit));
+                    }
+                },
+                events: {
+                    visible: function(event, api) {
+                        createEditHooks();
+                    },
+                    hide: function(event, api) {
+                        //jQuery('[id$="EditFilterCriterion"]').detach().appendTo('[id$="theFilterForm"]').hide();
+                    }
+                },
+                position: {
+                    my: 'left center',
+                    at: 'right center',
+                    adjust: {method: 'flip flip'},
+                    container: jQuery('#filter-criteria-container')
+                }
+            });
+        }
+
+        function loadCriteriaConfig(id, additionalCriteria)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.FilterCriteriaController.GetObjectCriteria}',
+	       		id,
+	      			function(result, event){
+	             		 if (event.status)
+			             {
+			             	theCriteriaConfig = result;
+
+			             	if (additionalCriteria != null) {
+			             	    Object.assign(theCriteriaConfig.CriteriaMap, additionalCriteria);
+                            }
+
+                            console.log('config loaded');
+                            console.log(theCriteriaConfig);
+
+                            if (onCriteriaConfigLoaded != null) onCriteriaConfigLoaded();
+
+			         	}
+			         	else if (event.type === 'exception')
+			         	{
+			             	alert(event.message);
+			         	}
+			         	else
+			         	{
+			             	alert(event.message);
+			         	}
+	         	},
+	         	{escape: false, timeout: 60000}
+	     	);
+		}
+
+        function validateCriteriaRemoteAction(j, oncomplete)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.FilterCriteriaController.ValidateCriteria}',
+	       		j,
+	      			function(result, event){
+	             		 jQuery('.update-filter-button input').prop('disabled', false);
+
+	             		 if (event.status)
+			             {
+			                oncomplete();
+			         	 }
+			         	 else if (event.type === 'exception')
+			         	 {
+			             	alert(event.message);
+			         	 }
+			         	 else
+			         	 {
+			             	 alert(event.message);
+			         	 }
+
+	         	},
+	         	{escape: false, timeout: 60000}
+	     	);
+		}
+
+        function loadAllObjectNames() {
+            jQuery.each(jQuery('.dynamic-lookup'), function(i, obj) {
+                var $o = jQuery(obj);
+                var ids =  JSON.parse($o.attr('data-ids'));
+                getObjectNames(ids, function(){
+                    var t = '';
+
+                    ids.forEach(function(id) {
+                           t += objectNamesMap[id] + ', ';
+                     });
+
+                     t = t.substring(0, t.length-2);
+
+                     $o.text(t);
+                });
+            });
+        }
+
+        function loadAllDynamicLabels() {
+            jQuery.each(jQuery('.dynamic-label'), function(i, obj) {
+                var $o = jQuery(obj);
+                getFieldLabel($o, theFilterCriteria.ArgumentObjectType, $o.attr('data-fld'));
+            });
+        }
+
+        var objectNamesMap = {};
+
+        function getObjectNames(ids, oncomplete) {
+
+            var idsToFind = [];
+
+            ids.forEach(function(id){
+                if (objectNamesMap[id] == null) {
+                    idsToFind.push(id);
+                }
+            });
+
+            if (idsToFind.length > 0) {
+
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.FilterCriteriaController.GetObjectNames}',
+                    ids,
+                        function(result, event){
+                             if (event.status)
+                             {
+                                //do the stuff with result;
+                                Object.assign(objectNamesMap, result);
+                                oncomplete();
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                alert(event.message);
+                            }
+                            else
+                            {
+                                alert(event.message);
+                            }
+                    },
+                    {escape: false, timeout: 60000}
+                );
+            } else {
+                oncomplete();
+            }
+        }
+
+        function sortOptions(a, b)
+        {
+            return a.text > b.text ? 1 : -1;
+        }
+
+        function getFieldLabel(node, typ, fld) {
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.FilterCriteriaController.GetFieldLabel}',
+	       		typ, fld,
+	      			function(result, event){
+	             		 if (event.status)
+			             {
+			             	node.text(result);
+			         	}
+			         	else if (event.type === 'exception')
+			         	{
+			             	alert(event.message);
+			         	}
+			         	else
+			         	{
+			             	alert(event.message);
+			         	}
+	         	},
+	         	{escape: false, timeout: 60000}
+	     	);
+        }
+
+        function getLookupValues(id, oncomplete) {
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.FilterCriteriaController.GetLookupValues}',
+	       		id,
+	      			function(result, event){
+	             		 if (event.status)
+			             {
+			             	oncomplete(result);
+			         	}
+			         	else if (event.type === 'exception')
+			         	{
+			             	alert(event.message);
+			         	}
+			         	else
+			         	{
+			             	alert(event.message);
+			         	}
+	         	},
+	         	{escape: false, timeout: 60000}
+	     	);
+        }
+
+        function searchLookupValues(id, term, oncomplete) {
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.FilterCriteriaController.SearchLookupValues}',
+	       		id, term,
+	      			function(result, event){
+	             		 if (event.status)
+			             {
+			             	oncomplete(result);
+			         	}
+			         	else if (event.type === 'exception')
+			         	{
+			             	alert(event.message);
+			         	}
+			         	else
+			         	{
+			             	alert(event.message);
+			         	}
+	         	},
+	         	{escape: false, timeout: 60000}
+	     	);
+        }
+
+        function switchDateRange()
+        {
+            if (jQuery('#date-fixed').prop('checked'))
+            {
+                jQuery('#fixed-dates').show();
+                jQuery('#rolling-dates').hide();
+            }
+            else if (jQuery('#date-rolling').prop('checked'))
+            {
+                jQuery('#fixed-dates').hide();
+                jQuery('#rolling-dates').show();
+            }
+            else
+            {
+                jQuery('#fixed-dates').hide();
+                jQuery('#rolling-dates').hide();
+            }
+        }
+
+    </script>
+
+
+    <style>
+        .filterLoading {
+            top:0;
+            right:0;
+            width:100%;
+            height:100%;
+            font-weight: bold;
+            position:absolute;
+            text-align:center;
+            /* IE filter */
+            filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+            -moz-opacity:0.7;    /* Mozilla extension */
+            -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+            opacity:0.7; /* CSS3 */
+            z-index:1000;
+            background-color:white;
+        }
+        .filterLoading img {
+            margin-right:9px;
+        }
+        #editfilterLoadingIndicatorInnerContainer.filterLoadingInner  {
+            position:absolute;
+            top:50%;
+            height:5em;
+            margin-top:-2em;
+            width:100%;
+        }
+        a.filter-clickable {
+            cursor:pointer;
+        }
+        div#addFilterButton, div.update-filter-button, div.edit-filter-logic-button {
+            padding-top:5px;
+            padding-left:10px;
+        }
+        div.filter-criteria-item {
+            padding-top: 5px;padding-left: 15px;
+        }
+
+        div.criterion-list-index {
+            display: inline-block;
+            padding-right: 5px;
+            vertical-align: top;
+            padding-top: 14px;
+        }
+        .locked-filter-line {
+            padding-left: 16px;
+            padding-right: 10px;
+            padding-top: 5px;
+        }
+        .criteria-logic-locked {
+            width: 100px;
+        }
+        .criteria-logic-unlocked {
+            width: 260px;
+            padding: 5px;
+            border: 1px solid rgb(221, 219, 218);
+        }
+
+        a.edit-filter-line {
+            cursor:pointer;
+        }
+        a.delete-filter-line {
+            cursor:pointer;
+            padding-top: 5px;
+            padding-right: 10px;
+            padding-left: 5px;
+        }
+        div.filter-row, div.value-row, div.operator-row, div.type-row {
+            padding-left: 10px;
+        }
+        div.filter-criteria-edit {
+            display:none;
+            padding-top:5px;
+            padding-bottom:5px;
+            padding-left:10px;
+        }
+        #FilterCriteriaPopup {
+           min-height: 130px;
+        }
+        .filter-criteria-date, .filter-string, .filter-numeric {
+            display: block;
+            width: 270px;
+            border: 1px solid rgb(221, 219, 218);
+            margin-top: 3px;
+            padding: 5px;
+        }
+        .operator-dropdown, .filter-dropdown, .value-dropdown, .value-dynamic, input.value-input-number, input.value-input-name, .type-dropdown, .object-fields {
+            display: block;
+            padding: 5px;
+            min-width: 280px;
+            padding-top: 5px;
+        }
+        input.value-input-checkbox {
+            display: block;
+            padding: 5px;
+            min-width: 150px;
+            padding-top: 5px;
+        }
+
+        .criterion-list-name {
+            padding:12px;
+            border:1px solid rgb(221, 219, 218);
+            border-radius:3px;
+            position:relative;
+            width:225px;
+            display: inline-block;
+            cursor:pointer;
+        }
+        .criterion-list-name div {
+            padding: 1px;
+        }
+        .criterion-list-name.locked-criteria {
+            background-color: #f3f2f2 !important;
+            cursor: default !important;
+        }
+        .delete-filter-line {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            color:rgb(62, 62, 60);
+            font-size:14px;
+        }
+        .static-select2 {display:none;}
+        .delete-filter-line:hover {
+            color:#c10000;
+            text-decoration:none;
+        }
+
+        .locked-filter-line {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            color:rgb(62, 62, 60);
+            font-size:14px;
+        }
+
+        .field-name {
+            padding: 2px;
+            color: rgb(62, 62, 60);
+        }
+
+        .criterion-list-name:hover {
+            background-color: #f4f6f9;
+        }
+
+        /* SELECT 2 STYLING */
+        .select2-results li {margin-left:0px;}
+        .select2-container-multi .select2-choices
+        {
+            border: 1px solid rgb(221, 219, 218);
+            background-image:none;
+        }
+        .select2-container-multi .select2-choices .select2-search-choice {
+            border: 1px solid #aaaaaa;
+            border-radius: 4px;
+            padding: 5px 20px 5px 5px;
+            background-image:none;
+        }
+
+        .select2-container-multi .select2-search-choice-close {
+            background-image:  url({!URLFOR($Resource.AssignmentImages, 'assignmentSprite.png')});
+            background-position: -2px -29px;
+            background-repeat: no-repeat;
+            left:auto;
+        }
+
+        .select2-container-multi .select2-choices .select2-search-choice .select2-search-choice-close:hover {
+            background-position: -2px -1px;
+        }
+        .select2-container.select2-container-multi {
+            display: block;
+            width: 280px !important;;
+            padding-left: 0px;
+            padding-right: 0px;
+        }
+        .filter-header {
+		    font-weight: bold;
+		    font-size: 14px;
+		    padding: 10px;
+		    background-color: #F5F5F5;
+		    border: 1px solid #DDD;
+		    border-radius: 4px;
+		    margin-left: 2px;
+		    margin-right: 2px;
+		    position:relative;
+        }
+        i.filter-collapse-btn.fa.fa-angle-double-up {
+            color: #BBB;
+            cursor: pointer;
+            padding-right: 6px;
+            position: absolute;
+            right: 13px;
+            top: 5px;
+            font-size: 26px;
+        }
+        .clear-filter-popup-btn {
+            position: absolute;
+            top: 6px;
+            right: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            color: #0094ff;
+            display:none;
+        }
+
+        .clear-filter-popup-btn:hover {
+           color: #c10000;
+        }
+
+        .ionTabs__tab_state_active .clear-filter-popup-btn {
+            display:initial;
+        }
+        .ionTabs__tab_state_active .clear-filter-popup-btn {
+            display:initial;
+        }
+
+        .filter-heading
+        {
+            position:relative;margin-top:8px;margin-left:8px;font-size: 1em;font-weight: bold;color: #4a4a56;margin-bottom: 3px;
+        }
+
+        .filter-heading input
+        {
+            position: relative;
+            top: 2px;
+            left: 12px;
+        }
+        .filter-popup-btn:hover {
+            background-color: #f4f6f9;
+        }
+        .filter-popup-btn {
+            display: inline-block;
+            padding: 6px 10px 6px 10px;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 2px;
+            cursor: pointer;
+
+
+        }
+        .filter-actions {position:relative;height:40px;margin-top: 6px;}
+        #date-range input[type="text"] {
+            border: 2px solid rgb(224,224,224);min-height: 22px;
+        }
+        #ui-datepicker-div {z-index:2000 !important;}
+
+        .filter-criteria-item.new-item .criterion-list-name {
+            background-color: rgb(250, 255, 189);
+        }
+        .filters-panel span {
+            font-weight: bold;
+            margin-bottom: 10px;
+
+            display: inline-block;
+        }
+
+        .filters-panel select {
+            margin-top:4px;
+            border-color: rgb(221, 219, 218);
+        }
+        .filters-panel {
+            min-height: 200px;
+            display: block;
+            position:relative;
+            width: 312px;
+            padding-top: 12px;
+        }
+        .filters-panel-region {
+            height: 230px;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        .qtip {max-width:unset;}
+        div#filter-criteria-list {
+    min-width: 282px;
+    min-height: 20px;
+}
+	</style>
+    <style>
+    /* Ion.Tabs
+    // css version 1.0.0
+    // by Denis Ineshin | ionden.com
+    // ===================================================================================================================*/
+
+    /* =====================================================================================================================
+    // Ion.Tabs: Base */
+
+    .ionTabs {
+    position: relative;
+    }
+    .ionTabs__head {
+    position: relative; display: block;
+    list-style-type: none;
+    margin: 0; padding: 0;
+    z-index: 1;
+    }
+    .ionTabs__head:before, .ionTabs__head:after {content: ""; display: table;}
+    .ionTabs__head:after {clear: both;}
+    .ionTabs__head {zoom: 1;}
+
+    .ionTabs__tab {
+    position: relative;
+    display: block; float: left;
+    list-style-type: none;
+    background: none;
+    margin: 0; padding: 0;
+    cursor: pointer;
+    }
+    .ionTabs__tab.ionTabs__tab_state_active {
+    cursor: default;
+    }
+
+    .ionTabs__body {
+    position: relative;
+    z-index: 2;
+    }
+
+    .ionTabs__item {
+    position: relative;
+    display: none;
+    }
+    .ionTabs__item.ionTabs__item_state_active {
+    display: block;
+    }
+
+    .ionTabs__preloader {
+    position: relative;
+    }
+
+
+    .ionTabs {
+    margin: 0 0 8px;
+    }
+    .ionTabs__tab {
+    font-size: 11px; line-height: 13px;
+    border-bottom: 1px solid #cecece;
+    padding: 7px 25px 7px;
+    color: #484848;
+    margin-top: 10px;
+    text-align: center;
+    min-width: 92px;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    }
+    .ionTabs__tab.ionTabs__tab_state_active {
+    top: 7px;
+    margin-top: 0;
+    padding: 9px 25px 11px;
+    background: #fff;
+    color: #4a4a56;
+    border-bottom: none !important;
+    border: 1px solid #cecece;
+    }
+
+    .ionTabs__body {
+    background: #fff;
+    border-top: none;
+    }
+
+    .ionTabs__item {
+    padding: 8px 6px;
+    overflow: auto;
+    /*height: 270px;*/
+    }
+
+    .ionTabs__preloader {
+    height: 50px;
+    background: url(../img/preloader-flat.gif) no-repeat 25px 50%;
+    }
+
+    </style>
+        <script>
+        // Ion.Tabs
+// version 1.0.2 Build: 17
+// https://github.com/IonDen/ion.tabs
+(function(a,w,g,n){if(!a.ionTabs){var h={},q={},k={},b,d,r,v=a(g),t=function(){try{if(g.localStorage&&null!==g.localStorage)return{save:function(b,a){"object"===typeof a&&(a=JSON.stringify(a));try{localStorage.setItem(b,a)}catch(c){"QUOTA_EXCEEDED_ERR"===c&&(localStorage.clear(),localStorage.setItem(b,a))}},load:function(a){try{return JSON.parse(localStorage.getItem(a))}catch(b){return localStorage.getItem(a)}},del:function(a){localStorage.removeItem(a)}}}catch(b){return{save:function(){return null},load:function(){return null},del:function(){return null}}}return null}(),u=function(a){this.container=a};u.prototype={init:function(){var c=this.container,m=c.find(".ionTabs__tab"),d=c.find(".ionTabs__item"),s=c.find(".ionTabs__preloader"),l,f=c.data("name"),e;m.each(function(){l=a(this);e="Button__"+f+"__"+l.data("target");l.prop("id",e)});d.each(function(){l=a(this);e="Tab__"+f+"__"+l.data("name");l.prop("id",e)});m.on("click.ionTabs",function(b){b.preventDefault();s[0].style.display="block";p(a(this).data("target"))});var p=function(c){c=decodeURIComponent(c);e="#Button__"+f+"__"+c;a(e).addClass("ionTabs__tab_state_active").siblings().removeClass("ionTabs__tab_state_active");e="#Tab__"+f+"__"+c;a(e).addClass("ionTabs__item_state_active").siblings().removeClass("ionTabs__item_state_active");s[0].style.display="none";var d;k[f]=c;b="tabs";for(d in k)k.hasOwnProperty(d)&&(b+="|"+encodeURIComponent(d)+":"+encodeURIComponent(k[d]));"hash"===h.type&&(n.hash=b);"storage"===h.type&&t.save(n.hostname+"__ionTabsPosition",b);v.trigger("ionTabsChange",{group:f,tab:c,tabId:e});if("function"===typeof h.onChange)h.onChange({group:f,tab:c,tabId:e})};k[f]?p(k[f]):p(m.eq(0).data("target"));this.setTab=function(a){p(a)}}};a.ionTabs=function(c,m){if(c){var g;h=a.extend({type:"hash",onChange:null},m);"hash"===h.type&&(b=n.hash);"storage"===h.type&&(b=t.load(n.hostname+"__ionTabsPosition"));if(b){b=b.split("|");if(1<b.length)for(d=1;d<b.length;d+=1)r=b[d].split(":"),k[decodeURIComponent(r[0])]=decodeURIComponent(r[1]);b=""}a(c).each(function(){g=a(this);var b=encodeURIComponent(g.data("name"));q[b]=new u(g);q[b].init()})}};a.ionTabs.setTab=function(a,b){q[a].setTab(b)}}})(jQuery,document,window,location);
+/* jshint ignore:end */
+        </script>
+</apex:page>

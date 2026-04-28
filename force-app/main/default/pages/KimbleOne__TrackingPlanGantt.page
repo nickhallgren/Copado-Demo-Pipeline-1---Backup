@@ -1,0 +1,3071 @@
+<apex:page standardController="KimbleOne__TrackingPlan__c" extensions="KimbleOne.TrackingPlanGanttController" sidebar="false" tabStyle="KimbleOne__ReferenceData__c">
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+	<c:Menu DefaultHelpPage="TaskManagement.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__TrackingPlan__c.ResourcedActivity__r.KimbleOne__DeliveryGroup__c}" MenuContextName="{!KimbleOne__TrackingPlan__c.ResourcedActivity__r.DeliveryGroup__r.Name}" />
+</apex:define>
+   
+<apex:define name="Content">
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__TasksGantt)}" />
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+	
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryTimePicker, 'jquery.timepicker.min.js')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQueryTimePicker, 'jquery.timepicker.css')}"/>		
+	<script>
+		var theTrackingPlanId = '<apex:outputText value="{!KimbleOne__TrackingPlan__c}"/>';
+		var exportTrackingPlanUrl = '<apex:outputText value="{!$Page.KimbleOne__TrackingPlanExport}"/>?Id=' + theTrackingPlanId;
+		var importFromMSPUrl = '<apex:outputText value="{!$Page.KimbleOne__TrackingPlanImport}"/>?Id=' + theTrackingPlanId;
+		var trackingPlanGanttUrl = '<apex:outputText value="{!$Page.KimbleOne__TrackingPlanGantt}"/>?Id=' + theTrackingPlanId;
+		var externalTrackingPlanGanttUrl = '<apex:outputText value="{!$Page.KimbleOne__TrackingPlanGantt}"/>?Id=';
+
+		// grid or planner
+		var viewMode = 'grid';
+		
+		var planningLabels = {};
+		planningLabels['move-dependent-tasks-warning'] = '<apex:outputText value="{!$Label.kimbleone__movedependenttaskswarning}"/>';
+		planningLabels['balance-label'] = '<apex:outputText value="{!$Label.kimbleone__balancelabel}"/>';
+		planningLabels['Backlog'] = '<apex:outputText value="{!$Label.kimbleone__unassignedworkitems}"/>';
+		planningLabels['AddWorkItem'] = '<apex:outputText value="{!$Label.kimbleone__addworkitem}"/>';
+		planningLabels['WorkItem'] = '<apex:outputText value="{!$ObjectType.KimbleOne__WorkItem__c.Label}"/>';
+		planningLabels['WorkItems'] = '<apex:outputText value="{!$ObjectType.KimbleOne__WorkItem__c.LabelPlural}"/>';
+		planningLabels['NewItem'] = '<apex:outputText value="{!$Label.kimbleone__newplanitem}"/>';
+		planningLabels['AddIterations'] = '<apex:outputText value="{!$Label.kimbleone__additerations}"/>';
+		planningLabels['NewWorkItemUnnamed'] = '<apex:outputText value="{!$Label.kimbleone__newworkitemunnamed}"/>';
+
+		planningLabels['ResourceOverUtilisedOnAssignmentWarning'] = '<apex:outputText value="{!$Label.kimbleone__resourceoverutilisedwarning}"/>';
+		planningLabels['ResourceOverUtilisedOnAllAssignmentsWarning'] = '<apex:outputText value="{!$Label.kimbleone__resourceoverutilisedonallassignmentswarning}"/>';
+		planningLabels['ImportantEvents'] = '<apex:outputText value="{!$Label.kimbleone__calendartasksheading}"/>';
+
+		planningLabels['NotStarted'] = '<apex:outputText value="{!$Label.kimbleone__notstartedlabel}"/>';
+		planningLabels['InProgress'] = '<apex:outputText value="{!$Label.kimbleone__inprogresslabel}"/>';
+		planningLabels['Completed'] = '<apex:outputText value="{!$Label.kimbleone__complete}"/>';
+		
+		planningLabels['AssignedLabel'] = '<apex:outputText value="{!$Label.kimbleone__assignedlabel}"/>';
+		
+		planningLabels['ActualUnits'] = '<apex:outputText value="{!$ObjectType.KimbleOne__WorkItem__c.Fields.KimbleOne__ActualUnits__c.Label}"/>';
+		planningLabels['RemainingUnits'] = '<apex:outputText value="{!$ObjectType.KimbleOne__WorkItem__c.Fields.KimbleOne__RemainingUnits__c.Label}"/>';
+		planningLabels['Notes'] = '<apex:outputText value="{!$ObjectType.KimbleOne__WorkItem__c.Fields.KimbleOne__Notes__c.Label}"/>';
+		planningLabels['ShowDetails'] = '<apex:outputText value="{!$Label.kimbleone__clicktoshowhideapprovaldetails}"/>';
+		planningLabels['IsBlocked'] = '<apex:outputText value="{!$ObjectType.KimbleOne__WorkItem__c.Fields.KimbleOne__IsBlocked__c.Label}"/>';
+		planningLabels['Delete'] = '<apex:outputText value="{!$Label.kimbleone__deletebutton}"/>';
+		planningLabels['Blocked'] = '<apex:outputText value="{!$Label.kimbleone__blocked}"/>';
+		planningLabels['Owner'] = '<apex:outputText value="{!$Label.kimbleone__ownerlabel}"/>';
+		planningLabels['None'] = '<apex:outputText value="{!$Label.kimbleone__none}"/>';
+		planningLabels['RemoveOwner'] = '<apex:outputText value="{!$Label.kimbleone__removeownerhover}"/>';
+
+		planningLabels['UsageBehaviourRule'] = '<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UsageBehaviourRule__c.Label}"/>';
+		planningLabels['NullDatesForBottomUpAssignment'] = '<apex:outputText value="{!$Label.kimbleone__nulldatesforbottomupassignmentlabel}"/>';
+		planningLabels['UnsavedChangesAddingTemplateTasksMessage'] = '{!JSENCODE($Label.UnsavedChangesAddingTemplateTasksMessage)}';
+		planningLabels['Unavailable'] = '{!JSENCODE($Label.UnavailableLabel)}';
+		planningLabels['NewPlanItem'] = '{!JSENCODE($Label.NewPlanItem)}';
+		planningLabels['AddMSPPlanItemsIntoPlan'] = '{!JSENCODE($Label.AddMSPPlanItemsIntoPlan)}';
+		planningLabels['Finish'] = '{!JSENCODE($Label.Finish)}';
+		planningLabels['Start'] = '{!JSENCODE($Label.Start)}';
+		
+		planningLabels['ExtSuccessorsInd'] = '{!JSENCODE($Label.ExternalSuccessorsInfo)}';
+		planningLabels['ExtSuccessorsDelAlert'] = '{!JSENCODE($Label.CannotDeleteParentPlanItems)}';
+		planningLabels['ExtDepInd'] = '{!JSENCODE($Label.ExternalDependenciesInfo)}';
+		planningLabels['ExtDepInds-b-f'] = '{!JSENCODE($Label.ExternalDependencyStartBeforeFinish)}';
+		planningLabels['ExtDepIndf-b-s'] = '{!JSENCODE($Label.ExternalDependencyFinishBeforeStart)}';
+		planningLabels['ExtDepInds-n-s'] = '{!JSENCODE($Label.ExternalDependencyStartNotStart)}';
+		planningLabels['ExtDepIndf-n-f'] = '{!JSENCODE($Label.ExternalDependencyFinishNotFinish)}';
+
+		planningLabels['PlanExtDeps'] = '{!JSENCODE($Label.PlanExternalDependenciesInfo)}';	
+		planningLabels['PlanExtDepsAlert'] = '{!JSENCODE($Label.ExternalDependencyOutOfSequence)}';
+		
+		planningLabels['DeliveryElement'] = '<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Label}"/>';
+		planningLabels['ItemName'] = '<apex:outputText value="{!$Label.kimbleone__name}"/>';
+		planningLabels['PlanItemType'] = '<apex:outputText value="{!$ObjectType.KimbleOne__PlanItem__c.Fields.KimbleOne__PlanItemType__c.Label}"/>';
+		planningLabels['StartDate'] = '<apex:outputText value="{!$ObjectType.KimbleOne__PlanTask__c.Fields.KimbleOne__StartDate__c.Label}"/>';
+		planningLabels['EndDate'] = '<apex:outputText value="{!$ObjectType.KimbleOne__PlanTask__c.Fields.KimbleOne__EndDate__c.Label}"/>';
+
+		planningLabels['CircularDependency'] = '{!JSENCODE($Label.CircularDependencyMessage)}';
+		planningLabels['Days'] = '{!JSENCODE($Label.DaysHeading)}';
+		planningLabels['Lag'] = '<apex:outputText value="{!$ObjectType.KimbleOne__PlanItemDependency__c.Fields.KimbleOne__Lag__c.Label}"/>';
+		
+		var calendarShowAsOptions = [];
+		<apex:repeat value="{!CalendarOptions}" var="opt">
+			calendarShowAsOptions['<apex:outputText value="{!opt.Id}"/>'] = '<apex:outputText value="{!opt.KimbleOne__Enum__c}"/>';
+		</apex:repeat>
+		
+		var newTaskStatus = 'NotStarted';
+		
+		var newWorkItemStatus = 'NotStarted';
+		var inProgressWorkItemStatus = 'InProgress';
+		var completedWorkItemStatus = 'Completed';
+		
+		var defaultIterationDuration = 10;
+			
+		var ganttViewStartDate = '{!YEAR(GanttViewProperties.StartDate)}-{!MONTH(GanttViewProperties.StartDate)}-{!DAY(GanttViewProperties.StartDate)}';
+		var ganttViewEndDate = '{!YEAR(GanttViewProperties.EndDate)}-{!MONTH(GanttViewProperties.EndDate)}-{!DAY(GanttViewProperties.EndDate)}';
+								
+		var theGlobalNonBusinessDays = new Object();
+		<apex:outputText value="theGlobalNonBusinessDays={!GanttViewProperties.GlobalNonBusDaysJson};" rendered="{!!ISBLANK(GanttViewProperties.GlobalNonBusDaysJson)}"/>
+		
+		var theCalendarNonBusinessDays = new Object();
+		<apex:outputText value="theCalendarNonBusinessDays={!GanttViewProperties.CalendarNonBusDaysJson};" rendered="{!!ISBLANK(GanttViewProperties.CalendarNonBusDaysJson)}"/>
+
+		var zoomLevel = <apex:outputText value="{!GanttViewProperties.ZoomLevel}"/>;
+		var showNonBusDays = <apex:outputText value="{!GanttViewProperties.ShowNonBusDays}"/>; 
+		
+		var classificationStyleMap = kimble.parseJSON("{!JSENCODE(GanttViewProperties.TheJsonClassificationsMap)}");
+		
+		var theResourcedActivityDatesMap = {};
+		<apex:outputText value="theResourcedActivityDatesMap={!ResourcedActivityDatesMapJson};" rendered="{!!ISBLANK(ResourcedActivityDatesMapJson)}"/>
+
+		var theScopingElements = {};
+		<apex:outputText value="theScopingElements={!ScopingElementsJson};" rendered="{!!ISBLANK(ScopingElementsJson)}"/>
+		
+		var theOrderedScopingElementIds = [];
+		<apex:repeat value="{!TheOrderedScopingElementIds}" var="TheOrderedScopingElementId">
+		<apex:outputText value="theOrderedScopingElementIds.push('{!TheOrderedScopingElementId}');"/>
+		</apex:repeat>
+		
+		var theOrderedScopingActivityIds = [];
+		<apex:repeat value="{!TheOrderedScopingActivityIds}" var="theOrderedScopingActivityId">
+		<apex:outputText value="theOrderedScopingActivityIds.push('{!theOrderedScopingActivityId}');"/>
+		</apex:repeat>
+		
+		var newTaskDefaultPlanItemConstraintType;
+		<apex:outputText value="newTaskDefaultPlanItemConstraintType='{!JSINHTMLENCODE(DefaultPlanItemConstraintType)}';" rendered="{!!ISBLANK(DefaultPlanItemConstraintType)}"/>
+
+		var newTaskDefaultVisibilityLevel;
+		<apex:outputText value="newTaskDefaultVisibilityLevel='{!JSINHTMLENCODE(DefaultTaskVisibilityLevel)}';" rendered="{!!ISBLANK(DefaultTaskVisibilityLevel)}"/>
+
+		var newPlanningMilestoneDefaultVisibilityLevel;
+		<apex:outputText value="newPlanningMilestoneDefaultVisibilityLevel='{!JSINHTMLENCODE(DefaultPlanningMilestoneVisibilityLevel)}';" rendered="{!!ISBLANK(DefaultPlanningMilestoneVisibilityLevel)}"/>
+
+		var newMilestoneDefaultIsCompletedByPredecessorTasks;
+		<apex:outputText value="newMilestoneDefaultIsCompletedByPredecessorTasks={!DefaultMilestoneIsCompletedByTask};"/>
+
+		var defaultNewItemDates;
+		defaultNewItemDates = <apex:outputText value="{!DefaultTaskDates}"/>;
+		
+		var theEarliestOpenTrackingDate;
+		<apex:outputText value="theEarliestOpenTrackingDate='{!JSINHTMLENCODE(EarliestOpenTrackingDate)}';" rendered="{!!ISBLANK(EarliestOpenTrackingDate)}"/>
+				
+		var newItemLatestContextDateMap = {};
+		var newItemEarliestContextDateMap = {};
+		var theEarliestAssignmentStartDateMap = {};
+
+		var plannedMilestonesRequireApproval = false;
+
+		var defaultTaskIsFixedEffort;
+		defaultTaskIsFixedEffort = <apex:outputText value="{!DefaultTaskIsFixedEffort}"/>;
+
+		var compressedViewMode;
+		compressedViewMode = <apex:outputText value="{!DefaultPlanGanttView}"/>;
+
+		var milestoneTypes = {};
+		<apex:outputText value="milestoneTypes={!MilestoneTypesJson};" rendered="{!!ISBLANK(MilestoneTypesJson)}"/>
+		
+		var usageUnitType = '<apex:outputText value="{!KimbleOne__TrackingPlan__c.ResourcedActivity__r.UsageUnitType__r.KimbleOne__Suffix__c}"/>';
+		var forecastUnitType = '<apex:outputText value="{!KimbleOne__TrackingPlan__c.ResourcedActivity__r.ForecastUnitType__r.KimbleOne__Enum__c}"/>';
+		var planningHoursPerDay = <apex:outputText value="{!KimbleOne__TrackingPlan__c.ResourcedActivity__r.TimePattern__r.KimbleOne__HoursPerDay__c}"/>;
+		
+		var TheTemplateProductId = '{!TheTemplateProduct}';
+
+		var enableWorkItemsMap = {};
+		<apex:outputText value="enableWorkItemsMap={!EnableWorkItemsJson};" rendered="{!!ISBLANK(EnableWorkItemsJson)}"/>
+		var enableWorkItemUnitsMap = {};
+		<apex:outputText value="enableWorkItemUnitsMap={!EnableWorkItemUnitsJson};" rendered="{!!ISBLANK(EnableWorkItemUnitsJson)}"/>
+		var unitTypeEnumToSuffixMap = {};
+		<apex:outputText value="unitTypeEnumToSuffixMap={!UnitTypeEnumToSuffixJson};" rendered="{!!ISBLANK(UnitTypeEnumToSuffixJson)}"/>
+
+		var enableOwners = <apex:outputText value="{!EnableOwnersWorkItems}"/>;
+
+		var planItems = {};
+		var externalPlanItems = {};
+		var planWorkItems = [];
+		var planPredecessors = {};
+		var planSuccessors = {};
+		var planResources = [];
+		var deletedItems = {};
+		var taskCategoryMap = {};
+		<apex:outputText value="taskCategoryMap={!TaskCategoriesJson};" rendered="{!!ISBLANK(TaskCategoriesJson)}"/>
+		
+		var taskTimeEntries = {};
+		<apex:outputText value="taskTimeEntries={!TaskTimeEntriesJson};" rendered="{!!ISBLANK(TaskTimeEntriesJson)}"/>
+		
+		var jumpTo;
+		
+		<apex:outputText value="jumpTo='{!JSENCODE($CurrentPage.Parameters.taskId)}';" rendered="{!!ISBLANK($CurrentPage.Parameters.taskId)}"/>
+		
+		var disablePlan=<apex:outputText value="{!KimbleOne__TrackingPlan__c.PlanStatus__r.KimbleOne__Enum__c = 'Frozen' || !$ObjectType.KimbleOne__TrackingPlan__c.updateable || !KimbleOne__TrackingPlan__c.ResourcedActivity__r.KimbleOne__AllowNewTasks__c}"/>;
+		
+		var planItemConstraintIdToEnumMap = kimble.parseJSON("{!JSENCODE(PlanItemConstraintTypeIdToEnumJson)}");
+		var planItemConstraintIdToNameMap = kimble.parseJSON("{!JSENCODE(PlanItemConstraintTypeIdToNameJson)}");
+		var planItemConstraintEnumToIdMap = kimble.parseJSON("{!JSENCODE(PlanItemConstraintTypeEnumToIdJson)}");
+		
+		var defaultTaskDates = true;
+		
+		var UnachievablePlanItemsMessage = '<apex:outputText value="{!$Label.kimbleone__unachievableplanitemsmessage}"/>';
+		var UnbalancedPlanItemsMessage = '<apex:outputText value="{!$Label.kimbleone__unbalancedplanitemsmessage}"/>';
+		var OverAllocatedPlanAssignmentsMessage = '<apex:outputText value="{!$Label.kimbleone__overallocatedplanassignmentsmessage}"/>';
+		var UnderAllocatedPlanAssignmentsMessage = '<apex:outputText value="{!$Label.kimbleone__underallocatedplanassignmentsmessage}"/>';
+		var UnbalancedPlanAssignmentsMessage = '<apex:outputText value="{!$Label.kimbleone__unbalancedplanassignmentsmessage}"/>';
+		var UnachievablePlanAssignmentsMessage = '<apex:outputText value="{!$Label.kimbleone__unachievableplanassignmentsmessage}"/>';
+		var OneOrMoreResourcesAreOverUtilisedOnThisActivity = '<apex:outputText value="{!$Label.kimbleone__oneormoreresourcesareoverutilisedonthisactivity}"/>';
+		var OneOrMoreResourcesAreOverUtilisedAcrossTheirActivities = '<apex:outputText value="{!$Label.kimbleone__resareoverutilisedacrossactivities}"/>';
+		
+		var screenLayout;
+		
+		jQuery(window).ready(function () {
+			var salesforceHeaderFooterHeight = jQuery('#layout-container').offset().top;
+			jQuery('#layout-container, .work-items-container, .iterations-container, .backlog-container').height(jQuery(window).height() - salesforceHeaderFooterHeight);
+			
+		   	screenLayout = jQuery('#layout-container').layout({
+					maskIframesOnResize: true, 
+					livePaneResizing:   true
+				,   east__size:		 .51
+				});
+					  	   	
+		  	maxGanttSectionHeight = jQuery('#layout-container').height() - jQuery('#gantt-header-container').height() - jQuery('#demand-gantt-container').height() - scrollbarWidth;
+			jQuery('#gantt-body-container, #gantt-vertical-scroll-container, #grid-body-container, #task-assignments-body-container').css('max-height', maxGanttSectionHeight);
+			
+			jQuery('.compressible').toggleClass('compressed', compressedViewMode);
+
+			jQuery(window).resize(function() {
+			
+				if(viewMode == 'grid')
+				{
+					salesforceHeaderFooterHeight = jQuery('#layout-container').offset().top;
+				}
+				else if(viewMode =='planner')
+				{
+					salesforceHeaderFooterHeight = jQuery('.work-items-container').offset().top;
+				}
+
+				jQuery('#layout-container, .work-items-container, .iterations-container, .backlog-container').height(jQuery(window).height() - salesforceHeaderFooterHeight);
+				
+				maxGanttSectionHeight = jQuery('#layout-container').height() - jQuery('#grid-header-container').height() - scrollbarWidth;
+				jQuery('#gantt-body-container, #gantt-vertical-scroll-container, #grid-body-container, #task-assignments-body-container').css('max-height', maxGanttSectionHeight);
+				
+				refreshVerticalScroll();
+				
+				jQuery('.week-divider, .non-bus-day-overlay, .non-bus-day-strip, .marker-line').height(jQuery('#layout-container').height() - 25);
+				
+				if(viewMode =='planner') jQuery('.all-iterations-container').width(jQuery('.work-items-container').width() - jQuery('.backlog-container').width() - 5);
+			});
+			
+			jQuery(document).off('change', 'input[type=radio][name=view-pref-group]').on('change', 'input[type=radio][name=view-pref-group]', setDefaultViewPreference);
+		});
+		
+		jQuery(window).load(function(){
+		
+			showWorking();
+			
+			loadAndRunTrackingPlanJobs('<apex:outputText value="{!KimbleOne__TrackingPlan__c}"/>', 'JobCalculateResourceAggregateUsage', initialise);			
+		});
+		
+		function initialise()
+		{
+			buildEarliestAndLatestDateMaps();
+			
+			jQuery('#gantt-header-container').paintPeriodsHeader(ganttViewStartDate.toDate(), ganttViewEndDate.toDate(), showNonBusDays);
+
+			getPlan();
+			
+			jQuery('#gantt-vertical-scroll-container').scroll(function() {
+	  			
+	  			jQuery('#grid-body-container').scrollTo(jQuery('#gantt-vertical-scroll-container').scrollTop());
+	  			
+	  			jQuery('#gantt-body-container').scrollTo(jQuery('#gantt-vertical-scroll-container').scrollTop());
+	  			
+	  			jQuery('#task-assignments-body-container').scrollTo(jQuery('#gantt-vertical-scroll-container').scrollTop());
+	  		});
+	  		
+	  		defaultDetailViewLayout();
+		}
+
+		function setDepContainerDimensions()
+		{
+			jQuery('#dependency-container').css('height', document.querySelector('#gantt-body-container').scrollHeight);
+		}
+		
+		function defaultDetailViewLayout() 
+		{
+			if (readCookie('kimble.trackingplanscreenstate') == 'gantt')
+			{
+				showGantt();
+				setDefaultViewIndicator('gantt');
+			}
+			else if (readCookie('kimble.trackingplanscreenstate') == 'details')
+			{
+				showDetails();
+				setDefaultViewIndicator('details');
+			}
+			else
+			{
+				showBoth();
+				setDefaultViewIndicator('both');
+			}
+		}
+
+		function setDefaultViewIndicator(viewName)
+		{
+			jQuery("input:radio[name='view-pref-group']").filter("[value='" + viewName + "']").attr('checked', true);
+		}
+				
+		function setDefaultViewPreference()
+		{
+	   		createCookie('kimble.trackingplanscreenstate', jQuery(this).prop('value'));
+		}
+
+		function resizeTrackingPlan(obj)
+		{			
+			toggleTrackingPlan(jQuery(this).hasClass('standard-view'));
+			
+			jQuery(this).toggleClass('standard-view');
+			jQuery(this).find('i').toggleClass('fa-expand');
+			jQuery(this).find('i').toggleClass('fa-compress');
+			jQuery(this).toggleClass('maximised-view');
+			
+			jQuery(this).prop('title', (jQuery(this).hasClass('maximised-view') ? jQuery(this).attr('restore-title') : jQuery(this).attr('maximise-title')));
+		}
+		
+		function toggleTrackingPlan(maximise)
+		{
+			jQuery('#side-bar-container, #kimble-page-header-container').toggleClass('hide-for-maximised', maximise);
+
+			jQuery('.sfdcBody').toggleClass('prevent-scroll', maximise);
+			if(isSFLightning()) jQuery('.sfdcBody').closest('html').toggleClass('prevent-scroll', maximise);
+
+			jQuery(window).resize();
+		}				 	
+
+		function refreshVerticalScroll()
+		{
+			if (jQuery('#grid-body-container>table').height() > jQuery('#grid-body-container').height())
+				jQuery('#verticalScroll').height(jQuery('#grid-body-container>table').height()).show();
+			else
+				jQuery('#verticalScroll').hide();
+		}
+		
+		var overrideLoadingHide = false;
+		
+		function getPlan()
+		{	   
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TrackingPlanGanttController.GetPlan}',
+					theTrackingPlanId,
+						function(result, event){		  
+							if (event.status) 
+							{
+								planItems = result.ThePlanItems;
+								externalPlanItems = result.TheExternalPlanItems;
+								planWorkItems = result.ThePlanWorkItems;
+								planPredecessors = result.ThePlanPredecessors;
+								planSuccessors = result.ThePlanSuccessors;
+								planResources = result.ThePlanResources;
+								plannedMilestonesRequireApproval = result.PlannedMilestoneRequiresApproval;
+
+								deletedItems = {};
+								externallyVisiblePlanItemsLoaded = false;
+								
+								jQuery('#snapshotButton').toggleClass('hidden-item', !enableWorkItemsMap[theOrderedScopingElementIds[0]]);
+
+								refreshPlan((result.ForceReflow || getQueryVariable('reflow') == '1'));
+								
+								// if we are loading a plan post templating then we reflow
+								if(result.ForceReflow || getQueryVariable('reflow') == '1')
+								{
+									overrideLoadingHide = true;
+									reflowPlan(true);
+									forceSavePlan();
+									
+									jQuery.subscribe('kimble.plan-save-complete', function(event){
+										resetPlanChanged();
+								    	safeNavigateToSForceURL(trackingPlanGanttUrl);
+								    });
+								}
+								
+								initialiseActions();
+								
+								if (jumpTo != null)
+								{
+									jQuery('[node-id="' + jumpTo + '"]').click();
+									jQuery('#gantt-vertical-scroll-container').scrollTop(jQuery('[node-id="' + jumpTo + '"]').position().top);
+								}
+								
+								jQuery.publish('kimble.plan-working-end');				
+							} 
+							else if (event.type === 'exception') 
+							{
+								alert(event.message);
+							} 
+							else 
+							{
+								alert(event.message);
+							}
+					}, 
+					{escape: true, timeout: 60000}
+				);
+		}
+
+		var externallyVisiblePlanItemsLoaded = false;
+		
+		function getExternallyVisiblePlanItems(externalPredecessorsBody, itemId, currentItemId, currentItemType, newRow)
+		{
+			if(externallyVisiblePlanItemsLoaded && !newRow)
+			{
+				var arow = getExternalPredecessorsHtml(itemId);
+				arow.appendTo(externalPredecessorsBody);
+				arow.find('#external-predecessor-select').val(currentItemId);
+				arow.find('#external-predecessor-type-select').val(currentItemType);
+				
+				jQuery('.searchable-dropdown:visible:not(.select2-container)').select2();
+				
+				return;
+			}
+			
+			allExternalPlanItems = {};
+			
+			jQuery('#addExternalPredecessorButton:visible i').removeClass('fa-plus-square').addClass('fa-circle-o-notch fa-spin ra-pending');
+			 
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TrackingPlanGanttController.GetVisiblePlanItems}',
+					theTrackingPlanId,
+						function(result, event){		  
+							if (event.status) 
+							{
+								externalPlanItems = result.TheExternalPlanItems;
+								externallyVisiblePlanItemsLoaded = true;
+								
+								if(newRow)
+								{
+									createNewExternalPredecessorRow(externalPredecessorsBody);
+								}
+								else
+								{
+									var arow = getExternalPredecessorsHtml(itemId);
+									arow.appendTo(externalPredecessorsBody);
+									arow.find('#external-predecessor-select').val(currentItemId);
+									arow.find('#external-predecessor-type-select').val(currentItemType);								
+									
+									jQuery('.searchable-dropdown:visible:not(.select2-container)').select2();
+								}
+							} 
+							else 
+							{
+								alert(event.message);
+							}
+						jQuery('#addExternalPredecessorButton:visible i').addClass('fa-plus-square').removeClass('fa-circle-o-notch fa-spin ra-pending');
+					}, 
+					{escape: true, timeout: 60000}
+				);
+		}
+		
+		function addTasksFromTemplateForResourcedActivity(startDate, templateProductId)
+		{	   
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TrackingPlanGanttController.AddTasksFromTemplate}',
+					theTrackingPlanId, parseInt(jQuery('span.position-num:last').text()), startDate, templateProductId, 
+						function(result, event){		  
+							if (event.status) 
+							{
+								planItems = result.ThePlanItems;
+								externalPlanItems = result.TheExternalPlanItems;
+								planWorkItems = result.ThePlanWorkItems;
+								planPredecessors = result.ThePlanPredecessors;
+								planSuccessors = result.ThePlanSuccessors;
+								deletedItems = {};
+								externallyVisiblePlanItemsLoaded = false;
+								refreshPlan();
+								// TODO125 display some sort of progress whilst plan is created and resaved
+								
+								setTimeout(function() { 
+									reflowPlan();
+									forceSavePlan();
+									resetPlanChanged();
+									jQuery.publish('kimble.plan-working-end');
+								}, 500);
+							} 
+							else if (event.type === 'exception') 
+							{
+								alert(event.message);
+								jQuery.publish('kimble.plan-working-end');
+							} 
+							else 
+							{
+								alert(event.message);
+								jQuery.publish('kimble.plan-working-end');
+							}						
+					}, 
+					{escape: true, timeout: 60000}
+				);
+		}
+				
+		function savePlan(itemsMap, silentSave, onError)
+		{			
+			if(!jQuery('#saveButton').find('i').hasClass('fa-circle-o-notch')) toggleWorking('#saveButton');
+			
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TrackingPlanGanttController.SavePlan}',
+					'<apex:outputText value="{!KimbleOne__TrackingPlan__c}"/>', itemsMap, planPredecessors, deletedItems, planWorkItems, 
+						function(result, event){		  
+							if (event.status) 
+							{
+								planItems = result.ThePlanItems;
+								externalPlanItems = result.TheExternalPlanItems;
+								planWorkItems = result.ThePlanWorkItems;
+								planPredecessors = result.ThePlanPredecessors;
+								planSuccessors = result.ThePlanSuccessors;
+								planResources = result.ThePlanResources;
+								
+								deletedItems = {};
+								externallyVisiblePlanItemsLoaded = false;
+
+								if(!silentSave)
+								{
+									assignmentsInitialised = false;
+									resetPlanChanged();
+									
+									loadAndRunTrackingPlanJobs('<apex:outputText value="{!KimbleOne__TrackingPlan__c}"/>', 'JobCalculateResourceAggregateUsage', refreshPlan);
+									// now called after jobs pending inline run for tracking plan so that assignment aggregate is correct
+									//refreshPlan();
+								}
+								
+								//Delete deleted assignments (can be done silently)
+								deleteAssignments(onError);											  
+							} 
+							else if (event.type === 'exception') 
+							{
+								if (onError != null)
+									onError(event.message);
+								else
+									alert(event.message);	
+							} 
+							else 
+							{
+								if (onError != null)
+									onError(event.message);
+								else
+									alert(event.message);
+							}
+
+							if(!silentSave)
+							{
+								jQuery('#toolbar-buttons>a').removeClass('disabled'); 
+							}
+							toggleWorking('#saveButton');
+							jQuery.publish('kimble.plan-save-complete');
+					}, 
+					{escape: true, timeout: 60000}
+				);
+			 
+		}
+		
+		var trackingPlanJobsToRun;
+		var trackingPlanThreads = 2;
+		var activeThreads = 0;
+		
+		function loadAndRunTrackingPlanJobs(contextId, jobName, callback)
+		{
+			activeThreads = 0;
+			
+			jQuery.ajax({type: "GET",
+						 url: '{!$Page.JobsPendingInline}?id=' + contextId + '&response=json&jobName=' + jobName,
+						 async: true,
+						 dataType: "json"})
+						 .done(function(data) {
+							trackingPlanJobsToRun = data;
+
+						 	if(trackingPlanJobsToRun.length == 0)
+						 	{
+					 			callback();
+					 		}
+						 	else
+						 	{
+						 		activeThreads = 0;
+						 		
+							 	for (var i=0;i < trackingPlanThreads;i++)
+							 	{
+									if(trackingPlanJobsToRun.length != 0)
+									{
+										activeThreads += 1;
+										setTimeout(function(){ RunAllTrackingPlanJobs(callback); }, (i+1) * 1000);
+									}
+								}
+							}
+						})
+						.fail(function(xhr, status, error) {
+							if(error !=null && error !="") alert(error);
+							callback();
+						});
+		}
+		
+		function RunAllTrackingPlanJobs(callback)
+		{
+			if (trackingPlanJobsToRun.length == 0)
+			{
+ 				activeThreads -= 1;
+		 		if(activeThreads == 0)
+		 		{
+		 			callback();
+	 			}
+			}
+			else
+			{				
+				var jobId = trackingPlanJobsToRun.shift();
+				
+				RunTrackingPlanJob(jobId, function(){RunAllTrackingPlanJobs(callback)});
+			}
+		}
+		
+		function RunTrackingPlanJob(jobId, onSuccessCallback)
+		{
+			var callback = {onSuccess : onSuccessCallback, target:null, onFailure : function(e){console.log(e);}};
+			sforce.apex.execute(KimbleNamespaceWithPeriod + 'JobWebService','RunJob',{jobId:jobId}, callback);
+		}
+		
+		function managePlanInternally()
+		{	   
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TrackingPlanGanttController.ManagePlanInternally}',
+					'<apex:outputText value="{!KimbleOne__TrackingPlan__c.KimbleOne__ResourcedActivity__c}"/>',
+						function(result, event){		  
+							if (event.status) 
+							{
+								location.reload();								
+							} 
+							else if (event.type === 'exception') 
+							{
+								alert(event.message);
+							} 
+							else 
+							{
+								alert(event.message);
+							}
+					}, 
+					{escape: true, timeout: 60000}
+				);
+		}
+		
+		function createWorkitemSnapshot()
+		{
+			if(jQuery('#saveButton').hasClass('has-changes'))
+			{
+				confirm(kimble.labels['UnsavedChangesPlan']);
+			}
+			else
+			{
+				jQuery.publish('kimble.plan-working-start');
+									
+				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TrackingPlanGanttController.SnapshotWorkItems}',
+						'<apex:outputText value="{!KimbleOne__TrackingPlan__c.KimbleOne__ResourcedActivity__c}"/>', 
+							function(result, event){		  
+								if (event.status) 
+								{
+									// nothing to do
+								} 
+								else if (event.type === 'exception') 
+								{
+									alert(event.message);
+								} 
+								else 
+								{
+									alert(event.message);
+								}
+	
+							jQuery.publish('kimble.plan-working-end');
+						}, 
+						{escape: true, timeout: 60000}
+					);
+			}
+		}		
+		
+		function showGantt() {
+			jQuery('.qtip').qtip('destroy', true);
+		
+			screenLayout.sizePane( 'east', jQuery('#layout-container').width() - 224 );
+			screenLayout.open( 'east' );
+		}
+		   
+		function showBoth() {
+			jQuery('.qtip').qtip('destroy', true);
+			screenLayout.sizePane( 'east', .51 );
+			screenLayout.open( 'east' );
+		}
+			
+		function showDetails() {
+			jQuery('.qtip').qtip('destroy', true);
+			screenLayout.close( 'east' );
+		}
+		
+	</script>
+	
+	<style>
+		/* TODO127: consolidate new for 1.27 START */
+		/* TODO127: consolidate new for 1.27 END */
+		
+		/* 1.25 new styling */
+		.bPageBlock
+		{
+			border-top: 1px solid #eaeaea !important;
+		}
+		#task-assignments-view
+		{
+			display: none;
+		}
+		.resource-header
+		{
+			height: 31px;
+		}
+		.all-assignment-header, .all-plan-task-assignment-cell {
+		    width: 54px !important;
+		}
+		.assign-to-all-tasks, 
+		.assign-all-to-all-tasks,
+		.balance-all-task-assignments {
+		    cursor: pointer;
+		    font-size: 12px;
+	        padding: 5px 2px 4px 5px;
+	        color: #606363;
+		}
+		.assign-task-effort,
+		.assign-task-effort-to-all 
+		{
+			cursor: pointer;
+			color: #888;
+		}
+		tr.deleted-predecessor {
+		    display: none;
+		}
+		.assignment-units {
+			font-size: 13px !important;
+		}		
+		th.task-assignment-header {
+			min-width: 82px;
+		}		
+		table#task-assignments-body {
+			width: initial;
+		}
+		.task-assignment-header {
+			width: 70px;
+		}
+		table#task-assignments-header {
+		    width: initial;
+		    border-bottom: none !important;
+		}
+		span.planned-usage-details {
+		    display: block;
+		}		
+		.plan-task-assignment-cell {
+			width: 66px;
+		}
+		tr.plan-item-assignment-row {
+			height: 32px;
+		}
+		td.plan-task-assignment-cell, td.all-plan-task-assignment-cell {
+		    text-align: center;
+		    font-size: 16px;
+		    padding-right: 6px;
+		}
+		td.all-plan-task-assignment-cell {
+		    text-align: center !important;
+		}
+		.plan-item-assignment-row td {
+		    border: none;
+		}
+		tr.plan-item-assignment-row td:first-child {
+		    border-left: none !important;
+		}
+		td.plan-task-assignment-cell:not(:first-child) {
+		    min-width: 78px;
+		}
+		th.task-assignment-header {
+			text-align: center;
+		}
+		tr.headerRow.scopeName {
+		    height: 22px;
+		}		
+		td.duration input, td.taskEffort input, td.plan-task-assignment-cell input {
+			width: 46px;
+			text-align: center;
+			background-color: rgba(0, 0, 0, 0) !important;
+			border: 0 !important;
+			cursor: text;
+			height: 100%;
+		}		
+		td.duration, td.taskEffort {
+			text-align: center;
+		}
+		.taskEffort, .taskEffortNA {
+			display: none;
+		}
+		span.fixed-constraint {
+			color: #2196F3 !important
+		}
+		span.constraint-ind {
+			color: #dedede; 
+			margin-right: 10px;
+			font-size: 14px;
+			cursor: pointer;
+			display: block;
+			float: left;
+			margin-left: 1px;
+		}
+		span.fa.constraint-ind.fa-thumb-tack.fixed-constraint {
+			margin-right: 12px;
+			margin-left: 3px;
+		}		
+		.constraint-date, .ignore-non-bus-days, .is-critical-path {
+ 			display: none;
+		}
+		.task-gantt-box.manually-scheduled {
+			border-left: 3px solid #000 !important;
+			border-right: 3px solid #000 !important;
+		}
+		.task-gantt-actual-box {
+		    height: 18px;
+		    bottom: 4px;
+		    border: none;
+		    position: absolute;
+		    color: #729BC7;
+		    font-size: 16px;
+	        opacity: 0.8;
+		}
+		th.position {
+			text-align: right;
+			padding-right: 6px !important;
+		}
+		td.by-label {
+			padding: 5px;
+			font-weight: bold;
+		}
+		#move-item-number {
+			text-align: center;	
+		}
+		select#move-by-type {
+			height: 20px;
+			margin-left: 5px;
+		}
+		
+		td.move-by-direction {
+			height: 20px;
+		}
+		
+		table#move-item {
+			margin-bottom: 7px;
+		}
+		
+		div#MovePlanItemContainer, div#AddTemplatedTasksContainer {
+			padding-bottom: 12px;
+		}
+		.task-name-col {
+ 			width: 215px;
+		}
+		th.task-name-col {
+			position: relative;
+		}
+		.task-name-resizer {
+			position: absolute;
+			top: 0px;
+			right: 0px;
+			width: 10px;
+			height: 100%;
+			cursor: col-resize;
+		}
+		td.unbalanced-assignment {
+			background-color: #ffc107;
+			border-radius: 2px;
+		}
+		td.date-unachievable, 
+		td.unacheivable-assignment {
+			background-color: #B42E34 !important;
+			border-radius: 2px;
+		}
+		div.hidden-qtip-content {
+		    display: none;
+		}
+		td.unacheivable-assignment input,
+		td.date-unachievable input, 
+		td.unbalanced-assignment span,
+		td.unacheivable-assignment span  {
+			color: white;
+		}
+		div#move-pane {
+		    display: table-cell;
+		    vertical-align: bottom;
+			padding-bottom: 2px;
+        	width: 109px;    
+		}
+		td.overview-label {
+		    color: #4a4a56;
+		    font-weight: bold;
+		    font-size: 11px;
+		    padding-bottom: 10px;
+		}
+		
+		table#add-tasks-from-external {
+		    margin-bottom: 6px;
+		}
+		.gantt-item-name {
+			color:#aaa;
+			position: absolute;
+			right: 10px;
+			z-index: 30;
+			top:6px;
+			font-size: 10px;
+		}
+		div.itemName input {
+		    font-size: 12px;
+		}
+		.critical-path-task {
+		    border-top: 2px solid #f00 !important;
+		    border-bottom: 2px solid #f00 !important;
+		}
+		table#predecessors-body, table#external-predecessors-body {
+		    width: 100%;
+		}
+		
+		table#predecessors-head, table#external-predecessors-head {
+		    width: 100%;
+		}
+		
+		.find-template-product {
+			width: 300px;
+		}
+		.floating-dropdown-menu li.dropdown-separator:not(:last-child) {
+		    border-top: 1px dashed #bbb;
+		}
+		tr.planItem {
+			height: 32px;
+		}
+		tr.plan-item-assignment-row td {
+			border-top: none !important;
+		}
+		table#task-assignments-body {
+			border-top: none !important;
+		}
+		/* Make select2 dropdowns look like conventional dropdowns */
+		a.select2-choice {
+		    height: 18px !important;
+		    line-height: 18px !important;
+		    background-image: none !important;
+		    border-radius: 0px !important;
+		    color: black !important;
+		    padding-left: 4px !important;
+		}
+		.select2-choice div {
+		    border-left: none !important;
+		}
+		.select2-result-label {
+		    border-bottom: 1px solid #cccccc;
+		}
+		/*
+			layout control
+		*/
+		
+		.ui-layout-center,.ui-layout-east, .ui-layout-west {
+			padding: 0;
+		}
+		
+		.ui-layout-content {
+			padding: 0px;
+		}
+		/*
+    		loading panel
+		*/
+
+		.loadingIndicator {
+		   top:0;
+		   right:0;
+		   width:100%;
+		   height:100%;
+		   font-weight: bold;
+		   position:absolute;
+		   text-align:center;
+		   /* IE filter */
+		   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+		   -moz-opacity:0.7;    /* Mozilla extension */
+		   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+		   opacity:0.7; /* CSS3 */
+		   z-index:10000;
+		   background-color:white;
+		   display:none; 
+		}
+		
+		.loadingIndicator img {
+		    margin-right:9px;
+		}
+		
+		#loadingIndicatorInnerContainer { 
+		    position:absolute; 
+		    top:50%;
+		    height:10em; 
+		    margin-top:-2em;
+		    width:100%;
+		}
+		.tracking-plan-charms i {
+			display: none;
+			font-size: 26px;
+			padding-right: 5px;
+			cursor: pointer;
+		}
+		.tracking-plan-charms {
+		    position: absolute;
+		    right: 220px;
+		    background-color: #fff;
+		    padding: 5px;
+		    top: -4px;
+		}
+		i.external-dep-ind {
+		    position: absolute;
+		    cursor: pointer;
+		    color: #2196f5;
+		    font-size: 14px;
+		}
+		i.external-dep-ind.alert {
+		    color: #e58e1a;
+		}		
+		i.external-dep-ind.on-left {
+			top: 3px;
+			left: 1px;
+		}
+		i.external-dep-ind.on-right {
+			bottom: 3px;
+			right: 1px;
+		}
+		.milestone-day i.external-dep-ind.on-left,
+		.milestone-day i.external-dep-ind.on-right {
+			top: 5px;
+			left: 17px;
+		}
+		.external-dep-details-container {
+		    padding: 10px;
+		}
+		.external-ind-qtip .qtip-title {
+		    font-size: 14px;
+		}
+		.external-ind-qtip .qtip-titlebar {
+		    padding: 14px;
+		}
+		table.list.external-dep-list {
+		    font-size: 12px;
+		}
+		a.jump-to-plan {
+		    color: rgb(0, 95, 178) !important;
+		}		
+		/* maximised view */
+		.maximised-view {
+		    color: #fff;
+		    background-color: #888 !important;
+		}		
+		.hide-for-maximised {
+		    display: none;
+		}
+		.prevent-scroll {
+			overflow-y: hidden;
+		}
+		/* compressed view */
+		table#tasks-body.compressed td,
+		div#task-assignments-body-container table td {
+		    padding: 0px 2px 0px 5px;
+		}
+		div#gantt-body-container.compressed div.gantt-item-container,
+		div#gantt-body-container.compressed div.day-content,
+		div#gantt-body-container.compressed div#lastGantt,
+		div#grid-body-container .tasks-grid-table.compressed tr.planItem,
+		div#grid-body-container .tasks-grid-table.compressed tr.backlog-row,
+		table#tasks-body.compressed tr#lastRow,
+		div#task-assignments-body-container.compressed table tr.plan-item-assignment-row,
+		div#task-assignments-body-container.compressed div#lastAssignment
+		{
+		    height: 24px;
+		}
+		div#gantt-body-container.compressed .task-gantt-box {
+		    height: 16px;
+		}
+		div#gantt-body-container.compressed .task-gantt-pct-complete {
+		    height: 6px;
+		}
+		div#gantt-body-container.compressed .gantt-summary {
+		    height: 3px;
+		}
+		div#gantt-body-container.compressed .utilisation-warning {
+			top: 5px;
+		}
+		div#gantt-body-container.compressed .scheduled-slot-container {
+			top: 5px;
+		}
+		div#gantt-body-container.compressed .gantt-summary-left,
+		div#gantt-body-container.compressed .gantt-summary-right {
+		    top: 12px;
+		    border-top: 5px solid #000;
+		}
+		div#gantt-body-container.compressed .milestone-gantt {
+		    width: 7px;
+		    height: 7px;
+		}
+		#dependency-container {
+			position: absolute;
+			width: 100%;
+  		}
+		#aH path {
+			fill: #267cd3;
+		}
+		#aHCP path {
+			fill: #2ba3ad;
+		}
+		#aHCPAlrt path {
+			fill: #e58e1a;
+		}
+		line:not(.ext-d) {
+			stroke: #267cd3;
+		}
+		line.ext-d {
+			stroke: #2ba3ad;
+		}
+		line.ext-d.ext-alert {
+			stroke: #e58e1a !important;
+		}
+        div#gantt-view {
+            overflow-y: hidden; 
+            height: 100%;
+        }
+		.toolbar-button.has-changes {
+			background-color: rgba(255, 165, 0, 0.55) !important;
+		}
+	</style>
+	<apex:outputPanel id="ErrorMessages">
+		<apex:pageMessages escape="false"/>
+	</apex:outputPanel>
+	<div id="remote-action-error" style="display:none"><span><div class="message errorM3"><table border="0" cellpadding="0" cellspacing="0" class="messageTable" style="padding:0px;margin:0px;"><tbody><tr valign="top"><td><img alt="error" class="msgIcon" src="/s.gif" title="{!$Label.Error}"/></td><td class="messageCell"><div class="messageText" id="remote-action-error-text"><br/></div></td></tr><tr><td></td><td></td></tr></tbody></table></div></span></div>
+
+	<apex:variable var="showActivityName" value="{!TheOrderedScopingElements.size > 1}"/>
+
+	<div class="toolbar-container">
+		<div class="toolbar">
+			<div id="toolbar-buttons">
+			<a class="toolbar-button button-left addTaskButton {!IF($ObjectType.TrackingPlan__c.updateable, '', 'disabled')}" scoping-id="{!TheOrderedScopingElements[0]}" title="{!$Label.Add} {!$ObjectType.Task__c.Label}" href="#"><i class="fa fa-plus"></i></a><a data-floating-dropdown="#add-button-floating-dropdown" class="toolbar-button button-right addButton {!IF($ObjectType.TrackingPlan__c.updateable, '', 'disabled')}" title="{!$Label.Add}" href="#"><i class="fa fa-caret-down"></i></a>
+			<a id="deleteTaskButton" title="{!$Label.Delete}" class="toolbar-button prevent-for-milestone {!IF($ObjectType.TrackingPlan__c.updateable, '', 'disabled')}" href="#"><i class="fa fa-trash-o"></i></a>
+			<a id="outdentButton" title="{!$Label.Outdent}" class="toolbar-button button-left prevent-for-milestone prevent-for-iteration {!IF($ObjectType.TrackingPlan__c.updateable, '', 'disabled')}" href="#" ><i class="fa fa-outdent"></i></a><a id="indentButton" title="{!$Label.Indent}" class="toolbar-button prevent-for-milestone prevent-for-iteration button-right {!IF($ObjectType.TrackingPlan__c.updateable, '', 'disabled')}" href="#"><i class="fa fa-indent"></i></a>
+			<a id="linkItemsButton" title="{!$Label.LinkItemsMessage}" class="toolbar-button button-left {!IF($ObjectType.TrackingPlan__c.updateable, '', 'disabled')}" href="#"><i class="fa fa-link"></i></a><a id="unlinkItemsButton" title="{!$Label.UnLinkItems}" class="toolbar-button button-right {!IF($ObjectType.TrackingPlan__c.updateable, '', 'disabled')}" href="#"><i class="fa fa-chain-broken"></i></a>
+			<a id="toggleCriticalButton" title="Add/Remove from Critical Path" class="toolbar-button prevent-for-summary prevent-for-iteration prevent-for-planning-milestone prevent-for-milestone {!IF($ObjectType.TrackingPlan__c.updateable, '', 'disabled')}" href="#"><i class="fa fa-exclamation"></i></a>
+			<a id="moveItemsButton" title="{!$Label.kimbleone__moveplanitemslabel}" class="toolbar-button prevent-for-summary prevent-for-iteration prevent-for-milestone {!IF($ObjectType.TrackingPlan__c.updateable, '', 'disabled')}" href="#"><i class="fa fa-arrows-h"></i></a>
+			<a id="toggleCompletedTaskDisplayButton" title="Show/Hide Completed Tasks" class="toolbar-button completed-tasks-shown" href="#"><i class="completed-task-toggle fa fa-eye-slash"></i></a>
+			<a id="snapshotButton" title="{!$Label.SnapshotButton} {!$ObjectType.KimbleOne__WorkItem__c.LabelPlural}" class="toolbar-button hidden-item" href="#"><i class="fa fa-camera"></i></a>
+			<a id="saveButton" title="{!$Label.Save}" class="toolbar-button {!IF($ObjectType.TrackingPlan__c.updateable, '', 'disabled')}" href="#"><i class="fa fa-save"></i></a>
+			
+			<span style="font-weight: bold;margin-left: 20px;"><a id="downloadMSPXML" class="toolbar-button" title="{!$Label.DownloadProjectPlanButton}" href="#"><i class="fa fa-download"></i></a><a id="importFromMSPXML" class="toolbar-button" title="{!$Label.ImportFromFileLabel}" href="#"><i class="fa fa-upload"></i></a><a class="toolbar-button button-left printBothButton" title="{!$Label.Print} Grid" href="#"><i class="fa fa-print"></i></a><a data-floating-dropdown="#print-button-floating-dropdown" class="toolbar-button button-right addButton" title="{!$Label.Print}" href="#"><i class="fa fa-caret-down"></i></a><apex:outputPanel layout="none" rendered="{!KimbleOne__TrackingPlan__c.ResourcedActivity__r.KimbleOne__HasExternalPlan__c}"><input id="manage-plan-internally" type="button" class="btn" value="{!$Label.ManagePlanInternallyButton}" onclick="jQuery(this).addClass('btnDisabled').removeClass('btn').prop('disabled', true); managePlanInternally();"/></apex:outputPanel><apex:outputText value="{!KimbleOne__TrackingPlan__c.Name}" rendered="{!KimbleOne__TrackingPlan__c.ResourcedActivity__r.PlanType__r.KimbleOne__Enum__c = 'Tracked'}"/></span>
+		
+			<span class="tracking-plan-charms">
+				<i class="charm-external-links cardIconInfo fa fa-external-link-square"></i>
+				<i class="charm-unachievable-date cardIconAlert fa fa-calendar"></i>
+				<i class="charm-unbalanced-date cardIconWarn fa fa-calendar"></i>
+				<i class="charm-unachievable-assignment cardIconAlert fa fa-balance-scale"></i>
+				<i class="charm-unbalanced-assignment cardIconWarn fa fa-balance-scale"></i>
+				<i class="charm-over-allocated cardIconAlert fa fa-user"></i>
+				<i class="charm-under-allocated cardIconWarn fa fa-user"></i>
+				<i class="charm-ass-over-allocated amberAlert fa fa-exclamation-triangle"></i>
+				<i class="charm-all-ass-over-allocated redAlert fa fa-exclamation-circle"></i>
+			</span>
+			<span class="gantt-display-mode">
+				
+				<a id="showGanttView" title="{!$Label.kimbleone__showganttlabel}" class="toolbar-button view-mode-button button-left active-toolbar-button" href="#" ><i class="fa fa-tasks"></i></a><apex:outputPanel layout="none" rendered="{!ShowPlanner}"><a id="plannerButton" title="Planner View" class="toolbar-button view-mode-button button-middle" href="#"><i class="fa fa-columns"></i></a></apex:outputPanel><a id="showTaskAssignmentsView" title="{!$Label.ShowTaskAssignmentsLabel}" class="toolbar-button view-mode-button button-right" href="#"><i class="fa fa-user-plus"></i></a>
+				
+				<a id="editAssignmentsButton" title="{!$Label.Edit} {!$ObjectType.ActivityAssignment__c.LabelPlural}" class="toolbar-button view-mode-button editAssignmentsButton" href="#"><i class="fa fa-users"></i></a>
+				
+				<a id="resizeTrackingPlanButton" title="{!$Label.MaximiseLabel}" maximise-title="{!$Label.MaximiseLabel}" restore-title="{!$Label.RestoreLabel}" class="toolbar-button standard-view" href="#"><i class="fa fa-expand"></i></a>
+			</span>
+			</div>
+			<div id="move-pane">
+				<apex:image id="btnCloseEast" style="width:26px;" html-data-floating-dropdown="#assignment-view-details-btn-menu-data" html-data-vertical-offset="5" styleClass="btn assignment-view-pref-trigger" url="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'LHS.png')}" onclick="showDetails()" title="{!$Label.kimbleone__showdetailslabel}" />
+				<apex:image id="btnSplitScreen" style="width:26px;" html-data-floating-dropdown="#assignment-view-both-btn-menu-data" html-data-vertical-offset="5" styleClass="btn assignment-view-pref-trigger" url="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'Split.png')}" onclick="showBoth()" title="{!$Label.kimbleone__showdetailsandganttlabel}" />
+				<apex:image id="btnExpandEast" style="width:26px;" html-data-floating-dropdown="#assignment-view-gantt-btn-menu-data" html-data-vertical-offset="5" styleClass="btn assignment-view-pref-trigger" url="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'RHS.png')}" onclick="showGantt()" title="{!$Label.kimbleone__showganttlabel}" />
+
+				<div id="assignment-view-details-btn-menu-data" class="assignment-view-pref floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+					<ul class="floating-dropdown-menu">
+						<li id="btnDetailsDefault"><label><input type="radio" name="view-pref-group" value="details"/>{!$Label.DefaultViewLabel}</label></li>
+					</ul>
+				</div>
+				<div id="assignment-view-both-btn-menu-data" class="assignment-view-pref floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+					<ul class="floating-dropdown-menu">
+						<li id="btnBothDefault"><label><input type="radio" checked="checked" name="view-pref-group" value="both"/>{!$Label.DefaultViewLabel}</label></li>
+					</ul>
+				</div>
+				<div id="assignment-view-gantt-btn-menu-data" class="assignment-view-pref floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+					<ul class="floating-dropdown-menu">
+						<li id="btnGanttDefault"><label><input type="radio" name="view-pref-group" value="gantt"/>{!$Label.DefaultViewLabel}</label></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+		
+		<div id="add-button-floating-dropdown" class="floating-dropdown floating-dropdown-relative" style="margin-top:1px">
+			<ul class="floating-dropdown-menu">					
+				<apex:repeat value="{!TheOrderedScopingElements}" var="scope">				   
+					<li><a scoping-id="{!scope.Id}" href="#" class="addTaskButton"><apex:outputText value="{!$ObjectType.KimbleOne__Task__c.Label + IF(showActivityName, ' [' + scope.Name + ']', '')}"/></a></li>
+					<li><a scoping-id="{!scope.Id}" href="#" id="addMilestoneButton"><apex:outputText value="{!$ObjectType.KimbleOne__Milestone__c.Label + IF(showActivityName, ' [' + scope.Name + ']', '')}"/></a></li>
+					<li><a scoping-id="{!scope.Id}" href="#" id="addTasksFromTemplateButton"><apex:outputText value="{!$ObjectType.KimbleOne__Task__c.LabelPlural} {!$Label.kimbleone__fromtemplatelabel} {!IF(showActivityName, ' [' + scope.Name + ']', '')}"/></a></li>
+					<apex:outputPanel layout="none" rendered="{!EnableIterations[scope.Id]}">
+					<li class="dropdown-separator"></li>
+					<li><a scoping-id="{!scope.Id}" href="#" class="addPlanWorkItemButton">{!$ObjectType.KimbleOne__WorkItem__c.Label}</a></li>
+					<li><a scoping-id="{!scope.Id}" href="#" class="addIterationButton">{!$Label.Iteration}</a></li>
+					<li><a scoping-id="{!scope.Id}" href="#" id="addIterationsButton">{!$Label.kimbleone__additerations}</a></li>
+					</apex:outputPanel>				 
+					<li class="dropdown-separator"></li>
+					<li><a scoping-id="{!scope.Id}" href="#" id="addTasksFromExternal"><apex:outputText value="{!$Label.kimbleone__addtasksfrommsplabel} {!IF(showActivityName, ' [' + scope.Name + ']', '')}"/></a></li>
+					<li class="dropdown-separator"></li>
+				</apex:repeat>				 
+			</ul>
+		</div>
+		
+		<div id="edit-assignments-floating-dropdown" class="floating-dropdown floating-dropdown-relative" style="margin-top:1px">
+			<ul class="floating-dropdown-menu">
+								<apex:repeat value="{!TheOrderedScopingElements}" var="scope">
+					<li><a scoping-id="{!scope.Id}" href="#" class="editAssignmentsButton"><apex:outputText value="{!$Label.kimbleone__edit} {!$ObjectType.KimbleOne__ActivityAssignment__c.LabelPlural + IF(showActivityName, ' [' + scope.Name + ']', '')}"/></a></li>
+				</apex:repeat>
+			</ul>
+		</div>			
+		
+		<div id="print-button-floating-dropdown" class="floating-dropdown floating-dropdown-relative" style="margin-top:1px">
+			<ul class="floating-dropdown-menu">
+				<li><a href="#" class="printGridButton">{!$Label.Gridview}</a></li>
+				<li><a href="#" id="printGanttButton">{!$Label.GanttViewButton}</a></li>
+			</ul>
+		</div>
+	</div>
+	<apex:form id="TheForm">
+	<apex:pageBlock id="trackingPlanGanttPB">
+			<div id="loadingIndicatorOuterContainer" class="loadingIndicator" style="display:none">
+				<div id="loadingIndicatorInnerContainer">
+					<img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+				</div>
+			</div>
+			
+			<div class="work-items-container planner-view-item">
+				<div class="backlog-container">
+				</div>
+				<div class="all-iterations-container" style="position:relative;">
+					<div class="dragging-scroll scroll-left" style="left: 0px; bottom: 0px;top: 0px;width: 30px;"></div>
+					<div class="dragging-scroll scroll-right" style="right: 0px;bottom: 0px;top: 0px;width: 30px;"></div>
+					<div class="iterations-container">
+					</div>
+				</div>
+			</div>			
+			
+			<div id="unachieveable-date-content" class="hidden-qtip-content"><apex:outputText value="{!$Label.kimbleone__unachievableplandatemessage}"/></div>
+			<div id="unacheivable-assignment-content" class="hidden-qtip-content"><apex:outputText value="{!$Label.kimbleone__unachievableassignmentmessage}"/></div>
+			<div id="unbalanced-assignment-content" class="hidden-qtip-content"><apex:outputText value="{!$Label.kimbleone__unbalancedassignmentmessage}"/></div>
+
+			<div id="container" class="zoom-level-1">
+			
+			<div id="layout-container">
+			<div id="grid-layout" class="ui-layout-center" style="overflow-y: hidden;">
+				<div id="grid-header-container">
+						<table id="tasks-head" class="tasks-grid-table list" border="0" cellpadding="0" cellspacing="0">
+							<colgroup>
+								<col style="width:50px;"/><!-- # -->
+								<col class="task-name-col"/><!-- Name -->
+								<col style="width:56px;"/><!-- Planned Duration -->
+								<col style="width:56px;display:none;"/><!-- Planned Effort -->
+								<col class="constraint-date" style="width:80px;"/><!-- Constraint Date -->
+								<col class="ignore-non-bus-days" style="width:80px;"/><!-- Include Non Business Days indicator -->
+								<col class="is-critical-path" style="width:80px;"/><!-- Is Critical Path indicator -->
+								<col style="width:80px;"/><!-- Start Date -->
+								<col style="width:80px;"/><!-- End Date -->
+								<col style="width:60px;"/><!-- Predecessors -->
+								<col style="width:80px;"/><!-- Assigned Resources -->
+								<col style="width:70px;"/><!-- Expended Effort -->
+								<col style="width:70px;"/><!-- Remaining Effort -->
+								<col style="width:70px;"/><!-- Total Effort -->
+								<col style="width:70px;"/><!-- Baseline Effort -->
+								<col style="width:80px;"/><!-- % Complete -->
+								<col style="width:60px;"/><!-- Fixed Effort -->
+								<col style="width:100px;"/><!-- Task Category -->
+								<col style="width:80px;"/><!-- External Id -->
+								<apex:outputPanel layout="none" rendered="{!showActivityName}">
+									<col style="width:200px;"/><!-- Scoping Activity Name -->
+								</apex:outputPanel>
+								
+							</colgroup>
+							<thead>
+							<tr class="headerRow">
+								<th rowspan="2" class="position">#</th>
+								<th class="headerRow task-name-col"><h2>{!$ObjectType.Task__c.Label}</h2><div class="task-name-resizer"></div></th>
+								<th rowspan="2" style="text-align:center">{!$ObjectType.PlanTask__c.Fields.Duration__c.Label}</th>
+								<th rowspan="2" style="text-align:center;display:none;">{!$ObjectType.PlanTask__c.Fields.Effort__c.Label}</th>
+								<th class="constraint-date" rowspan="2" style="text-align:center">{!$ObjectType.PlanTask__c.Fields.ConstraintDate__c.Label}</th>
+								<th class="ignore-non-bus-days" rowspan="2" style="text-align:center">{!$ObjectType.PlanTask__c.Fields.IncludeNonBusinessDays__c.Label}</th>
+								<th class="is-critical-path" rowspan="2" style="text-align:center">{!$ObjectType.PlanTask__c.Fields.IsCriticalPath__c.Label}</th>
+								<th rowspan="2" style="text-align:center">{!$ObjectType.KimbleOne__PlanTask__c.Fields.KimbleOne__StartDate__c.Label}</th>	
+								<th rowspan="2" style="text-align:center">{!$ObjectType.KimbleOne__PlanTask__c.Fields.KimbleOne__EndDate__c.Label}</th>	
+								<th rowspan="2" style="text-align:center">{!$Label.Predecessors}</th>
+								<th rowspan="2" style="text-align:center">{!$ObjectType.Resource__c.LabelPlural}</th>
+								<th colspan="4" style="text-align:center">{!$Label.DeliveryGroupDashboardMainContentEffort} (<apex:outputText value="{!KimbleOne__TrackingPlan__c.ResourcedActivity__r.UsageUnitType__r.KimbleOne__Suffix__c}"/>)</th>
+								<th rowspan="2" style="text-align:center">% {!$Label.kimbleone__complete}</th>
+								<th rowspan="2" style="text-align:center">{!$ObjectType.KimbleOne__Task__c.Fields.KimbleOne__IsFixedEffort__c.Label}</th>
+								<th rowspan="2">{!$ObjectType.KimbleOne__Task__c.Fields.KimbleOne__TaskCategory__c.Label}</th>
+								<th rowspan="2">{!$ObjectType.KimbleOne__Task__c.Fields.KimbleOne__ExternalId__c.Label}</th>
+								<apex:outputPanel layout="none" rendered="{!showActivityName}">
+									<th rowspan="2">{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ResourcedActivity__c.Label}</th>
+								</apex:outputPanel>												
+							</tr>
+							<tr class="headerRow">
+								<th style="background-color:white;"><input id="task-search" type="text" size="1"  autocomplete="off"/></th>
+								<th class="expendedEffort">{!$Label.ExpendedEffort}</th>
+								<th class="remainingEffort">{!$Label.RemainingEffort}</th>
+								<th class="totalEffort">{!$Label.TotalEffort}</th>
+								<th class="baselineEffort">{!$Label.BaselineLabel}</th>
+							</tr>
+							</thead>
+							
+						</table>  
+				</div>
+				<div id="draggable-container">
+				<div id="upper-scroll"></div>
+				<div id="grid-body-container" style="overflow-y:hidden; display: inline-block;position:relative;padding-bottom:2px;">
+						<table id="tasks-body" class="tasks-grid-table compressible list" border="0" cellpadding="0" cellspacing="0">
+							<colgroup>
+								<col style="width:50px;"/><!-- # -->
+								<col class="task-name-col"/><!-- Name -->
+								<col style="width:56px;"/><!-- Planned Duration -->
+								<col style="width:56px;display:none;"/><!-- Planned Effort -->
+								<col class="constraint-date" style="width:80px;"/><!-- Constraint Date -->
+								<col class="ignore-non-bus-days" style="width:80px;"/><!-- Include Non Business Days indicator -->
+								<col class="is-critical-path" style="width:80px;"/><!-- Is Critical Path -->
+								<col style="width:80px;"/><!-- Start Date -->
+								<col style="width:80px;"/><!-- End Date -->
+								<col style="width:60px;"/><!-- Predecessors -->
+								<col style="width:80px;"/><!-- Assigned Resources -->
+								<col style="width:70px;"/><!-- Expended Effort -->
+								<col style="width:70px;"/><!-- Remaining Effort -->
+								<col style="width:70px;"/><!-- Total Effort -->
+								<col style="width:70px;"/><!-- Baseline Effort -->
+								<col style="width:80px;"/><!-- % Complete -->
+								<col style="width:60px;"/><!-- Fixed Effort -->
+								<col style="width:100px;"/><!-- Task Category -->
+								<col style="width:80px;"/><!-- External Id -->
+								<apex:outputPanel layout="none" rendered="{!showActivityName}">
+									<col style="width:200px;"/><!-- Scoping Activity Name -->
+								</apex:outputPanel>						
+							</colgroup>
+							<tbody><tr id="lastRow"><td colspan="11"></td></tr></tbody>
+							
+						</table>  						
+				</div>
+				<div id="lower-scroll" style="bottom:0px"></div>
+				</div>
+			</div>
+			
+			<div id="east-layout" class="ui-layout-east" style="overflow: hidden;">
+				<div id="gantt-view" style="overflow-y: hidden;height: 100%;">
+			
+					<div id="gantt-header-container"></div>
+						
+					<div id="gantt-body-container" class="compressible" style="display: inline-block;overflow-y:hidden;position:relative;">
+										
+					</div>
+				
+				</div>
+				<div id="task-assignments-view" style="overflow-y: hidden;height: 100%;">
+			
+					<div id="task-assignments-header-container"></div>
+						
+					<div id="task-assignments-body-container" class="compressible" style="display: inline-block;overflow-y:hidden;position:relative;">
+										
+					</div>
+				
+				</div>				
+			</div><!-- gantt-layout -->
+			
+			</div>
+			
+			<div id="gantt-vertical-scroll-container">
+				<div id="verticalScroll" style="width:20px;display:none;"></div>
+			</div>
+				<div id="footer" >
+					<a class="zoom-out fa fa-minus-circle" onclick="zoomOut()" onmouseover="jQuery('#zoom-level').fadeIn();" onmouseout="jQuery('#zoom-level').fadeOut('slow');"></a>
+					<span id="zoom-level" class="zoom-level-1"></span>
+					<a class="zoom-in fa fa-plus-circle" onclick="zoomIn()" onmouseover="jQuery('#zoom-level').fadeIn();;" onmouseout="jQuery('#zoom-level').fadeOut('slow');"></a>
+				</div>
+			
+			</div><!-- Container -->
+			
+			<div id="assignments-container" style="display:none">
+				<apex:include pageName="{!$Page.ActivityAssignmentsNewEdit}"/>
+			</div>
+			
+			<div id="EditTaskContainer" style="display:none">
+				<div class="ionTabs" id="edit-task-tabs" data-name="edit-tasks-group" >
+					<ul class="ionTabs__head task">
+						<li class="ionTabs__tab" data-target="task-details">{!$Label.DetailsLabel}</li>
+						<apex:outputPanel layout="none" rendered="{!TaskFieldsetFields.size > 0}">
+							<li class="ionTabs__tab" data-target="task-additional-details">{!$Label.kimbleone__additionaldetailsheading}</li>
+						</apex:outputPanel>
+						<li class="ionTabs__tab" data-target="task-work-items">{!$ObjectType.KimbleOne__WorkItem__c.LabelPlural}</li>
+						<li class="ionTabs__tab" data-target="task-resources">{!$ObjectType.Resource__c.LabelPlural}</li>
+						<li class="ionTabs__tab" data-target="task-predecessors">{!$Label.Predecessors}</li>
+						<li class="ionTabs__tab" data-target="task-advanced-details">{!$Label.AdvancedHeading}</li>
+					</ul>
+					<div class="ionTabs__body" style="width:740px;height:360px;">
+						<div class="ionTabs__item" data-name="task-details">
+							<table cellpadding="0" cellspacing="0" border="0" id="edit-task">
+								<apex:variable var="showScopedWith" value="{!TheOrderedScopingElements.size > 1}"/>
+								<apex:outputPanel layout="none" rendered="{!showScopedWith}">
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.ActivityAssignment__c.Fields.ResourcedActivity__c.Label}</td>
+									<td colspan="3">
+										<span id="read-scope"></span>										
+									</td>
+								</tr>				  
+								</apex:outputPanel>
+								
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.Task__c.Label}</td>
+									<td colspan="3"><input type="text" id="edit-task-name" style="width:305px"/></td>
+								</tr>
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.PlanTask__c.Fields.Duration__c.Label} (<apex:outputText value="{!$Label.kimbleone__daysheading}"/>)</td>
+									<td><input type="text" id="edit-task-duration" class="task-edit-input" style="width:90px"/></td>
+									<td class="edit-label not-summary">{!$ObjectType.PlanTask__c.Fields.Effort__c.Label} (<apex:outputText value="{!KimbleOne__TrackingPlan__c.ResourcedActivity__r.UsageUnitType__r.KimbleOne__Suffix__c}"/>)</td>
+									<td class="not-summary"><input type="text" id="edit-task-effort" class="task-edit-input" style="width:90px"/></td>
+								</tr>
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.KimbleOne__PlanTask__c.Fields.KimbleOne__StartDate__c.Label}</td>
+									<td><input type="text" id="edit-task-start-date" class="task-edit-input" style="width:90px"/></td>
+									<apex:outputPanel layout="none" rendered="{!EnableTaskStartEndTime}">
+									<td class="edit-label not-summary">{!$ObjectType.PlanTask__c.Fields.StartTime__c.Label}</td>
+									<td class="not-summary"><input type="text" id="edit-task-start-time" class="task-edit-input kimbleTimePicker" style="width:90px"/></td>
+									</apex:outputPanel>
+								</tr>
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.KimbleOne__PlanTask__c.Fields.KimbleOne__EndDate__c.Label}</td>
+									<td><input type="text" id="edit-task-end-date" class="task-edit-input" style="width:90px"/></td>
+									<apex:outputPanel layout="none" rendered="{!EnableTaskStartEndTime}">
+									<td class="edit-label not-summary">{!$ObjectType.PlanTask__c.Fields.EndTime__c.Label}</td>
+									<td class="not-summary"><input type="text" id="edit-task-end-time" class="task-edit-input kimbleTimePicker" style="width:90px"/></td>
+									</apex:outputPanel>
+								</tr>
+								<tr style="height: 30px;" class="not-summary">
+									<td class="edit-label">{!$ObjectType.Task__c.Fields.IsFixedEffort__c.Label}</td>
+									<td colspan="3"><input type="checkbox" id="edit-fixed"/></td>
+								</tr>
+								<tr style="height: 30px;" class="not-summary">
+									<td class="edit-label">{!$ObjectType.PlanTask__c.Fields.IsScheduled__c.Label}</td>
+									<td><input type="checkbox" id="edit-task-is-scheduled" class="task-edit-input"/></td>
+									<apex:outputPanel layout="none" rendered="{!ShowTaskCalendar}">
+									<td class="edit-label">{!$ObjectType.KimbleOne__Task__c.Fields.KimbleOne__CalendarShowAs__c.Label}</td>
+									<td>
+										<select id="edit-calendar-show-as">
+											<apex:repeat value="{!CalendarOptions}" var="cal">
+												<option value="{!cal.Id}"><apex:outputText value="{!cal.Name}"/></option>
+											</apex:repeat>
+										</select>
+									</td>
+									</apex:outputPanel>
+								</tr>
+								<tr style="height: 30px;" class="not-summary">
+									<td class="edit-label">{!$ObjectType.Task__c.Fields.TaskCategory__c.Label}</td>
+									<td colspan="3">
+										<select id="edit-category">
+											<option value=""></option>
+											<apex:repeat value="{!TaskCategories}" var="cat">
+												<option value="{!cat.Id}"><apex:outputText value="{!cat.Name}"/></option>
+											</apex:repeat>
+										</select>
+									</td>
+								</tr>
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.PlanTask__c.Fields.Notes__c.Label}</td>
+									<td colspan="3">
+										<textarea id="edit-notes" style="width:242px;height:{!IF(showScopedWith, '54px','80px')};margin-bottom: 4px;margin-top: 4px;"></textarea>
+									</td>
+								</tr>
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.Task__c.Fields.ExternalId__c.Label}</td>
+									<td><input type="text" id="edit-task-externalId" class="task-edit-input" style="width:90px"/></td>
+									<td class="edit-label">{!$ObjectType.Task__c.Fields.ExternalIdUrl__c.Label}</td>
+									<td><input type="text" id="edit-task-externalIdURL" class="task-edit-input" style="width:170px"/><i class="external-url-link fa fa-external-link"></i></td>
+								</tr>								
+							</table>
+						</div>
+						<apex:outputPanel layout="none" rendered="{!TaskFieldsetFields.size > 0}">
+							<div class="ionTabs__item" data-name="task-additional-details">
+								<apex:outputPanel id="CustomFieldsPanel" layout="block">
+								<table cellpadding="0" cellspacing="0" border="0" id="edit-task-additional">
+
+									<apex:repeat value="{!TaskFieldsetFields}" var="f">
+										<tr style="height: 30px;">
+											<td class="edit-label"><apex:outputText value="{!f.Label}"/></td>
+											<td>
+												<apex:inputField value="{!DummyTask[f.Name]}" styleclass="task-details-field {!IF(AND(f.DisplayType == 'DATE',$ObjectType.KimbleOne__Task__c.Fields[f.Name].updateable),'kimbleDatePicker','')}" html-data-reference="{!f.RelatedObjectName}" html-data-fld-type="{!f.DisplayType}" html-data-fld-name="{!f.Name}" required="{!f.IsRequired}">
+													<apex:actionSupport event="onchange" action="{!ValidateInput}" rerender="CustomFieldsPanel" />
+												</apex:inputField>
+											</td>
+										</tr>
+									</apex:repeat>
+
+								</table>
+								</apex:outputPanel>
+							</div>
+						</apex:outputPanel>
+						<div class="ionTabs__item" data-name="task-work-items">
+							<div id="task-work-items-container" style="height: 305px;overflow-y: auto;background-color: #FFF;margin-bottom: 5px;">
+							</div>
+						</div>					
+						<div class="ionTabs__item" data-name="task-resources">
+							<table id="resource-assignments-head" border="0" cellpadding="0" cellspacing="0" class="tasks-grid-table list">
+							<colgroup>
+								<col style="width:30px;"/>
+								<col style="width:260px;"/>
+								<col style="width:70px;"/>
+								<col style="width:70px;"/>
+								<col style="width:70px;"/>
+								<col style="width:70px;"/>
+								<col style="width:120px;"/>
+							</colgroup>
+							<thead>
+							<tr>
+								<th colspan="2" style="border: 0;padding: 0;"></th>
+								<th colspan="4" style="text-align: center;border: 0;font-size: 11px;padding: 0;">{!$Label.DeliveryGroupDashboardMainContentEffort} (<apex:outputText value="{!KimbleOne__TrackingPlan__c.ResourcedActivity__r.UsageUnitType__r.KimbleOne__Suffix__c}"/>)</th>
+								<th colspan="1" style="border: 0;padding: 0;"></th>
+							</tr>
+							<tr class="headerRow" style="height:31px;">
+								<th></th>
+								<th class="headerRow"><h2>{!$ObjectType.ActivityAssignment__c.Fields.Resource__c.Label}</h2></th>
+								<th style="text-align: center;">{!$Label.ExpendedEffort}</th>
+								<th style="text-align: center;">{!$Label.RemainingEffort}</th>
+								<th style="text-align: center;">{!$Label.TotalEffort}</th>
+								<th style="text-align: center;">{!$Label.BaselineLabel}</th>
+								<th style="text-align: center;white-space: normal;">{!$Label.RemainingUsageHeading} (<apex:outputText value="{!KimbleOne__TrackingPlan__c.ResourcedActivity__r.ForecastUnitType__r.KimbleOne__Suffix__c}"/>)</th>	
+							</tr>
+							</thead>
+							</table>
+							
+							<div style="height: 288px;overflow-y: auto;background-color: #FFF;margin-bottom: 5px;">
+								<table id="resource-assignments-body" border="0" cellpadding="0" cellspacing="0" class="tasks-grid-table list">
+								<colgroup>
+									<col style="width:30px;"/>
+									<col style="width:260px;"/>
+									<col style="width:70px;"/>
+									<col style="width:70px;"/>
+									<col style="width:70px;"/>
+									<col style="width:70px;"/>
+									<col style="width:120px;"/>
+								</colgroup>
+								<tbody>
+															
+								</tbody>
+								</table>
+							</div>
+						</div>
+						<div class="ionTabs__item" data-name="task-predecessors">
+							<table id="predecessors-head" border="0" cellpadding="0" cellspacing="0" class="tasks-grid-table list">
+							<colgroup>
+								<col style="width:40px;"/><!-- Delete -->
+								<col style="width:280px;"/><!-- Task Name -->
+								<col style="width:140px;"/><!-- Type -->
+								<col style="width:50px;"/><!-- Lag -->
+							</colgroup>
+							<thead>
+							<tr class="headerRow"  style="height:31px;">
+								<th><a class="toolbar-button" style="padding: 3px 7px 3px 7px;" href="#" id="addPredecessorButton" title="{!$Label.Add} {!$ObjectType.PlanItemDependency__c.Fields.PlanItemPredecessor__c.Label}"><i class="fa fa-plus"></i></a></th>
+								<th class="headerRow"><h2>{!$ObjectType.PlanItemDependency__c.Fields.PlanItemPredecessor__c.Label}</h2></th>
+								<th>{!$ObjectType.PlanItemDependency__c.Fields.DependencyType__c.Label}</th>
+								<th>{!$ObjectType.KimbleOne__PlanItemDependency__c.Fields.KimbleOne__Lag__c.Label} ({!JSENCODE($Label.DaysHeading)})</th>
+							</tr>							
+							</thead>
+							</table>
+							
+							<div style="min-height: 200px;background-color: #FFF;margin-bottom: 5px;">
+								<table id="predecessors-body" border="0" cellpadding="0" cellspacing="0" class="tasks-grid-table list">
+								<colgroup>
+									<col style="width:40px;"/><!-- Delete -->
+									<col style="width:280px;"/><!-- Task Name -->
+									<col style="width:140px;"/><!-- Type -->
+                                    <col style="width:50px;"/><!-- Lag -->
+								</colgroup>
+								<tbody>
+													
+								</tbody>
+								</table>
+							</div>
+							<table id="external-predecessors-head" border="0" cellpadding="0" cellspacing="0" class="tasks-grid-table list">
+							<colgroup>
+								<col style="width:40px;"/><!-- Delete -->
+								<col style="width:280px;"/><!-- Task Name -->
+								<col style="width:140px;"/><!-- Type -->
+							</colgroup>
+							<thead>
+							<tr class="headerRow"  style="height:31px;">
+								<th><a class="toolbar-button" style="padding: 3px 7px 3px 7px;" href="#" id="addExternalPredecessorButton" title="{!$Label.Add} {!$Label.ExternalPredecessor}"><i class="fa fa-plus-square"></i></a></th>
+								<th class="headerRow"><h2>{!$Label.ExternalPredecessor}</h2></th>
+								<th>{!$ObjectType.PlanItemDependency__c.Fields.DependencyType__c.Label}</th>
+							</tr>							
+							</thead>
+							</table>
+							
+							<div style="background-color: #FFF;margin-bottom: 5px;">
+								<table id="external-predecessors-body" border="0" cellpadding="0" cellspacing="0" class="tasks-grid-table list">
+								<colgroup>
+									<col style="width:40px;"/><!-- Delete -->
+									<col style="width:280px;"/><!-- Task Name -->
+									<col style="width:140px;"/><!-- Type -->	
+								</colgroup>
+								<tbody>
+													
+								</tbody>
+								</table>
+							</div>
+						</div>
+						<div class="ionTabs__item" data-name="task-advanced-details">
+							<table cellpadding="0" cellspacing="0" border="0" id="edit-task-advanced">
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.PlanTask__c.Fields.PlanItemConstraintType__c.Label}</td>
+									<td>
+										<select id="edit-constraint-type" class="task-edit-input">
+											<apex:repeat value="{!PlanItemConstraintTypes}" var="constraintType">
+												<option value="{!constraintType.Id}"><apex:outputText value="{!constraintType.Name}"/></option>
+											</apex:repeat>
+										</select>
+									</td>
+								</tr>
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.PlanTask__c.Fields.ConstraintDate__c.Label}</td>
+									<td><input type="text" id="edit-task-constraint-date" class="task-edit-input" style="width:90px"/></td>
+								</tr>
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.PlanTask__c.Fields.IncludeNonBusinessDays__c.Label}</td>
+									<td><input type="checkbox" id="edit-task-ignore-non-bus-days" class="task-edit-input" style="width:90px"/></td>
+								</tr>
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.PlanTask__c.Fields.IsCriticalPath__c.Label}</td>
+									<td><input type="checkbox" id="edit-task-is-critical-path" style="width:90px"/></td>
+								</tr>
+								<tr style="height: 30px;" class="edit-task-visibility-item">
+									<td class="edit-label">{!$ObjectType.PlanTask__c.Fields.VisibilityLevel__c.Label}</td>
+									<td>
+										<select id="edit-task-visibility" class="task-edit-input">
+											<apex:repeat value="{!TaskVisibilityLevels}" var="visibilityLevel">
+												<option value="{!visibilityLevel.Value}"><apex:outputText value="{!visibilityLevel.label}"/></option>
+											</apex:repeat>
+										</select>
+									</td>
+								</tr>
+							</table>
+						</div>				
+						<div class="ionTabs__preloader"></div>
+					</div>
+				</div>
+				<div style="text-align:center;">
+					<input id="TaskOkButton" class="btn" type="button" value="{!$Label.Ok}" />
+					<input class="btn popup-cancel" type="button" value="{!$Label.Cancel}" onclick="cancelPlanItemPopup();"/>
+				</div>
+			</div>
+			
+			<div id="EditMilestoneContainer" style="display:none">
+				<div class="ionTabs" id="edit-milestone-tabs" data-name="edit-milestones-group">
+					<ul class="ionTabs__head milestone">
+						<li class="ionTabs__tab" data-target="milestone-details">{!$Label.DetailsLabel}</li>
+						<li class="ionTabs__tab" data-target="milestone-predecessors">{!$Label.Predecessors}</li>
+						<li class="ionTabs__tab" data-target="milestone-advanced-details">{!$Label.AdvancedHeading}</li>
+					</ul>
+					<div class="ionTabs__body" style="width:640px; height:260px;">
+						<div class="ionTabs__item" data-name="milestone-details">
+							<table cellpadding="0" cellspacing="0" border="0" id="edit-milestone">
+								<apex:outputPanel layout="none" rendered="{!TheOrderedScopingElements.size > 1}">
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.Milestone__c.Fields.DeliveryElement__c.Label}</td>
+									<td>
+										<span id="read-scope"></span>										
+									</td>
+								</tr>				  
+								</apex:outputPanel>
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.Milestone__c.Fields.MilestoneType__c.Label}</td>
+									<td><span id="read-milestone-type"></span>	</td>
+								</tr>
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.Milestone__c.Label}</td>
+									<td><input type="text" id="edit-name" style="width:242px"/></td>
+								</tr>
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.Milestone__c.Fields.MilestoneDate__c.Label}</td>
+									<td><input type="text" id="edit-milestone-date" class="milestone-edit-input" style="width:90px"/></td>
+								</tr>
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$Label.IsComplete}</td>
+									<td>
+										<input type="checkbox" id="edit-complete"/><i class="fa fa-info-circle" id="edit-complete-pending" title="{!JSENCODE($Label.CompletionPendingLabel)}"></i>
+										<div id="planned-milestone-approval">
+											<i class="fa" data-rejected-title="{!$Label.Rejected}"/>
+											<a data-url="{!$Page.MilestoneHome}?id=">{!$Label.DetailsLabel}</a>
+										</div>
+									</td>
+								</tr>
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.Milestone__c.Fields.Notes__c.Label}</td>
+									<td>
+										<textarea id="edit-notes" style="width:242px;height:80px;"></textarea>
+									</td>
+								</tr>
+							</table>
+						</div>
+						<div class="ionTabs__item" data-name="milestone-predecessors">
+							<table id="predecessors-head" border="0" cellpadding="0" cellspacing="0" class="tasks-grid-table list">
+							<colgroup>
+								<col style="width:40px;"/><!-- Delete -->
+								<col style="width:225px;"/><!-- Task Name -->
+								<col style="width:81px;"/><!-- Type -->
+                                <col style="width:45px;"/><!-- Lag -->
+							</colgroup>
+							<thead>
+							<tr class="headerRow"  style="height:31px;">
+								<th><a class="toolbar-button" style="padding: 3px 7px 3px 7px;" href="#" id="addPredecessorButton" title="{!$Label.Add} {!$ObjectType.PlanItemDependency__c.Fields.PlanItemPredecessor__c.Label}"><i class="fa fa-plus"></i></a></th>
+								<th class="headerRow"><h2>{!$ObjectType.PlanItemDependency__c.Fields.PlanItemPredecessor__c.Label}</h2></th>
+								<th>{!$ObjectType.PlanItemDependency__c.Fields.DependencyType__c.Label}</th>
+                                <th>{!$ObjectType.KimbleOne__PlanItemDependency__c.Fields.KimbleOne__Lag__c.Label} ({!JSENCODE($Label.DaysHeading)})</th>
+							</tr>							
+							</thead>
+							</table>
+							
+							<div style="min-height: 120px;background-color: #FFF;margin-bottom: 5px;">
+								<table id="predecessors-body" border="0" cellpadding="0" cellspacing="0" class="tasks-grid-table list">
+								<colgroup>
+									<col style="width:40px;"/><!-- Delete -->
+									<col style="width:280px;"/><!-- Task Name -->
+									<col style="width:103px;"/><!-- Type -->
+                                    <col style="width:48px;"/><!-- Lag -->
+								</colgroup>
+								<tbody>
+													
+								</tbody>
+								</table>
+							</div>
+							<table id="external-predecessors-head" border="0" cellpadding="0" cellspacing="0" class="tasks-grid-table list">
+							<colgroup>
+								<col style="width:40px;"/><!-- Delete -->
+								<col style="width:280px;"/><!-- Task Name -->
+								<col style="width:140px;"/><!-- Type -->
+							</colgroup>
+							<thead>
+							<tr class="headerRow"  style="height:31px;">
+								<th><a class="toolbar-button" style="padding: 3px 7px 3px 7px;" href="#" id="addExternalPredecessorButton" title="{!$Label.Add} {!$Label.ExternalPredecessor}"><i class="fa fa-plus-square"></i></a></th>
+								<th class="headerRow"><h2>{!$Label.ExternalPredecessor}</h2></th>
+								<th>{!$ObjectType.PlanItemDependency__c.Fields.DependencyType__c.Label}</th>
+							</tr>							
+							</thead>
+							</table>
+							
+							<div style="background-color: #FFF;margin-bottom: 5px;">
+								<table id="external-predecessors-body" border="0" cellpadding="0" cellspacing="0" class="tasks-grid-table list">
+								<colgroup>
+									<col style="width:40px;"/><!-- Delete -->
+									<col style="width:280px;"/><!-- Task Name -->
+									<col style="width:140px;"/><!-- Type -->	
+								</colgroup>
+								<tbody>
+													
+								</tbody>
+								</table>
+							</div>							
+						</div>
+						<div class="ionTabs__item" data-name="milestone-advanced-details">
+							<table cellpadding="0" cellspacing="0" border="0" id="edit-milestone-advanced">
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.PlanMilestone__c.Fields.PlanItemConstraintType__c.Label}</td>
+									<td>
+										<select id="edit-milestone-constraint-type" class="milestone-edit-input">
+											<apex:repeat value="{!PlanItemConstraintTypes}" var="constraintType">
+												<option value="{!constraintType.Id}"><apex:outputText value="{!constraintType.Name}"/></option>
+											</apex:repeat>
+										</select>
+									</td>
+								</tr>
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.PlanMilestone__c.Fields.ConstraintDate__c.Label}</td>
+									<td><input type="text" id="edit-milestone-constraint-date" class="milestone-edit-input" style="width:90px"/></td>
+								</tr>
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.PlanMilestone__c.Fields.IncludeNonBusinessDays__c.Label}</td>
+									<td><input type="checkbox" id="edit-milestone-ignore-non-bus-days" class="milestone-edit-input" style="width:90px"/></td>
+								</tr>
+								<tr style="height: 30px;">
+									<td class="edit-label">{!$ObjectType.PlanMilestone__c.Fields.IsCompletedByPredecessorTasks__c.Label}</td>
+									<td><input type="checkbox" id="edit-milestone-completed-by-tasks" class="milestone-edit-input" style="width:90px"/></td>
+								</tr>
+								<tr style="height: 30px;" class="edit-milestone-visibility-item hidden-item">
+									<td class="edit-label">{!$ObjectType.PlanMilestone__c.Fields.VisibilityLevel__c.Label}</td>
+									<td>
+										<select id="edit-milestone-visibility" class="milestone-edit-input">
+											<apex:repeat value="{!PlanningMilestoneVisibilityLevels}" var="visibilityLevel">
+												<option value="{!visibilityLevel.Value}"><apex:outputText value="{!visibilityLevel.label}"/></option>
+											</apex:repeat>
+										</select>
+									</td>
+								</tr>
+							</table>
+						</div>				
+				
+						<div class="ionTabs__preloader"></div>
+					</div>
+				</div>
+				<div style="text-align:center;">
+					<input id="MilestoneOkButton" class="btn" type="button" value="{!$Label.Ok}" />
+					<input class="btn popup-cancel" type="button" value="{!$Label.Cancel}" onclick="cancelPlanItemPopup();"/>
+				</div>
+			</div>
+
+			<div id="MovePlanItemContainer" style="display:none">
+				<table cellpadding="0" cellspacing="0" border="0" id="move-item">
+					<tr style="height: 30px;">
+						<td class="edit-label"><apex:outputText value="{!$Label.kimbleone__moveplanitemslabel}"/></td>
+						<td class="move-by-direction">
+							<select id="move-by-direction">
+								<option value="1"><apex:outputText value="{!$Label.kimbleone__forwardslabel}"/></option>
+								<option value="-1"><apex:outputText value="{!$Label.kimbleone__backwardslabel}"/></option>
+							</select>
+						</td>
+						<td class="by-label"><apex:outputText value="{!$Label.kimbleone__bylabel}"/></td>
+						<td><input type="text" id="move-item-number" style="width:40px" value="1"/></td>
+						<td class="move-by-type">
+							<select id="move-by-type">
+								<option value="DAY"><apex:outputText value="{!$Label.kimbleone__taskoffsetdayslabel}"/></option>
+								<option value="MONTH"><apex:outputText value="{!$Label.kimbleone__taskoffsetmonthslabel}"/></option>
+							</select>
+		   				</td>
+					</tr>
+					<tr>
+						<td class="edit-label"><apex:outputText value="{!$Label.kimbleone__balanceassignmentslabel}"/></td>
+						<td><input class="balance-assignments-checkbox" type="checkbox" checked="checked"/></td>
+					</tr>
+				</table>
+				<div style="text-align:center;">
+					<input id="MoveOkButton" class="btn" type="button" value="{!$Label.Ok}" />
+					<input class="btn" type="button" value="{!$Label.Cancel}" onclick="hideModalBoxy();"/>
+				</div>
+			</div>
+
+			<div id="AddTemplatedTasksContainer" style="display:none">
+				<table cellpadding="0" cellspacing="0" border="0" id="add-template-tasks">
+					<tr>
+						<td class="edit-label"><apex:outputText value="{!$Label.kimbleone__populatefromtemplatelabel}"/></td>
+						<td>
+							<select id="task-template-product" class="find-template-product">
+								<apex:repeat value="{!TheTaskTemplateProducts}" var="templateProd">
+									<apex:outputPanel layout="none" rendered="{!templateProd.Id == TheTemplateProduct}">
+									<option value="{!templateProd.Id}" selected="selected"><apex:outputText value="{!templateProd.Name}"/></option>
+									</apex:outputPanel>
+									<apex:outputPanel layout="none" rendered="{!templateProd.Id != TheTemplateProduct}">
+									<option value="{!templateProd.Id}"><apex:outputText value="{!templateProd.Name}"/></option>
+									</apex:outputPanel>									
+								</apex:repeat>
+							</select>
+						</td>
+					</tr>
+					<tr style="height: 30px;">
+						<td class="edit-label"><apex:outputText value="{!$Label.kimbleone__relativeto}"/></td>
+						<td class="relative-start-date"><input type="text" id="template-start-date"  style="width:90px"/></td>
+					</tr>
+				</table>
+				<div style="text-align:center;margin-top: 5px;">
+					<input id="AddTemplatedTasksOkButton" class="btn" type="button" value="{!$Label.Ok}" />
+					<input class="btn" type="button" value="{!$Label.Cancel}" onclick="hideModalBoxy();"/>
+				</div>
+			</div>
+
+			<div id="AddTasksFromExternalContainer" style="display:none">
+				<table cellpadding="0" cellspacing="0" border="0" id="add-tasks-from-external">
+					<tr>
+						<td class="overview-label"><apex:outputText value="{!$Label.kimbleone__taskpastemessage}"/>:</td>
+					</tr>
+					<tr style="height: 30px;">
+						<td><textarea id="externalTaskPasteArea" rows="20" cols="80"></textarea></td>
+					</tr>
+				</table>
+				<div style="text-align:center;">
+					<input id="AddExternalTasksOkButton" class="btn" type="button" value="{!$Label.Ok}" />
+					<input class="btn" type="button" value="{!$Label.Cancel}" onclick="hideModalBoxy();"/>
+				</div>
+			</div>
+
+			<div id="AddIterationsContainer" style="display:none">
+				<table cellpadding="0" cellspacing="0" border="0" id="add-iterations">
+					<tr style="height: 30px;">
+						<td class="edit-label"><apex:outputText value="{!$Label.kimbleone__iterationname}"/></td>
+						<td><input id="addIterationsName" value="{!$Label.kimbleone__iteration}"/></td>
+					</tr>
+					<tr style="height: 30px;">
+						<td class="edit-label"><apex:outputText value="{!$Label.kimbleone__iterationduration}"/></td>
+						<td><input id="addIterationsDuration" value="10"/></td>
+					</tr>
+					<tr style="height: 30px;">
+						<td class="edit-label"><apex:outputText value="{!$Label.kimbleone__numberofiterations}"/></td>
+						<td><input id="addIterationsQuantity" value="1"/></td>
+					</tr>
+				</table>
+				<div style="text-align:center;">
+					<input id="AddIterationsOkButton" class="btn" type="button" value="{!$Label.Ok}" />
+					<input class="btn" type="button" value="{!$Label.Cancel}" onclick="hideModalBoxy();"/>
+				</div>
+			</div>			
+
+			</apex:pageBlock>
+	</apex:form>
+<style>
+
+body {
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			-khtml-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			user-select: none;
+		}
+
+	.default-view-ind {
+		position: absolute;
+		padding-left: 6px;
+		padding-top: 3px;
+	}
+	
+	.view-pref-link {
+		padding-right: 27px !important;
+	}
+
+		#container
+		{
+			position:relative;
+		}
+
+#gantt-vertical-scroll-container{
+	overflow-y: scroll;
+	position: absolute;
+	right: 0px;
+	bottom:16px;}
+#tasks-head, #tasks-body, #resource-assignments-head, #resource-assignments-body, #predecessors-head, #predecessors-body, #external-predecessors-head, #external-predecessors-body {width: auto;table-layout: fixed;border-collapse: collapse;width: 0;padding:0;overflow:hidden;}
+#tasks-head th, #tasks-body td {overflow:hidden;white-space: nowrap;}
+#task-search {border:0; background-image: url({!URLFOR($Resource.KimbleOne__TaskGanttIcons, 'search.png')}); padding-left: 25px; width: 100%; height: 20px; background-position: 5px 50%; background-repeat: no-repeat no-repeat;}
+.tasks-grid-table tr:hover {background-color: #e3feff;}
+.itemName {display:inline-block;width:95%;}
+.itemName input[type="text"] {border: 0;margin: 0;background-color: transparent;}
+.remainingEffort, .expendedEffort, .baselineEffort,.totalEffort, .pctComplete, .fixedEffort  {text-align: center;}
+.fixedEffort {position: relative;}
+.fixedEffort input {position: absolute;top: 10%;left: 32%;}
+span.assignment-popup {cursor: pointer;font-size: 12px;padding: 0px 2px 4px 5px;color: #606363;}
+.indent {display: inline-block;width: 8px;height:8px;padding: 3px;}
+.planItem.branch {font-weight: bold;}
+.branch .indent {cursor:pointer; background-image: url({!URLFOR($Resource.KimbleOne__TaskGanttIcons, 'arrows.gif')});background-position: -4px, 0px;}
+.branch.expanded .indent {background-image: url({!URLFOR($Resource.KimbleOne__TaskGanttIcons, 'arrows.gif')});background-position: -22px, 0px;}
+.branch input[type="text"] {font-weight: bold;}
+.branch input[type="checkbox"] {display:none;}
+.planItem[level="1"] .indent {margin-left: 10px;}
+.planItem[level="2"] .indent {margin-left: 20px;}	
+.planItem[level="3"] .indent {margin-left: 30px;}
+.planItem[level="4"] .indent {margin-left: 40px;}
+.planItem[level="5"] .indent {margin-left: 50px;}
+.planItem[level="6"] .indent {margin-left: 60px;}
+.planItem[level="7"] .indent {margin-left: 70px;}
+.planItem[level="8"] .indent {margin-left: 80px;}
+.planItem[level="9"] .indent {margin-left: 90px;}
+.planItem[level="10"] .indent {margin-left: 100px;}
+.planItem[level="11"] .indent {margin-left: 110px;}
+.planItem[level="12"] .indent {margin-left: 120px;}	
+.planItem[level="13"] .indent {margin-left: 130px;}
+.planItem[level="14"] .indent {margin-left: 140px;}
+.planItem[level="15"] .indent {margin-left: 150px;}
+.planItem[level="16"] .indent {margin-left: 160px;}
+.planItem[level="17"] .indent {margin-left: 170px;}
+.planItem[level="18"] .indent {margin-left: 180px;}
+.planItem[level="19"] .indent {margin-left: 190px;}
+.planItem[level="20"] .indent {margin-left: 200px;}
+.task-gantt-box{height: 18px;border: 1px solid #3172d7;position: absolute;left:0px;right:0px;bottom: 3px;vertical-align: middle;border-radius: 2px;}
+.task-gantt-box.complete {background-color: #008852;}
+/* .task-gantt-box.in-progress {background-color: #E58E1A;} */
+.task-gantt-box.in-progress {background-color: lightblue;}
+.task-gantt-box.not-started {background-color: lightblue;}
+.completed-tasks-shown {background-color: white !important; color: black !important;}
+.completed-tasks-hidden {background-color: #008852 !important; color: white !important;}
+.task-gantt-pct-complete {position: absolute;height: 8px;background-color: black;width:0%;bottom: 9px;}
+.milestone-gantt {position: absolute;bottom: 8px;left:2px;z-index: 49;background-color: gold;border: 1px solid black;width: 10px;height: 10px;-o-transform: rotate(-45deg);-webkit-transform: rotate(-45deg);transform: rotate(-45deg);}
+.milestone-gantt.Completed {border-color: gold;}
+.milestone-gantt.AutoCompletionPending {border-style: dashed;}
+.milestone-gantt.gantt-marker.Planning {background-color: #34b27d;}
+.milestone-gantt.gantt-marker.Planning.Completed {border-color: #34b27d;}
+#edit-complete-pending { color: #428BCA;margin-left: 5px;font-size: 16px;}
+
+.input-date {background-color: rgba(0, 0, 0, 0) !important;border: 0 !important;cursor: pointer;}
+
+.planItem.selected,
+.backlog-row.selected {
+	background-color: #DFE8F6 !important;
+}
+
+.task-row-header{text-align: right !important;padding-right: 6px !important;}
+.draggable {cursor:pointer;}
+.task-dragging{border: 1px dotted #3172d7;padding: 7px 11px 8px 11px;font-weight: bold;background-color: lightblue;width: 241px;text-align: left;color:#4a4a56;}
+/*Task Matching*/
+.task-match {display: table-row !important;}
+.task-filter {display: none;}
+.task-filter.branch .indent {background:none;}
+
+.tree-node-drop {border-top: 4px solid #008000;}
+
+.tree-node.new .task-row-header{background-color: #33cc33;color:white;}
+
+.input-effort {width: 50px;}
+
+.assignedResources, .remainingEffort, .totalEffort, .category, .predecessors {white-space: nowrap;text-overflow: ellipsis;cursor:pointer;}
+
+input:focus {outline: 0 !important;}
+
+#upper-scroll, #lower-scroll {display:none;height: 16px;position: absolute;width: 100%;z-index: 10;}
+
+.qtip{max-width:700px;}
+
+#period-header-container
+{
+	border:0;
+	padding:0;
+}
+.day-head
+{
+	white-space: nowrap;
+	font-size: 0.75em;
+	overflow:hidden;
+	display: inline-block;
+	height: 25px;
+	line-height: 25px;
+	text-align: center;
+	border-bottom: solid white 2px;
+	border-right: solid white 2px;
+}
+.day-head, .week-head				
+{
+	background-color: #ccc;
+	text-overflow: ellipsis;					
+}
+.day-head.non-bus-day {background-color:#aaa}
+.month-head
+{
+	background-color: #1797C0;
+	color:white !important;
+	font-weight:bold;
+	white-space: nowrap;
+	font-size: 0.75em;
+	overflow:hidden;
+	height: 25px;
+	line-height: 25px;
+	text-align: center;
+	border-bottom: solid white 2px;
+	border-right: solid white 2px;
+}
+.week-head
+{
+	white-space: nowrap;
+	font-size: 0.75em;
+	overflow:hidden;
+	height: 25px;
+	line-height: 25px;
+	text-align: center;
+	border-bottom: solid white 2px;
+	border-right: solid white 2px;
+}
+.non-bus-day-overlay
+{
+	position: absolute;top: 25px;background: white;right: 0px;z-index:1;
+}
+
+.relative
+{
+	position:relative;
+}
+
+/* Activity GANTT */
+.gantt-item-container
+{
+	white-space:nowrap;
+	height:32px;
+	position: relative;
+}
+.gantt-summary
+{
+	background-color: black;
+	height: 5px;
+	width: 100%;
+	position: absolute;
+	z-index: 10;
+	bottom: 12px;
+	border-top-left-radius: 2px;
+	border-top-right-radius: 2px;
+}
+.gantt-summary-left, .gantt-summary-right
+{
+	width: 0;
+	height: 0px;
+	border-left: 5px solid rgba(0, 0, 0, 0);
+	border-right: 5px solid rgba(0, 0, 0, 0);
+	border-top: 6px solid #000;
+	top: 20px;
+	position: absolute;
+}
+.gantt-summary-left
+{
+	left: 0px;
+}
+.gantt-summary-right
+{
+	right: 0px;
+}
+.day-content
+{
+	position:relative;
+	height:32px;
+	display: inline-block;
+	overflow: hidden;
+}
+div#lastGantt, div#lastAssignment, tr#lastRow {
+    height: 32px;
+}
+
+table#tasks-body, table#task-assignments-body, #lastRow td {
+    border-bottom: none !important;
+}
+
+i.external-url-link {
+    margin-left: 8px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.collapsed-node, .hidden-node {display:none;}
+.latest-line {right: 0px;}
+
+#container.zoom-level-1 #weeks-header {display:none;}
+#container.zoom-level-1 .day-head {width:40px;}
+#container.zoom-level-1	.month-head {max-width: 40px;}
+#container.zoom-level-1	#zoom-level{background-position: -248px -4px;}
+#container.zoom-level-1 .day-content{width:42px;}
+#container.zoom-level-1 .week-divider {display:none; position: absolute;top: 25px; width: 2px;background: white;right: 0px;z-index:10;}
+#container.zoom-level-1 .non-bus-day-overlay{ width: 42px;}
+#container.zoom-level-1 .non-bus-day-strip{position: absolute;top: 25px; width: 42px;background: #F8F8F8;z-index: -2;}
+#container.zoom-level-1 .today-line{position: absolute; top: 25px; border-left: 1px solid #53ecff;}
+#container.zoom-level-1 .earliest-open-tp-line{position: absolute; top: 25px; border-left: 1px solid #9e9e9e;}
+#container.zoom-level-1 .marker-line:not(.today-line):not(.earliest-open-tp-line){position: absolute; top: 25px; border-left: 2px dashed #9E9E9E;}
+#container.zoom-level-1 .task-gantt-actual-box{display:initial;}
+#container.zoom-level-1 .scheduled-time{display:initial;}
+#container.zoom-level-1 .scheduled-slot-container{display:initial;}
+
+#container.zoom-level-2 #weeks-header{display:none;}
+#container.zoom-level-2 .day-head {width:21px;text-indent:-999px;}
+#container.zoom-level-2	.month-head {max-width: 21px;}
+#container.zoom-level-2	#zoom-level{background-position: -216px -4px;}
+#container.zoom-level-2 .day-content{width:23px;}
+#container.zoom-level-2 .last-day-of-week{width:21px; border-right:2px solid white;}
+#container.zoom-level-2 .week-divider {position: absolute;top: 25px; width: 2px;background: white;right: 0px;z-index:10;}
+#container.zoom-level-2 .non-bus-day-overlay{ width: 23px;}
+#container.zoom-level-2 .non-bus-day-strip{position: absolute;top: 25px; width: 23px;background: #F8F8F8;z-index: -2;}
+#container.zoom-level-2 .today-line{position: absolute; top: 25px; border-left: 1px solid #53ecff;}
+#container.zoom-level-2 .earliest-open-tp-line{position: absolute; top: 25px; border-left: 1px solid #9e9e9e;}
+#container.zoom-level-2 .marker-line:not(.today-line):not(.earliest-open-tp-line){position: absolute; top: 25px; border-left: 2px dashed #9E9E9E;}
+#container.zoom-level-2 .task-gantt-actual-box{display:none;}
+#container.zoom-level-2 .scheduled-time{display:none;}
+#container.zoom-level-2 .scheduled-slot-container{display:none !important;}
+
+#container.zoom-level-3 .day-head {visibility: hidden;height: 0px;line-height: 0px;border:0;width:16px;}
+#container.zoom-level-3	.month-head {max-width: 16px;}
+#container.zoom-level-3	#zoom-level{background-position: -184px -4px;}
+#container.zoom-level-3	.week-head {max-width: 16px;}
+#container.zoom-level-3 .day-content{width:16px;}
+#container.zoom-level-3 .week-divider {display:none;}
+#container.zoom-level-3 .non-bus-day-overlay{ width: 16px;}
+#container.zoom-level-3 .non-bus-day-strip{display:none;}
+#container.zoom-level-3 .today-line{position: absolute; border-left: 1px dashed #53ecff;}
+#container.zoom-level-3 .earliest-open-tp-line{position: absolute; border-left: 1px solid #9e9e9e;}
+#container.zoom-level-3 .marker-line:not(.today-line):not(.earliest-open-tp-line){position: absolute; border-left: 1px dashed #9E9E9E;}
+#container.zoom-level-3 .task-gantt-actual-box{display:none;}
+#container.zoom-level-3 .scheduled-time{display:none;}
+#container.zoom-level-3 .scheduled-slot-container{display:none !important;}
+
+#container.zoom-level-4 .day-head {visibility: hidden;height: 0px;line-height: 0px;border:0;width:7px;}
+#container.zoom-level-4 .week-head {text-indent:-999px;}
+#container.zoom-level-4	.month-head {max-width: 7px;}
+#container.zoom-level-4	#zoom-level{background-position: -152px -4px;}
+#container.zoom-level-4 .day-content{width:7px;}
+#container.zoom-level-4 .week-divider {display:none;}
+#container.zoom-level-4 .non-bus-day-overlay{ width: 7px;}
+#container.zoom-level-4 .non-bus-day-strip{display:none;}
+#container.zoom-level-4 .today-line{position: absolute; border-left: 1px dashed #53ecff;}
+#container.zoom-level-4 .earliest-open-tp-line{position: absolute; border-left: 1px solid #9e9e9e;}
+#container.zoom-level-4 .marker-line:not(.today-line):not(.earliest-open-tp-line){position: absolute; border-left: 1px dashed #9E9E9E;}
+#container.zoom-level-4 .task-gantt-actual-box{display:none;}
+#container.zoom-level-4 .scheduled-time{display:none;}
+#container.zoom-level-4 .scheduled-slot-container{display:none !important;}
+
+#container.zoom-level-5 .day-head {visibility: hidden;height: 0px;line-height: 0px;border:0;width:4px;}
+#container.zoom-level-5 .week-head {text-indent:-999px;}
+#container.zoom-level-5	.month-head {max-width: 4px;}
+#container.zoom-level-5 #zoom-level {background-position: -118px -4px;}
+#container.zoom-level-5 .day-content{width:4px;}
+#container.zoom-level-5 .week-divider {display:none;}	
+#container.zoom-level-5 .non-bus-day-overlay{ width: 4px;}
+#container.zoom-level-5 .non-bus-day-strip{display:none;}
+#container.zoom-level-5 .today-line{position: absolute; border-left: 1px dashed #53ecff;}
+#container.zoom-level-5 .earliest-open-tp-line{position: absolute; border-left: 1px solid #9e9e9e;}
+#container.zoom-level-5 .marker-line:not(.today-line):not(.earliest-open-tp-line){position: absolute; border-left: 1px dashed #9E9E9E;}
+#container.zoom-level-5 .task-gantt-actual-box{display:none;}
+#container.zoom-level-5 .scheduled-time{display:none;}
+#container.zoom-level-5 .scheduled-slot-container{display:none !important;}
+
+td.edit-label {color: #4a4a56;font-weight: bold;font-size: 11px;text-align: right;padding-right: 8px;padding-left:30px;}
+div#ui-datepicker-div {z-index: 9999999 !important;}
+
+/*LAYER AND ZOOM STYLES */
+#footer {
+	height: 31px;
+	position:absolute;
+	bottom:22px;
+	right:25px;			
+}
+
+.zoom-in, .zoom-out {
+ 	cursor: pointer;  
+	display: inline-block;
+ 	height: 30px;
+ 	text-align: center;
+ 	font-size: 31px !important;
+	vertical-align: middle;
+	white-space: nowrap;
+	color: #737373 !important;
+	opacity: 0.6;
+}
+
+.zoom-in:hover, .zoom-out:hover {
+	color: #9FD7FF !important;
+	opacity: 1;
+	text-decoration: none;
+}
+		
+#zoom-level {
+		background-image: url({!URLFOR($Resource.KimbleOne__AssignmentImages, 'assignmentSprite.png')});
+		background-repeat: no-repeat;
+		display: none;
+		height: 108px;
+		text-align: center;
+		vertical-align: middle;
+		white-space: nowrap;
+		width: 25px;
+		zoom: 1;
+		position:absolute;
+		right: 16px;
+		bottom: 27px;
+	}
+	
+a.toolbar-button {
+	display: inline-block;
+	padding: 6px 10px 6px 10px;
+	background-color: white;
+	margin-right: 4px;
+	border: 1px solid #ccc;
+	border-radius: 2px;
+}
+a.toolbar-button.active-toolbar-button {
+	color: white;
+	background-color: #888;
+}
+.toolbar-container {
+    position: relative;
+    background-color: #f8f8f8;
+    padding: 6px;
+    margin-bottom: 5px;
+}
+.toolbar {
+	display: table;
+	width: 100%;
+}
+div#toolbar-buttons {
+	display: table-cell;
+	position: relative;
+}
+span.gantt-display-mode {
+    position: absolute;
+    right: 10px;
+}
+a.toolbar-button:hover {
+	text-decoration: none;
+	color: white;
+	background-color: #1A9EFF;
+}
+a.toolbar-button.button-left {
+	border-top-right-radius: 0px;
+	border-bottom-right-radius: 0px;
+	margin-right: 0px;
+}
+a.toolbar-button.button-middle {
+	border-radius: 0px;
+	border-left: 0;
+	margin-right: 0px;
+}
+a.toolbar-button.button-right {
+	border-top-left-radius: 0px;
+	border-left: 0;
+	border-bottom-left-radius: 0px;
+}
+a.toolbar-button .fa {font-size: 14px;}
+a.toolbar-button.disabled {background-color: #ccc;color: darkgray;}
+a.toolbar-button.disabled:hover {background-color: #ccc;color: darkgray;}
+
+.pbBody {
+	margin: 0px !important;
+}
+
+.dependency-line {position: absolute;background-color:#dedede;z-index:2}
+.dependency-arrow {position: absolute; color:#bbb}
+
+tr[category-name="Green"] .position {
+background-color: #34b27d;
+color:white !important;
+}
+tr[category-name="Yellow"] .position {
+background-color: #dbdb57;
+color:white !important;
+}
+tr[category-name="Orange"] .position {
+background-color: #e09952;
+color:white !important;
+}
+tr[category-name="Red"] .position {
+background-color: #cb4d4d;
+color:white !important;
+}
+tr[category-name="Purple"] .position {
+background-color: #93c;
+color:white !important;
+}
+tr[category-name="Blue"] .position {
+background-color: #4d77cb;
+color:white !important;
+}
+
+	/* work item management */
+	div[id$='trackingPlanGanttPB'] {
+		background-color: #fff !important;
+		border: none !important;
+	}
+	.dragging-scroll {
+		position:absolute;
+		z-index:999999999
+	}
+	.gantt-node.Iteration .task-gantt-box {
+	    background-color: #ededed;
+	}
+	td.t-nme {
+		position: relative;
+	}
+	.work-items-ind {
+		font-weight: initial;
+		font-size: 12px;
+		position: absolute;
+		right: 4px;
+		top: 3px;
+		cursor: pointer;
+	    padding: 2px;
+	    color: #428BCA;		
+	}
+	tr.planItem.Iteration .itemName input {
+		font-size: 12px;
+		font-weight: bold;
+	}
+	tr.planItem.Iteration,
+	tr.backlog-row {
+		background-color: #ededed;
+	}
+	tr.selected .work-items-ind {
+	    background-color: #dfe8f6 !important;
+	}		
+	tr.backlog-row .work-items-ind,
+	tr.Iteration .work-items-ind {
+	    background-color: #ededed;
+	}	
+	tr.Task:not(.Iteration) .work-items-ind {
+	    background-color: #fff;
+	}	
+	tr.planItem.Iteration {
+		border-bottom: 2px solid #fff;
+	}
+	tr.backlog-row {
+		font-size: 12px;
+		font-weight: bold;
+		height: 32px;
+	}
+	input.work-item-name {
+		padding: 0px;
+		border: none;
+		width: 700px;
+		height:15px;
+		line-height:15px;
+		resize:none;
+		overflow:hidden;
+	}
+	.work-item-templates-container {
+		position: relative;
+		min-height: 380px;
+	}
+	.planner-view-item {
+		display: none;
+	}
+	.work-items-container .backlog-container,
+	.work-items-container .all-iterations-container {
+		display: inline-flex;
+	}
+	.all-iterations-container {
+/* 		width: 760px; */
+		vertical-align: top;
+	}
+	.work-items-container .iterations-container {
+		display: -webkit-box;
+		display: -ms-flexbox;
+		display: flex;
+		overflow-x: auto;
+	}
+	.iteration-container {
+		position: relative;
+	}
+	.iteration-container.backlog {
+		width: 300px;
+	}
+	#task-work-items-container {
+	    position: relative;
+	}
+	.iteration-container,
+	#task-work-items-container {
+		min-width: 300px;
+		margin-right: 8px;
+		margin-bottom: 5px;
+	}
+	.iteration-container ul,
+	#task-work-items-container ul {
+		grid-style: none;
+		margin: 0;
+		max-height: calc(100% - 72px);
+		overflow-y: auto;
+	}
+	.iteration-container > *,
+	#task-work-items-container > * {
+		background-color: #e2e4e6;
+		color: #333;
+		padding: 0 10px;
+	}
+ 	.iteration-container {
+		max-width: 320px;
+	}
+	.iteration-container ul li,
+	#task-work-items-container ul li {
+		background-color: #fff;
+		padding: 10px 10px 10px 25px;
+		border-radius: 3px;
+		box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+		margin-left: auto;
+	}
+	
+	.iteration-container ul li:not(:last-child),
+	#task-work-items-container ul li:not(:last-child) {
+		margin-bottom: 8px;
+	}
+	.selectable {
+		cursor: pointer;
+	}
+	.selectable:hover {
+		background-color: #e3f3ff;
+	}
+	.work-items-footer {
+		line-height: 36px;
+		border-bottom-left-radius: 4px;
+		border-bottom-right-radius: 4px;
+		color: #888;
+		position: relative;
+	}
+	.iteration-a-units-total {
+        position: absolute;
+	    right: 41px;
+	    font-size: 18px;
+	    font-weight: bold;
+	    top: 3px;
+	    width: 34px;
+	    text-align: center;
+       	padding: 0px;
+	}
+	.iteration-r-units-total {
+	    width: 34px;
+	    text-align: center;
+        padding: 0px;
+	}
+	.iteration-r-units-total,
+	.task-r-units-total {
+        position: absolute;
+	    right: 2px;
+	    font-size: 18px;
+	    font-weight: bold;
+	    top: 3px;
+	}
+	.iteration-a-units-type {
+	    position: absolute;
+	    top: 24px;
+	    right: 36px;
+	    font-size: 8px;
+	}
+	.iteration-r-units-type,
+	.task-r-units-type {
+	    position: absolute;
+	    top: 24px;
+	    right: 0px;
+	    font-size: 8px;
+	}	
+	.work-items-header {
+		line-height: 36px;
+		font-size: 16px;
+		font-weight: bold;
+		border-top-left-radius: 4px;
+		border-top-right-radius: 4px;
+	}
+	.iteration-action-ind {
+		color: #888;
+		font-size: 16px;
+		cursor: pointer;
+		margin-right: 5px;
+	}
+	.add-work-item, .add-task-work-item {
+		cursor: pointer;
+		display: inline;
+	}
+	.iteration-action-ind:hover, .add-work-item:hover, .add-task-work-item:hover {
+		color: black;
+	}
+	ul.work-items {
+		min-height: 48px;
+	}
+	.wi-status-details {
+	    text-align: right;
+	    padding-top: 10px;
+	    display: table-cell;
+    	width: 15%;
+	}
+	select.status-select option[value="NotStarted"] {
+		background-color: #AFAFAF;
+	}
+	select.status-select option[value="InProgress"] {
+		background-color: #E58E1A;
+	}
+	select.status-select option[value="Completed"] {
+		background-color: #008852;
+	}
+	select.status-select {
+		border-radius: 4px;
+		padding: 2px 10px 2px 10px;
+		cursor: pointer;
+	}
+	select.status-select[disabled] {
+		cursor: not-allowed;
+	}
+	select.status-select.NotStarted {
+		background-color: #AFAFAF;
+		border-color: #AFAFAF;
+		color: white;
+	}
+	select.status-select.InProgress {
+		background-color: #E58E1A;
+		border-color: #E58E1A;
+		color: white;
+	}
+	select.status-select.Completed {
+		background-color: #008852;
+		border-color: #008852;
+		color: white;
+	}	
+	.work-item {
+		border-right-style: solid;
+		border-right-width: 10px;
+		border-bottom-left-radius: 2px !important;
+		border-top-left-radius: 2px !important;
+		position: relative;
+	}
+	.work-item[item-status='NotStarted'][item-blocked='false'] {
+		border-right-color: #AFAFAF;
+	}
+	.work-item[item-status='InProgress'][item-blocked='false'] {
+		border-right-color: #E58E1A;
+	}
+	.work-item[item-status='Completed'][item-blocked='false'] {
+		border-right-color: #008852;
+	}
+	.work-item[item-blocked='true'] {
+		border-right-color: #333;
+	}	
+	.iteration-name {
+		font-size: 16px;
+		font-weight: bold;
+		padding: 0px;
+		height: 36px;
+		border: none;
+		background-color: #e2e4e6;
+		width: 242px;
+		position: relative;
+	}
+	.iteration-name.with-actual {
+		width: 208px;
+	}
+	.work-item-name, .work-item-r-units, .work-item-notes {
+		padding: 0px;
+		border: none;
+	}
+	.work-items-header:hover .iteration-name {
+		background-color: white;
+	}
+	textarea.work-item-name {
+		width: 450px;
+		height:15px;
+		line-height:15px;
+		min-width: 450px;
+		max-width: 450px;
+		resize:none;
+		overflow:hidden;
+	}
+	.work-items-container textarea.with-actual.work-item-name {
+	    min-width: 155px !important;
+	    max-width: 155px !important;
+    }	
+	.work-items-container textarea.work-item-name:not(.with-actual) {
+	    min-width: 204px !important;
+	    max-width: 204px !important;
+    }	
+	textarea.work-item-notes {
+		width: 100%;
+		min-width: 100%;
+		max-width: 100%;
+		overflow:hidden;	
+	}
+	.wi-isblocked-div {
+		padding-top: 5px;
+		display: table-cell;
+	}
+	input.wi-isblocked {
+		margin: 5px 5px 0px 4px;
+		transform: scale(1.3);
+		-webkit-appearance: checkbox;
+    	box-sizing: border-box;
+    	vertical-align: bottom;
+	}
+	/* Make select2 dropdowns look like conventional dropdowns */
+	a.select2-choice {
+	    height: 18px !important;
+	    line-height: 18px !important;
+	    background-image: none !important;
+	    border-radius: 0px !important;
+	    color: black !important;
+	    padding-left: 4px !important;
+	}
+	.select2-choice div {
+	    border-left: none !important;
+	}
+	.owner-selector-container {
+		position: inherit;
+		top: 55px;
+		width: 105%;
+		display: inline-table;
+		padding-top: 8px;
+	}
+	input.owner-selector-input {
+		border: none;
+		height: 14px;
+		font-size: 100%;
+		padding-left: 20px;
+		margin-left: 10px;
+		border-radius: 4px;
+		width: 94%;
+	}
+	.owner-selector-container label {
+		display: table-cell;
+		vertical-align: middle;
+		width: 5%;
+		padding-right: 5px;
+	}
+	.clear-button {
+		visibility: hidden;
+		position: relative;
+		font-size: 14px;
+		top: 2px;
+		right: 30px;
+		color: #aaa;
+		cursor: pointer;
+	}	
+	.wi-add-details {
+	    margin-top: 15px;
+	    display: none;
+	}
+	.wi-add-details.detail-edit-mode {
+	    display: block;
+	}
+	.edit-work-item.has-detail {
+		color: #029bd7;
+	}	
+	input.work-item-r-units {
+        width: 32px;
+	    text-align: center;
+	    padding: 0px;
+	    border: none;
+	    position: absolute;
+	    right: 5px;
+	    font-size: 16px;
+	    top: 4px;
+	}
+	.work-item-r-unit-type {
+	    position: absolute;
+	    right: 6px;
+	    font-size: 8px;
+	    top: 25px;
+	}
+	input.work-item-a-units {
+        width: 32px;
+	    text-align: center;
+	    padding: 0px;
+	    border: none;
+	    position: absolute;
+	    right: 40px;
+	    font-size: 16px;
+	    top: 4px;
+	}
+	.work-item-a-unit-type {
+	    position: absolute;
+	    right: 43px;
+	    font-size: 8px;
+	    top: 25px;
+	}
+	.task-a-units-total {
+        position: absolute;
+        right: 44px;
+	    font-size: 18px;
+	    font-weight: bold;
+	    top: 3px;
+	    width: 34px;
+	    text-align: center;		    
+	}
+	.task-a-units-type {
+	    position: absolute;
+	    top: 24px;
+        right: 47px;
+	    font-size: 8px;
+	}			
+	.work-item-actions i:hover {
+		color: black;
+	}
+	.work-item-actions {
+		position: absolute;
+		left: 6px;
+		top: 2px;
+		font-size: 14px;
+		color: #888;
+		cursor: pointer;
+	}
+	.work-item-actions i {
+		display: block;
+		margin-top: 2px;
+	}
+	.ti-owner-details div {
+	    font-size: 14px;
+	    font-weight: normal;
+	    margin-bottom: 1px;
+	}
+	.ti-owner-details {
+	    text-align: right;
+	  	display: none;
+		margin-top: 8px;
+	}
+	.task-owner-name {
+	    font-size: 11px !important;
+	    padding: 8px 0px 0px 12px;
+	    text-align: right;
+	}
+	.owner-ind {
+		font-size: 15px;
+		color: #afafaf;
+		position: absolute;
+    	top: 10px;
+    	right: 75px;
+	 }	
+	ul {
+		list-style-type: none;
+	}
+	#snapshotButton {
+		display: inline-block;
+	}
+
+</style>
+
+<style>
+/* Ion.Tabs
+// css version 1.0.0
+// by Denis Ineshin | ionden.com
+// ===================================================================================================================*/
+
+/* =====================================================================================================================
+// Ion.Tabs: Base */
+
+.ionTabs {
+	position: relative;
+}
+	.ionTabs__head {
+		position: relative; display: block;
+		list-style-type: none;
+		margin: 0; padding: 0;
+		z-index: 1;
+	}
+	.ionTabs__head:before, .ionTabs__head:after {content: ""; display: table;}
+	.ionTabs__head:after {clear: both;}
+	.ionTabs__head {zoom: 1;}
+
+		.ionTabs__tab {
+			position: relative;
+			display: block; float: left;
+			list-style-type: none;
+			background: none;
+			margin: 0; padding: 0;
+			cursor: pointer;
+		}
+			.ionTabs__tab.ionTabs__tab_state_active {
+				cursor: default;
+			}
+
+	.ionTabs__body {
+		position: relative;
+		z-index: 2;
+	}
+
+	.ionTabs__item {
+		position: relative;
+		display: none;
+	}
+		.ionTabs__item.ionTabs__item_state_active {
+			display: block;
+		}
+
+	.ionTabs__preloader {
+		position: relative;
+	}
+	
+
+.ionTabs {
+	margin: 0 0 8px;
+}
+	.ionTabs__head {
+		border-bottom: 1px solid #cecece;
+	}
+
+	.ionTabs__tab {
+		font-size: 11px; line-height: 13px;
+		background: #ededed;
+		border: 1px solid #cecece;
+		border-bottom: none;
+		padding: 7px 25px 7px;
+		margin-right: 10px;
+		color: #484848;
+		margin-top: 10px;
+		text-align: center;
+		min-width: 50px;
+	}
+		.ionTabs__tab:hover {
+			background: #e5e5e5;
+		}
+		.ionTabs__tab.ionTabs__tab_state_active {
+			top: 7px;
+			margin-top: 0;
+			padding: 5px 25px 11px;
+			background: #fff;
+			color: #4a4a56;
+			border-top-color: #d71410;
+			border-bottom: 1px solid #fff;
+		}
+
+	.ionTabs__body {
+		background: #fff;
+		border: 1px solid #cecece;
+		border-top: none;
+	}
+
+	.ionTabs__item {
+		padding: 8px 6px;
+	    overflow: auto;		
+	}
+	#edit-task-tabs .ionTabs__item {
+	    height: 344px;
+	}
+	#edit-milestone-tabs .ionTabs__item {
+	    height: 244px;
+	}
+
+	.ionTabs__preloader {
+		height: 50px;
+		background: url(../img/preloader-flat.gif) no-repeat 25px 50%;
+	}
+	ul.ionTabs__head.task li.ionTabs__tab_state_active {
+		border-top: 2px solid  #3172d7;
+		font-weight:bold;
+	}
+	ul.ionTabs__head.planning-milestone li.ionTabs__tab_state_active {
+		border-top: 2px solid #34b27d;
+		font-weight:bold;
+	}
+	table#edit-task,
+	table#edit-milestone {
+	    width: 100%;
+	}
+	#EditTaskContainer.is-summary .not-summary {
+		display: none;
+	}
+	#EditMilestoneContainer .ionTabs__tab_state_active {
+		border-top: 2px solid gold;
+		font-weight:bold;
+	}
+	#EditMilestoneContainer.Planning .ionTabs__tab_state_active {
+		border-top: 2px solid #34b27d;
+		font-weight:bold;
+	}
+	
+/* 	for disabling links */
+	a.disabled {
+ 		pointer-events: none; 
+	}
+	
+	.utilisation-warning {
+		position: absolute;
+		font-size: 14px;
+		z-index: 999999;
+		top: 12px;
+		cursor:pointer;
+		width: 14px;
+    	height: 14px;
+    	background-color: #add8e6;
+	}
+	.day-charms {
+		position: absolute;
+		right: 12px;
+		top: 7px;
+	}
+	.day-charms i {
+		font-size: 22px;
+		margin-right: 5px;
+	}
+	.utilisation-warning.multiple-warnings {
+		color: red;
+		z-index:99999;
+	}
+	.utilisation-warning.important-event {
+		color: #696969;
+	}
+	.utilisation-warning.assignment-over-utilised,
+	.amberAlert {
+		color: #ffb600;
+		z-index:99
+	}
+	.utilisation-warning.all-over-utilised,
+	.redAlert {
+		color: #B42E34 !important;
+		z-index:999;
+	}
+	.day-summary-qtip .qtip-content {
+	    padding: 2px 2px 0px 2px;
+	    font-size: 12px;
+	}
+	.scheduled-slot-container {
+    position: absolute;
+    font-size: 14px;
+    z-index: 999999;
+    top: 12px;
+    color:#2196F3;
+    cursor: pointer;
+    width: 39px;
+    height: 19px;
+	}
+	.scheduled-slot-container .fa-calendar {
+    	position: absolute;
+    	left: 14px;
+	}
+	
+	.scheduled-slot-container .fa-clock-o {
+    	position: absolute;
+    	left: 14px;
+	}
+	
+	.sched-time-container {
+			display: table;
+		    border-collapse: collapse;-
+		}
+		.sched-time-entry {
+			display: table-row;
+			background-color: #eee;
+		}
+		.sched-time-entry-details {
+			display: table-cell;
+	        width: 180px;
+		}
+		.sched-time-entry-times {
+			display: table-cell;
+		    font-size: 14px;
+    		padding: 2px;
+		}
+		.sched-task-name {
+		    display: inline-block;
+		    margin-left: 25px;
+    		margin-top: 6px;
+		}
+		.sched-start-time, .sched-end-time {
+		padding: 5px;
+	    text-align: right;
+		}
+
+		div#planned-milestone-approval {
+    		font-size: 16px;
+		}
+
+		i.fa.fa-check-square.pending-approval {
+    		color: #aaa;
+		}
+
+		i.rejected{
+    		color: #B42E34 !important;
+		}
+
+		i.fa.fa-check-square.completion-requested {
+    		color: #aaa;
+    		cursor:pointer;
+		}
+
+		div#planned-milestone-approval a {
+			font-size:12px;
+			color: #015ba7;
+			text-decoration: none;
+  		}
+		div#planned-milestone-approval a:hover {
+			text-decoration: underline;
+		}
+
+</style>
+<style>
+
+</style>
+<style media="print">
+div#AppBodyHeader {display: none;}
+div#side-bar-container {display: none;}
+div.bPageFooter.noTableFooter {display: none;}
+body {background: 0 !important;}
+table#bodyTable {border: 0 !important;}
+div.bodyDiv.brdPalette.brandPrimaryBrd {border: 0 !important;box-shadow: none;}
+div.links {display: none;}
+div#footer {display: none;}
+.bPageBlock {background: 0 !important; border: 0 !important;}
+div.pbBody {margin: 0 !important;}
+div#layout-container {height: auto !important;-webkit-print-color-adjust: exact; color-adjust: exact;}
+div#grid-body-container {max-height: 100% !important;}
+div#gantt-body-container {max-height: 100% !important;}
+div#gantt-layout {page-break-before: always !important;}
+div#grid-body-container {border-right: 1px solid #ededed;}
+#gantt-vertical-scroll-container{display:none;}
+#print-button-floating-dropdown{display:none !important;}
+div#grid-layout {page-break-after: always !important;}
+</style>
+
+</apex:define>
+
+</apex:composition>
+</apex:page>

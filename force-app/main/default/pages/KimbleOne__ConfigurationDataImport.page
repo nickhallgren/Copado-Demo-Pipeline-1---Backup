@@ -1,0 +1,364 @@
+<apex:page sidebar="false" standardcontroller="KimbleOne__ConfigurationDataImport__c" extensions="KimbleOne.ConfigurationDataImportController,KimbleOne.FilesAndAttachmentsController">
+
+    <script type="text/javascript">
+    	var __sfdcSessionId = '{!GETSESSIONID()}';
+    	sforce.connection.sessionId = __sfdcSessionId;
+    </script>
+	
+	<apex:outputPanel layout="none" rendered="{!$Label.kimbleone__namespace == 'null'}">
+		<script>
+			var KimbleNamespaceWithUnderscores = '';
+		</script>
+	</apex:outputPanel>
+	<apex:outputPanel layout="none" rendered="{!$Label.kimbleone__namespace != 'null'}">
+		<script>
+			var KimbleNamespaceWithUnderscores = '{!JSENCODE($Label.Namespace)}__';
+		</script>
+	</apex:outputPanel>
+			    
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__ConfigurationDataJs)}" />
+	
+	<apex:outputPanel layout="none" rendered="{!!ConfigScopeOverriden}">
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__ConfigurationDataExportScope)}" />
+	</apex:outputPanel>
+	<apex:outputPanel layout="none" rendered="{!ConfigScopeOverriden}">
+		<apex:includeScript value="{!JSENCODE(ConfigScopeOverrideResourcePath)}" />
+	</apex:outputPanel>
+	
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuery, 'jquery-1.10.1.min.js')}"/>
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryUI, 'js/jquery-ui-1.10.3.custom.min.js')}"/>
+
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQueryUI, 'css/cupertino/jquery-ui-1.10.3.custom.min.css')}"/>
+
+	<apex:includeScript value="/soap/ajax/29.0/connection.js"/>
+	<apex:includeScript value="/soap/ajax/29.0/apex.js"/>
+
+      
+    <apex:pageMessages escape="false"/>
+     	
+	<apex:pageBlock title="Import Kimble Configuration Data">
+		
+		<apex:pageblockSection collapsible="false" showheader="false" columns="2" >
+
+		<apex:outputPanel layout="none">
+			<input type="button" class="btn btnDisabled" id="importBtn" disabled="disabled" value="Import Configuration Data" onclick="resetProgressBar();importKimbleConfigurationData(false, '{!ConfigurationDataImport__c.Id}');"/>
+		</apex:outputPanel>
+
+		<apex:outputPanel layout="none">
+			<input type="button" class="btn btnDisabled" id="deleteAllBtn" disabled="disabled" title="This action cannot be undone, please be very sure you want to delete all data in this org - this will result in the loss of ALL Kimble data that is using this configuration data!" value="Delete All Configuration Data" onclick="if(!confirmDeleteAllAllowed()) return false; if (!confirm('Are you REALLY sure you want to delete ALL configuration data in this org? (this will also result in ALL Kimble Data being deleted)')) return false; resetProgressBar(); cleanOrg();"/>
+			<label for="deleteAllChkbox" >Allow Delete of All Configuration Data:</label><input type="checkbox" id="deleteAllChkbox" disabled="disabled" title="Please be very sure you want to delete all data in this org!  Check this checkbox to enable the delete button" value="Allow Delete of All Configuration Data" />
+		</apex:outputPanel>
+		
+		</apex:pageblockSection>
+
+		<apex:pageblockSection collapsible="true" showheader="true" columns="1" >
+			<textarea id="import-json"></textarea>
+		</apex:pageblockSection>
+	
+	</apex:pageBlock>
+	
+	<apex:pageBlock title="Import Progress">
+		
+		<apex:pageblockSection collapsible="true" showheader="false" columns="1" >
+
+		<apex:outputPanel layout="none">
+			<div id="progressbar"><div class="progress-label"></div></div>	
+		</apex:outputPanel>
+		
+		<div id="logMessages" style="width: 100%;height: 100px;overflow: auto"></div>
+							
+		</apex:pageblockSection>
+	
+	</apex:pageBlock>
+
+	<div class="currencyHandlingBlock">
+	<apex:pageBlock title="Currency Handling">
+		
+		<apex:pageblockSection collapsible="true" showheader="false" columns="1" >
+
+		<div class="currencyHandlingNarrative">Entries in this section have their Currency values set exactly as they were configured in the Source org.  Unchecking an entry will override this preservation behaviour and instead set the currency to that of the importing user.  Only change entries in this section if your import is into a new org where you want to override currencies in the target: by default we'd expect that movement of data between a single customers sandbox and prod orgs should preserve the currency (and therefore all checkboxes should remain checked)</div>
+		
+		<div class="currencyHandlingForceOverrideNarrative">The configuration data being imported is from the Kimble Master Org and therefore all items below have been unchecked (the currency of the importing user will be used for all records during import)</div>
+		
+		<input type="button" id="selectAllPreserve" class="btn btnDisabled" disabled="disabled" value="Select All" onclick="setAllCheckboxes('currencyPreserveExcludeChk', true);"/>
+		<input type="button" id="clearSelectionPreserve" class="btn btnDisabled" disabled="disabled" value="Clear Selection" onclick="setAllCheckboxes('currencyPreserveExcludeChk', false);"/>
+		
+		<apex:outputPanel layout="none">
+			<table id="configurationObjectPreserveCurrencyDetail">
+		     <thead class="ui-widget-header">
+ 			 	<tr>
+ 			 		<th>Preserve?</th>
+					<th>sObjectName</th>
+					<th>Fields</th>
+				</tr>
+		     </thead>
+ 			 <tbody class="ui-widget-content">
+  			</tbody>
+			</table>
+		</apex:outputPanel>
+							
+		</apex:pageblockSection>
+	
+	</apex:pageBlock>
+	</div>
+	
+	<apex:pageBlock title="Import File Contents">
+		
+		<apex:pageblockSection collapsible="true" showheader="false" columns="1" >
+
+		<input type="button" id="selectAll" class="btn btnDisabled" disabled="disabled" value="Select All" onclick="setAllCheckboxes('importExcludeChk', true);"/>
+		<input type="button" id="clearSelection" class="btn btnDisabled" disabled="disabled" value="Clear Selection" onclick="setAllCheckboxes('importExcludeChk', false);"/>
+		<input type="button" id="currencyHandlingToggle" class="btn btnDisabled" disabled="disabled" value="Override Currency Handling" onclick="enableCurrencyOverride();"/>
+		
+		<apex:outputPanel layout="none">
+			<table id="configurationObjectDetail">
+		     <thead class="ui-widget-header">
+ 			 	<tr>
+ 			 		<th>Import?</th>
+					<th>sObjectName</th>
+					<th>Source Org Count</th>
+					<th>Target Org Previous Import Count</th>
+					<th>Target Org Current Count</th>
+				</tr>
+		     </thead>
+ 			 <tbody class="ui-widget-content">
+  			</tbody>
+			</table>
+		</apex:outputPanel>
+							
+		</apex:pageblockSection>
+	
+	</apex:pageBlock>
+	
+	<style>
+	
+	#import-json
+	{
+		width: 100%;
+	    height: 300px;
+	    display: none;
+	}
+	.ui-progressbar
+	{
+	  position: relative;
+	}
+	
+	.progress-label
+	{
+	  position: absolute;
+	  left: 50%;
+	  top: 4px;
+	  font-weight: bold;
+	  text-shadow: 1px 1px 0 #fff;
+	}
+	
+	.importRow
+	{
+		height: 25px;
+	}
+	
+	.processingRow td
+	{
+		background: #ffb732;
+	}
+
+	.completedRow td
+	{
+		background: #80c080;
+	}
+		
+	.countCell
+	{
+		text-align: center;
+		vertical-align: middle !important;
+	}
+	
+	.labelCell
+	{
+		text-align: left;
+		vertical-align: middle !important;
+	}
+	
+	.GOOD
+	{
+	  color: green;
+	}
+	
+	.INFO
+	{
+	  color: black;
+	}
+	
+	.ERROR
+	{
+	  color: red;
+	}
+	
+	.currencyHandlingNarrative {
+	    padding: 10px;
+	    font-style: italic;
+	}
+	.currencyHandlingForceOverrideNarrative {
+	    display: none;
+	    padding: 10px 10px 10px 10px;
+	    color: #00f;
+	    border: 1px dotted #00f;
+	    margin-bottom: 10px;
+	    font-weight: bold;
+        text-align: center;
+	}
+	#currencyHandlingToggle, .currencyHandlingBlock {
+		display: none;
+	}
+	#currencyHandlingToggle {
+		position: absolute;
+		right: 20px;
+	}
+		
+	</style>
+		
+	<script>
+		var thisImportId = '{!ConfigurationDataImport__c.Id}';
+		var sObjectBatchSizeOverride = <apex:outputText value="{!SObjectBatchSizeOverride}"/>;
+
+		var isFilesEnabled = <apex:outputText value="{!FilesEnabled}"/>;
+		
+		if(sObjectBatchSizeOverride != 0) sObjectBatchSize = sObjectBatchSizeOverride; 
+		
+		var progressbar;
+				
+		// in orgs where there is more than one version of jQuery installed we must explicitly override other versions
+		jQuery1_10_1 = $.noConflict( true );
+	
+		jQuery1_10_1(document).ready(function()
+		{
+			jQuery1_10_1('#importBtn').prop('disabled', true).addClass('btnDisabled');
+			jQuery1_10_1('#deleteAllBtn').prop('disabled', true).addClass('btnDisabled');
+			jQuery1_10_1('#deleteAllChkbox').prop('disabled', true).addClass('btnDisabled');
+			
+			parseUploadedFiles();
+		});
+		
+		function confirmDeleteAllAllowed()
+		{
+			if(!jQuery1_10_1('#deleteAllChkbox').prop('checked'))
+			{
+				alert("You must check the Allow Delete of All Configuration Data checkbox to continue");
+				return false;
+			}
+			else
+			{
+				return true;
+			}
+		}
+
+		function incrementProgressBar(incrementValue)
+		{
+	 		var val = progressbar.progressbar( "value" ) || 0;
+	
+	    	progressbar.progressbar( "value",  val + incrementValue);
+	 	}
+
+	 	function resetProgressBar()
+	 	{
+	 		progressbar.progressbar( "value",  0);
+	 	}
+	 	 	
+	 	function completeProgressBar()
+	 	{
+	 		progressbar.progressbar( "value",  100);
+	 	}
+	 	
+	 	function parseUploadedFiles()
+	 	{
+	 		// don't trigger the call to parse the input file until the screen has had chance to render
+	 		initialise();
+			setTimeout( parseDataFiles('{!ConfigurationDataImport__c.Id}'), 500 );
+	 	}
+	 	
+		function createSObjectViaRemoting(theObjectsToCreate, callback)
+		{ 
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ConfigurationDataImportController.Create}',
+		       		theObjectsToCreate,
+		      			function(result, event)
+		      			{          
+		             		
+		             		if (event.status) 
+				            {
+				             	callback(result);		             								
+				         	} 
+				         	else if (event.type === 'exception') 
+				         	{
+				             	alert(event.message);
+				         	} 
+				         	else 
+				         	{
+				             	alert(event.message);
+				         	}
+			         	}, 
+			         	{escape: true, buffer: false, timeout: 120000});
+	    }
+
+		function updateSObjectViaRemoting(theObjectsToUpdate, callback)
+		{ 
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ConfigurationDataImportController.UpdateSObjects}',
+		       		theObjectsToUpdate,
+		      			function(result, event)
+		      			{          
+		             		
+		             		if (event.status) 
+				            {
+				             	callback(result);		             								
+				         	} 
+				         	else if (event.type === 'exception') 
+				         	{
+				             	alert(event.message);
+				         	} 
+				         	else 
+				         	{
+				             	alert(event.message);
+				         	}
+			         	}, 
+			         	{escape: true, buffer: false, timeout: 60000});
+	    }
+	    
+	   	function queryAndDeleteSObjectsViaRemoting(queryToExecute, pageSize, callback)
+		{ 
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ConfigurationDataImportController.QueryAndDeleteSObjects}',
+	       		queryToExecute, pageSize,
+	      			function(result, event){          
+	             		
+	             		if (event.status) 
+			            {
+			             	callback(result, queryToExecute, pageSize);		             								
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+	         	}, 
+	         	{escape: true, buffer: false, timeout: 120000}
+	     	);
+	    }
+	    		
+		function asyncJSCall(targetFunction, callback)
+		{
+			setTimeout(function()
+			{
+				targetFunction();
+				
+				if (callback)
+				{
+					callback();
+				}
+			}, 0);
+		}
+		
+	</script>
+
+
+</apex:page>

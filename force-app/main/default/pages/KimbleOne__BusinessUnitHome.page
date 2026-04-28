@@ -1,0 +1,423 @@
+<apex:page standardcontroller="KimbleOne__BusinessUnit__c" extensions="KimbleOne.BusinessUnitHomeController,KimbleOne.SecurityController" showHeader="true" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+  	<c:Menu MenuContextName="{!KimbleOne__BusinessUnit__c.Name}"/> 
+</apex:define>
+    
+<apex:define name="Content">
+
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleJS, 'Charm.js')}"/>
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__jQueryBarGraph, 'jqBarGraph.1.1.min.js')}"/>
+
+	<style>
+		.bu-edit-btn {
+			position: absolute;
+			top: 7px;
+			left: 600px;
+			font-size: 12px !important;
+		}
+		.cardContainer .card,
+		.card.business-unit-details
+		{
+			display: block;
+		}
+		.cardBody {
+			padding-top: 20px;
+		}
+		.card.business-unit-details {
+			display: block;
+		}
+		.business-unit-details .cardBody {
+			padding: 10px;
+		}
+		.full-width-dashboard-container {
+			display: table;
+			width: 100%;
+			margin-bottom: 5px;
+		}
+		.title-card-heading {
+		    position: relative;
+		}
+		#internalCostSummary, #internalRevenueSummary {
+			display: table-cell;
+		}
+		/* SF Pageblock overrides */
+		.pbBody, .bPageBlock {
+			border: none !important;
+			background-color: initial !important;
+			margin: 0px !important;
+			padding: 0px !important;
+		}
+		.bPageBlock .detailList tr td, .bPageBlock .detailList tr th, .hoverDetail .bPageBlock .detailList tr td, .hoverDetail .bPageBlock .detailList tr th {
+			border-bottom: none;
+		}
+		.pbSubheader {
+			background-color: #dddddd !important;
+			color: #333333 !important;
+			padding: 5px !important;
+			border-radius: 2px;
+		}
+		.intercompany-summary-card {
+			position: relative;
+			min-width: unset;
+		}
+
+  		.undecorated-link
+  		{
+  			cursor:pointer;
+  		}
+
+		.rightAlignDataCell {
+		    text-align: right;
+		}
+
+		td.dataCell {
+		    border-bottom: none !important;
+		}
+
+		td.row-label-cell {
+		    border-top: 1px solid #ececec !important;
+		}
+
+		.cursor-pointer {
+			cursor:pointer;
+		}
+
+		.Loading
+		{
+			background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'running16.gif')}') !important;
+			background-repeat:no-repeat !important;
+			background-position: 50%, 50%;
+			width:18px;
+			height:18px;
+		}
+
+		.cardBodyTable {
+    		border-bottom: 1px solid #ececec !important;
+			width: 100%;
+		}
+
+		.cardBodyTable tr:not(:first-child).primary-row td
+		{
+		    border-top: 2px solid #D6D6D6 !important;
+		}
+		.action-btn {
+			color: #BBB;
+			cursor: pointer;
+		}
+	</style>
+  
+	<apex:form >
+		<apex:pagemessages escape="false"/>
+
+		<div id="business-unit-title">
+			<apex:outputPanel id="businessUnitCard" layout="none">
+				<div class="title-card-container">
+				<div class="title-card">
+					<div class="title-card-heading" >
+						<div class="title-card-heading-text">
+							<apex:outputText value="{!KimbleOne__BusinessUnit__c.Name}"/>
+						</div>
+						<input class="btn bu-edit-btn" type="button" onclick="safeNavigateToSForceURL('{!$Page.BusinessUnitEdit}?id={!KimbleOne__BusinessUnit__c.Id}');" value="{!$Label.Edit}" />
+					</div>
+
+					<div class="title-card-body">
+						<div id="embeddedCharmsContainer" pageSource="BusinessUnitCharmsCard"><i class="charm-loading fa fa-circle-o-notch fa-spin fa-3x fa-fw"/></div>
+					</div>
+				</div>
+				</div>
+			</apex:outputPanel>
+		</div>
+
+		<apex:outputPanel layout="none" rendered="{!IsIntercompanyEnabled}">
+			<div class="full-width-dashboard-container">
+				<div id="internalCostSummary" class="cardContainer">
+					<div class="card inverted min-horizontal-padding variable-width intercompany-summary-card">
+						<div class="cardHeading inverted">
+							<h3 class="cardTitle"><apex:outputText value="{!$Label.kimbleone__intercompanycostsummary}"/></h3>
+						</div>
+
+						<div class="cardBody">
+							<div id="divForIntCostSummaryGraph">
+							</div>
+							<p/>
+							<apex:actionStatus id="costBreakdownDetail">
+								<apex:facet name="start">
+									<div style="margin-top:20px; margin-bottom:20px;margin-left:12px">
+										<span style="font-weight: bold;color: #4A4A56;font-size: 91%;"><img src="{!URLFOR($Resource.KimbleOne__LoadingImage)}" style="margin-right: 8px;position: relative;top: 2px;"/>{!$Label.kimbleone__loading}</span>
+									</div>
+								</apex:facet>
+								<apex:facet name="stop">
+									<apex:outputPanel layout="none" rendered="{!TheEngagementCostDetails.size > 0}">
+										<table class="list cardBodyTable" border="0" cellpadding="0" cellspacing="0" width="100%">
+											<thead>
+												<tr class="headerRow">
+													<th id="costBUcolumn" class="headerRow"><h2>{!$ObjectType.DeliveryGroup__c.Label}</h2></th>
+													<th id="costInvoiceableServicesColumn" class="headerRow" style="text-align: right;"><h2>{!$Label.ServicesLabel} </h2></th>
+													<th id="costInvoiceableExpensesColumn" class="headerRow" style="text-align: right;"><h2>{!$Label.ExpensesLabel}</h2></th>
+													<th id="costInvoiceableAllColumn" class="headerRow" style="text-align: right;"><h2>{!$Label.Total}</h2></th>
+												</tr>
+											</thead>
+											<tbody>
+												<apex:repeat value="{!TheEngagementCostDetails}" var="engagementSummary">
+													<tr class="dataRow primary-row" >
+														<td class="dataCell row-label-cell">
+															<span class="cursor-pointer" id="{!JSINHTMLENCODE(engagementSummary.EngagementId)}" onblur="safeHideSFInlineHover('{!JSENCODE(engagementSummary.EngagementId)}');" onfocus="safeShowSFInlineHover('{!JSENCODE(engagementSummary.EngagementId)}','{!JSENCODE(engagementSummary.EngagementId)}');" onmouseout="safeHideSFInlineHover('{!JSENCODE(engagementSummary.EngagementId)}');" onmouseover="safeShowSFInlineHover('{!JSENCODE(engagementSummary.EngagementId)}','{!JSENCODE(engagementSummary.EngagementId)}');">
+																<apex:outputText value="{!engagementSummary.EngagementName}"/>
+															</span>
+														</td>
+														<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!engagementSummary.ServicesAmount.KimbleOne__InputDecimal__c}" /></td>
+														<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!engagementSummary.ExpensesAmount.KimbleOne__InputDecimal__c}" /></td>
+														<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!engagementSummary.TotalAmount.KimbleOne__InputDecimal__c}" /></td>
+													</tr>
+												</apex:repeat>
+											</tbody>
+										</table>
+									</apex:outputPanel>
+								</apex:facet>
+							</apex:actionStatus>
+
+						</div>
+					</div>
+				</div>
+				<div id="internalRevenueSummary" class="cardContainer">
+					<div class="card inverted min-horizontal-padding variable-width intercompany-summary-card">
+						<div class="cardHeading inverted">
+							<h3 class="cardTitle"><apex:outputText value="{!$Label.kimbleone__intercompanyrevenuesummary} ({!TheBusinessUnit.CurrencyIsoCode})"/></h3>
+						</div>
+
+						<div class="cardBody">
+							<div id="divForIntRevSummaryGraph">
+							</div>
+							<p/>
+							<apex:actionStatus id="revenueBreakdownDetail">
+								<apex:facet name="start">
+									<div style="margin-top:20px; margin-bottom:20px;margin-left:12px">
+										<span style="font-weight: bold;color: #4A4A56;font-size: 91%;"><img src="{!URLFOR($Resource.KimbleOne__LoadingImage)}" style="margin-right: 8px;position: relative;top: 2px;"/>{!$Label.kimbleone__loading}</span>
+									</div>
+								</apex:facet>
+								<apex:facet name="stop">
+									<apex:outputPanel layout="none" rendered="{!TheEngagementRevenueDetails.size > 0}">
+										<table class="list cardBodyTable" border="0" cellpadding="0" cellspacing="0" width="100%">
+											<thead>
+												<tr class="headerRow">
+													<th id="revenueBUColumn" class="headerRow"><h2>{!$ObjectType.DeliveryGroup__c.Label}</h2></th>
+													<th id="revenueInvoiceableServicesColumn" class="headerRow" style="text-align: right;"><h2>{!$Label.ServicesLabel} </h2></th>
+													<th id="revenueInvoiceableExpensesColumn" class="headerRow" style="text-align: right;"><h2>{!$Label.ExpensesLabel}</h2></th>
+													<th id="revenueInvoiceableAllColumn" class="headerRow" style="text-align: right;"><h2>{!$Label.Total}</h2></th>
+													<th id="actionsColumn" class="headerRow" width="3%">
+														<h2>
+															<apex:outputPanel layout="none" rendered="{!HasPermission['EditAllInternalInvoice'] && $ObjectType.KimbleOne__Invoice__c.createable}">
+																<a class="undecorated-link" title="{!$Label.GenerateLabel} {!$ObjectType.Invoice__c.Label} ({!$Label.All} {!$ObjectType.DeliveryGroup__c.LabelPlural})" href="javascript:void(0);" onclick="safeNavigateToSForceURL('{!JSENCODE($Page.InvoiceNew)}?sbuId={!JSENCODE(TheBusinessUnit.Id)}&dbuId={!JSENCODE(TheSelectedRevenueBusinessUnit.Id)}&iso={!JSENCODE(TheBusinessUnit.CurrencyIsoCode)}');"><i class="fa fa-file-text-o"/></a>
+															</apex:outputPanel>
+														</h2>
+													</th>
+												</tr>
+											</thead>
+											<tbody>
+												<apex:repeat value="{!TheEngagementRevenueDetails}" var="engagementSummary">
+													<tr class="dataRow primary-row" >
+														<td class="dataCell row-label-cell">
+															<span class="cursor-pointer" id="{!JSINHTMLENCODE(engagementSummary.EngagementId)}" onblur="safeHideSFInlineHover('{!JSENCODE(engagementSummary.EngagementId)}');" onfocus="safeShowSFInlineHover('{!JSENCODE(engagementSummary.EngagementId)}','{!JSENCODE(engagementSummary.EngagementId)}');" onmouseout="safeHideSFInlineHover('{!JSENCODE(engagementSummary.EngagementId)}');" onmouseover="safeShowSFInlineHover('{!JSENCODE(engagementSummary.EngagementId)}','{!JSENCODE(engagementSummary.EngagementId)}');">
+																<apex:outputText value="{!engagementSummary.EngagementName}"/>
+															</span>
+														</td>
+														<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!engagementSummary.ServicesAmount.KimbleOne__InputDecimal__c}" /></td>
+														<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!engagementSummary.ExpensesAmount.KimbleOne__InputDecimal__c}" /></td>
+														<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!engagementSummary.TotalAmount.KimbleOne__InputDecimal__c}" /></td>
+														<td class="dataCell row-label-cell">
+															<apex:outputPanel layout="none" rendered="{!HasPermission['EditAllInternalInvoice'] && $ObjectType.KimbleOne__Invoice__c.createable && engagementSummary.CanCreateInvoice}">
+																<a class="undecorated-link" title="{!$Label.GenerateLabel} {!$ObjectType.Invoice__c.Label}" href="javascript:void(0);" onclick="safeNavigateToSForceURL('{!JSENCODE($Page.InvoiceNew)}?sbuId={!JSENCODE(TheBusinessUnit.Id)}&dbuId={!JSENCODE(engagementSummary.BusinessUnitId)}&iso={!JSENCODE(engagementSummary.InvoicingCurrency)}&deliveryGroupId={!JSENCODE(engagementSummary.EngagementId)}');"><i class="fa fa-file-text-o"/></a>
+															</apex:outputPanel>
+														</td>
+													</tr>
+												</apex:repeat>
+											</tbody>
+										</table>
+									</apex:outputPanel>
+								</apex:facet>
+							</apex:actionStatus>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<apex:actionFunction id="costAction" action="{!ChangeCostBreakdownView}" name="changeCostBreakdownView" status="costBreakdownDetail" rerender="costBreakdownDetail" onComplete="">
+				<apex:param name="selcostbuId" value=""/>
+			</apex:actionFunction>
+			<apex:actionFunction id="revenueAction" action="{!ChangeRevenueBreakdownView}" name="changeRevenueBreakdownView" status="revenueBreakdownDetail" rerender="revenueBreakdownDetail" onComplete="">
+				<apex:param name="selrevbuId" value=""/>
+			</apex:actionFunction>
+		</apex:outputPanel>
+
+		<div class="full-width-dashboard-container">
+			<div class="card inverted min-horizontal-padding business-unit-details">
+				<div class="cardHeading inverted">
+					<h3 class="cardTitle"><apex:outputText value="{!$Label.kimbleone__detailsheading}"/></h3>
+				</div>
+
+				<div class="cardBody">
+				<apex:pageBlock >
+
+					<apex:pageblockSection collapsible="false" showheader="false"  columns="2">
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.CurrencyIsoCode}"  />
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__IsActive__c}"  />
+					</apex:pageblockSection>
+
+					<apex:pageblockSection collapsible="false" title="{!$Label.kimbleone__businessunitoperatingdetails}" showheader="true"  columns="2" rendered="{!KimbleOne__BusinessUnit__c.KimbleOne__IsOperatingEntity__c}">
+
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__IsOperatingEntity__c}" />
+						<apex:pageBlockSectionItem />
+
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__BusinessUnitGroup__c}" />
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__Calendar__c}" />
+
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__TimePatternRule__c}" />
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__TimePatternVariant__c}" />
+
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__AllowanceScheme__c}" />
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__SupplierPurchaseOrderRule__c}" />
+
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__ExpenseItemSubmissionDays__c}"  />
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__ExpenseItemExchangeRateTolerancePct__c}"  />
+
+					</apex:pageblockSection>
+
+					<apex:pageblockSection collapsible="false" title="{!$Label.kimbleone__businessunitorganisationaldetails}" showheader="true"  columns="2" rendered="{!(KimbleOne__BusinessUnit__c.KimbleOne__IsPrimaryOrganisationalEntity__c || KimbleOne__BusinessUnit__c.KimbleOne__IsSecondaryOrganisationalEntity__c)}">
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__IsPrimaryOrganisationalEntity__c}"  />
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__IsSecondaryOrganisationalEntity__c}"  />
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__BusinessUnit__c}"  />
+					</apex:pageblockSection>
+
+					<apex:pageblockSection collapsible="false" title="{!$Label.kimbleone__businessunitintercompanydetails}" showheader="true"  columns="2" rendered="{!IsIntercompanyEnabled}">
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__InternalAccount__c}" >
+                            <apex:outputPanel layout="none" rendered="{!!ISBLANK(KimbleOne__BusinessUnit__c.KimbleOne__InternalAccount__c)}">
+                                <a class="action-btn" onclick="javascript:safeNavigateToSForceURL('{!$Page.AccountEdit}?id={!JSINHTMLENCODE(BusinessUnit__c.InternalAccount__c)}&rId={!JSINHTMLENCODE(BusinessUnit__c.Id)}');"
+                                   title="{!$Label.Edit} {!$ObjectType.Account.label}"><i class="fa fa-pencil-square-o"></i></a>
+                            </apex:outputPanel>
+						</apex:outputField>
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__IntercompanyGroup__c}"  />
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__InternalInvoiceSequenceBehaviour__c}"/>
+					</apex:pageblockSection>
+
+					<apex:pageblockSection collapsible="false" title="{!$Label.kimbleone__businessunittradingdetails}" showheader="true"  columns="2" rendered="{!KimbleOne__BusinessUnit__c.KimbleOne__IsTradingEntity__c}">
+
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__InvoicingBusinessUnitName__c}"  />
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__InvoicingAddress__c}"  />
+
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__LogoDocumentName__c}"  />
+						&nbsp;
+
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__TaxCode__c}" />
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__ExpensesTaxCodeRule__c}" />
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__TaxCodeReference__c}"  />
+						&nbsp;
+
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__PurchaseOrderRule__c}" />
+						&nbsp;
+
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__InvoicingCurrencyIsoCode__c}" />
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__InvoiceBankAccount__c}" />
+
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__InvoicePaymentTermDays__c}" />
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__InvoiceTaxCalcOffSystem__c}"  rendered="{!TaxCalcOffSystem}"/>
+
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__DefaultInvoiceTemplate__c}" />
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__DefaultCreditNoteTemplate__c}" />
+
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__InvoiceFooter__c}"  />
+						<apex:outputField value="{!KimbleOne__BusinessUnit__c.KimbleOne__CreditNoteFooter__c}"  />
+
+					</apex:pageBlockSection>
+
+					<apex:pageblockSection collapsible="false" title="{!$Label.kimbleone__otherdetailslabel}" showheader="true"  columns="2" rendered="{!$ObjectType.KimbleOne__BusinessUnit__c.FieldSets.KimbleOne__BusinessUnitDetails.size>0}">
+						<apex:repeat value="{!$ObjectType.KimbleOne__BusinessUnit__c.FieldSets.KimbleOne__BusinessUnitDetails}" var="f">
+							<apex:outputField value="{!KimbleOne__BusinessUnit__c[f]}" /><br/>
+						</apex:repeat>
+					</apex:pageblockSection>
+
+				</apex:pageBlock>
+				</div>
+			</div>
+		</div>
+		<script>
+			jQuery(window).load(function()
+			{
+				var contextId = '<apex:outputText value="{!KimbleOne__BusinessUnit__c.Id}"/>';
+				
+				jQuery('div[pageSource]').each(function() {
+		   		var theComponent = jQuery( this );
+		   		var pageSourceName = theComponent.attr('pageSource');
+		   		
+		   		// kick off the population of the page with an ajax call
+				jQuery.ajax({ url: kimble.pages[pageSourceName] + contextId})
+					.done(function(html) {
+						theComponent.empty();
+						jQuery(html).appendTo("#" + theComponent.attr('id'));
+					})
+					.fail(function(xhr, status, error) {
+						if(error !=null && error !="") alert(error);								
+					})				
+				});
+			});
+
+			function initialiseRevenueSummaryGraphs()
+			{
+				var summaryData = jQuery.parseJSON('<apex:outputText value="{!JSENCODE(BusinessUnitRevenueChartSummaryJson)}"/>');
+				var marginData = new Array();
+
+				for (var i = 0; i < summaryData.length; i++)
+				{
+					var id = '\'' + summaryData[i].Id + '\'';
+
+					var shortName = summaryData[i].BusinessUnitName;
+					if(shortName.length > 12)
+						 shortName = shortName.substring(0,12)+'...';
+					marginData.push([summaryData[i].TotalAmount, '<a href="javascript:void(0)" onclick="changeRevenueBreakdownView(' + id + ');" title="'+summaryData[i].BusinessUnitName+'">' + shortName + '</a>', '#729BC7']);
+				}
+
+				jQuery('#divForIntRevSummaryGraph').jqBarGraph({ data: marginData, height:150, width:85*marginData.length, animate: true, speed: 0.5, barSpace: 6});
+
+				jQuery.each($('div.graphValuedivForIntRevSummaryGraph'),function(i,obj){
+					$(obj).text($.formatNumber($(obj).text(), {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+				});
+			}
+
+			function initialiseCostSummaryGraphs()
+			{
+				var summaryData = jQuery.parseJSON('<apex:outputText value="{!JSENCODE(BusinessUnitCostChartSummaryJson)}"/>');
+				var marginData = new Array();
+
+				for (var i = 0; i < summaryData.length; i++)
+				{
+					var id = '\'' + summaryData[i].Id + '\'';
+
+					var shortName = summaryData[i].BusinessUnitName;
+					if(shortName.length > 12)
+						 shortName = shortName.substring(0,12)+'...';
+					marginData.push([summaryData[i].TotalAmount, '<a href="javascript:void(0)" onclick="changeCostBreakdownView(' + id + ');" title="'+summaryData[i].BusinessUnitName+'">' + shortName + '</a> (' + summaryData[i].BusinessUnitInternalInvoicingCurrencyIsoCode + ')', '#729BC7']);
+				}
+
+				jQuery('#divForIntCostSummaryGraph').jqBarGraph({ data: marginData, height:150, width:85*marginData.length, animate: true, speed: 0.5, barSpace: 6});
+
+				jQuery.each($('div.graphValuedivForIntCostSummaryGraph'),function(i,obj){
+					$(obj).text($.formatNumber($(obj).text(), {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+				});
+			}
+
+			initialiseRevenueSummaryGraphs();
+			initialiseCostSummaryGraphs();
+
+		</script>
+
+    </apex:form>
+
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

@@ -1,0 +1,747 @@
+<apex:page controller="KimbleOne.SecurityConfigurationController" sidebar="false">
+	
+	<apex:outputPanel layout="none" rendered="{!$Label.kimbleone__namespace == 'null'}">
+		<script>
+			var KimbleNamespaceWithUnderscores = '';
+		</script>
+	</apex:outputPanel>
+	<apex:outputPanel layout="none" rendered="{!$Label.kimbleone__namespace != 'null'}">
+		<script>
+			var KimbleNamespaceWithUnderscores = '{!JSENCODE($Label.Namespace)}__';
+		</script>
+	</apex:outputPanel>
+	
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__ConfigurationDataJs)}" />
+
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuery, 'jquery-1.10.1.min.js')}"/>
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryUI, 'js/jquery-ui-1.10.3.custom.min.js')}"/>
+
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQueryUI, 'css/cupertino/jquery-ui-1.10.3.custom.min.css')}"/>
+
+	<apex:includeScript value="/soap/ajax/29.0/connection.js"/>
+	<apex:includeScript value="/soap/ajax/29.0/apex.js"/>
+	
+	<apex:pageBlock id="permissionPageBlock" title="Analyse Kimble Security Configuration">
+
+		<input type="button" class="btn" id="analysePermissionsBtn" value="Analyse Permissions" onclick="readSecurityConfigurationData();"/>
+		&nbsp;&nbsp;
+		Objects<input type="checkbox" id="includeObjects" value="Objects" checked="true"/>
+		Fields<input type="checkbox" id="includeFields" value="Fields" checked="true"/>
+		Apex Classes, Visualforce Pages and Applications<input type="checkbox" id="includeApexClassesPagesAndApps" value="Apex Classes, Visualforce Pages and Applications" checked="true"/>
+		<span id="working" class="hidden">&nbsp;&nbsp;Working</span>
+		<br/>
+		<br/>
+		
+		<div id="tabs">
+			<ul>
+				<li><a href="#all-permissions-tab">All Permissions</a></li>
+				<li><a href="#permissions-by-role-tab">Access By Application Role</a></li>
+			</ul>
+			
+			<!-- All Permissions -->
+	  		<div id="all-permissions-tab" class="tabContainer">
+				<input type="button" class="btn" id="selectAllPermOutputBtn" value="Select All Output" onclick="selectText('permResultsContainer');"/>
+				<div id="permResultsContainer">
+					<table id="permResultsTable" class="list">
+						<thead>
+							<tr>
+								<th>Permission Set Name</th>
+								<th>Item Type</th>
+								<th>Item Name</th>
+								<th>Create</th>
+								<th>Read</th>
+								<th>Edit</th>
+								<th>Delete</th>
+								<th>View All</th>
+								<th>Modify All</th>	
+							</tr>			
+						</thead>
+						<tbody>
+						</tbody>
+					</table>
+				</div>
+	  		</div>
+
+			<!-- All Permissions -->
+	  		<div id="permissions-by-role-tab" class="tabContainer">
+				<input type="button" class="btn" id="selectAllPermOutputBtn" value="Select All Output" onclick="selectText('roleResultsContainer');"/>
+				<div id="roleResultsContainer">
+					<table id="roleResultsTable" class="list">
+						<thead>
+							<tr>
+								<th>Application Role</th>
+								<th>Item Type</th>
+								<th>Item Name</th>
+								<th>Create</th>
+								<th>Read</th>
+								<th>Edit</th>
+								<th>Delete</th>
+								<th>View All</th>
+								<th>Modify All</th>	
+							</tr>			
+						</thead>
+						<tbody>
+						</tbody>
+					</table>
+				</div>
+	  		</div>
+  		</div>					
+	</apex:pageBlock>
+	
+	<style>
+		.hidden
+		{display: none}	
+	</style>
+	<script>
+	
+		var apexClassQuery = "SELECT Id, Name FROM ApexClass";
+		var apexClassMap = {};
+		var apexPageQuery = "SELECT Id, Name FROM ApexPage";
+		var apexPageMap = {};
+		var appMapQuery = "SELECT Id, Label FROM AppMenuItem";
+		var appMap = {};
+		
+		var applicationRolePermissionQuery = "SELECT " + KimbleNamespaceWithUnderscores + "ApplicationRole__c, " + KimbleNamespaceWithUnderscores + "ApplicationRole__r.Name, " + KimbleNamespaceWithUnderscores + "Permission__c, " + KimbleNamespaceWithUnderscores + "Permission__r." + KimbleNamespaceWithUnderscores + "PermissionSetAPIName__c FROM " + KimbleNamespaceWithUnderscores + "ApplicationRolePermission__c";
+		var applicationRoleMap = {};
+		var applicationRolePermissionMap = {};
+		
+		var permissionObjectAccessMap = {};
+		var permissionFieldAccessMap = {};
+		var permissionEntityAccessMap = {};
+		
+		var objectQuery = "SELECT Parent.Id, Parent.Name, Parent.Label, SObjectType, PermissionsCreate, PermissionsRead, PermissionsEdit, PermissionsDelete, PermissionsViewAllRecords, PermissionsModifyAllRecords FROM ObjectPermissions WHERE Parent.IsOwnedByProfile = false";
+		var fieldQuery = "SELECT Parent.Id, Parent.Name, Parent.Label, Field, PermissionsRead, PermissionsEdit FROM FieldPermissions WHERE Parent.IsOwnedByProfile = false";
+		var entityAccessQuery = "SELECT Parent.Id, Parent.Name, Parent.Label, SetupEntityId, SetupEntityType FROM SetupEntityAccess WHERE Parent.IsOwnedByProfile = false";
+
+		var objectDataGathered = false;
+		var fieldDataGathered = false;
+		var entityDataGathered = false;
+		
+		var permissionResultsMap = {};
+		var applicationRoleResultsMap = {};
+		
+		function RoleAccess( roleName, itemType, itemName, createAccess, readAccess, editAccess, deleteAccess, viewAllAccess, modifyAllAccess) {
+			this.roleName = roleName;
+			this.itemType = itemType;
+			this.itemName = itemName;
+			this.createAccess = createAccess;
+			this.readAccess = readAccess;
+			this.editAccess = editAccess;
+			this.deleteAccess = deleteAccess;
+			this.viewAllAccess = viewAllAccess;
+			this.modifyAllAccess = modifyAllAccess;
+		}
+		
+		initialiseLookupMaps();
+					
+		function readSecurityConfigurationData()
+		{
+			jQuery('#working').removeClass('hidden');
+			jQuery('#analysePermissionsBtn').prop('disabled', true);
+			jQuery('#analysePermissionsBtn').addClass('btnDisabled');
+							
+			permissionObjectAccessMap = {};
+			permissionFieldAccessMap = {};
+			permissionEntityAccessMap = {};
+		
+			permissionResultsMap = {};
+			applicationRoleResultsMap = {};
+			jQuery('#permResultsTable > tbody').empty();
+			jQuery('#roleResultsTable > tbody').empty();
+			
+			if(jQuery('#includeObjects').is(':checked'))
+			{
+				getPagedData(objectQuery, 1000, 'analyseObjectQueryResults');
+			}
+			else
+			{
+				objectDataGathered = true;
+			}
+			
+			if(jQuery('#includeFields').is(':checked'))
+			{
+				getPagedData(fieldQuery, 1000, 'analyseFieldQueryResults');
+			}
+			else
+			{
+				fieldDataGathered = true;
+			}
+
+			if(jQuery('#includeApexClassesPagesAndApps').is(':checked'))
+			{
+				getPagedData(entityAccessQuery, 1000, 'analyseEntityAccessQueryResults');
+			}
+			else
+			{
+				entityDataGathered = true;
+			}			
+		}
+		
+		function initialiseLookupMaps()
+		{
+			jQuery('#analysePermissionsBtn').prop('disabled', true);
+			jQuery('#analysePermissionsBtn').addClass('btnDisabled');
+			
+			getPagedData(apexClassQuery, 1000, 'buildApexClassMap');
+			getPagedData(apexPageQuery, 1000, 'buildApexPageMap');
+			getPagedData(appMapQuery, 1000, 'buildAppMap');
+			
+			getPagedData(applicationRolePermissionQuery, 1000, 'buildApplicationRolePermissionMap');
+		}
+		
+		function buildApexClassMap(cumulativeQueryResults)
+		{
+			apexClassMap = {};
+			for(resultIdx = 0; resultIdx < cumulativeQueryResults.length; resultIdx++)
+			{
+				var resultItem = cumulativeQueryResults[resultIdx];
+				apexClassMap[resultItem.Id] = resultItem.Name;
+			}
+		}
+
+		function buildApexPageMap(cumulativeQueryResults)
+		{
+			apexPageMap = {};
+			for(resultIdx = 0; resultIdx < cumulativeQueryResults.length; resultIdx++)
+			{
+				var resultItem = cumulativeQueryResults[resultIdx];
+				apexPageMap[resultItem.Id] = resultItem.Name;
+			}
+		}
+
+		function buildAppMap(cumulativeQueryResults)
+		{
+			appMap = {};
+			for(resultIdx = 0; resultIdx < cumulativeQueryResults.length; resultIdx++)
+			{
+				var resultItem = cumulativeQueryResults[resultIdx];
+				appMap[resultItem.Id] = resultItem.Label;
+			}
+		}
+		
+		function buildApplicationRolePermissionMap(cumulativeQueryResults)
+		{
+			applicationRoleMap = {};
+			applicationRolePermissionMap = {};
+			for(resultIdx = 0; resultIdx < cumulativeQueryResults.length; resultIdx++)
+			{
+				var resultItem = cumulativeQueryResults[resultIdx];
+				
+				// switch based on whether this org is packaged or not
+				if(KimbleNamespaceWithUnderscores != null && KimbleNamespaceWithUnderscores != '')
+				{
+					// construct a map of application role ID to Name
+					applicationRoleMap[resultItem.KimbleOne__ApplicationRole__c] = resultItem.KimbleOne__ApplicationRole__r.Name;
+					
+					// make a list of permissions in this application role
+					if(!(resultItem.KimbleOne__ApplicationRole__c in applicationRolePermissionMap))
+					{
+						applicationRolePermissionMap[resultItem.KimbleOne__ApplicationRole__c] = [];
+					}
+					applicationRolePermissionMap[resultItem.KimbleOne__ApplicationRole__c].push(resultItem.KimbleOne__Permission__r.KimbleOne__PermissionSetAPIName__c);
+				}
+				else
+				{
+					// construct a map of application role ID to Name
+					applicationRoleMap[resultItem.ApplicationRole__c] = resultItem.ApplicationRole__r.Name;
+					
+					// make a list of permissions in this application role
+					if(!(resultItem.ApplicationRole__c in applicationRolePermissionMap))
+					{
+						applicationRolePermissionMap[resultItem.ApplicationRole__c] = [];
+					}
+					applicationRolePermissionMap[resultItem.ApplicationRole__c].push(resultItem.Permission__r.PermissionSetAPIName__c);				
+				}
+			}
+			
+			jQuery('#analysePermissionsBtn').prop('disabled', false);
+			jQuery('#analysePermissionsBtn').removeClass('btnDisabled');
+		}
+		
+		function analyseObjectQueryResults(cumulativeQueryResults)
+		{
+			for(resultIdx = 0; resultIdx < cumulativeQueryResults.length; resultIdx++)
+			{
+				var thisResult = cumulativeQueryResults[resultIdx];
+				
+				// create and output a new row in the all permissions view for this permission
+				var tableBodyRow = "<tr>";
+				tableBodyRow+="<td>" + thisResult.Parent.Label + "</td>";
+				tableBodyRow+="<td>SObject</td>";
+				tableBodyRow+="<td>" + thisResult.SobjectType + "</td>";
+				tableBodyRow+="<td title='Create'>" + parseBooleanForDisplay(thisResult.PermissionsCreate) + "</td>";
+				tableBodyRow+="<td title='Read'>" + parseBooleanForDisplay(thisResult.PermissionsRead) + "</td>";
+				tableBodyRow+="<td title='Edit'>" + parseBooleanForDisplay(thisResult.PermissionsEdit) + "</td>";
+				tableBodyRow+="<td title='Delete'>" + parseBooleanForDisplay(thisResult.PermissionsDelete) + "</td>";
+				tableBodyRow+="<td title='View All'>" + parseBooleanForDisplay(thisResult.PermissionsViewAllRecords) + "</td>";
+				tableBodyRow+="<td title='Modify All'>" + parseBooleanForDisplay(thisResult.PermissionsModifyAllRecords) + "</td>";
+				tableBodyRow+="</tr>";
+				
+				permissionResultsMap[thisResult.Parent.Label + thisResult.SobjectType + "a_SObject"] = tableBodyRow;
+				
+				// store this result in the permissionObjectAccessMap map so that we can use it later in the application role breakdown
+				// key is the permissionSetAPIName, the contents of which are then a map keyed by objectName
+				if(!(thisResult.Parent.Name in permissionObjectAccessMap))
+				{
+					permissionObjectAccessMap[thisResult.Parent.Name] = {};
+				}
+				permissionObjectAccessMap[thisResult.Parent.Name][thisResult.SobjectType] = thisResult;
+			}
+			
+			// build the Access By Application Role view
+			// iterate through each Application Role
+			// iterate each permission set that the role holds
+			// build a list of object access for that role - maintaining only one entry per object to avoid duplicates
+			var roleAccessMap = {};
+			for (applicationRole in applicationRoleMap)
+			{
+				var roleName = applicationRoleMap[applicationRole];
+				var rolePermissions = applicationRolePermissionMap[applicationRole];
+				
+				for(rolePermissionIdx = 0; rolePermissionIdx < rolePermissions.length; rolePermissionIdx++)
+				{
+					// get the objects this permission has access to
+					var objectMap = permissionObjectAccessMap[rolePermissions[rolePermissionIdx]];
+					
+					if(!(applicationRole in roleAccessMap))
+					{
+						roleAccessMap[applicationRole] = {};
+					}
+					
+					// work through the elements of the objectMap entry, if any access level is true for this object then set it on the relevant roleaccess item		
+					for(objectAccess in objectMap)
+					{
+						var thisObjectAccess = objectMap[objectAccess];
+						var SobjectType = thisObjectAccess.SobjectType;
+
+						if(!(SobjectType in roleAccessMap[applicationRole]))
+						{
+							roleAccessMap[applicationRole][SobjectType] = new RoleAccess( roleName, 'SObject', SobjectType, false, false, false, false, false, false);
+						}
+						
+						if(thisObjectAccess.PermissionsCreate)
+						{
+							roleAccessMap[applicationRole][SobjectType].createAccess = true;
+						}
+						if(thisObjectAccess.PermissionsRead)
+						{
+							roleAccessMap[applicationRole][SobjectType].readAccess = true;
+						}
+						if(thisObjectAccess.PermissionsEdit)
+						{
+							roleAccessMap[applicationRole][SobjectType].editAccess = true;
+						}
+						if(thisObjectAccess.PermissionsDelete)
+						{
+							roleAccessMap[applicationRole][SobjectType].deleteAccess = true;
+						}
+						if(thisObjectAccess.PermissionsViewAllRecords)
+						{
+							roleAccessMap[applicationRole][SobjectType].viewAllAccess = true;
+						}
+						if(thisObjectAccess.PermissionsModifyAllRecords)
+						{
+							roleAccessMap[applicationRole][SobjectType].modifyAllAccess = true;
+						}
+					}
+				}
+			}
+			
+			// output the consolidated view
+			for(applicationRole in roleAccessMap)	
+			{
+				var applicationRoleAccess = roleAccessMap[applicationRole];
+				
+				for(sObjectAccess in applicationRoleAccess)
+				{	
+					var sObjectAccess = applicationRoleAccess[sObjectAccess];
+					
+					var accessTableBodyRow = "<tr>";
+					accessTableBodyRow+="<td>" + sObjectAccess.roleName + "</td>";
+					accessTableBodyRow+="<td>" + sObjectAccess.itemType + "</td>";
+					accessTableBodyRow+="<td>" + sObjectAccess.itemName + "</td>";
+					accessTableBodyRow+="<td title='Create'>" + parseBooleanForDisplay(sObjectAccess.createAccess) + "</td>";
+					accessTableBodyRow+="<td title='Read'>" + parseBooleanForDisplay(sObjectAccess.readAccess) + "</td>";
+					accessTableBodyRow+="<td title='Edit'>" + parseBooleanForDisplay(sObjectAccess.editAccess) + "</td>";
+					accessTableBodyRow+="<td title='Delete'>" + parseBooleanForDisplay(sObjectAccess.deleteAccess) + "</td>";
+					accessTableBodyRow+="<td title='View All'>" + parseBooleanForDisplay(sObjectAccess.viewAllAccess) + "</td>";
+					accessTableBodyRow+="<td title='Modify All'>" + parseBooleanForDisplay(sObjectAccess.modifyAllAccess) + "</td>";
+					accessTableBodyRow+="</tr>";
+					
+					applicationRoleResultsMap[sObjectAccess.roleName + sObjectAccess.itemName + 'a_' + sObjectAccess.itemType] = accessTableBodyRow;
+				}
+			}
+
+			objectDataGathered = true;
+			
+			outputResults();
+		}
+
+		function analyseFieldQueryResults(cumulativeQueryResults)
+		{
+			for(resultIdx = 0; resultIdx < cumulativeQueryResults.length; resultIdx++)
+			{
+				var thisResult = cumulativeQueryResults[resultIdx];
+				
+				var tableBodyRow = "<tr>";
+
+				// create and output a new row in the all permissions view for this permission
+				var tableBodyRow = "<tr>";
+				tableBodyRow+="<td>" + thisResult.Parent.Label + "</td>";
+				tableBodyRow+="<td>Field</td>";
+				tableBodyRow+="<td>" + thisResult.Field + "</td>";
+				tableBodyRow+="<td title='Create'>" + parseBooleanForDisplay(null) + "</td>";
+				tableBodyRow+="<td title='Read'>" + parseBooleanForDisplay(thisResult.PermissionsRead) + "</td>";
+				tableBodyRow+="<td title='Edit'>" + parseBooleanForDisplay(thisResult.PermissionsEdit) + "</td>";
+				tableBodyRow+="<td title='Delete'>" + parseBooleanForDisplay(null) + "</td>";
+				tableBodyRow+="<td title='View All'>" + parseBooleanForDisplay(null) + "</td>";
+				tableBodyRow+="<td title='Modify All'>" + parseBooleanForDisplay(null) + "</td>";
+				tableBodyRow+="</tr>";
+				
+				permissionResultsMap[thisResult.Parent.Label + thisResult.Field + "b_Field"] = tableBodyRow;
+
+				// store this result in the permissionFieldAccessMap map so that we can use it later in the application role breakdown
+				// key is the permissionSetAPIName, the contents of which are then a map keyed by fieldname
+				if(!(thisResult.Parent.Name in permissionFieldAccessMap))
+				{
+					permissionFieldAccessMap[thisResult.Parent.Name] = {};
+				}
+				permissionFieldAccessMap[thisResult.Parent.Name][thisResult.Field] = thisResult;
+			}
+
+			// build the Access By Application Role view
+			// iterate through each Application Role
+			// iterate each permission set that the role holds
+			// build a list of object access for that role - maintaining only one entry per object to avoid duplicates
+			var roleAccessMap = {};
+			for (applicationRole in applicationRoleMap)
+			{
+				var roleName = applicationRoleMap[applicationRole];
+				var rolePermissions = applicationRolePermissionMap[applicationRole];
+				
+				for(rolePermissionIdx = 0; rolePermissionIdx < rolePermissions.length; rolePermissionIdx++)
+				{
+					// get the objects this permission has access to
+					var fieldMap = permissionFieldAccessMap[rolePermissions[rolePermissionIdx]];
+					
+					if(!(applicationRole in roleAccessMap))
+					{
+						roleAccessMap[applicationRole] = {};
+					}
+					
+					// work through the elements of the fieldMap entry, if any access level is true for this field then set it on the relevant roleaccess item		
+					for(fieldAccess in fieldMap)
+					{
+						var thisFieldAccess = fieldMap[fieldAccess];
+						var fieldName = thisFieldAccess.Field;
+
+						if(!(fieldName in roleAccessMap[applicationRole]))
+						{
+							roleAccessMap[applicationRole][fieldName] = new RoleAccess( roleName, 'Field', fieldName, null, false, false, null, null, null);
+						}
+						
+						if(thisFieldAccess.PermissionsRead)
+						{
+							roleAccessMap[applicationRole][fieldName].readAccess = true;
+						}
+						if(thisFieldAccess.PermissionsEdit)
+						{
+							roleAccessMap[applicationRole][fieldName].editAccess = true;
+						}
+					}
+				}
+			}
+			
+			// output the consolidated view
+			for(applicationRole in roleAccessMap)	
+			{
+				var applicationRoleAccess = roleAccessMap[applicationRole];
+				
+				for(fieldAccess in applicationRoleAccess)
+				{	
+					var thisFieldAccessAccess = applicationRoleAccess[fieldAccess];
+					
+					var accessTableBodyRow = "<tr>";
+					accessTableBodyRow+="<td>" + thisFieldAccessAccess.roleName + "</td>";
+					accessTableBodyRow+="<td>" + thisFieldAccessAccess.itemType + "</td>";
+					accessTableBodyRow+="<td>" + thisFieldAccessAccess.itemName + "</td>";
+					accessTableBodyRow+="<td title='Create'>" + parseBooleanForDisplay(thisFieldAccessAccess.createAccess) + "</td>";
+					accessTableBodyRow+="<td title='Read'>" + parseBooleanForDisplay(thisFieldAccessAccess.readAccess) + "</td>";
+					accessTableBodyRow+="<td title='Edit'>" + parseBooleanForDisplay(thisFieldAccessAccess.editAccess) + "</td>";
+					accessTableBodyRow+="<td title='Delete'>" + parseBooleanForDisplay(thisFieldAccessAccess.deleteAccess) + "</td>";
+					accessTableBodyRow+="<td title='View All'>" + parseBooleanForDisplay(thisFieldAccessAccess.viewAllAccess) + "</td>";
+					accessTableBodyRow+="<td title='Modify All'>" + parseBooleanForDisplay(thisFieldAccessAccess.modifyAllAccess) + "</td>";
+					accessTableBodyRow+="</tr>";
+					
+					applicationRoleResultsMap[thisFieldAccessAccess.roleName + thisFieldAccessAccess.itemName + 'b_' + thisFieldAccessAccess.itemType] = accessTableBodyRow;
+				}
+			}
+												
+			fieldDataGathered = true;
+			outputResults();
+		}
+		
+		function analyseEntityAccessQueryResults(cumulativeQueryResults)
+		{
+			for(resultIdx = 0; resultIdx < cumulativeQueryResults.length; resultIdx++)
+			{
+				var thisResult = cumulativeQueryResults[resultIdx];
+				
+				var entityName;
+				var itemType;
+				
+				if(thisResult.SetupEntityType == 'ApexClass')
+				{
+					entityName = apexClassMap[thisResult.SetupEntityId];
+					itemType = 'd_' + thisResult.SetupEntityType;
+				}
+				else if(thisResult.SetupEntityType == 'ApexPage')
+				{
+					entityName = apexPageMap[thisResult.SetupEntityId];
+					itemType = 'c_' + thisResult.SetupEntityType;
+				}
+				else if(thisResult.SetupEntityType == 'TabSet')
+				{
+					entityName = appMap[thisResult.SetupEntityId];
+					itemType = 'e_' + thisResult.SetupEntityType;
+				}
+
+				var tableBodyRow = "<tr>";
+				
+				tableBodyRow+="<td>" + thisResult.Parent.Label + "</td>";
+				tableBodyRow+="<td>" + thisResult.SetupEntityType + "</td>";
+				tableBodyRow+="<td>" + entityName + "</td>";
+				tableBodyRow+="<td title='Create'>" + parseBooleanForDisplay(null) + "</td>";
+				tableBodyRow+="<td title='Read'>" + parseBooleanForDisplay(true) + "</td>";
+				tableBodyRow+="<td title='Edit'>" + parseBooleanForDisplay(null) + "</td>";
+				tableBodyRow+="<td title='Delete'>" + parseBooleanForDisplay(null) + "</td>";
+				tableBodyRow+="<td title='View All'>" + parseBooleanForDisplay(null) + "</td>";
+				tableBodyRow+="<td title='Modify All'>" + parseBooleanForDisplay(null) + "</td>";
+				tableBodyRow+="</tr>";
+				
+				permissionResultsMap[thisResult.Parent.Label + entityName + itemType] = tableBodyRow;
+
+				// store this result in the permissionEntityAccessMap map so that we can use it later in the application role breakdown
+				// key is the permissionSetAPIName, the contents of which are then a map keyed by entityName
+				// add the entity name to the result as this will be useful later
+				thisResult.EntityName = entityName;
+				if(!(thisResult.Parent.Name in permissionEntityAccessMap))
+				{
+					permissionEntityAccessMap[thisResult.Parent.Name] = {};
+				}
+				permissionEntityAccessMap[thisResult.Parent.Name][entityName] = thisResult;
+			}
+
+			// build the Access By Application Role view
+			// iterate through each Application Role
+			// iterate each permission set that the role holds
+			// build a list of object access for that role - maintaining only one entry per object to avoid duplicates
+			var roleAccessMap = {};
+			for (applicationRole in applicationRoleMap)
+			{
+				var roleName = applicationRoleMap[applicationRole];
+				var rolePermissions = applicationRolePermissionMap[applicationRole];
+				
+				for(rolePermissionIdx = 0; rolePermissionIdx < rolePermissions.length; rolePermissionIdx++)
+				{
+					// get the objects this permission has access to
+					var entityMap = permissionEntityAccessMap[rolePermissions[rolePermissionIdx]];
+					
+					if(!(applicationRole in roleAccessMap))
+					{
+						roleAccessMap[applicationRole] = {};
+					}
+					
+					// work through the elements of the entityMap entry, if any access level is true for this entity then set it on the relevant roleaccess item		
+					for(entityAccess in entityMap)
+					{
+						var thisEntityAccess = entityMap[entityAccess];
+						var entityName = thisEntityAccess.EntityName;
+
+						if(!(entityName in roleAccessMap[applicationRole]))
+						{
+							roleAccessMap[applicationRole][entityName] = new RoleAccess( roleName, thisEntityAccess.SetupEntityType, entityName, null, true, null, null, null, null);
+						}
+					}
+				}
+			}
+			
+			// output the consolidated view
+			for(applicationRole in roleAccessMap)	
+			{
+				var applicationRoleAccess = roleAccessMap[applicationRole];
+				
+				for(entityAccess in applicationRoleAccess)
+				{	
+					var thisEntityAccessAccess = applicationRoleAccess[entityAccess];
+					
+					var accessTableBodyRow = "<tr>";
+					accessTableBodyRow+="<td>" + thisEntityAccessAccess.roleName + "</td>";
+					accessTableBodyRow+="<td>" + thisEntityAccessAccess.itemType + "</td>";
+					accessTableBodyRow+="<td>" + thisEntityAccessAccess.itemName + "</td>";
+					accessTableBodyRow+="<td title='Create'>" + parseBooleanForDisplay(thisEntityAccessAccess.createAccess) + "</td>";
+					accessTableBodyRow+="<td title='Read'>" + parseBooleanForDisplay(thisEntityAccessAccess.readAccess) + "</td>";
+					accessTableBodyRow+="<td title='Edit'>" + parseBooleanForDisplay(thisEntityAccessAccess.editAccess) + "</td>";
+					accessTableBodyRow+="<td title='Delete'>" + parseBooleanForDisplay(thisEntityAccessAccess.deleteAccess) + "</td>";
+					accessTableBodyRow+="<td title='View All'>" + parseBooleanForDisplay(thisEntityAccessAccess.viewAllAccess) + "</td>";
+					accessTableBodyRow+="<td title='Modify All'>" + parseBooleanForDisplay(thisEntityAccessAccess.modifyAllAccess) + "</td>";
+					accessTableBodyRow+="</tr>";
+
+					var itemType;
+					
+					if(thisEntityAccessAccess.itemType == 'ApexClass')
+					{
+						itemType = 'd_' + thisResult.SetupEntityType;
+					}
+					else if(thisEntityAccessAccess.itemType == 'ApexPage')
+					{
+						itemType = 'c_' + thisResult.SetupEntityType;
+					}
+					else if(thisEntityAccessAccess.itemType == 'TabSet')
+					{
+						itemType = 'e_' + thisResult.SetupEntityType;
+					}					
+					
+					applicationRoleResultsMap[thisEntityAccessAccess.roleName + thisEntityAccessAccess.itemName + itemType] = accessTableBodyRow;
+				}
+			}
+						
+			entityDataGathered = true;
+			outputResults();
+		}
+		
+		function parseBooleanForDisplay(boolVal)
+		{
+			var returnVal = "N";
+			
+			if(boolVal == null)
+				returnVal = "-";
+
+			if(boolVal == true)
+				returnVal = "Y";
+								
+			return returnVal;
+		}
+		
+		function outputResults()
+		{
+			if(objectDataGathered && fieldDataGathered && entityDataGathered)
+			{
+				// first iterate the key which is the sortable item, add each to an array then sort it
+				// we then iterate back through this in order to output in a sorted list
+				var sortableItemArray = [];
+				
+				for(sortableItem in permissionResultsMap)
+				{
+					sortableItemArray.push(sortableItem);
+				}
+				
+				// now sort the array
+				sortableItemArray.sort();
+				
+				for(resultIdx = 0; resultIdx < sortableItemArray.length; resultIdx++)
+				{
+					var mapKey = sortableItemArray[resultIdx];
+					tableBodyRow = permissionResultsMap[mapKey];
+					jQuery('#permResultsTable > tbody:last').append(tableBodyRow);
+				}
+				
+				// output the role results too
+				sortableItemArray = [];
+				
+				for(sortableItem in applicationRoleResultsMap)
+				{
+					sortableItemArray.push(sortableItem);
+				}
+				
+				// now sort the array
+				sortableItemArray.sort();
+				
+				for(resultIdx = 0; resultIdx < sortableItemArray.length; resultIdx++)
+				{
+					var mapKey = sortableItemArray[resultIdx];
+					tableBodyRow = applicationRoleResultsMap[mapKey];
+					jQuery('#roleResultsTable > tbody:last').append(tableBodyRow);
+				}
+				jQuery('#working').addClass('hidden');
+			}
+		}
+		
+		function getPagedData(queryString, pageSize, finalCallMethodName)
+		{			
+			var cumulativeQueryResults = [];
+			console.log("Querying");
+			jQuery('#working').append('.');
+			
+			getPagedDataViaRemoting(queryString, pageSize, null, cumulativeQueryResults,
+				function lambda(queryResult, queryString, pageSize, cumulativeQueryResults)
+				{					
+					// add the returned results to the cumulativeQueryResults array
+					cumulativeQueryResults.push.apply(cumulativeQueryResults, queryResult);
+						
+					// recursively call the export function for this object if we have returned
+					// a complete page of records (as it's likely there is another page to come)
+					if(queryResult.length == pageSize)
+					{
+						var lastReturnedId = queryResult[queryResult.length - 1].Id;
+						console.log("Querying Next Page");
+						jQuery('#working').append('.');
+						
+						getPagedDataViaRemoting(queryString, pageSize, lastReturnedId, cumulativeQueryResults, lambda);
+					}
+					else
+					{
+					
+						// we returned less than a full page in this call so we must now have all the rows in the cumulativeQueryResults
+						window[finalCallMethodName](cumulativeQueryResults);		
+					}
+				}
+			);
+		}
+		
+		function selectText(divid)
+		{
+			if (document.selection)
+			{
+				var div=document.body.createTextRange();
+				div.moveToElementText(document.getElementById(divid));
+				div.select();
+			}
+			else
+			{
+				var div = document.createRange();
+				div.setStartBefore(document.getElementById(divid));   div.setEndAfter(document.getElementById(divid));
+				window.getSelection().addRange(div);
+			}
+		}
+		
+		function getPagedDataViaRemoting(queryToExecute, pageSize, lastId, cumulativeQueryResults, callback)
+		{ 
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.SecurityConfigurationController.Query}',
+		       		queryToExecute, pageSize, lastId,
+		      			function(result, event){          
+		             		
+		             		if (event.status) 
+				            {
+				             	callback(result, queryToExecute, pageSize, cumulativeQueryResults);		             								
+				         	} 
+				         	else if (event.type === 'exception') 
+				         	{
+				             	alert(event.message);
+				         	} 
+				         	else 
+				         	{
+				             	alert(event.message);
+				         	}
+		         	}, 
+		         	{escape: true, buffer: false, timeout: 60000}
+		     	);
+	     	}
+	     	
+		jQuery(function()
+		{
+			jQuery( "#tabs" ).tabs();
+		});
+	</script>
+
+</apex:page>

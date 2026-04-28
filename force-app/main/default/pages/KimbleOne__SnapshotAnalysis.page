@@ -1,0 +1,664 @@
+<apex:page controller="KimbleOne.SnapshotAnalysisController" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+  	<c:Menu DefaultHelpPage="ForecastAccuracy.html" MenuContextName="{!PageTitle}"/> 
+</apex:define>
+  
+<apex:define name="Content">
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__ChartJs)}" />
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+   	<apex:pageMessages escape="false"/>
+   	
+   	<style>
+		div#dashboard-container {
+			min-height: 400px;
+			padding: 10px;
+		}
+		.chart-container {
+			width: 850px;
+		    height: 420px;
+		    padding: 10px 20px 20px 20px;
+		    box-shadow: rgba(31, 31, 31, 0.16) 1px 2px 5px 1px;
+		    background-color: #FFF;
+		    border-radius: 2px;
+		    display: table-cell;
+			position: relative;
+		}		
+		.narrative-container {
+			vertical-align: top;
+		    padding: 20px;
+		    box-shadow: rgba(31, 31, 31, 0.16) 1px 2px 5px 1px;
+		    background-color: #FFF;
+		    border-radius: 2px;
+		    display: table-cell;
+		}
+		.narrative-container .scrollable-container {
+			height: 409px;
+			overflow-y: auto;
+			min-width: 318px;
+		}
+		.p-container {
+			display: table-row;
+		}
+		.all-ps {
+			display: table;
+			border-spacing: 10px;
+		}
+		/* narrative styling*/
+		.n-item {
+			font-size: 14px;
+			margin-bottom: 8px;
+			color: #666666;
+		    padding: 10px;
+    		border-radius: 4px;
+    		box-shadow: rgba(31, 31, 31, 0.16) 1px 2px 5px;
+		}
+		.n-item.headline {
+			font-size: 16px;
+		    font-weight: bold;
+		    padding-bottom: 12px;
+		}
+		.n-item.facc-warn {
+		    background-color: #E58E1A;
+		    color: white;
+		}
+		.n-item.facc-info {
+		    background-color: #428BCA;
+		    color: white;
+		}
+		.n-item.facc-good {
+		    background-color: #008852;
+		    color: white;
+		}
+		.n-item.facc-hot {
+		    background-color: #B42E34;
+		    color: white;
+		}
+		.n-item.facc-hotwarn {
+		    background-color: #d55a5f;
+		    color: white;
+		}
+		.n-item.facc-cold {
+		    background-color: #36a2eb;
+		    color: white;
+		}
+		.n-item.facc-coldwarn {
+		    background-color: #7cc2f2;
+		    color: white;
+		}
+		.filter-items {
+			position: absolute;
+			right: 0px;
+			top: 0px;
+		}
+		span.time-period-name {
+		    font-size: 18px;
+		    margin-right: 10px;
+		    font-weight: bold;
+		}		
+		select#businessUnit, select#forecastStatus, select#analysisFact {
+		    margin-right: 10px;
+		    padding: 4px;
+		}   		
+		.filter-items label {
+		    font-weight: bold;
+		    font-size: 12px;
+		    margin-right: 9px;
+		}
+		label.last-closed-period {
+			font-weight: bold;
+		    font-size: 12px;
+		    margin-right: 9px;
+	    }
+	    .period-header {
+		    position: relative;
+		    margin-left: 10px;
+			top: 2px;
+		}
+		.header-container {
+		    vertical-align: top;
+		    padding: 2px 6px 2px 6px;
+		    border-radius: 4px;
+		    margin-bottom: 10px;
+		    text-align: center;
+		    font-size: 22px;
+		    font-weight: bold;
+		    color: #666666;
+		}
+		.y-axis-label {
+		    position: absolute;
+			top: 28px;
+			left: 28px;
+			font-size: 20px;
+		    color: #6f6f6f;
+		}				
+		/* loading */   	
+		#data-loading {
+			text-align: center;
+			font-size: 200px;
+			color: #d3d3d3;
+			position: absolute;
+			filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+			-moz-opacity: 0.7;
+			-khtml-opacity: 0.7;
+			opacity: 0.7;
+			z-index: 1000;
+			background-color: #fff;
+		    height: calc(100% - 253px);
+		    width: calc(100% - 150px);
+			padding: 100px 50px 0px 50px;
+		}
+			
+		/* toolbar styling */
+		.toolbar-container {
+			position: relative;
+			background-color: #f8f8f8;
+			padding: 6px;
+			margin-bottom: 5px;
+			height: 26px;
+			display: block;
+		}
+		.toolbar {
+			display: table;
+			width: 100%;
+		}
+		div#toolbar-buttons {
+			position: relative;
+		}
+		a.toolbar-button {
+			display: inline-block;
+			padding: 6px 10px 6px 10px;
+			background-color: white;
+			margin-right: 4px;
+			border: 1px solid #ccc;
+			border-radius: 2px;
+		}
+		a.toolbar-button.active-toolbar-button {
+			color: white;
+			background-color: #888;
+		}		
+		a.toolbar-button:hover {
+			text-decoration: none;
+			color: white;
+			background-color: #1A9EFF;
+		}
+		a.toolbar-button.button-left {
+			border-top-right-radius: 0px;
+			border-bottom-right-radius: 0px;
+			margin-right: 0px;
+		}
+		a.toolbar-button.button-middle {
+			border-radius: 0px;
+			border-left: 0;
+			margin-right: 0px;
+		}
+		a.toolbar-button.button-right {
+			border-top-left-radius: 0px;
+			border-left: 0;
+			border-bottom-left-radius: 0px;
+		}
+		a.toolbar-button .fa {font-size: 14px;}
+		a.toolbar-button.disabled {background-color: #ccc;color: darkgray;}
+		a.toolbar-button.disabled:hover {background-color: #ccc;color: darkgray;}
+   	</style>
+
+	<div class="toolbar-container card">
+		<div class="toolbar">
+			<div id="toolbar-buttons" style="position: relative;">
+				<div class="period-header">
+				<apex:outputLabel value="{!LastClosedPeriodLabel}" styleClass="last-closed-period"/>
+				<span class="time-period-name">{!JSENCODE(LastClosedPeriodName)}</span>
+				</div>
+				<div class="filter-items">
+				<apex:outputLabel value="{!$ObjectType.KimbleOne__BusinessUnit__c.Label}" />
+				<select id="businessUnit">
+				<apex:repeat value="{!TheBusinessUnits}" var="option">
+					<apex:outputPanel layout="none" rendered="{!!ISBLANK(BusinessUnit) && option.Value == BusinessUnit}">
+					<option value="{!JSENCODE(option.Value)}" selected="selected">{!JSENCODE(option.Label)}</option>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!ISBLANK(BusinessUnit) || option.Value != BusinessUnit}">
+					<option value="{!JSENCODE(option.Value)}">{!JSENCODE(option.Label)}</option>
+					</apex:outputPanel>
+				</apex:repeat>
+				</select>
+				<apex:outputLabel value="{!$ObjectType.KimbleOne__ForecastStatus__c.Fields.KimbleOne__Probability__c.Label}" />
+				<select id="forecastStatus">
+				<apex:repeat value="{!TheForecastStatuses}" var="option">
+					<apex:outputPanel layout="none" rendered="{!!ISBLANK(ForecastStatus) && option.Value == ForecastStatus}">
+					<option value="{!JSENCODE(option.Value)}" selected="selected">{!JSENCODE(option.Label)}</option>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!ISBLANK(ForecastStatus) || option.Value != ForecastStatus}">
+					<option value="{!JSENCODE(option.Value)}">{!JSENCODE(option.Label)}</option>
+					</apex:outputPanel>
+				</apex:repeat>
+				</select>
+				<apex:outputLabel value="{!$ObjectType.KimbleOne__PerformanceAnalysisTrend__c.Fields.KimbleOne__AnalysisFact__c.Label}" />
+				<select id="analysisFact">
+				<apex:repeat value="{!TheAnalysisFacts}" var="option">
+					<apex:outputPanel layout="none" rendered="{!!ISBLANK(AnalysisFact) && option.Value == AnalysisFact}">
+					<option value="{!JSENCODE(option.Value)}" selected="selected">{!JSENCODE(option.Label)}</option>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!ISBLANK(AnalysisFact) || option.Value != AnalysisFact}">
+					<option value="{!JSENCODE(option.Value)}">{!JSENCODE(option.Label)}</option>
+					</apex:outputPanel>
+				</apex:repeat>
+				</select>
+				</div>			
+			</div>
+		</div>
+	</div>
+	   	
+   	<div id="dashboard-container" class="card">
+   		<div id="data-loading" class="hidden-item"><i class="fa fa-circle-o-notch fa-spin"></i></div>
+   		
+   		<div class="all-ps">
+	   		<div class="p-container">
+		   		<div class="chart-container"><div class="y-axis-label">%</div><canvas id="theForecastAnalysisChartP1"></canvas></div>
+		   		<div class="narrative-container p1-narrative">
+			   		<div class="header-container">{!JSENCODE(NarrativeTitleLabel)}</div>
+		   			<div class="scrollable-container"></div>
+	   			</div>
+	   		</div>
+   		
+	   		<div class="p-container">
+		   		<div class="chart-container"><div class="y-axis-label">%</div><canvas id="theForecastAnalysisChartP2"></canvas></div>
+		   		<div class="narrative-container p2-narrative">
+			   		<div class="header-container">{!JSENCODE(NarrativeTitleLabel)}</div>
+		   			<div class="scrollable-container"></div>
+	   			</div>
+	   		</div>
+   		
+	   		<div class="p-container">
+		   		<div class="chart-container"><div class="y-axis-label">%</div><canvas id="theForecastAnalysisChartP3"></canvas></div>
+		   		<div class="narrative-container p3-narrative">
+			   		<div class="header-container">{!JSENCODE(NarrativeTitleLabel)}</div>
+		   			<div class="scrollable-container"></div>
+	   			</div>
+	   		</div>
+   		</div>
+   	</div>
+
+<script>
+	var lastClosedPeriodId = '{!JSENCODE(LastClosedPeriodId)}';
+	var rangeLabels = kimble.parseJSON("{!JSENCODE(RangeLabelsJSON)}");
+	var fAccChartLabel = '{!JSENCODE(FAccChartLabel)}';
+	var fConChartLabel = '{!JSENCODE(FConChartLabel)}';
+	var analysisScope = '{!JSENCODE(AnalysisScope)}';
+	var analysisFact = '';
+	var selectedProbabilityCode = '';
+	
+	var theForecastAnalysis;
+
+	var kimbleChart = {};
+	kimbleChart.colours = {
+		white: 'rgb(255, 255, 255)',
+		red: 'rgb(255, 99, 132)',
+		orange: 'rgb(255, 159, 64)',
+		yellow: 'rgb(255, 205, 86)',
+		green: 'rgb(75, 192, 192)',
+		blue: 'rgb(54, 162, 235)',
+		purple: 'rgb(153, 102, 255)',
+		grey: '#DDD',
+		kgreen: '#008752',
+		kred: '#B42B33',
+		korange: '#E68F1A',
+		kblue: '#729BC7'	
+	};
+	
+	var periodColours = [];
+	periodColours[0] = kimbleChart.colours.orange;
+	periodColours[1] = kimbleChart.colours.purple;
+	periodColours[2] = kimbleChart.colours.green;
+	periodColours[3] = '#c89f72';
+	periodColours[4] = '#72c6c8';
+	periodColours[5] = '#c8729b';
+	periodColours[6] = '#9bc872';
+	periodColours[7] = '#d7e51a';
+	periodColours[8] = '#b46b2e';
+	periodColours[9] = '#7472c8';
+	
+	var l = {};
+	l['Min'] = '{!JSENCODE(MinLabel)}';
+	l['Max'] = '{!JSENCODE(MaxLabel)}';
+	l['Average'] = '{!JSENCODE(AvgLabel)}';
+	
+	function getTheForecastAnalysis()
+	{
+		jQuery('#data-loading').toggleClass('hidden-item');
+		
+		analysisFact = jQuery('#analysisFact').val();
+		selectedProbabilityCode = jQuery('#forecastStatus').val();
+		var selectedBusinessUnit = jQuery('#businessUnit').val();
+					
+		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.SnapshotAnalysisController.GetForecastAnalysisForLastClosedPeriod}',
+       		selectedBusinessUnit, lastClosedPeriodId, analysisFact, selectedProbabilityCode, 
+      			function(result, event){          
+             		if (event.status) 
+		            {
+		             	theForecastAnalysis = result;
+		             	
+		             	populateForecastAnalysis();
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		         	}
+					jQuery('#data-loading').toggleClass('hidden-item');
+         	}, 	
+         {escape: true, timeout: 60000});
+	}
+	
+	function getTheForecastConfidence()
+	{
+		jQuery('#data-loading').toggleClass('hidden-item');
+		
+		analysisFact = jQuery('#analysisFact').val();
+		selectedProbabilityCode = jQuery('#forecastStatus').val();
+		var selectedBusinessUnit = jQuery('#businessUnit').val();
+					
+		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.SnapshotAnalysisController.GetForecastConfidenceForOpenPeriods}',
+       		selectedBusinessUnit, lastClosedPeriodId, analysisFact, selectedProbabilityCode, 
+      			function(result, event){          
+             		if (event.status) 
+		            {
+		             	theForecastAnalysis = result;
+		             	
+		             	populateForecastAnalysis();
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		         	}
+					jQuery('#data-loading').toggleClass('hidden-item');
+         	}, 	
+         {escape: true, timeout: 60000});
+	}
+	
+
+	function populateForecastAnalysis()
+	{
+		if(selectedProbabilityCode == 'ALLP' || selectedProbabilityCode == 'P1')
+		{
+			jQuery('#theForecastAnalysisChartP1').closest('.p-container').removeClass('hidden-item');
+			populateForecastAnalysisForFactAndProbability(analysisFact, 'P1');
+		}
+		else
+			jQuery('#theForecastAnalysisChartP1').closest('.p-container').addClass('hidden-item');
+		
+		if(selectedProbabilityCode == 'ALLP' || selectedProbabilityCode == 'P2')
+		{
+			jQuery('#theForecastAnalysisChartP2').closest('.p-container').removeClass('hidden-item');
+			populateForecastAnalysisForFactAndProbability(analysisFact, 'P2');
+		}
+		else
+			jQuery('#theForecastAnalysisChartP2').closest('.p-container').addClass('hidden-item');
+
+		if(selectedProbabilityCode == 'ALLP' || selectedProbabilityCode == 'P3')
+		{
+			jQuery('#theForecastAnalysisChartP3').closest('.p-container').removeClass('hidden-item');
+			populateForecastAnalysisForFactAndProbability(analysisFact, 'P3');
+		}
+		else
+			jQuery('#theForecastAnalysisChartP3').closest('.p-container').addClass('hidden-item');
+	}
+	
+	function populateForecastAnalysisForFactAndProbability(fact, probability)
+	{
+		populateForecastAnalysisChart(fact, probability);
+		populateForecastAnalysisNarrative(fact, probability);
+	}
+	
+	function getPeriodColour(periodCounter)
+	{
+		return (periodCounter < periodColours.length ? periodColours[periodCounter] : periodColours[periodColours.length - 1]);
+	}
+	
+	function populateForecastAnalysisChart(fact, probabilityCode)
+	{
+		var chartLabel = '';
+
+		if(analysisScope == 'F_CON')
+		{
+			if(probabilityCode == 'P1') chartLabel = l['FCONP1Title'];
+			else if(probabilityCode == 'P2') chartLabel = l['FCONP2Title'];
+			else if(probabilityCode == 'P3') chartLabel = l['FCONP3Title'];
+		}
+		else
+		{
+			if(probabilityCode == 'P1') chartLabel = l['FACCP1Title'];
+			else if(probabilityCode == 'P2') chartLabel = l['FACCP2Title'];
+			else if(probabilityCode == 'P3') chartLabel = l['FACCP3Title'];
+		}
+		
+		var rangeData  = {};
+		rangeData['Min'] = [];
+		rangeData['Max'] = [];
+		rangeData['Average'] = [];
+		
+		for(var periodCounter = 0; periodCounter < theForecastAnalysis.ThePeriods.length; periodCounter++)
+		{
+			rangeData[theForecastAnalysis.ThePeriods[periodCounter].Id] = [];
+		}
+		
+		var xAxisLabels = [];
+
+		for(var rangeCounter = 0; rangeCounter < theForecastAnalysis.TheRanges.length; rangeCounter++)
+		{
+			var rangeId = theForecastAnalysis.TheRanges[rangeCounter];
+			xAxisLabels.push(rangeLabels[rangeId]);
+
+			if(theForecastAnalysis.TheAnalysisFactItems[fact].TheProbabilityCodeItems[probabilityCode] != undefined)
+			{
+				var analysisFunctionItems = theForecastAnalysis.TheAnalysisFactItems[fact].TheProbabilityCodeItems[probabilityCode].TheAnalysisFunctionItems;
+	
+				if(Object.keys(analysisFunctionItems).length)
+				{
+					rangeData['Min'].push((analysisFunctionItems['Min'].TheRangeValues[rangeId] != undefined) ? analysisFunctionItems['Min'].TheRangeValues[rangeId].TheValue.toFixed() : '0');
+					rangeData['Max'].push((analysisFunctionItems['Max'].TheRangeValues[rangeId] != undefined) ? analysisFunctionItems['Max'].TheRangeValues[rangeId].TheValue.toFixed() : '0');
+					rangeData['Average'].push((analysisFunctionItems['Average'].TheRangeValues[rangeId] != undefined) ? analysisFunctionItems['Average'].TheRangeValues[rangeId].TheValue.toFixed() : '0');
+					
+					for(var periodCounter = 0; periodCounter < theForecastAnalysis.ThePeriods.length; periodCounter++)
+					{
+						var periodId = theForecastAnalysis.ThePeriods[periodCounter].Id;
+						var theCurrentPeriodAnalysisFunctionItems = theForecastAnalysis.TheAnalysisFactItems[fact].TheProbabilityCodeItems[probabilityCode].ThePeriodAnalysisFunctionItems;
+						
+						var rangeValue = null;
+						if(theCurrentPeriodAnalysisFunctionItems[periodId] != undefined
+							&& theCurrentPeriodAnalysisFunctionItems[periodId].TheRangeValues[rangeId] != undefined
+							&& theCurrentPeriodAnalysisFunctionItems[periodId].TheRangeValues[rangeId].TheValue != undefined) rangeValue = theCurrentPeriodAnalysisFunctionItems[periodId].TheRangeValues[rangeId].TheValue.toFixed();
+							
+						rangeData[periodId].push(rangeValue);
+					}
+				}
+			}
+		}
+		
+		var ctx = document.getElementById("theForecastAnalysisChart"+probabilityCode).getContext("2d");
+
+		if(probabilityCode == 'P1' && window.forecastAccuracyChartP1 != undefined) window.forecastAccuracyChartP1.destroy();
+		else if(probabilityCode == 'P2' && window.forecastAccuracyChartP2 != undefined) window.forecastAccuracyChartP2.destroy();
+		else if(probabilityCode == 'P3' && window.forecastAccuracyChartP3 != undefined) window.forecastAccuracyChartP3.destroy();
+		
+		var theChartData = [];
+		
+		for(var periodCounter = 0; periodCounter < theForecastAnalysis.ThePeriods.length; periodCounter++)
+		{
+			var periodId = theForecastAnalysis.ThePeriods[periodCounter].Id;
+			
+			var thePeriodData = {};
+			
+			thePeriodData.label = theForecastAnalysis.ThePeriods[periodCounter].Name;
+			thePeriodData.fill = false;
+			thePeriodData.pointRadius = 5;
+			thePeriodData.backgroundColor = getPeriodColour(periodCounter);
+			thePeriodData.borderColor = getPeriodColour(periodCounter);
+			thePeriodData.data = rangeData[periodId];
+			thePeriodData.lineTension = 0;
+			
+			theChartData.push(thePeriodData);
+		}
+		
+		var theMinData = {};
+		theMinData.label = l['Min'];
+		theMinData.fill = false;
+		theMinData.pointRadius = 5;
+		theMinData.borderDash = [5, 5];
+		theMinData.backgroundColor = kimbleChart.colours.blue;
+		theMinData.borderColor = kimbleChart.colours.blue;
+		theMinData.data = rangeData['Min'];
+		theMinData.lineTension = 0;	
+		theChartData.push(theMinData);
+		
+		var theMaxData = {};
+		theMaxData.label = l['Max'];
+		theMaxData.fill = false;
+		theMaxData.pointRadius = 5;
+		theMaxData.borderDash = [5, 5];
+		theMaxData.backgroundColor = kimbleChart.colours.red;
+		theMaxData.borderColor = kimbleChart.colours.red;
+		theMaxData.data = rangeData['Max'];
+		theMaxData.lineTension = 0;	
+		theChartData.push(theMaxData);
+		
+		var theAvgData = {};
+		theAvgData.label = l['Average'];
+		theAvgData.fill = false;
+		theAvgData.pointRadius = 5;
+		theAvgData.borderDash = [5, 5];
+		theAvgData.backgroundColor = kimbleChart.colours.grey;
+		theAvgData.borderColor = kimbleChart.colours.grey;
+		theAvgData.data = rangeData['Average'];
+		theAvgData.cubicInterpolationMode = 'monotone';
+		theChartData.push(theAvgData);
+		
+		var config = {
+			type: 'line',
+			data: {
+				labels: xAxisLabels,
+				datasets: theChartData
+			},
+			options: {
+				maintainAspectRatio: false,
+				responsive: true,
+				title: {
+					display: true,
+					text: chartLabel,
+					fontSize: 18,
+					padding: 20
+				},
+				scales: {
+	                xAxes: [{
+	                    ticks: {
+	                        fontSize: 18
+	                    }
+	                }],
+	                yAxes: [{
+	                    ticks: {
+	                        fontSize: 18,
+	                        min: 0,
+	                        stepSize: 10
+	                    }
+	                }]
+	            },
+				legend: {
+					labels: {
+                        fontSize: 16
+                    },
+                    position: 'bottom'
+				},
+			}
+		};
+		
+		if(probabilityCode == 'P1') window.forecastAccuracyChartP1 = new Chart(ctx, config);
+		else if(probabilityCode == 'P2') window.forecastAccuracyChartP2 = new Chart(ctx, config);
+		else if(probabilityCode == 'P3') window.forecastAccuracyChartP3 = new Chart(ctx, config);
+	}
+	
+	function getNarrativeItemHtml(narrativeItem)
+	{
+		var html = '';
+		
+		html += '<div class="n-item ' + narrativeItem.StyleClass + ' ' + narrativeItem.EnumVal + (narrativeItem.IsHeadline ? ' headline' : '') + '">';
+		html += '<span>' + narrativeItem.Narrative + '</span>';
+		html += '</div>'; 
+		
+		return html;
+	}
+	
+	function populateForecastAnalysisNarrative(fact, probabilityCode)
+	{
+		var html = '';
+
+		if (theForecastAnalysis.TheAnalysisFactItems[fact].TheProbabilityCodeItems[probabilityCode] != undefined)
+		{
+			var overallNarratives = theForecastAnalysis.TheAnalysisFactItems[fact].TheProbabilityCodeItems[probabilityCode].TheOverallNarrative;
+			
+			for(var narrativeCounter = 0; narrativeCounter < overallNarratives.length; narrativeCounter++)
+			{
+				html += getNarrativeItemHtml(overallNarratives[narrativeCounter]);
+			}
+	
+			for(var periodCounter = 0; periodCounter < theForecastAnalysis.ThePeriods.length; periodCounter++)
+			{
+				var periodId = theForecastAnalysis.ThePeriods[periodCounter].Id;
+	
+				var theCurrentPeriodAnalysisFunctionItems = theForecastAnalysis.TheAnalysisFactItems[fact].TheProbabilityCodeItems[probabilityCode].ThePeriodAnalysisFunctionItems[periodId];
+	
+				if(theCurrentPeriodAnalysisFunctionItems != undefined)
+				{
+					for(var narrativeCounter = 0; narrativeCounter < theCurrentPeriodAnalysisFunctionItems.TheNarrative.length; narrativeCounter++)
+					{
+						html += getNarrativeItemHtml(theCurrentPeriodAnalysisFunctionItems.TheNarrative[narrativeCounter]);
+					}
+				}
+			}		
+		}	
+
+		if(probabilityCode == 'P1') jQuery('.narrative-container.p1-narrative .scrollable-container').html(html);
+		else if(probabilityCode == 'P2') jQuery('.narrative-container.p2-narrative .scrollable-container').html(html);
+		else if(probabilityCode == 'P3') jQuery('.narrative-container.p3-narrative .scrollable-container').html(html);
+	}
+	
+	jQuery(document).ready(function()
+	{							
+		initialise();		
+	});
+	
+	function initialise()
+	{
+		l['FACCP1Title'] = fAccChartLabel.format('P1');
+		l['FACCP2Title'] = fAccChartLabel.format('P2');
+		l['FACCP3Title'] = fAccChartLabel.format('P3');
+		l['FCONP1Title'] = fConChartLabel.format('P1');
+		l['FCONP2Title'] = fConChartLabel.format('P2');
+		l['FCONP3Title'] = fConChartLabel.format('P3');
+		
+		initialiseActions();
+	}
+	
+	jQuery(window).load(function(){
+		// done within load rather than ready as requires site master to be complete
+		getAnalysis();
+	});
+	
+	function getAnalysis()
+	{
+		if(analysisScope == 'F_ACC')
+			getTheForecastAnalysis();
+		else
+			getTheForecastConfidence();
+	}
+	
+	function initialiseActions()
+	{
+		jQuery(document).off('change', '#forecastStatus, #analysisFact, #businessUnit').on('change', '#forecastStatus, #analysisFact, #businessUnit', getAnalysis);
+	}
+</script>
+
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

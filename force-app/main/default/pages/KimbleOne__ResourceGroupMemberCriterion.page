@@ -1,0 +1,305 @@
+<apex:page id="ResourceGroupMemberCriterion" controller="KimbleOne.ResourceGroupMemberCriterionController" extensions="KimbleOne.TooltipsController" sidebar="false">
+
+    <apex:composition template="KimbleOne__SiteMaster">
+
+        <apex:define name="Menu">
+            <c:Menu rendered="{!!ISBLANK(resourceGroupId)}" MenuContextType="Resource" MenuContextId="{!resourceGroupId}" MenuContextName="{!theResourceGroup.Name}"/>
+        </apex:define>
+
+        <apex:define name="Content">
+
+            <!-- Kimble Guidance -->
+            <apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+            <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+            <apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+                <apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/ResGrpMmbrCriterionNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+                <apex:outputPanel layout="none" rendered="{!ResGrpMmbrCriterionTipOverrideEnabled}">
+                    <apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+                </apex:outputPanel>
+            </apex:outputPanel>
+            
+            <apex:form >
+                <apex:pageBlock mode="edit" id="theResourceGroup">
+                    <apex:pageMessages id="ResourceGroupMemberCriterionErrors" escape="false"/>
+                    <apex:pageBlockButtons location="top">
+                        <apex:commandButton id="save" value="{!$Label.kimbleone__save}" action="{!SaveResourceGroup}" rendered="{!$ObjectType.KimbleOne__Resource__c.updateable}"/>
+                        <apex:commandButton id="saveAndClose" value="{!$Label.kimbleone__saveandclose}" action="{!SaveAndClose}" rendered="{!$ObjectType.KimbleOne__Resource__c.updateable}"/>
+                        <apex:commandButton id="refreshCriteria" action="{!ReEvaluateAllGroupCriteria}" value="{!$Label.kimbleone__reevaulateresourcegroupcriteria}" rendered="{!theResourceGroup.KimbleOne__ResourceGroupInclusionMode__c != ManualId && $ObjectType.KimbleOne__ResourceGroupMember__c.updateable && $ObjectType.KimbleOne__ResourceGroupMember__c.createable && $ObjectType.KimbleOne__ResourceGroupMember__c.deletable}"/>
+                    </apex:pageBlockButtons>
+
+                    <apex:pageBlockSection columns="2">
+
+                        <apex:inputField styleClass="group-name-input" id="name" value="{!theResourceGroup.Name}" required="true"/>
+                        
+                        <apex:pageBlockSectionItem >
+                            <apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.fields.KimbleOne__ResourceGroupInclusionMode__c.label}"/>
+                            <apex:outputPanel id="inclusionModeSelect">
+                                <div class="requiredInput">
+                                    <div class="requiredBlock"></div>
+                                    <apex:selectList value="{!theResourceGroup.KimbleOne__ResourceGroupInclusionMode__c}" size="1" >
+                                        <apex:selectOptions value="{!inclusionModeOptions}"/>
+                                        <apex:actionSupport event="onchange" reRender="theMembers,memberCriteria"/>
+                                    </apex:selectList>
+                                </div>
+                            </apex:outputPanel>
+                        </apex:pageBlockSectionItem>
+                        
+                    </apex:pageBlockSection>
+                </apex:pageBlock>
+            </apex:form>
+
+            <apex:form >
+
+                <apex:outputPanel id="theMembers">
+                    <apex:pageBlock >
+                    <apex:pageBlockTable value="{!groupMembers}" var="gM">
+                        <apex:column headerClass="action-label" headerValue="{!$Label.kimbleone__actionlinksheader}">
+                            <apex:outputPanel rendered="{!$ObjectType.KimbleOne__ResourceGroupMember__c.deletable && theResourceGroup.KimbleOne__ResourceGroupInclusionMode__c != AutomatcallyAddAndRemoveId}">
+                                <a href="javascript:void(0);" onclick="delResourceGroupMember('{!JSINHTMLENCODE(gM.Id)}')">{!$Label.Remove}</a>
+                                &nbsp;|&nbsp;
+                            </apex:outputPanel>
+                            <apex:outputPanel rendered="{!$ObjectType.KimbleOne__ResourceGroupMember__c.updateable}">
+                                <a href="javascript:initialiseModalBoxy('#ResourceGroupMemberPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__ResourceGroupMember__c.label}');editResourceGroupMember('{!JSINHTMLENCODE(gM.Id)}','');">{!$Label.kimbleone__edit}</a>
+                            </apex:outputPanel>
+                        </apex:column>
+                        <apex:column headerClass="member-label" headerValue="{!$ObjectType.KimbleOne__ResourceGroupMember__c.fields.KimbleOne__ChildResource__c.Label}">
+                            <apex:outputField value="{!gM.KimbleOne__ChildResource__c}"/>
+                        </apex:column>
+                        <apex:column headerClass="start-date-label" headerValue="{!$ObjectType.KimbleOne__ResourceGroupMember__c.fields.KimbleOne__StartDate__c.Label}">
+                            <apex:outputField value="{!gM.KimbleOne__StartDate__c}"/>
+                        </apex:column>
+                        <apex:column headerClass="end-date-label" headerValue="{!$ObjectType.KimbleOne__ResourceGroupMember__c.fields.KimbleOne__EndDate__c.Label}">
+                            <apex:outputField value="{!gM.KimbleOne__EndDate__c}"/>
+                        </apex:column>
+                    </apex:pageBlockTable>
+                    </apex:pageBlock>
+
+                    <apex:actionFunction action="{!getResourceGroupMember}" name="editResourceGroupMember" rerender="theMembers,ResourceGroupMember" oncomplete="showModalBoxy();SetupDatePicker();jQuery(':focus').blur()">
+                        <apex:param name="rgmid" value="" />
+                    </apex:actionFunction>
+
+                    <apex:actionFunction action="{!DeleteResourceGroupMember}" name="delResourceGroupMember" rerender="theMembers">
+                        <apex:param name="rgmid" value="" />
+                    </apex:actionFunction>
+
+                </apex:outputPanel>
+
+            </apex:form>
+
+            <apex:outputPanel id="memberCriteria">
+            <apex:form >
+                    <apex:pageBlock rendered="{!theResourceGroup.KimbleOne__ResourceGroupInclusionMode__c != ManualId}">
+                        <apex:pageBlockButtons location="top">
+                            <apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ResourceGroupMembershipCriterion__c.createable}">
+                                <input type="button" class="btn"
+                                       value="{!$Label.New} {!$ObjectType.KimbleOne__ResourceGroupMembershipCriterion__c.Label}"
+                                       onclick="initialiseModalBoxy('#ResourceGroupCriterionPopup', '{!JSENCODE($Label.New)} {!$ObjectType.KimbleOne__ResourceGroupMembershipCriterion__c.Label}'); showModalBoxy(); initialisePageTips();"></input>
+                            </apex:outputPanel>
+                        </apex:pageBlockButtons>
+
+
+                        <apex:pageBlockTable value="{!theCriteria}" var="crit">
+                            <apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+                                <apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ResourceGroupMembershipCriterion__c.deletable}">
+                                    <a href="javascript:void(0); var d = confirmDelete();if(!d) return;" onclick="delResourceGroupCriteria('{!JSINHTMLENCODE(crit.Id)}')">{!$Label.kimbleone__delete}</a>
+                                </apex:outputPanel>
+                            </apex:column>
+                            <apex:column headerValue="{!$ObjectType.KimbleOne__ResourceGroupMembershipCriterion__c.Label}">
+                                <apex:outputText value="{!displayInfoMap[crit.Id].pathLabel}"/>
+                            </apex:column>
+                            <apex:column headerValue="{!$ObjectType.KimbleOne__ResourceGroupMembershipCriterion__c.fields.KimbleOne__Operator__c.Label}" >
+                                <apex:outputField value="{!crit.Operator__r.Name}" />
+                            </apex:column>
+                            <apex:column headerClass="value-label" headerValue="{!$Label.kimbleone__valuelabel}">
+                                <apex:outputText value="{!displayInfoMap[crit.Id].pathValue}" rendered="{!!fieldIsBoolean[crit.KimbleOne__FieldName__c]}"/>
+                                <apex:outputField value="{!displayInfoMap[crit.Id].uiCon.InputCheckbox__c}" rendered="{!fieldIsBoolean[crit.KimbleOne__FieldName__c]}"/>
+                            </apex:column>
+                        </apex:pageBlockTable>
+                    </apex:pageBlock>
+
+                <apex:actionFunction action="{!DeleteResourceGroupMembershipCriterion}" name="delResourceGroupCriteria" rerender="memberCriteria,ResourceGroupMemberCriterionErrors">
+                    <apex:param name="rgmcid" value="" />
+                </apex:actionFunction>
+
+            </apex:form>
+
+            </apex:outputPanel>
+
+            <div id="ResourceGroupMemberPopup" style="display: none">
+
+                <apex:outputPanel id="ResourceGroupMember">
+
+                    <apex:form >
+
+                        <apex:pageBlock >
+
+                            <div id="EditResourceGroupMemberErrors">
+                                <apex:pageMessages escape="false"/>
+                            </div>
+
+                            <apex:pageBlockButtons location="bottom">
+                                <apex:commandButton styleClass="DisableButtonWhileBusy" rendered="{!$ObjectType.KimbleOne__ResourceGroupMember__c.updateable}" action="{!saveResourceGroupMember}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#EditResourceGroupMemberErrors');SetupDatePicker();" reRender="theMembers, ResourceGroupMember,EditResourceGroupMemberErrors,ResourceGroupMemberCriterionErrors" />
+                                <input class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}" />
+                            </apex:pageBlockButtons>
+
+                            <apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+
+                                <apex:outputField value="{!ResourceGroupMember.KimbleOne__ChildResource__c}"/>
+
+                                <apex:inputField value="{!ResourceGroupMember.KimbleOne__StartDate__c}" styleclass="kimbleDatePicker "/>
+
+                                <apex:inputField value="{!ResourceGroupMember.KimbleOne__EndDate__c}" styleclass="kimbleDatePicker "/>
+
+                            </apex:pageblockSection>
+
+                        </apex:pageBlock>
+
+                    </apex:form>
+
+                </apex:outputPanel>
+
+            </div>
+
+            <div id="ResourceGroupCriterionPopup" style="display: none">
+                <apex:outputPanel id="ResourceGroupCriterion">
+
+                    <apex:form id="TheForm2">
+
+                        <apex:outputPanel style="width:500px;" layout="block">
+
+                            <apex:outputPanel id="Errorpanel2">
+                                <div id="resourceGroupCriterionValueErrors">
+                                    <apex:pageMessages escape="false"/>
+                                </div>
+                            </apex:outputPanel>
+
+                            <apex:pageBlock >
+
+                                <apex:pageBlockButtons location="bottom">
+                                    <apex:commandButton action="{!SaveResourceGroupMembershipCriterion}"
+                                                        value="{!$Label.kimbleone__save}"
+                                                        oncomplete="hideModalBoxyWithErrorCheck('#resourceGroupCriterionValueErrors');"
+                                                        reRender="Errorpanel2, memberCriteria,ResourceGroupCriterion" styleclass="SaveButton"
+                                                        styleClass="DisableButtonWhileBusy"
+                                                        rendered="{!$ObjectType.KimbleOne__ResourceGroupMembershipCriterion__c.updateable}"/>
+                                    <input class="btn" type="button" onclick="hideModalBoxy();"
+                                           value="{!$Label.Cancel}"/>
+                                </apex:pageBlockButtons>
+
+
+                                <apex:pageblockSection collapsible="false" showheader="false" columns="2">
+                            <apex:pageBlockSectionItem >
+                            <apex:outputLabel value="{!$ObjectType.KimbleOne__ResourceGroupMembershipCriterion__c.Label}"/>
+                            <apex:outputPanel >
+                                <apex:outputPanel styleClass="requiredInput" layout="block">
+                                    <apex:outputPanel styleClass="requiredBlock" layout="block"/>
+                                    <apex:selectList id="criterionSelect" value="{!selectedCriterion}" size="1" >
+                                        <apex:selectOptions value="{!criterionOptions}"/>
+                                        <apex:actionSupport event="onchange" action="{!updateOptionFieldPath}" reRender="theInput" onComplete="initialisePageTips();"/>
+                                    </apex:selectList>
+                                </apex:outputPanel>
+                            </apex:outputPanel>
+                            </apex:pageBlockSectionItem>
+                            </apex:pageblockSection>
+
+                            <apex:outputPanel id="theInput">
+                            <apex:pageblockSection collapsible="false" showheader="false" columns="2">
+                                <apex:pageBlockSectionItem rendered="{!!ISBLANK(criterionOptionFieldPath) && criterionUpdateable}">
+                                    <apex:outputLabel value="{!$ObjectType.KimbleOne__ResourceGroupMembershipCriterion__c.Fields.KimbleOne__Value__c.Label}" />
+                                    <apex:outputPanel layout="block">
+                                        <apex:inputField value="{!dummyResource[criterionOptionFieldPath]}" required="false"/>
+                                    </apex:outputPanel>
+                                </apex:pageBlockSectionItem>
+
+                                <apex:pageBlockSectionItem rendered="{!!ISBLANK(criterionOptionFieldPath) && !criterionUpdateable && !criterionIsBoolean}">
+                                    <apex:outputLabel value="{!$ObjectType.KimbleOne__ResourceGroupMembershipCriterion__c.Fields.KimbleOne__Value__c.Label}" />
+                                    <apex:outputPanel layout="block">
+                                        <apex:inputText value="{!criterionStringInput}"/>
+                                    </apex:outputPanel>
+                                </apex:pageBlockSectionItem>
+
+                                <apex:pageBlockSectionItem rendered="{!!ISBLANK(criterionOptionFieldPath) && !criterionUpdateable && criterionIsBoolean}">
+                                    <apex:outputLabel value="{!$ObjectType.KimbleOne__ResourceGroupMembershipCriterion__c.Fields.KimbleOne__Value__c.Label}" />
+                                    <apex:outputPanel layout="block">
+                                        <apex:inputCheckbox value="{!criterionCheckboxInput}"/>
+                                    </apex:outputPanel>
+                                </apex:pageBlockSectionItem>
+                            </apex:pageblockSection>
+                            </apex:outputPanel>
+                            </apex:pageBlock>
+                        </apex:outputPanel>
+
+                        <apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+
+                    </apex:form>
+                </apex:outputPanel>
+            </div>
+
+            <div style="display:none;" kimble-tip="null"></div>
+
+            <script>
+
+            function SetupDatePicker()
+            {
+                jQuery('.kimbleDatePicker').datepicker({
+                    dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+                    showOtherMonths: true,
+                    selectOtherMonths: true
+                });
+            }
+
+            jQuery(window).load(function()
+            {
+                initialisePageTips();
+            });
+
+            /* Tooltips */
+            var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+            var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+            var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+            var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+            var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+            var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+        
+            function initialisePageTips()
+            {
+                ApplyTipAttributes();
+                initialiseTips();
+            }
+            
+            // add tip attributes to elements
+            function ApplyTipAttributes()
+            {
+                if(enableTips)
+                {
+                    jQuery('[id$="inclusionModeSelect"]').attr('kimble-tip','InclusionMode').attr('kimble-tip-extended-text','InclusionModeExtendedText').addClass('tip-top').attr('kimble-tip-help-link','PageHelp');
+                    jQuery('[id$="criterionSelect"]').attr('kimble-tip','ResGrpMpCriterion').attr('kimble-tip-help-link','PageHelp');
+                    jQuery('[id$="theInput"]').attr('kimble-tip','Value').addClass('tip-top').attr('kimble-tip-help-link','PageHelp').addClass('tip-left');
+                }
+            }
+            
+            function updateTipsConfigSetting(newTipSetting)
+            {
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+                    newTipSetting,
+                        function(result, event){
+                            if (event.status)
+                            {
+                                var data = {};
+                                data.results = result;
+                                loadGuidance();
+                            }
+                            else
+                            {
+                                alert(event.message);
+                            }
+                    },
+                    {escape: false, timeout: 60000}
+                );
+            }
+
+            </script>
+        </apex:define>
+    </apex:composition>
+</apex:page>

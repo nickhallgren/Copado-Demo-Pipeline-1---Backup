@@ -1,0 +1,495 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.DeliveryGroupEditController" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+    <c:Menu DefaultHelpPage="EngagementScope.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryGroup__c.Id}" MenuContextName="{!KimbleOne__DeliveryGroup__c.Name}"/>
+
+</apex:define>
+  
+<apex:define name="Content">
+
+    <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+    <apex:pageMessages escape="false"/>
+    
+    <style>
+        table.element-table {
+            width: 100%;
+            background-color: white;
+            padding-top: 5px;           
+        }
+        table.element-table tr.dataRow:hover {
+            background-color: #e3feff;
+        }
+        .headerRow.fixed-width {
+            width: 120px;
+        }
+        .tool-tip-info {
+            color: #428BCA;
+        }
+        .inline-ind {
+            font-size: 14px;
+            margin-left: 3px;
+        }
+        i.reorder-itm {
+            font-size: 16px;
+            color: #8b8b8b;
+        }
+        th.reordererHead {
+            display: none;
+        }
+        td.reorderer {
+            cursor: pointer;
+            display: none;
+        }
+        tr.ele-container:hover td {
+            background-color: #e1f6ff;
+        }   
+        i.status-ind {
+            font-size: 18px;
+            cursor: pointer;
+            margin-left: 15px;
+        }
+        i.status-ind.disabled {
+            color: #8b8b8b;
+            cursor: not-allowed;
+        }
+        tr.ele-container.Closed {
+            background-color: #ededed;
+        }
+        tr.ele-container.Archived {
+            background-color: #dadada;
+        }
+        tr.ele-container.Closed td {
+            border-color: white;
+        }
+        .element-table tr:not(:first-child).primary-row td {
+            border-top: 2px solid #D6D6D6 !important;
+        }
+        #data-loading {
+            text-align: center;
+            font-size: 200px;
+            color: #d3d3d3;
+            position: absolute;
+            filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+            -moz-opacity: 0.7;
+            -khtml-opacity: 0.7;
+            opacity: 0.7;
+            z-index: 1000;
+            background-color: #fff;
+            height: calc(100% - 160px);
+            width: calc(100% - 320px);
+            padding: 100px 50px 0px 50px;
+        }
+            
+        /* toolbar styling */
+        .toolbar-container {
+            position: relative;
+            background-color: #f8f8f8;
+            padding: 6px;
+            margin-bottom: 5px;
+            height: 26px;
+        }
+        .toolbar {
+            display: table;
+            width: 100%;
+        }
+        div#toolbar-buttons {
+            display: table-cell;
+            position: relative;
+            float: right;
+        }
+        a.toolbar-button {
+            display: inline-block;
+            padding: 6px 10px 6px 10px;
+            background-color: white;
+            margin-right: 4px;
+            border: 1px solid #ccc;
+            border-radius: 2px;
+        }
+        a.toolbar-button.active-toolbar-button {
+            color: white;
+            background-color: #888;
+        }       
+        a.toolbar-button:hover {
+            text-decoration: none;
+            color: white;
+            background-color: #1A9EFF;
+        }
+        a.toolbar-button.button-left {
+            border-top-right-radius: 0px;
+            border-bottom-right-radius: 0px;
+            margin-right: 0px;
+        }
+        a.toolbar-button.button-middle {
+            border-radius: 0px;
+            border-left: 0;
+            margin-right: 0px;
+        }
+        a.toolbar-button.button-right {
+            border-top-left-radius: 0px;
+            border-left: 0;
+            border-bottom-left-radius: 0px;
+        }
+        a.toolbar-button .fa {font-size: 14px;}
+        a.toolbar-button.disabled {background-color: #ccc;color: darkgray;}
+        a.toolbar-button.disabled:hover {background-color: #ccc;color: darkgray;}
+        #saveButton.has-changes {
+            background-color: #ffa500;
+        }
+        .auto-save-toggle-container .undecorated-link {
+            cursor: pointer;
+        }       
+    </style>
+
+    <div class="toolbar-container">
+        <div class="toolbar">
+            <div id="toolbar-buttons">
+                <div class="auto-save-toggle-container">
+                    <a id="saveButton" title="{!$Label.Save}" class="toolbar-button" href="#"><i class="fa fa-save"></i></a>
+                    <span class="undecorated-link" onclick="autoSave(false)">{!JSENCODE($Label.AutoSaveOffLabel)}</span>
+                    <span id="autoSaveMode" onclick="toggleAutoSave()" class="k-tgl fa fa-toggle-on"></span>
+                    <span class="undecorated-link" onclick="autoSave(true)">{!JSENCODE($Label.On)}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+        
+    <div id="all-elements-container">
+        <div id="data-loading" class="hidden-item"><i class="fa fa-circle-o-notch fa-spin"></i></div>
+        <table class="list element-table kimble-enhanced-table cardBodyTable" border="0" cellpadding="0" cellspacing="0">
+            <thead>
+                <tr class="headerRow">
+                    <th class="headerRow reordererHead"><h2></h2></th> <!-- reorder -->
+                    <th class="headerRow"><h2></h2></th> <!-- probability -->
+                    <apex:outputPanel layout="none" rendered="{!HasChangeOrders}">
+                    <th class="headerRow fixed-width"><h2>{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ChangeOrder__c.Label}</h2></th>
+                    </apex:outputPanel>
+                    <th class="headerRow"><h2>{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.Name.Label}</h2></th>
+                    <apex:outputPanel layout="none" rendered="{!HasReferences}">
+                    <th class="headerRow fixed-width"><h2>{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__Reference__c.Label}</h2></th>
+                    </apex:outputPanel>
+                    <th class="headerRow fixed-width"><h2>{!$ObjectType.DeliveryElement__c.Fields.StartDate__c.Label}</h2></th>
+                    <th class="headerRow fixed-width"><h2>{!$ObjectType.DeliveryElement__c.Fields.EndDate__c.Label}</h2></th>
+                    <th class="headerRow"><h2>{!ClosedLabel}</h2><i class="inline-ind tool-tip-info fa fa-info-circle" title="{!JSENCODE(ClosedNarrative)}"></i></th>
+                    <th class="headerRow"><h2>{!ArchivedLabel}</h2><i class="inline-ind tool-tip-info fa fa-info-circle" title="{!JSENCODE(ArchivedNarrative)}"></i></th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>    
+    </div>
+
+<script>
+    var deliveryGroupId = '{!JSENCODE(DeliveryGroupId)}';
+    var theGroupElements;
+    var theElementsMap = {};
+    var theChangedElementsMap = {};
+    
+    var l = {};
+    var dragDropLabel = '{!JSENCODE($Label.DragAndDropToReorderLabel)}';
+    l['ChangeStatus'] = '{!JSENCODE($Label.ClickToChangeStatus)}';
+    l['ChangePrimaryStatusDisabled'] = '{!JSENCODE($Label.CannotChangePrimaryElementStatus)}';
+    l['ChangeSecondaryStatusDisabled'] = '{!JSENCODE($Label.CannotChangeSecondaryElementStatus)}';
+    
+    function getTheGroupElements()
+    {
+        jQuery('#data-loading').toggleClass('hidden-item');
+    
+        Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupEditController.GetElements}',
+            deliveryGroupId,
+                function(result, event){          
+                    if (event.status) 
+                    {
+                        theGroupElements = result;
+        
+                        populateElementTable();
+                    } 
+                    else 
+                    {
+                        alert(event.message);
+                    }
+                    jQuery('#data-loading').toggleClass('hidden-item');
+                    resetListChanged();
+            },  
+         {escape: true, timeout: 60000});
+    }
+
+    function saveChangedElements()
+    {
+        clearTimer();
+        
+        var theChangedElements = [];
+        
+        theChangedElements = Object.keys(theChangedElementsMap).map(function(e) {return theChangedElementsMap[e]});
+        
+        if(theChangedElements.length > 0)
+        {
+            jQuery('#data-loading').toggleClass('hidden-item');
+
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupEditController.SaveElements}',
+                deliveryGroupId, theChangedElements,
+                    function(result, event){          
+                        if (event.status) 
+                        {
+                            theGroupElements = result;
+            
+                            populateElementTable();
+                        } 
+                        else 
+                        {
+                            alert(event.message);
+                        }
+                        jQuery('#data-loading').toggleClass('hidden-item');
+                        resetListChanged();
+             },     
+             {escape: true, timeout: 60000});
+         }
+    }
+    
+    function getElementHtml(theElement)
+    {
+        var html = '';
+        html += '<tr class="ele-container' + (theElement.IsPrimary ? ' primary-row' : ' secondary-row') + (theElement.Status != '' ? ' ' + theElement.Status : '') + '" ele-id="' + theElement.ElementId + '"' + (!theElement.IsPrimary ? ' primary-ele-id="' + theElement.PrimaryElementId + '"' : '') + ' ele-ds="' + theElement.DisplaySequence + '">';
+        
+            html += '<td class="reorderer">';
+                html += '<i seq="' + theElement.DisplaySequence + '" class="reorder-itm fa fa-ellipsis-v"></i>';
+            html += '</td>';
+
+            html += '<td class="probability">';
+                html += '<i class="kimble-probability fa ' + (theElement.ForecastStatusNameIsDelivery ? 'fa-exclamation-triangle ' : 'fa-square ' + theElement.ForecastStatusStyle) + '" title="' + theElement.ForecastStatusName + '"></i>';
+            html += '</td>';
+
+<apex:outputPanel layout="none" rendered="{!HasChangeOrders}">
+            html += '<td class="change-name">';
+                if(theElement.ChangeReference != '') html += theElement.ChangeReference;
+            html += '</td>';
+</apex:outputPanel>
+
+            html += '<td class="ele-name">';
+                html += theElement.Name;
+            html += '</td>';
+
+<apex:outputPanel layout="none" rendered="{!HasReferences}">
+            html += '<td class="ref-name">';
+                if(theElement.Reference != '') html += theElement.Reference;
+            html += '</td>';
+</apex:outputPanel>
+
+            html += '<td class="start-date">';
+                html += kimble.formatDate(theElement.StartDateUTC);
+            html += '</td>';
+
+            html += '<td class="end-date">';
+                html += kimble.formatDate(theElement.EndDateUTC);
+            html += '</td>';
+
+            html += '<td class="closed-ind">';
+                if(theElement.Status != 'Closed') 
+                    html += '<i class="status-ind fa fa-square-o"></i>';
+                else if(theElement.Status == 'Closed')
+                    html += '<i class="status-ind fa fa-check-square"></i>';
+            html += '</td>';
+
+            html += '<td class="archived-ind">';
+                if(theElement.Status != 'Archived') 
+                    html += '<i class="status-ind fa fa-square-o"></i>';
+                else if(theElement.Status == 'Archived')
+                    html += '<i class="status-ind fa fa-check-square"></i>';
+            html += '</td>';
+
+        html += '</tr>';
+        
+        theElementsMap[theElement.ElementId] = theElement;
+        
+        return html;
+    }
+    
+    function getElementsHtml(elementsArray)
+    {
+        var html = '';
+        var elementsLength = elementsArray.length;
+        
+        for(var i=0; i < elementsLength;i++)
+        {
+            var theElement = elementsArray[i];
+                        
+            html += getElementHtml(theElement);
+            
+            if(theElement.TheChangeRequestElements != undefined && theElement.TheChangeRequestElements.length) html += getElementsHtml(theElement.TheChangeRequestElements);
+        }
+        
+        return html;
+    }
+    
+    function getAllElementsHtml()
+    {
+        var html = '';
+        html += '<table class="list">';
+        
+        if(theGroupElements != undefined && theGroupElements.TheElements.length)
+        {
+            html += getElementsHtml(theGroupElements.TheElements);
+        }
+        html += '</table>';
+        return html;
+    }
+    
+    function populateElementTable()
+    {
+        jQuery('.element-table tbody').html(getAllElementsHtml());
+        
+        initialiseDynamicElements();
+    }
+    
+    function initialiseDynamicElements()
+    {
+        if(jQuery('.kimble-enhanced-table').length && jQuery('div.table-filter').length == 0) jQuery('.kimble-enhanced-table').enhancedTable();
+    
+        //TODO128: commented until ready to implement sort order drag drop (need to unhide the re-order indicators too)
+        //jQuery('.element-table tbody').sortable({handle: 'td:first'}).disableSelection();
+        
+        //repeat any active filter
+        if(jQuery('input.table-filter-term').val().length) searchTable(jQuery('input.table-filter-term'));
+        
+        setParentElementStatusCheckboxes();
+    }
+    
+    function initialiseTooltips()
+    {
+        jQuery('.reorderer').prop('title', l['DragAndDrop']);
+        jQuery('.status-ind:not(.disabled)').prop('title', l['ChangeStatus']);
+        jQuery('.primary-row .status-ind.disabled').prop('title', l['ChangePrimaryStatusDisabled']);
+        jQuery('.secondary-row .status-ind.disabled').prop('title', l['ChangeSecondaryStatusDisabled']);
+    }
+
+    jQuery(document).ready(function()
+    {                           
+        initialise();       
+    });
+    
+    function initialise()
+    {
+        l['DragAndDrop'] = dragDropLabel.format(['Delivery Elements']);
+        
+        initialiseActions();
+    }
+    
+    jQuery(window).load(function(){
+        // done within load rather than ready as requires site master to be complete
+        getTheGroupElements();
+    });
+    
+    function initialiseActions()
+    {
+        jQuery(document).off('click', '.status-ind:not(.disabled)').on('click', '.status-ind:not(.disabled)', toggleStatus);
+        jQuery(document).off('click', '#saveButton').on('click', '#saveButton', saveChangedElements);
+    }
+    
+    function toggleStatus()
+    {
+        var statusInd = jQuery(this);
+        var theRow = statusInd.closest('tr');
+        var theElementId = theRow.attr('ele-id');
+        var theElement = theElementsMap[theElementId];
+        
+        theRow.removeClass('Closed').removeClass('Archived');
+        
+        if(statusInd.parent('td').hasClass('closed-ind'))
+        {
+            statusInd.toggleClass('fa-square-o');
+            statusInd.toggleClass('fa-check-square');
+            
+            theRow.find('td.archived-ind i').addClass('fa-square-o').removeClass('fa-check-square');
+            if(statusInd.hasClass('fa-check-square')) theRow.addClass('Closed').removeClass('Archived');
+        }
+        else if(statusInd.parent('td').hasClass('archived-ind'))
+        {
+            statusInd.toggleClass('fa-square-o');
+            statusInd.toggleClass('fa-check-square');
+            
+            theRow.find('td.closed-ind i').addClass('fa-square-o').removeClass('fa-check-square');
+            if(statusInd.hasClass('fa-check-square')) theRow.addClass('Archived').removeClass('Closed');
+        }
+        
+        theElement.Status = (theRow.hasClass('Archived') ? 'Archived' : (theRow.hasClass('Closed') ? 'Closed' : ''));
+        theChangedElementsMap[theElementId] = theElement;
+        
+        setParentElementStatusCheckboxes();
+        listChanged();
+    }
+    
+    function setParentElementStatusCheckboxes()
+    {
+        jQuery('.status-ind').removeClass('disabled');
+
+        /* prevent close/archive of parents who have active children */
+        jQuery('.ele-container.secondary-row:not(.Archived):not(.Closed)').each(function(){
+            var theElement = jQuery(this);
+            var primaryElementId = theElement.attr('primary-ele-id');
+            jQuery('.ele-container.primary-row[ele-id="' + primaryElementId + '"] .status-ind').addClass('disabled');
+        });
+
+        /* prevent revert of close/archive of children who have closed/archived parents */
+        jQuery('.ele-container.secondary-row.Closed, .ele-container.secondary-row.Archived').each(function(){
+            var theElement = jQuery(this);
+            // if the relevant primary element is closed/archived then prevent changing my status
+            var primaryElementId = theElement.attr('primary-ele-id');
+            theElement.find('.status-ind.fa-check-square').toggleClass('disabled', (jQuery('.ele-container.primary-row[ele-id="' + primaryElementId + '"].Archived').length > 0) || (jQuery('.ele-container.primary-row[ele-id="' + primaryElementId + '"].Closed').length > 0));
+        });
+        
+        initialiseTooltips();
+    }
+
+    var saveTimer;
+    
+    function listChanged()
+    {
+        jQuery(window).off('.has-changes').on('beforeunload.has-changes', function(){
+            return kimble.labels['UnsavedChangesHeading'] + "\n\n" + kimble.labels['UnsavedChangesMessage']; 
+        });
+
+        clearTimer();
+        
+        if(autoSaveInd)
+        {
+            saveTimer = setTimeout(saveChangedElements, 2000);
+        }
+        
+        jQuery('#saveButton').addClass('has-changes');
+    }
+        
+    function clearTimer()
+    {
+        clearTimeout(saveTimer);
+    }
+
+    function resetListChanged()
+    {
+        jQuery(window).off('.has-changes');
+        jQuery('#saveButton').removeClass('has-changes');
+    }
+
+    var autoSaveInd = true;
+    
+    function toggleAutoSave() {
+        if(autoSaveInd) clearTimer();
+
+        autoSaveInd = !autoSaveInd;
+        jQuery("#autoSaveMode").toggleClass('fa-toggle-off').toggleClass('fa-toggle-on');
+    }
+    
+    function autoSave(autoSaveIndIn) {
+        if(autoSaveInd) clearTimer();
+
+        autoSaveInd = autoSaveIndIn;
+        jQuery("#autoSaveMode").toggleClass('fa-toggle-off', !autoSaveInd).toggleClass('fa-toggle-on', autoSaveIndIn);          
+    }   
+</script>
+
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

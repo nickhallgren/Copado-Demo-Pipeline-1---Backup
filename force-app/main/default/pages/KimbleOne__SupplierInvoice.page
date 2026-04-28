@@ -1,0 +1,247 @@
+<apex:page standardController="KimbleOne__SupplierInvoice__c" extensions="KimbleOne.SupplierInvoiceController,KimbleOne.FilesAndAttachmentsController,KimbleOne.SecurityController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__SupplierInvoice__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+	<apex:define name="Menu">
+
+		<c:Menu MenuContextType="SupplierInvoice" MenuContextId="{!KimbleOne__SupplierInvoice__c.Id}" MenuContextName="{!KimbleOne__SupplierInvoice__c.Name}"/>
+
+	</apex:define>
+    
+    <apex:define name="Content">
+		<style>
+			.mainTitle {white-space:nowrap;}
+
+			.status-icons {
+	    		float: right;
+	    	    display: inline-flex;
+			}
+
+			.email-icon > i.bottom-ind {
+			    font-size: 22px;
+				color: #505050;
+			}
+
+			.email-icon > i.top-ind {
+			    color: #505050;
+			    left: 16px;
+			    position: absolute;
+	    		top: 13px;
+	   	 		background-color: white;
+	   			font-size: 13px;
+			}
+
+			.email-icon {
+			    position: relative;
+			    margin-left: 10px;
+			}
+
+			.download-icon > i.bottom-ind {
+			    font-size: 22px;
+				color: #505050;
+				margin-top: 2px;
+
+			}
+			.download-icon > i.top-ind {
+			    color: #505050;
+			    left: 16px;
+			    position: absolute;
+	    		top: 13px;
+	   	 		background-color: white;
+	   			font-size: 13px;
+			}
+			.download-icon{
+			 	position: relative;
+			    margin-left: 10px;
+			}
+		</style>
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+		<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+
+		<apex:form id="TheForm">
+    	<apex:pageMessages escape="false"/>
+    	
+		<!--  Run the invoice schedule jobs (if any) -->
+		<apex:outputPanel rendered="{!!ISNULL(JobToRun)}">
+
+			<div id="InvoiceScheduleJobs">
+			</div>
+			<script>
+				$(function () {
+						loadJobsInline($('#InvoiceScheduleJobs'), '{!JSINHTMLENCODE(JobToRun.ContextId__c)}','{!JSENCODE($Label.InitialisingInvoicingdataMessage)}', refresh);
+				});
+
+			</script>
+
+			<apex:actionFunction name="refresh" action="{!Refresh}"/>
+
+		</apex:outputPanel>
+
+    	<apex:pageBlock title="{!$ObjectType.KimbleOne__SupplierInvoice__c.Label}" rendered="{!ISNULL(JobToRun)}">
+
+			<apex:pageBlockButtons location="top" styleclass="InvoiceButtonPanel">
+    			<apex:commandButton id="sendInvoiceForApprovalBtn" action="{!SendForApproval}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__sendforapprovalbutton}" rerender="TheForm, SupplierApprovalHistoryPanel" rendered="{!IsDraft && $ObjectType.KimbleOne__SupplierInvoice__c.updateable}"/>
+    			<apex:commandButton action="{!Preview}" value="{!$Label.kimbleone__view}" />
+    			<apex:commandButton action="{!DeleteSupplierInvoice}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__deletebutton}" rerender="TheForm" rendered="{!IsDraft && $ObjectType.KimbleOne__SupplierInvoice__c.deletable}"/>
+
+				<apex:outputPanel layout="none" rendered="{!KimbleOne__SupplierInvoice__c.Status__r.KimbleOne__Enum__c = 'Approved' || KimbleOne__SupplierInvoice__c.Status__r.KimbleOne__Enum__c = 'Credited'}">
+					<apex:outputPanel layout="none" rendered="{!HasPermission['DispatchSupplierInvoice'] && CanEmail}">
+						<input id="sendEmailBtn" class="btn" type="button" onclick="initialiseModalBoxy('#sendEmailPopup', '{!JSENCODE($Label.EmailInvoiceLabel)}', jQuery('form[id$=\'TheForm\']'));initialiseEmail();" value="{!$Label.EmailInvoiceLabel}" rendered="{!TheSupplierInvoiceAttachments.size > 0}"/>
+					</apex:outputPanel>
+					<input id="downloadBtn" class="btn" type="button" onclick="initialiseModalBoxy('#DownloadPopup', '{!JSENCODE($Label.Download)} {!$ObjectType.KimbleOne__SupplierInvoice__c.Label}', jQuery('form[id$=\'TheForm\']'));initialiseDownload();" value="{!$Label.Download}" rendered="{!TheSupplierInvoiceAttachments.size > 0}"/>
+				</apex:outputPanel>
+
+				<div class="status-icons">
+					<apex:outputPanel layout="none" rendered="{!KimbleOne__SupplierInvoice__c.KimbleOne__IsEmailed__c}">
+						<div class="email-icon" title="{!JSENCODE(EmailSentLabel)}">
+							<i class="fa fa-envelope-o bottom-ind"></i>
+							<i class="fa fa-check-circle top-ind"></i>
+						</div>
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!KimbleOne__SupplierInvoice__c.KimbleOne__IsDownloaded__c}">
+						<div class="download-icon" title="{!JSENCODE(DownloadedLabel)}">
+							<i class="fa fa-download bottom-ind"></i>
+							<i class="fa fa-check-circle top-ind"></i>
+						</div>
+					</apex:outputPanel>
+				</div>
+           	</apex:pageBlockButtons>
+			
+			<apex:pageBlockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__invoicedetailsheading}"  columns="2" >
+		    	
+		    	<apex:outputField value="{!KimbleOne__SupplierInvoice__c.Name}" />
+		    	<apex:outputField value="{!KimbleOne__SupplierInvoice__c.KimbleOne__InvoiceDate__c}" />
+		    	<apex:outputField value="{!KimbleOne__SupplierInvoice__c.KimbleOne__SupplierAccount__c}" />
+		    	<apex:outputField value="{!KimbleOne__SupplierInvoice__c.KimbleOne__IsSelfBill__c}" />
+		    	<apex:outputField value="{!KimbleOne__SupplierInvoice__c.KimbleOne__SupplierContact__c}" />
+		    	<apex:outputField value="{!KimbleOne__SupplierInvoice__c.KimbleOne__NetAmount__c}" />
+				
+		    </apex:pageBlockSection>
+		    
+		    <apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__requisitionlineallocationsheading}" columns="1" rendered="{!KimbleOne__SupplierInvoice__c.KimbleOne__IsSupplierRequisitioned__c}">
+		    	<apex:pageBlockTable value="{!TheSupplierInvoiceAllocations}" var="line">
+					<apex:column value="{!line.SupplierRequisitionLine__r.KimbleOne__SupplierRequisition__c}"/>
+					<apex:column value="{!line.SupplierRequisitionLine__r.SupplierRequisition__r.KimbleOne__SupplierPurchaseOrder__c}"/>
+					<apex:column value="{!line.SupplierRequisitionLine__r.KimbleOne__LineNumber__c}" />
+					<apex:column value="{!line.SupplierRequisitionLine__r.Name}" width="340px"/>
+					<apex:column value="{!line.SupplierRequisitionLine__r.KimbleOne__UnitAmount__c}" />
+					<apex:column value="{!line.SupplierRequisitionLine__r.KimbleOne__RequisitionedUnits__c}" />
+					<apex:column value="{!line.SupplierRequisitionLine__r.KimbleOne__NetAmount__c}" />
+					<apex:column value="{!line.KimbleOne__AllocatedAmount__c}" />
+				</apex:pageBlockTable>
+		    </apex:pageblockSection>
+  		  
+		    <apex:pageblockSection collapsible="false" showheader="true" title="{!$ObjectType.KimbleOne__SupplierInvoiceLine__c.labelPlural}"  columns="1" rendered="{!!KimbleOne__SupplierInvoice__c.KimbleOne__IsSupplierRequisitioned__c}">
+		    	<apex:pageBlockTable value="{!TheSupplierInvoiceLines}" var="line">
+					<apex:column value="{!line.KimbleOne__LineNumber__c}" />
+					<apex:column value="{!line.KimbleOne__Narrative__c}" width="340px"/>
+					<apex:column value="{!line.KimbleOne__NetAmount__c}" />
+					<apex:column value="{!line.KimbleOne__TaxAmount__c}" />
+					<apex:column value="{!line.KimbleOne__TimeCostRate__c}" />
+					<apex:column value="{!line.KimbleOne__TimeTotalUnitsFormatted__c}" />
+				</apex:pageBlockTable>
+		    </apex:pageblockSection>
+
+		</apex:pageBlock>
+
+		<div id="sendEmailPopup" style="display:none">
+			<apex:outputPanel id="sendEmailPanel">
+				<apex:pageBlock >
+					<div id="sendEmailErrors"><apex:pageMessages escape="false"/></div>
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton id="sendEmailBtn" value="{!$Label.kimbleone__ok}" styleclass="DisableButtonWhileBusy" action="{!SendEmail}" oncomplete="hideModalBoxyWithErrorCheck('#sendEmailErrors')" rerender="sendEmailPanel" />
+						<input class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+					</apex:pageBlockButtons>
+					<apex:pageBlockSection columns="1" >
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$Label.kimbleone__to}..."></apex:outputLabel>
+							<apex:outputPanel layout="block">
+								<apex:selectList value="{!ContactsToEmail}" styleclass="select-contacts select2-filter" size="1" multiselect="true" style="width: 300px;">
+									<apex:selectOptions value="{!AvailableContacts}" />
+								</apex:selectList>
+								<script>
+								jQuery('.select-contacts').select2();
+							</script>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$Label.kimbleone__emailtemplatelabel}"></apex:outputLabel>
+							<apex:selectList id="emailTemplate" value="{!TheSelectedDocTemplateId}" size="1">
+								<apex:selectOptions value="{!TheEmailTemplates}" />
+							</apex:selectList>
+						</apex:pageBlockSectionItem>
+
+					</apex:pageBlockSection>
+				</apex:pageBlock>
+			</apex:outputPanel>
+		</div>
+
+		<apex:actionFunction action="{!InitialiseDownload}" name="initialiseDownload" rerender="DownloadPanel" oncomplete="showModalBoxy()"/>
+		<apex:actionFunction action="{!InitialiseEmail}" name="initialiseEmail" rerender="sendEmailPanel" oncomplete="showModalBoxy();"/>
+
+		<div id="DownloadPopup" style="display:none">
+			<apex:outputPanel id="DownloadPanel">
+				<apex:inputText value="{!SelectedDocuments}" styleClass="SelectedDocuments" style="display:none"/>
+				<apex:pageBlock >
+					<div id="dowloadErrors"><apex:pageMessages escape="false"/></div>
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton value="{!$Label.kimbleone__ok}" styleclass="DisableButtonWhileBusy" action="{!DownloadSupplierInvoice}" onclick="performDownloads()" oncomplete="hideModalBoxyWithErrorCheck('#dowloadErrors')" rerender="DownloadPanel"/>
+						<input class="btn DisableButtonWhileBusy" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+					</apex:pageBlockButtons>
+					<apex:outputPanel layout="block" styleClass="documents-table">
+						<apex:pageblocktable value="{!TheSupplierInvoiceAttachments}" var="att" >
+							<apex:column style="width:20px">
+								<input type="checkbox" class="document-cb" data-id="{!att.id}" theDownload="/servlet/servlet.FileDownload?file={!JSENCODE(att.id)}"/></apex:column>
+							<apex:column value="{!att.name}"/>
+						</apex:pageblocktable>
+					</apex:outputPanel>
+				</apex:pageBlock>
+			</apex:outputPanel>
+		</div>
+
+		</apex:form>
+		
+   	  	<apex:relatedList list="CombinedAttachments" rendered="{!AttachmentsEnabled && ISNULL(JobToRun)}"/>
+		<apex:relatedList subject="{!KimbleOne__SupplierInvoice__c}" list="AttachedContentDocuments" rendered="{!FilesEnabled && ISNULL(JobToRun)}"/>
+		
+		<apex:outputPanel layout="none" id="ApprovalHistoryPanel" rendered="{!ISNULL(JobToRun)}">
+
+			<apex:relatedList list="ProcessSteps" id="SupplierInvoiceApprovalHistory"></apex:relatedList>
+
+			<script>
+				$(document).ready(function(){
+					$(function() {
+						hideSalesForceApprovalProcessButtons();
+					})
+				});
+				function hideSalesForceApprovalProcessButtons()
+				{
+						$('input[name="piSubmit"]').remove();
+						$('input[name="piRemove"]').remove();
+				}
+			</script>
+
+		</apex:outputPanel>
+		
+		<script>
+			jQuery(document).ready(function() {
+				if(isSFLightning()) jQuery('input[name="newNote"],input[name="attachFile"]').hide();
+			});
+
+			function performDownloads(){
+				var selectedDocsStr = '';
+
+				$('.document-cb:checked').each(function(i, el) {
+					selectedDocsStr = selectedDocsStr + $(el).attr('data-id')+',';
+					window.open('/servlet/servlet.FileDownload?file='+$(el).attr('data-id'));
+				});
+
+
+				$('.SelectedDocuments').val(selectedDocsStr);
+			}
+		</script>
+	</apex:define>
+</apex:composition>
+
+</apex:page>

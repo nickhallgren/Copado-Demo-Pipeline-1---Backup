@@ -1,0 +1,244 @@
+<apex:page sidebar="false" recordSetVar="ConfigurationDataExports" standardcontroller="KimbleOne__ConfigurationDataExport__c" extensions="KimbleOne.ConfigurationDataAuditController" >
+
+    <script type="text/javascript">
+    	var __sfdcSessionId = '{!GETSESSIONID()}';
+    	sforce.connection.sessionId = __sfdcSessionId;
+    </script>
+
+	<apex:outputPanel layout="none" rendered="{!$Label.kimbleone__namespace == 'null'}">
+		<script>
+			var KimbleNamespaceWithUnderscores = '';
+		</script>
+	</apex:outputPanel>
+	<apex:outputPanel layout="none" rendered="{!$Label.kimbleone__namespace != 'null'}">
+		<script>
+			var KimbleNamespaceWithUnderscores = '{!JSENCODE($Label.Namespace)}__';
+		</script>
+	</apex:outputPanel>
+	    
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__ConfigurationDataJs)}" />
+	
+	<apex:outputPanel layout="none" rendered="{!!ConfigScopeOverriden}">
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__ConfigurationDataExportScope)}" />
+	</apex:outputPanel>
+	<apex:outputPanel layout="none" rendered="{!ConfigScopeOverriden}">
+		<apex:includeScript value="{!ConfigScopeOverrideResourcePath}" />
+	</apex:outputPanel>
+	
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuery, 'jquery-1.10.1.min.js')}"/>
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryUI, 'js/jquery-ui-1.10.3.custom.min.js')}"/>
+
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQueryUI, 'css/cupertino/jquery-ui-1.10.3.custom.min.css')}"/>
+
+	<apex:includeScript value="/soap/ajax/29.0/connection.js"/>
+	<apex:includeScript value="/soap/ajax/29.0/apex.js"/>
+
+      
+    <apex:pageMessages escape="false"/>
+     	
+	<apex:pageBlock title="{!$Label.kimbleone__configdataauditlabel}" rendered="{!ISNULL(Messages)}">
+		
+		<apex:pageblockSection collapsible="false" showheader="false" columns="2" >
+
+		<apex:outputPanel layout="none" rendered="{!!CompareMode}">
+			<input type="button" class="btn" id="auditBtn" value="Audit Configuration Data" onclick="auditKimbleObjects();"/>
+
+			<span class="outputFormatLabel">Output Format:</span>
+			<label class="outputFormatRadioLabel" for="JSON">JSON</label> 
+			<input type="radio" name="outputFormat" id="JSON" checked="checked" onclick="auditFormat='JSON';"/>
+			<label class="outputFormatRadioLabel" for="CSV">CSV</label> 
+			<input type="radio" name="outputFormat" id="CSV" onclick="auditFormat='CSV';"/>
+
+			<input type="button" class="btn btnDisabled" id="selectAllBtn" value="Select All Audit Output" disabled="true" onclick="selectText('auditLog');"/>
+		</apex:outputPanel>
+
+		<apex:outputPanel layout="none" rendered="{!CompareMode}">
+			<input type="button" class="btn" id="compareBtn" value="Compare Configuration Data" onclick="compareConfigs(orgAId, orgBId);"/>
+
+			<input type="button" class="btn btnDisabled" id="selectAllBtn" value="Select All Output" disabled="true" onclick="selectText('auditLog');"/>
+		</apex:outputPanel>
+		
+		<apex:outputPanel layout="none" rendered="{!!CompareMode}">
+			<div id="progressbar"><div class="progress-label"></div></div>	
+		</apex:outputPanel>
+						
+		</apex:pageblockSection>
+	
+	</apex:pageBlock>
+	
+	<apex:pageBlock title="Audit Results" rendered="{!ISNULL(Messages)}">
+		
+		<apex:pageblockSection collapsible="true" showheader="false" columns="1" >
+		
+		<div id="logMessages" style="width: 100%;height: 100px;overflow: auto"></div>
+		<br/>
+		<div id="auditLog" style="width: 100%;overflow: auto"></div>
+							
+		</apex:pageblockSection>
+	
+	</apex:pageBlock>
+
+	<style>
+	
+	.ui-progressbar
+	{
+	  position: relative;
+	}
+	
+	.progress-label
+	{
+	  position: absolute;
+	  left: 50%;
+	  top: 4px;
+	  font-weight: bold;
+	  text-shadow: 1px 1px 0 #fff;
+	}
+	
+	.GOOD
+	{
+	  color: green;
+	}
+	
+	.INFO
+	{
+	  color: black;
+	}
+	
+	.ERROR
+	{
+	  color: red;
+	}
+	
+	.auditObjectName {
+	    font-weight: bold;
+	    font-size: 16px;
+	    margin-bottom: 5px;
+	}
+	
+	tr.auditHeaderRow {
+	    font-weight: bold;
+	}
+	
+	#selectAllBtn {
+	    margin-left: 10px;
+    }
+    
+    span.outputFormatLabel {
+        margin-left: 10px;
+    	font-weight: bold;
+    }
+	.auditSection {
+	    font-weight: bold;
+	    margin-bottom: 10px;
+	    margin-top: 5px;
+	    font-size: 18px;
+		background-color: #404040;
+    	color: #FFF;
+    	padding: 10px;
+    	border-radius: 4px;
+	}
+	
+	table.auditObjectTable.list {
+    	width: initial !important;
+    	margin-bottom: 20px;
+    	border: 1px solid #000 !important;
+	}
+	
+	tr.dataRowB td {
+	    border-bottom: 1px solid #000 !important;
+	}
+	
+	td.valueDiff {
+    	background-color: #FFE596;
+	}	
+	</style>
+		
+	<script>
+
+		<apex:outputPanel layout="none" rendered="{!CompareMode}">
+		var orgAId = '{!Selected[0].Id}';
+		var orgBId = '{!Selected[1].Id}';
+		</apex:outputPanel>
+	
+		var progressbar;
+		
+		// in orgs where there is more than one version of jQuery installed we must explicitly override other versions
+		jQuery1_10_1 = $.noConflict( true );
+	
+		jQuery1_10_1(document).ready(function()
+		{
+			jQuery1_10_1('#auditBtn').prop('disabled', true).addClass('btnDisabled');
+			
+			progressbar = jQuery1_10_1( "#progressbar" ),
+    		progressLabel = jQuery1_10_1( ".progress-label" );
+
+		  	progressbar.progressbar({
+		    	value: false,
+		    	change: function() {
+		      		progressLabel.text( progressbar.progressbar( "value" ).toFixed(2) + "%" );
+		    	},
+		    	complete: function() {
+		      		progressLabel.text( "Done" );
+		    	}
+		  	});
+		  	jQuery1_10_1('#auditBtn').prop('disabled', false).removeClass('btnDisabled');
+		});
+
+		function incrementProgressBar(incrementValue)
+		{
+	 		var val = progressbar.progressbar( "value" ) || 0;
+	
+	    	progressbar.progressbar( "value",  val + incrementValue);
+	 	}
+
+	 	function resetProgressBar()
+	 	{
+	 		progressbar.progressbar( "value",  0);
+	 	}
+	 	 	
+	 	function completeProgressBar()
+	 	{
+	 		progressbar.progressbar( "value",  100);
+	 	}
+	 	
+		function selectText(divid)
+		{
+			if (document.selection)
+			{
+				var div=document.body.createTextRange();
+				div.moveToElementText(document.getElementById(divid));
+				div.select();
+			}
+			else
+			{
+				var div = document.createRange();
+				div.setStartBefore(document.getElementById(divid));   div.setEndAfter(document.getElementById(divid));
+				window.getSelection().addRange(div);
+			}
+		}
+	 	
+		function querySObjectsViaRemoting(queryToExecute, pageSize, lastId, cumulativeQueryResults, callback)
+		{ 
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ConfigurationDataAuditController.Query}',
+		       		queryToExecute, pageSize, lastId,
+		      			function(result, event){          
+		             		
+		             		if (event.status) 
+				            {
+				             	callback(result, queryToExecute, pageSize, cumulativeQueryResults);		             								
+				         	} 
+				         	else if (event.type === 'exception') 
+				         	{
+				             	alert(event.message);
+				         	} 
+				         	else 
+				         	{
+				             	alert(event.message);
+				         	}
+		         	}, 
+		         	{escape: true, buffer: false, timeout: 60000}
+		     	);
+	     	}
+	</script>
+
+</apex:page>

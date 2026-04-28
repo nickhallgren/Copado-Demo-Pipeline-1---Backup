@@ -1,0 +1,2119 @@
+<apex:page controller="KimbleOne.TrackingPlansController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__ReferenceData__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+	<c:Menu DefaultHelpPage="TaskManagement.html" MenuContextType="{!MenuContext}" MenuContextId="{!ThePageContext.Id}" MenuContextName="{!ThePageContext['Name']}" />
+
+</apex:define>
+  
+<apex:define name="Content">
+
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__Handlebars)}" />
+
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+    <apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+   	<apex:pageMessages escape="false"/>
+   	
+   	<style>
+		:root {
+			--dw:30px;
+			--hdw:28px;
+		}
+   		.plan-grid-container {
+			display: table;
+		}
+		.pitm,
+		.phdr {
+			display: table-row;
+		}
+		.pitm {
+			line-height: 14px;
+		}
+		.phdr {
+		    cursor: pointer;
+		    line-height: 15px;
+  		}
+		.phdr div {
+			border-bottom: 2px solid #b7b7b7 !important;
+		}
+		.phdr-g,
+		.pitm-g {
+			display: table-row;
+  		}
+  		.phdr-g {
+			height: 30px;
+		}
+  		.pitm-g {
+			height: 27px;
+		}
+		.phdr div,
+		.pitm div {
+			background-color: white;
+		}
+		.phdr div,
+		.phdr-g div,
+		.pitm div,
+		.pitm-g div {
+			display: table-cell;
+			padding: 6px;
+			border-bottom: 1px solid #ededed;
+		}
+		.footer-spacer {
+			display: table-row;
+			height: 27px;
+		}
+		.dte,
+		.num {
+		    text-align: right;
+  		}
+		.phdr,
+		.pitm.smry {
+		    font-weight: bold;
+		}
+		.branch.exp .indent {
+			background-image: url({!URLFOR($Resource.TaskGanttIcons, 'arrows.gif')});
+			background-position: -22px, 0px;
+		}
+		.branch .indent {
+			cursor: pointer;
+			background-image: url({!URLFOR($Resource.TaskGanttIcons, 'arrows.gif')});
+			background-position: -4px, 0px;
+		}
+		.clpsd-node {
+		    display:none;
+		}
+		.tp-name {
+		    font-size: 14px;
+		    min-width: 200px;
+		    max-width: 200px;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			overflow: hidden;
+			padding-left: 0px !important;
+			cursor: pointer;
+  		}
+  		.tp-d {
+			text-align: center;
+			font-size: 14px;
+		}
+  		.jump-to-item {
+  		    cursor: pointer;
+    	}
+		.pitm-name {
+		    padding-left: calc(var(--in) * 10px) !important;
+		    min-width: 200px;
+		    max-width: 200px;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			overflow: hidden;
+			cursor: pointer;
+  		}
+  		.pitm-g:not(.smry) .pitm-g-bar.T {
+			background-color: #8abbed !important;
+			border-radius: 2px;
+		}
+		.pitm-g-bar.T.MS {
+			border-left: 2px solid black;
+			border-right: 2px solid black;
+		}
+		.pitm-g-bar.T.Crt {
+            border-top: 2px solid #f00 !important;
+            border-bottom: 2px solid #f00 !important;
+			padding: 5px 0px !important;
+        }
+		.pitm-ct {
+			padding: 3px 4px !important;
+		}
+		.pitm-ct i.fixed-constraint {
+			color: #2196F3 !important;
+		}
+		.pitm-ct i {
+			color: #dedede;
+			margin-right: 10px;
+			font-size: 14px;
+			display: block;
+			float: left;
+			margin-left: 1px;
+		}
+		.pitm-ct i.fa-thumb-tack.fixed-constraint {
+			margin-right: 12px;
+			margin-left: 3px;
+		}
+		.phdr-g-bar {
+			background-color: #2ba3ad !important;
+			border-radius: 2px;
+			width: calc(var(--ED) * (var(--dw))) !important;
+		}
+		.phdr-g-bar-lbl {
+			font-size: 12px !important;
+		}
+  		.pitm-g.smry .pitm-g-bar {
+			margin-top: 6px;
+			border-top: 3px solid #545454;
+			border-left: 2px solid #545454;
+			border-right: 2px solid #545454;
+			border-top-left-radius: 2px;
+			border-top-right-radius: 2px;
+			border-bottom: none;
+			width: calc(var(--ED) * (var(--dw)) - 4px) !important;
+		}
+		.phdr-g-bar, .pitm-g-bar {
+			position: absolute;
+			left: calc(var(--os) * (var(--dw))) !important;
+			margin-top: 8px !important;
+			padding: 7px 0px !important;
+		}
+		.phdr-g-bar, .pitm-g-bar:not(.MS) {
+			width: calc(var(--ED) * (var(--dw))) !important;
+		}
+		.pitm-g-bar.MS {
+			width: calc(var(--ED) * (var(--dw)) - 4px) !important;
+		}
+		.phdr-g-bar-lbl,
+		.pitm-g-bar-lbl {
+  		    position: absolute;
+			left: calc(var(--os) * (var(--dw))) !important;
+			margin-top: 20px;
+		    white-space: nowrap;
+			border-bottom: none !important;
+			color: #aaa;
+			padding: 0px !important;
+			font-size: 10px;
+		}
+		.pitm-g-p-bar {
+			position: absolute;
+			left: calc(var(--os) * (var(--dw))) !important;
+			width: calc(var(--ED) * (var(--dw)) * var(--pc)/100) !important;
+			margin-top: 12px !important;
+			padding: 3px 0px !important;
+			border-bottom: none !important;
+			background-color: #545454 !important;
+			border-radius: 0px;
+		}
+		.pitm-g-bar.RM,
+		.pitm-g-bar.PM {
+			width: 8px !important;
+			height: 8px !important;
+			padding: 0px !important;
+			border-radius: 0px !important;
+			transform: rotate(45deg);
+			border: 1px solid black;
+		}
+		.pitm-g-bar.RM.C {
+		    border: 1px solid gold !important;
+		}
+		.pitm-g-bar.PM.C {
+		    border: 1px solid #34b27d !important;
+		}
+		.pitm-g-bar.RM {
+		    background-color: gold !important;
+		}
+		.pitm-g-bar.PM {
+		    background-color: #34b27d !important;
+		}
+		#aH path {
+			fill: #267cd3;
+		}
+		#aHCP path {
+			fill: #2ba3ad;
+		}
+		#aHCPAlrt path {
+			fill: #e58e1a;
+		}
+		line:not(.ext-d) {
+			stroke: #267cd3;
+		}
+		line.ext-d {
+			stroke: #2ba3ad;
+		}
+		line.ext-d.ext-alert {
+			stroke: #e58e1a !important;
+		}
+		.external-dep-ind {
+		    position: absolute;
+			font-size: 16px;
+			cursor: pointer;
+		}
+		.external-dep-ind.alert
+		{
+		    color: #e58e1a;
+  		}
+		.external-dep-ind:not(.alert)
+		{
+		    color: #2ba3ad;
+  		}
+  		.external-ind-qtip {
+			max-width: 700px;
+		}
+  		.external-dep-details-container {
+			padding: 10px;
+		}
+		.external-ind-qtip .qtip-title {
+			font-size: 14px;
+		}
+		.external-ind-qtip .qtip-titlebar {
+			padding: 14px;
+		}
+		table.list.external-dep-list {
+			font-size: 12px;
+		}
+		.tracking-plan-charms {
+			position: absolute;
+			left: 377px;
+			top: 0px;
+			padding: 5px;
+			background-color: white;
+			margin: 5px;
+			margin-right: 10px;
+		}
+		.tracking-plan-charms i {
+			display: none;
+			font-size: 26px;
+			cursor: pointer;
+		}
+		.jump-to-plan {
+			color: rgb(0, 95, 178) !important;
+		}
+		.tp-name {
+			font-weight: bold;
+		}
+		.phdr:hover div,
+		.pitm:hover div {
+			background-color: #e3feff !important;
+		}
+		div#zoom-slider {
+			position: absolute;
+			width: 120px;
+			top: 13px;
+			left: 230px;
+			cursor: pointer;
+		}
+		div#zoom-slider-key {
+			position: absolute;
+			left: 210px;
+			top: 12px;
+			width: 175px;
+			font-size: 14px;
+			color: #9e9e9e;
+		}
+		#zoom-slider-key .zoom-in {
+			margin-left: 140px;
+		}
+		#zoom-slider-key .zoom-in:hover, #zoom-slider-key .zoom-out:hover {
+			color: #1A9EFF;
+			cursor: pointer;
+		}
+        #data-loading {
+            text-align: center;
+            font-size: 200px;
+            color: #d3d3d3;
+            position: absolute;
+            filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+            -moz-opacity: 0.7;
+            -khtml-opacity: 0.7;
+            opacity: 0.7;
+            z-index: 1000;
+            background-color: #fff;
+            height: calc(100% - 160px);
+            width: calc(100% - 320px);
+            padding: 100px 50px 0px 50px;
+        }
+		/* toolbar styling */
+		.toolbar-container {
+			position: relative;
+			background-color: #f8f8f8;
+			padding: 6px;
+			margin-bottom: 5px;
+			height: 26px;
+			display: none;
+		}
+		.toolbar {
+			display: table;
+			width: 100%;
+		}
+		div#toolbar-buttons {
+			display: inline-table;
+			position: relative;
+			padding: 6px;
+		}
+		a.toolbar-button-single {
+			padding-right: 3px;
+		}
+		a.toolbar-button-double > div {
+		    border-right-style: hidden;
+		}
+		div.toolbar-button {
+			display: inline-block;
+			padding: 6px 8px;
+			background-color: white;
+			border: 1px solid #ccc;
+			border-radius: 2px;
+		}
+		div.toolbar-button.active-toolbar-button {
+			color: white;
+			background-color: #888;
+		}		
+		div.toolbar-button:hover {
+			text-decoration: none;
+			color: white;
+			background-color: #1A9EFF;
+		}
+		div.toolbar-button .fa {font-size: 14px;}
+		div.toolbar-button.disabled {background-color: #ccc;color: darkgray;}
+		div.toolbar-button.disabled:hover {background-color: #ccc;color: darkgray;}
+
+		/* period header */
+		.month-head,
+		div#days-header div[id^="day"], div#weeks-header div[id^="week"], div#quarters-header div[id^="quarter"] {
+			display: table-cell;
+		}
+		div#days-header .day-head {
+			width: calc(var(--hdw)) !important;
+		}
+		div#days-header div.td-non-bus-day {
+			background-color: #aaa;
+		}
+		div#days-header.days-hidden {
+			height: 0px;
+			opacity: 0;
+		}
+		.hide-text {
+		    font-size: 0px !important;
+		}
+		div#weeks-header .week-head {
+			width: calc((var(--dw) * var(--Wdays)) - 2px) !important;
+		}
+		div#quarters-header .quarter-head {
+			width: calc((var(--dw) * var(--Qdays)) - 2px) !important;
+		}
+		.relative {
+			position: relative;
+		}
+		div.week-divider {display:none; position: absolute;top: 25px; width: 2px;background: white;right: 0px;z-index:10;}
+		div.non-bus-day-overlay{ width: 42px;}
+		div.non-bus-day-strip {
+			position: absolute;
+			width: calc(var(--hdw)) !important;
+			background: #f8f8f8;
+			top: 25px;
+  		}
+		div.today-line{
+			position: absolute;
+			border-left: 1px solid #53ecff;
+			height: 1000px;
+  		}
+		.plan-gantt-items-container {
+			background-color: white;
+		}
+		.day-head, .week-head, .quarter-head
+		{
+			white-space: nowrap;
+			font-size: 0.75em;
+			overflow:hidden;
+			display: inline-block;
+			height: 25px;
+			line-height: 25px;
+			text-align: center;
+			border-bottom: solid white 2px;
+			border-right: solid white 2px;
+		}
+		.day-head, .week-head, .quarter-head
+		{
+			background-color: #ccc;
+			text-overflow: ellipsis;
+		}
+		.day-head.non-bus-day {
+			background-color:#aaa
+		}
+		.month-head
+		{
+			background-color: #1797C0;
+			color:white !important;
+			font-weight:bold;
+			white-space: nowrap;
+			font-size: 0.75em;
+			overflow:hidden;
+			height: 25px;
+			line-height: 25px;
+			text-align: center;
+			border-bottom: solid white 2px;
+			border-right: solid white 2px;
+		}
+		#dep-container {
+			position: absolute;
+			width: calc((var(--dw)) * var(--totalDays));
+  		}
+		/* dynamic header widths */
+		/* (number of days * (width of a day + 1px border each side)) - the month padding */
+		.month-head .m-name{
+		    width: calc((var(--dayspan) * (var(--dw))) - 2px) !important;
+			display: inline-block;
+  		}
+		.non-bus-day-overlay
+		{
+			position: absolute;top: 25px;background: white;right: 0px;z-index:1;
+		}
+		#grid-layout {
+			overflow-y: hidden;
+			overflow-x: hidden;
+			height: auto !important;
+		}
+		#grid-body-container {
+			overflow-y:hidden;
+    		overflow-x: auto;
+			position: relative;
+		}
+		#gantt-layout {
+			overflow: hidden;
+		}
+		#gantt-view {
+			overflow-y: hidden;
+			height: 100%;
+		}
+		div#grid-header-container {
+			height: 53px;
+			background-color: #f2f3f3;
+			position: relative;
+		}
+		#gantt-body-container {
+			width: calc((var(--dw)) * var(--totalDays));
+			overflow-y: hidden;
+			position: relative;
+		}
+		#gantt-vertical-scroll-container {
+			overflow-y: scroll;
+			position: absolute;
+			right: 10px;
+		}
+		#verticalScroll {
+		    width: 20px;
+		    display: none;
+  		}
+		/* maximised view */
+		.maximised-view div {
+		    color: #fff;
+		    background-color: #888 !important;
+		}
+		.hide-for-maximised {
+		    display: none;
+		}
+		.prevent-scroll {
+			overflow-y: hidden;
+		}
+		/* layout control overrides */
+		.ui-layout-center,.ui-layout-east, .ui-layout-west {
+			padding: 0;
+		}
+		.ui-layout-content {
+			padding: 0px;
+		}
+		#print-button-floating-dropdown{display:none;}
+		
+		/* filter pop up */
+		#filter-key-ext {
+			display: inline-grid;
+			left: 216px !important;
+			color: #2ba3ad;
+			position: absolute;
+			font-size: 16px;
+		}
+		#filter-key-ms{
+			display: inline-grid;
+			left: 218px !important;
+		}
+		#filter-key-task {
+			display: inline-grid;
+			width: 50px !important;
+			left: 200px !important;
+			background-color: #8abbed !important;
+			border-radius: 2px;
+		}
+		#filter-key-smry {
+			border-top: 3px solid #545454;
+			border-left: 2px solid #545454;
+			border-right: 2px solid #545454;
+			border-top-left-radius: 2px;
+			border-top-right-radius: 2px;
+			border-bottom: none;
+			width: 45px !important;
+			left: 200px !important;
+			display: inline-grid;
+		}
+		#filter-key-smry-bar {
+			display: inline-grid;
+			width: 50px !important;
+			left: 200px !important;
+			border-radius: 2px;
+		}
+		a#select-all-checkboxes {
+			cursor: pointer;
+			color: rgb(0, 109, 204) !important;
+		}
+		div.toolbar-button-selected {
+			text-decoration: none;
+			color: white;
+			background-color: #1A9EFF;
+		}
+		i.filter-collapse-btn.fa.fa-angle-double-up {
+			color: #BBB;
+			cursor: pointer;
+			padding-right: 6px;
+			position: absolute;
+			right: 13px;
+			top: 13px;
+			font-size: 26px;
+		}
+		input#applyFilterButton {
+			margin-top: 10px;
+		}
+		div#PlansFilterPopup {
+			position: absolute;
+			top: 51px;
+			padding: 5px;
+			width: auto;
+			max-width: 500px;
+			min-width: 250px;
+			height: auto;
+			z-index: 999;
+			border-color: #ddd;
+			border-style: solid;
+			border-width: 0px 1px 1px 1px;
+			background-color: #fff;
+			box-shadow: rgba(31, 31, 31, 0.16) 4px 3px 8px;
+			left: 219px;
+			overflow-y: auto;
+		}
+		.filter-row {
+			margin-top:8px;
+			margin-left:8px;
+			font-size: 1em;
+			font-weight: bold;
+			color: #4a4a56;
+			margin-bottom: 3px;
+		}
+		.filter-row-category {
+			margin-bottom: 0px;
+		}
+		.plans-filter-header {
+			font-weight: bold;
+			font-size: 14px;
+			padding: 10px;
+			background-color: #F5F5F5;
+			border: 1px solid #DDD;
+			border-radius: 4px;
+			margin-left: 2px;
+			margin-right: 2px;
+		}
+		
+		/* SELECT 2 STYLING */
+		.select2-results li {margin-left:0px;}
+		.select2-container-multi .select2-choices
+		{
+			border: 2px solid rgb(224,224,224);
+			background-image:none;
+		}
+		.select2-container-multi .select2-choices .select2-search-choice {
+			border: 1px solid #aaaaaa;
+			border-radius: 4px;
+			padding: 5px 20px 5px 5px;
+			background-image:none;
+		}
+		
+		.select2-container-multi .select2-search-choice-close {
+			background-image:  url({!URLFOR($Resource.AssignmentImages, 'assignmentSprite.png')});
+			background-position: -2px -29px;
+			background-repeat: no-repeat;
+			left:auto;
+		}
+		
+		.select2-container-multi .select2-choices .select2-search-choice .select2-search-choice-close:hover {
+			background-position: -2px -1px;
+		}
+		.select2-container.select2-container-multi {
+			width: auto !important;
+			min-width: 301px;
+			display: block;
+			max-width: 400px;
+		}
+   	</style>
+	
+	<style media="print">
+		div#AppBodyHeader {display: none;}
+		div#side-bar-container {display: none;}
+		div.bPageFooter.noTableFooter {display: none;}
+		body {background: 0 !important;}
+		table#bodyTable {border: 0 !important;}
+		div.bodyDiv.brdPalette.brandPrimaryBrd {border: 0 !important;box-shadow: none;}
+		div.links {display: none;}
+		div#footer {display: none;}
+		.bPageBlock {background: 0 !important; border: 0 !important;}
+		div.pbBody {margin: 0 !important;}
+		div#layout-container {height: auto !important;-webkit-print-color-adjust: exact;color-adjust: exact;}
+		div#grid-body-container {max-height: 100% !important; height: 100% !important}
+		div#gantt-body-container {max-height: 100% !important; height: 100% !important}
+		div#grid-layout {page-break-after: always !important;}
+		div#grid-body-container {border-right: 1px solid #ededed;}
+		#gantt-vertical-scroll-container{display:none;}
+		#print-button-floating-dropdown{display:none !important;}
+		div.kimble-help-popout{display:none !important;}
+	</style>
+
+	<script id="tp-grid-template" type="text/x-handlebars-template">
+		<div class="phdr branch exp" tp-id="{{Id}}">
+			<div class="tp-ct"></div>
+			<div class="indent"></div>
+			<div class="tp-name">{{{AName}}}</div>
+			<div class="tp-d"><i class="fa fa-external-link jump-to-plan"></i></div>
+			<div class="tp-sd dte">{{formatUTCDate EIDUTC}}</div>
+			<div class="tp-ed dte">{{formatUTCDate LIDUTC}}</div>
+		</div>
+		{{#each PlanItems}}
+		{{> pitm-template parent=..}}
+		{{/each}}
+	</script>
+
+	<script id="pitm-template" type="text/x-handlebars-template" partial="true">
+		<div class="pitm {{#if IsSum}}smry branch{{#if IsClpsd}}{{else}} exp{{/if}}{{/if}} {{T}}" style="--in:{{L}}" pi-id="{{Id}}" tp-id="{{parent.Id}}" pip-id="{{#if PId}}{{PId}}{{/if}}">
+			<div class="pitm-ct">{{{cTypeHtml CDUTC CTypeId INBD}}}</div>
+			<div class="{{#if IsSum}}indent{{/if}}"></div>
+			<div class="pitm-name">{{{Name}}}</div>
+			<div class="pitm-d num">{{formatNum D}}</div>
+			<div class="pitm-sd dte">{{formatUTCDate SDUTC}}</div>
+			<div class="pitm-ed dte">{{formatUTCDate EDUTC}}</div>
+		</div>
+	</script>
+
+	<script id="tp-gantt-template" type="text/x-handlebars-template">
+		<div class="phdr-g" tp-id="{{Id}}" style="--os:{{SOffset}};--ED:{{ED}}">
+			<div class="phdr-g-bar"></div>
+			<div class="phdr-g-bar-lbl">{{AName}}</div>
+		</div>
+		{{#each PlanItems}}
+			{{> pitm-g-template parent=..}}
+		{{/each}}
+	</script>
+
+	<script id="pitm-g-template" type="text/x-handlebars-template" partial="true">
+		<div class="pitm-g {{#if IsSum}}smry{{/if}} {{T}} " style="--os:{{SOffset}};--ED:{{ED}}" pi-id="{{Id}}" tp-id="{{parent.Id}}" pip-id="{{#if PId}}{{PId}}{{/if}}">
+			<div class="pitm-g-bar {{T}} {{#if IsCmplt}}C{{/if}} {{#if IsCrt}}Crt{{/if}} {{#if (eq CType "ManuallyScheduled")}}MS{{/if}}"></div>
+			{{#if SPctCmplt}}<div class="pitm-g-p-bar" style="--pc:{{PctCmplt}}"></div>{{/if}}
+			<div class="pitm-g-bar-lbl">{{Name}}</div>
+		</div>
+	</script>
+
+	<script>
+		var contextId = '{!JSENCODE(ThePageContextId)}';
+		var thePlans;
+
+		var trackingPlanUrl = '<apex:outputText value="{!$Page.KimbleOne__TrackingPlanGantt}"/>?Id=';
+
+		var theGlobalNonBusinessDays;
+		
+		var l = {};
+		l['OpenPlan'] = '{!JSENCODE($Label.OpenPlan)}';
+
+		l['DeliveryElement'] = '<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Label}"/>';
+		l['ItemName'] = '<apex:outputText value="{!$Label.kimbleone__name}"/>';
+		l['PlanItemType'] = '<apex:outputText value="{!$ObjectType.KimbleOne__PlanItem__c.Fields.KimbleOne__PlanItemType__c.Label}"/>';
+		l['StartDate'] = '<apex:outputText value="{!$ObjectType.KimbleOne__PlanTask__c.Fields.KimbleOne__StartDate__c.Label}"/>';
+		l['EndDate'] = '<apex:outputText value="{!$ObjectType.KimbleOne__PlanTask__c.Fields.KimbleOne__EndDate__c.Label}"/>';
+
+		l['ExtDepInd'] = '{!JSENCODE($Label.ExternalDependenciesInfo)}';
+		l['ExtDepSuccInd'] = '{!JSENCODE($Label.ExternalSuccessorsInfo)}';
+		l['ExtDepInds-b-f'] = '{!JSENCODE($Label.ExternalDependencyStartBeforeFinish)}';
+		l['ExtDepIndf-b-s'] = '{!JSENCODE($Label.ExternalDependencyFinishBeforeStart)}';
+		l['ExtDepInds-n-s'] = '{!JSENCODE($Label.ExternalDependencyStartNotStart)}';
+		l['ExtDepIndf-n-f'] = '{!JSENCODE($Label.ExternalDependencyFinishNotFinish)}';
+
+		l['PlanExtDeps'] = '{!JSENCODE($Label.PlanExternalDependenciesInfo)}';
+		l['PlanExtDepsAlert'] = '{!JSENCODE($Label.ExternalDependencyOutOfSequence)}';
+
+		var planItemConstraintIdToEnumMap = kimble.parseJSON("{!JSENCODE(PlanItemConstraintTypeIdToEnumJson)}");
+		var planItemConstraintIdToNameMap = kimble.parseJSON("{!JSENCODE(PlanItemConstraintTypeIdToNameJson)}");
+
+		var handlebarsTemplates = {};
+
+		function getThePlansForContext()
+		{
+			showWorking();
+		
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TrackingPlansController.GetPlansForContext}',
+	       		contextId,
+	      			function(result, event){          
+	             		if (event.status) 
+			            {
+			             	thePlans = result;
+			
+							populatePlans();
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+			         	
+						hideWorking();
+	         	}, 	
+	         {escape: false, timeout: 60000});
+		}
+		
+		function getPlanDetailHtml(thePlan)
+		{
+		    return handlebarsTemplates['tp-grid-template'].call(this, thePlan);
+		}
+
+		function getPlanGanttHtml(thePlan)
+		{
+		    return handlebarsTemplates['tp-gantt-template'].call(this, thePlan);
+		}
+
+		function getPlansHtml()
+		{
+			var html = '';
+
+			var plansLength = thePlans.TheOrderedPlanIds.length;
+			
+			html += '<div class="plan-grid-container">';
+
+			for(var i=0; i < plansLength;i++)
+			{
+				var thePlanId = thePlans.TheOrderedPlanIds[i];
+
+				html += getPlanDetailHtml(thePlans.ThePlans[thePlanId]);
+			}
+
+			html += '<div class="footer-spacer"></div>';
+			html += '</div>';
+
+			return html;
+		}
+		function getDependencyContainerHtml()
+		{
+		    var html = '';
+
+		    html += '<svg xmlns="http://www.w3.org/2000/svg" id="dep-container"></svg>';
+
+      		return html;
+  		}
+
+  		function getPlanItemBar(piId)
+  		{
+  		    if(ganttHtml == undefined) ganttHtml = document.querySelector('#gantt-body-container');
+  		    return ganttHtml.querySelector('div.pitm-g[pi-id="' + piId + '"] .pitm-g-bar');
+    	}
+
+  		function getPlanBar(tpId)
+  		{
+  		    if(ganttHtml == undefined) ganttHtml = document.querySelector('#gantt-body-container');
+  		    return ganttHtml.querySelector('div.phdr-g[tp-id="' + tpId + '"] .phdr-g-bar');
+    	}
+
+		var svgStrokeWidth = 1;
+		function getSvgLine(x1, y1, x2, y2, itmId, isCrossPlan, isOffPlan, withArrowHead, cls, succNotInScope, indicatorPosition) {
+		    var arrowElId = (withArrowHead ? (isCrossPlan ? (cls != undefined && cls != null && cls != '' ? '#aHCPAlrt' : '#aHCP') : '#aH') : '');
+		    var arrowHead = (withArrowHead ? 'stroke-linecap="round" marker-end="url(' + arrowElId + ')"' : '');
+		    var itemStyle = (isCrossPlan ? 'class="ext-d' + (isOffPlan ? ' off-p' : '') + (cls != undefined && cls != null && cls != '' ? ' ext-alert ' + cls : '') + (withArrowHead ? ' end ' : '') + (succNotInScope ? ' s-not-in-scope ' : '') + '" stroke-dasharray="5"' : '');
+		    var pIId = (isCrossPlan && withArrowHead ? 'pi-id="' + itmId + '"' : '');
+		    var indPos = ' ind-pos="' + indicatorPosition + '"';
+            return '<line ' + pIId + ' x1 = "'+x1+'" y1 = "'+y1+'" x2 = "'+x2+'" y2 = "'+y2+'" stroke-width = "' + svgStrokeWidth + '" ' + arrowHead + itemStyle + indPos + '/>';
+		}
+
+		var ganttHtml;
+		
+  		function getDependencyHtml()
+  		{
+		    var html = '';
+		    var xSpacerWidth = 10;
+
+			html += '<defs>';
+    		html += '    <marker id="aH" markerWidth="20" markerHeight="20" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"  viewBox="0 0 25 25">';
+    		html += '       <path d="M0,0 L0,10 L10,5 z"/>';
+    		html += '    </marker>';
+    		html += '    <marker id="aHCP" markerWidth="20" markerHeight="20" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"  viewBox="0 0 25 25">';
+    		html += '       <path d="M0,0 L0,10 L10,5 z"/>';
+    		html += '    </marker>';
+    		html += '    <marker id="aHCPAlrt" markerWidth="20" markerHeight="20" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"  viewBox="0 0 25 25">';
+    		html += '       <path d="M0,0 L0,10 L10,5 z"/>';
+    		html += '    </marker>';
+    		html += '</defs>';
+
+		    var plansLength = thePlans.TheOrderedPlanIds.length;
+
+			for(var i=0; i < plansLength;i++)
+			{
+				var thePlanId = thePlans.TheOrderedPlanIds[i];
+
+				var planData = thePlans.ThePlans[thePlanId];
+
+				var planDepsLength = planData.PlanItemDs.length;
+				for(var d=0; d < planDepsLength;d++)
+   				{
+   				    var dep = planData.PlanItemDs[d];
+
+   				    var x1 = 0;
+   				    var x2 = 0;
+   				    var y1 = 0;
+   				    var y2 = 0;
+
+					//x1 and y1 are were we want to start
+					//x2 and y2 are were we want to end up
+					//X2 and Y2 are were we left off
+
+   				    // the other end of the dep is external so we add an indicator
+   				    if(dep.PIPExtOS || dep.PISExtOS)
+   				    {
+   				        var fromItem = getPlanItemBar(dep.PIPId);
+						var toItem = getPlanItemBar(dep.PISId);
+						var depLineLength = xSpacerWidth*3;
+
+                        // as one end of the connector is off plan we only draw a single line to the non-null item
+                        // as we are here at least one end of the line must be in scope
+						if(dep.DType == 'FinishStart' || dep.DType == 'StartStart')
+						{
+							// line from RHS of fromItem to LHS of toItem
+							if(fromItem == null)
+							{
+								if(toItem.offsetWidth == 0) continue;
+								var barHeightAdjust = toItem.offsetHeight / 2;
+
+							    x1 = toItem.offsetLeft - depLineLength;
+							    y1 = toItem.offsetTop + barHeightAdjust;
+                                x2 = toItem.offsetLeft;
+                                y2 = toItem.offsetTop + barHeightAdjust;
+                            }
+                            else
+                            {
+								if(fromItem.offsetWidth == 0) continue;
+								var barHeightAdjust = fromItem.offsetHeight / 2;
+
+							    x1 = fromItem.offsetLeft + fromItem.offsetWidth;
+							    y1 = fromItem.offsetTop + barHeightAdjust;
+                                x2 = fromItem.offsetLeft + depLineLength;
+                                y2 = fromItem.offsetTop + barHeightAdjust;
+                            }
+                        }
+                        else if(dep.DType == 'StartFinish' || dep.DType == 'FinishFinish')
+                        {
+							// line from LHS of fromItem to RHS of toItem
+							if(fromItem == null)
+							{
+								if(toItem.offsetWidth == 0) continue;
+								var barHeightAdjust = toItem.offsetHeight / 2;
+
+							    x1 = toItem.offsetLeft + toItem.offsetWidth + depLineLength;
+							    y1 = toItem.offsetTop + barHeightAdjust;
+                                x2 = toItem.offsetLeft + toItem.offsetWidth;
+                                y2 = toItem.offsetTop + barHeightAdjust;
+                            }
+                            else
+                            {
+								if(fromItem.offsetWidth == 0) continue;
+								var barHeightAdjust = fromItem.offsetHeight / 2;
+
+							    x1 = fromItem.offsetLeft;
+							    y1 = fromItem.offsetTop + barHeightAdjust;
+                                x2 = fromItem.offsetLeft - depLineLength;
+                                y2 = fromItem.offsetTop + barHeightAdjust;
+                            }
+						}
+
+                        html += getSvgLine( x1, y1, x2, y2, (fromItem == null ? dep.PIPId : dep.PISId), dep.Ext, true, true, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+           			}
+           			else
+           			{
+						var fromItem = getPlanItemBar(dep.PIPId);
+						var toItem = getPlanItemBar(dep.PISId);
+
+						if(dep.Ext && (fromItem == null || fromItem.offsetWidth == 0)) fromItem = getPlanBar(dep.ExtTpId);
+
+						// if either item has no width, it is likely hidden
+						if(fromItem.offsetWidth == 0 || toItem.offsetWidth == 0) continue;
+
+						var barHeightAdjust = fromItem.offsetHeight / 2;
+
+						if(dep.DType == 'FinishStart')
+						{
+							// line from RHS of fromItem to LHS of toItem
+							x1 = fromItem.offsetLeft + fromItem.offsetWidth;
+							y1 = fromItem.offsetTop + barHeightAdjust;
+
+							x2 = toItem.offsetLeft;
+							y2 = toItem.offsetTop + barHeightAdjust;
+
+							var X1=x1, Y1=y1, X2=X1+xSpacerWidth, Y2=Y1;
+							html += getSvgLine( X1, Y1, X2, Y2, null, dep.Ext, false, false, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+
+							X1=X2, Y1=Y2, X2=X2, Y2=Y2+((y2-y1)/2);
+							html += getSvgLine( X1, Y1, X2, Y2, null, dep.Ext, false, false, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+
+							if(x1 == x2)
+							{
+								X1=X2, Y1=Y2, X2=X2-xSpacerWidth*2, Y2=Y2;
+								html += getSvgLine( X1, Y1, X2, Y2, null, dep.Ext, false, false, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+							}
+							else
+							{
+								X1=X2, Y1=Y2, X2=x2-xSpacerWidth, Y2=Y2;
+								html += getSvgLine( X1, Y1, X2, Y2, null, dep.Ext, false, false, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+							}
+
+							X1=X2, Y1=Y2, X2=X2, Y2=Y2+((y2-y1)/2);
+							html += getSvgLine( X1, Y1, X2, Y2, null, dep.Ext, false, false, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+
+							X1=X2, Y1=Y2, X2=x2, Y2=y2;
+							html += getSvgLine( X1, Y1, X2, Y2, dep.PIPId, dep.Ext, false, true, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+						}
+						else if(dep.DType == 'StartFinish')
+						{
+							// line from LHS of fromItem to RHS of toItem
+							x1 = fromItem.offsetLeft;
+							y1 = fromItem.offsetTop + barHeightAdjust;
+
+							x2 = toItem.offsetLeft + toItem.offsetWidth;
+							y2 = toItem.offsetTop + barHeightAdjust;
+
+							var X1=x1, Y1=y1, X2=X1-xSpacerWidth, Y2=Y1;
+							html += getSvgLine( X1, Y1, X2, Y2, null, dep.Ext, false, false, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+
+							X1=X2, Y1=Y2, X2=X2, Y2=Y2+((y2-y1)/2);
+							html += getSvgLine( X1, Y1, X2, Y2, null, dep.Ext, false, false, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+
+							if(x1 == x2)
+							{
+								X1=X2, Y1=Y2, X2=X2+xSpacerWidth*2, Y2=Y2;
+								html += getSvgLine( X1, Y1, X2, Y2, null, dep.Ext, false, false, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+							}
+							else
+							{
+								X1=X2, Y1=Y2, X2=x2+xSpacerWidth, Y2=Y2;
+								html += getSvgLine( X1, Y1, X2, Y2, null, dep.Ext, false, false, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+							}
+
+							X1=X2, Y1=Y2, X2=X2, Y2=Y2+((y2-y1)/2);
+							html += getSvgLine( X1, Y1, X2, Y2, null, dep.Ext, false, false, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+
+							X1=X2, Y1=Y2, X2=x2, Y2=y2;
+							html += getSvgLine( X1, Y1, X2, Y2, dep.PIPId, dep.Ext, false, true, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+						}
+						else if(dep.DType == 'FinishFinish')
+						{
+							// line from RHS of fromItem to RHS of toItem
+							x1 = fromItem.offsetLeft + fromItem.offsetWidth;
+							y1 = fromItem.offsetTop + barHeightAdjust;
+
+							x2 = toItem.offsetLeft+ toItem.offsetWidth;
+							y2 = toItem.offsetTop + barHeightAdjust;
+
+							var X1=x1, Y1=y1, X2=X1+xSpacerWidth, Y2=Y1;
+							html += getSvgLine( X1, Y1, X2, Y2, null, dep.Ext, false, false, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+
+							X1=X2, Y1=Y2, X2=X2, Y2=Y2+((y2-y1)/2);
+							html += getSvgLine( X1, Y1, X2, Y2, null, dep.Ext, false, false, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+
+							if(x1 != x2)
+							{
+								X1=X2, Y1=Y2, X2=x2+xSpacerWidth, Y2=Y2;
+								html += getSvgLine( X1, Y1, X2, Y2, null, dep.Ext, false, false, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+							}
+
+							X1=X2, Y1=Y2, X2=X2, Y2=Y2+((y2-y1)/2);
+							html += getSvgLine( X1, Y1, X2, Y2, null, dep.Ext, false, false, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+
+							X1=X2, Y1=Y2, X2=x2, Y2=y2;
+							html += getSvgLine( X1, Y1, X2, Y2, dep.PIPId, dep.Ext, false, true, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+						}
+						else if(dep.DType == 'StartStart')
+						{
+							// line from LHS of fromItem to LHS of toItem
+							x1 = fromItem.offsetLeft;
+							y1 = fromItem.offsetTop + barHeightAdjust;
+
+							x2 = toItem.offsetLeft
+							y2 = toItem.offsetTop + barHeightAdjust;
+
+							var X1=x1, Y1=y1, X2=X1-xSpacerWidth, Y2=Y1;
+							html += getSvgLine( X1, Y1, X2, Y2, null, dep.Ext, false, false, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+
+							X1=X2, Y1=Y2, X2=X2, Y2=Y2+((y2-y1)/2);
+							html += getSvgLine( X1, Y1, X2, Y2, null, dep.Ext, false, false, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+
+							if(x1 != x2)
+							{
+								X1=X2, Y1=Y2, X2=x2-xSpacerWidth, Y2=Y2;
+								html += getSvgLine( X1, Y1, X2, Y2, null, dep.Ext, false, false, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+							}
+
+							X1=X2, Y1=Y2, X2=X2, Y2=Y2+((y2-y1)/2);
+							html += getSvgLine( X1, Y1, X2, Y2, null, dep.Ext, false, false, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+
+							X1=X2, Y1=Y2, X2=x2, Y2=y2;
+							html += getSvgLine( X1, Y1, X2, Y2, dep.PIPId, dep.Ext, false, true, dep.InfoCls, dep.PISExtOS, dep.IndPos );
+						}
+					}
+				}
+			}
+
+			return html;
+    	}
+
+		function getPlanGanttsHtml()
+		{
+			var html = '';
+
+			html += getDependencyContainerHtml();
+
+			var plansLength = thePlans.TheOrderedPlanIds.length;
+
+			for(var i=0; i < plansLength;i++)
+			{
+				var thePlanId = thePlans.TheOrderedPlanIds[i];
+
+				html += getPlanGanttHtml(thePlans.ThePlans[thePlanId]);
+			}
+
+			html += '<div class="footer-spacer"></div>';
+			return html;
+		}
+
+		var todayDrawn = false;
+		function getHeaderHtml()
+		{
+		    todayDrawn = false;
+
+			theGlobalNonBusinessDays = JSON.parse(thePlans.ViewProperties.GlobalNonBusDaysJson);
+
+			jQuery('#gantt-header-container').paintPeriodsHeader();
+  		}
+
+		function isDateNonBusDay(dte)
+		{
+			return theGlobalNonBusinessDays[dte.toKimbleUTC()] != undefined;
+		}
+
+		function isToday(dte)
+		{
+			return dte.toKimbleUTC() == new Date().toKimbleUTC();
+		}
+
+		function generateWeekName(dte)
+		{
+			var weekStart = kimbleGetStartOfWeek(dte);
+			return kimble.regional.dayNamesShort[weekStart.getDay()] + ' ' + jQuery.datepicker.formatDate(kimble.regional.dateFormat, weekStart);
+		}
+
+  		jQuery.fn.paintPeriodsHeader = function()
+		{
+			var tableHtml = '<div class="period-hdr">';
+			var daysHtml = '<div id="days-header" class="period-header-container">';
+			var weeksHtml = '<div id="weeks-header" class="period-header-container hidden-item">';
+			var monthsHtml = '<div id="months-header" class="period-header-container">';
+			var quartersHtml = '<div id="quarters-header" class="period-header-container hidden-item">';
+
+			var daySpan = 0;
+			colspanAll = 0;
+			
+			var startDate = (new Date(Date.parse(thePlans.ViewProperties.StartDateUTC)));
+			var endDate = (new Date(Date.parse(thePlans.ViewProperties.EndDateUTC)));
+			
+			if(startDate.getTimezoneOffset() > 0)
+			{
+			    startDate = new Date(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate(), 0, 0, 0, 0);
+			    endDate = new Date(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate() , 0, 0, 0, 0);
+			}
+			
+			if (!thePlans.ViewProperties.ShowNonBusDays)
+			{
+				while (isDateNonBusDay(startDate))
+				{
+					startDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + 1, 0, 0, 0, 0);
+				}
+			}
+			
+			var isFirstDay = true;
+			
+			while (startDate.valueOf() < endDate.valueOf())
+			{
+				var nextDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + 1, 0, 0, 0, 0);
+				var previousDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() - 1, 0, 0, 0, 0);
+
+				if (!thePlans.ViewProperties.ShowNonBusDays)
+				{
+					while (isDateNonBusDay(nextDay))
+					{
+						nextDay = new Date(nextDay.getFullYear(), nextDay.getMonth(), nextDay.getDate() + 1, 0, 0, 0, 0);
+					}
+				}
+
+				var dayCellContents = '';
+
+				var isLastDayOfWeek = (kimbleGetStartOfWeek(startDate).valueOf()  != kimbleGetStartOfWeek(nextDay).valueOf());
+
+				var isNonBusDay = isDateNonBusDay(startDate);
+
+				if(isNonBusDay)
+				{
+					dayCellContents += '<div class="relative"><div class="non-bus-day-strip"></div></div>';
+				}
+
+				if(!todayDrawn && isToday(startDate))
+				{
+					todayDrawn = true;
+					dayCellContents += '<div class="relative"><div class="today-line marker-line"></div></div>';
+				}
+
+				dayCellContents += '<span class="day-head ' + (isNonBusDay?' non-bus-day':'') + '">' + kimble.regional.dayNamesShort[startDate.getDay()].substring(0,1) + ' ' + startDate.getDate() + '</span>';
+
+				if (!thePlans.ViewProperties.ShowNonBusDays && isNonBusDay)
+				{
+					dayCellContents += '<div class="non-bus-day-overlay"></div>';
+				}
+
+				var dayCellHtml = '<div id="day' + startDate.valueOf() + '" class="' + (isNonBusDay?' td-non-bus-day':'') + '">' + dayCellContents + '</div>';
+
+				daysHtml += dayCellHtml;
+
+				colspanAll++;
+
+				//if next day belongs to same month then add one to the colspan
+				if (startDate.getMonth() == nextDay.getMonth())
+				{
+					 daySpan++;
+				}
+				else //next date belongs another month
+				{
+					monthsHtml += ('<div class="month-head" style="--dayspan:' + (daySpan + 1) + '"><span class="m-name">' + kimble.regional.monthNames[startDate.getMonth()] + ' ' + startDate.getFullYear() + '</span></div>');
+					daySpan = 0;
+				}
+				
+				// WEEKS
+				var isStartOfWeek = (kimbleGetStartOfWeek(startDate).valueOf()  != kimbleGetStartOfWeek(previousDay).valueOf());
+				
+				if(isStartOfWeek == true || isFirstDay)
+				{
+    				var weekName = generateWeekName(startDate);
+    				
+					var weekCellContents = '<span class="week-head">' + weekName + '</span>';
+					
+					var nextWeekDay = nextDay;
+
+					while (kimbleGetStartOfWeek(startDate).valueOf()  == kimbleGetStartOfWeek(nextWeekDay).valueOf() && nextWeekDay.valueOf() <= endDate.valueOf())
+					{
+						nextWeekDay = new Date(nextWeekDay.getFullYear(), nextWeekDay.getMonth(), nextWeekDay.getDate() + 1, 0, 0, 0, 0);
+					}
+
+					var Wdays = calcDaysBetween(nextWeekDay, startDate);
+
+					var weekCellHtml = '<div id="week' + startDate.valueOf() + '" style="--Wdays:' + Wdays + '; ' + (Wdays < 4 ? ' font-size: 0px !important' : '') + '" class="week-cell">' + weekCellContents + '</div>';
+
+					weeksHtml += weekCellHtml;
+			    }
+			    
+			    // QUARTERS
+				QKeys = Object.keys(thePlans.TheQuarterDates);
+				
+			    if(QKeys.length > 0 && (isFirstDay || thePlans.TheQuarterDates[startDate.toKimbleUTC()] != undefined))
+			    {
+					var Qdays = 0;
+					var Qrow = 0;
+					var QstartDate;
+					var startDateYear = startDate.getYear();
+					var startDateMonth = startDate.getMonth();
+					var startDateDay = startDate.getDay();
+					
+					for(Qrow; Qrow < QKeys.length; Qrow++)
+					{
+					    var theDate = QKeys[Qrow].toDate();
+					    var quarterYear = theDate.getYear();
+					    var quarterMonth = theDate.getMonth();
+					    var quarterDay = theDate.getDay();
+					
+						if((quarterYear > startDateYear) || (quarterYear == startDateYear && quarterMonth > startDateMonth) || (quarterYear == startDateYear && quarterMonth == startDateMonth && quarterDay > startDateDay))
+						{
+							Qrow--;
+							break;
+						}
+					}
+					
+					if(isFirstDay) 
+						QstartDate = startDate;
+					else 
+						QstartDate = QKeys[Qrow].toDate();
+					
+					if(QKeys[Qrow + 1] != undefined)
+					    Qdays = calcDaysBetween(QKeys[Qrow + 1].toDate(), QstartDate);
+					else
+						Qdays = calcDaysBetween(endDate, QstartDate);
+						
+					if(Qdays > calcDaysBetween(endDate, QstartDate)) 
+						Qdays = calcDaysBetween(endDate, QstartDate);
+
+					var quarterName = thePlans.TheQuarterDates[QKeys[Qrow]];
+					var quarterCellContents = '<span class="quarter-head">' + quarterName + '</span>';
+					var quarterCellHtml = '<div id="quarter' + QstartDate.valueOf() + '" style="--Qdays:' + Qdays + '; ' + (Qdays < 20 ? ' font-size: 0px !important' : '') + '" class="quarter-cell">' + quarterCellContents + '</div>';
+
+					quartersHtml += quarterCellHtml;
+				}
+				else if(QKeys.length == 0 && isFirstDay)
+				{
+					var quarterCellContents = '<span class="quarter-head"></span>';
+					var quarterCellHtml = '<div id="quarter' + startDate.valueOf() + '" style="--Qdays:' + calcDaysBetween(endDate, startDate) + '; " class="quarter-cell">' + quarterCellContents + '</div>';
+					quartersHtml += quarterCellHtml;
+				}
+
+				startDate = nextDay;
+				isFirstDay = false;
+			}
+
+			monthsHtml += ('<div class="month-head" style="--dayspan:' + (daySpan + 1) + '"><span class="m-name">' + kimble.regional.monthNames[startDate.getMonth()] + ' ' + startDate.getFullYear() + '</span></div>');
+
+			this.append(tableHtml + '</div>');
+			this.find('.period-hdr').append(monthsHtml + '</div>');
+			this.find('.period-hdr').append(weeksHtml + '</div>');
+			this.find('.period-hdr').append(quartersHtml + '</div>');
+			this.find('.period-hdr').append(daysHtml + '</div>');
+		};
+		
+		function calcDaysBetween(date1, date2)
+		{
+		    if(thePlans.ViewProperties.ShowNonBusDays || date2.valueOf() >= date1.valueOf())
+		    	return daysBetween(date1, date2);
+
+			dayCount = 0;
+			
+			while (date2.valueOf() < date1.valueOf())
+			{
+				var nextDay = new Date(date2.getFullYear(), date2.getMonth(), date2.getDate() + 1, 0, 0, 0, 0);
+
+				if (!isDateNonBusDay(nextDay))
+				{
+				    dayCount += 1;
+				}
+				
+				date2 = nextDay;
+			}
+					
+			return dayCount;
+  		}
+
+		function populatePlans()
+		{
+			jQuery('#grid-body-container').html(getPlansHtml());
+			getHeaderHtml();
+			jQuery('#gantt-body-container').html(getPlanGanttsHtml());
+
+			jQuery('#gantt-view').attr('style','--totalDays:' + thePlans.ED + ';');
+
+			initialiseSummaryTasks();
+
+			setGanttRowHeights();
+			setHeaderWidths();
+
+			drawDependencies();
+
+			handleResize();
+
+			initialiseDynamicElements();
+						
+			initialiseFilter();
+			applyCookie();
+		}
+
+		function initialiseSummaryTasks()
+		{
+		    // hide child items where persisted summary is collapsed
+			jQuery('.branch:not(.exp)').each(function() {
+				var planItem = jQuery(this);
+				hideNodes(planItem);
+			});
+		}
+
+		function drawDependencies()
+		{
+		    jQuery('#dep-container').html(getDependencyHtml());
+
+			jQuery('.external-dep-ind').remove();
+			jQuery('.ext-d:not(.ext-alert).end').each(function () {
+			    var externalItemInd = getExternalDepHtml(false, jQuery(this));
+				jQuery(externalItemInd).appendTo('#gantt-body-container');
+			});
+		    jQuery('.ext-d.ext-alert.end').each(function () {
+				var externalItemInd = getExternalDepHtml(true, jQuery(this));
+				jQuery(externalItemInd).appendTo('#gantt-body-container');
+			});
+  		}
+
+  		function getExternalDepHtml(isAlert, theItem)
+  		{
+			var leftPos = (parseInt(theItem.attr('x1')) > parseInt(theItem.attr('x2')) ? parseInt(theItem.attr('x1')) + 5 : parseInt(theItem.attr('x1')) - 18);
+			var topPos = theItem.attr('y1') - 9;
+
+  		    // cannot use jQuery to query active classes on an svg line
+  		    var cls = theItem.attr('class');
+  		    var titleText = l['ExtDepInd'];
+
+			if(cls.includes('s-not-in-scope'))
+			{
+  		        titleText = l['ExtDepSuccInd'];
+			}
+   			else if(cls.includes('s-b-f'))
+  		    {
+  		        titleText = l['ExtDepInds-b-f'];
+        	}
+        	else if(cls.includes('s-n-s'))
+        	{
+        	    titleText = l['ExtDepInds-n-s'];
+			}
+			else if(cls.includes('f-b-s'))
+			{
+				titleText = l['ExtDepIndf-b-s'];
+			}
+			else if(cls.includes('f-n-f'))
+			{
+				titleText = l['ExtDepIndf-n-f'];
+			}
+
+            if(jQuery('i[ind-pos="' + theItem.attr('ind-pos') + '"]').length > 0)
+            {
+                if(isAlert)
+                {
+                    jQuery('i[ind-pos="' + theItem.attr('ind-pos') + '"]').addClass('alert');
+                    jQuery('i[ind-pos="' + theItem.attr('ind-pos') + '"]').attr('title', titleText);
+                }
+                
+                return '';
+            }
+            
+			return '<i pi-id="' + theItem.attr('pi-id') + '"' + ' ind-pos="' + theItem.attr('ind-pos') + '" class="external-dep-ind fa fa-external-link-square' + (isAlert ? ' alert' : '') +'" style="top:' + topPos + 'px;left:' + leftPos + 'px;" title="' + titleText + '"></i>';
+    	}
+
+		function scrollAndShowPlan(planId)
+		{
+		    var theItm = jQuery('.phdr-g[tp-id="' + planId + '"] .phdr-g-bar');
+		    scrollToItemAndFlash(theItm);
+		}
+
+		function scrollAndShowPlanItem(planItemId)
+		{
+		    var theItm = jQuery('.pitm-g[pi-id="' + planItemId + '"] .pitm-g-bar');
+			scrollToItemAndFlash(theItm);
+		}
+
+		function scrollToItemAndFlash(theItm)
+		{
+			if (!isInViewport(theItm[0]))
+			{
+			    var left = theItm.position().left;
+				jQuery("#gantt-view").animate({ scrollLeft: left - 80 }, "fast");
+			}
+
+			theItm.fadeOut(400).fadeIn(400).fadeOut(400).fadeIn(400);
+		}
+
+		var isInViewport = function (elem) {
+		    var leftPanelWidth = jQuery('#grid-layout').width() + jQuery('#grid-layout').offset().left;
+			var bounding = elem.getBoundingClientRect();
+			return (
+				bounding.top >= 0 &&
+				bounding.left - leftPanelWidth >= 0 &&
+				bounding.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+				bounding.right <= (window.innerWidth || document.documentElement.clientWidth)
+			);
+		};
+
+		function initialiseDynamicElements()
+		{
+			jQuery('#gantt-vertical-scroll-container').scroll(function() {
+			    var newTop = jQuery('#gantt-vertical-scroll-container').scrollTop();
+			    jQuery('#grid-body-container').prop('scrollTop', newTop);
+			    jQuery('#gantt-body-container').prop('scrollTop', newTop);
+	  		});
+
+			jQuery( "#zoom-slider" ).slider({
+				min:1,
+				max:28,
+				value:28,
+				slide: function(event, ui) {
+					zoomTo(ui.value);
+				}
+			});
+
+			jQuery('.jump-to-plan').prop('title', l['OpenPlan']);
+
+			jQuery(document).off('mouseover', '.external-dep-ind');
+			jQuery(document).on('mouseover', '.external-dep-ind', function (event) {
+				  var j = jQuery(this);
+
+				  var tipHtml = buildExternalDependencyQtipHtml(j);
+
+				  //tooltips
+				  j.qtip('destroy', true);
+
+				  j.qtip({
+					  overwrite: true,
+					  hide: 'unfocus',
+					  show: {
+						  solo:true,
+						  ready: true // Show immediately - important!
+					  },
+					  style: {
+						  classes: 'qtip-light qtip-shadow qtip-rounded external-ind-qtip'
+					  },
+					  content: {
+						  text: tipHtml,
+						  title: j.attr('title'),
+						  button: 'Close'
+					  },
+					  position: { adjust: { method: 'flip flip'
+						  },
+						  viewport: $(window)
+					  }
+				  });
+			});
+
+			jQuery('.charm-external-links').toggle(thePlans.HasExt);
+			jQuery('.charm-external-links').toggleClass('cardIconWarn', thePlans.HasExtAlerts == true);
+			jQuery('.charm-external-links').toggleClass('cardIconInfo', thePlans.HasExtAlerts == false);
+			jQuery('.charm-external-links.cardIconWarn').attr('title', l['PlanExtDepsAlert'])
+			jQuery('.charm-external-links.cardIconInfo').attr('title', l['PlanExtDeps'])
+			jQuery('.charm-external-links:visible').qtip('destroy').qtip({style: {classes: 'qtip-light qtip-shadow',width: 200}});
+
+			if(thePlans.HasExt == undefined)
+			{
+			    jQuery('.charm-external-links').hide();
+			    jQuery('.tracking-plan-charms').hide();
+   			}
+   			
+	  		refreshVerticalScroll();
+		}
+
+		function initialise()
+		{
+			initialiseActions();
+			initialiseLayout();
+		}
+		
+		jQuery(window).load(function(){
+		    initialise();	
+			// done within load rather than ready as requires site master to be complete
+			getThePlansForContext();
+
+			initialiseHandlebars();
+			
+			initialiseFilter();
+		});
+
+		function initialiseHandlebars()
+		{
+            //register templates
+            jQuery.each(jQuery('script[type="text/x-handlebars-template"]:not([partial]'), function (i, s) {
+                handlebarsTemplates[s.id] = Handlebars.compile(s.innerHTML);
+            });
+
+            //register partials
+            jQuery.each(jQuery('script[type="text/x-handlebars-template"][partial="true"]'), function (i, s) {
+                Handlebars.registerPartial(s.id, s.innerHTML);
+            });
+
+            Handlebars.registerHelper('formatNum', function(numVal){
+              return kimble.formatNumber(numVal, "#.##");
+            });
+
+            Handlebars.registerHelper('formatUTCDate', function(UTCDate){
+              return kimble.formatDate(UTCDate);
+            });
+
+            Handlebars.registerHelper('planItemIds', function(planItem){
+              return '';
+            });
+
+            Handlebars.registerHelper('cTypeHtml', function(dte, ctype, ignoreNBD){
+              return getConstraintHtml(dte, ctype, ignoreNBD);
+            });
+
+			Handlebars.registerHelper('eq', function(lvalue, rvalue) {
+                return lvalue==rvalue;
+            });
+		}
+
+		function getConstraintHtml(constraintDate, constraintType, ignoreNBD)
+		{
+			var formattedConstraintDate = (constraintDate != null ? jQuery.datepicker.formatDate(kimble.regional.dateFormat, constraintDate.toDate()) : '');
+
+			var constraintHtml = '';
+			var titleText = planItemConstraintIdToNameMap[constraintType];
+			var constraintIndClass = 'constraint-ind';
+
+			var calendarIcon = (ignoreNBD ? 'fa-calendar-o' : 'fa-calendar');
+
+			if(planItemConstraintIdToEnumMap[constraintType] == 'AsSoonAsPossible'
+				|| planItemConstraintIdToEnumMap[constraintType] == 'AsLateAsPossible')
+			{
+				constraintIndClass += ' ' + calendarIcon;
+			}
+			else if(planItemConstraintIdToEnumMap[constraintType] == 'ManuallyScheduled')
+			{
+				constraintIndClass += ' fa-thumb-tack fixed-constraint';
+			}
+			else if(planItemConstraintIdToEnumMap[constraintType] == 'MustStartOn'
+				|| planItemConstraintIdToEnumMap[constraintType] == 'StartNoEarlierThan'
+				|| planItemConstraintIdToEnumMap[constraintType] == 'StartNoLaterThan'
+				|| planItemConstraintIdToEnumMap[constraintType] == 'MustFinishOn'
+				|| planItemConstraintIdToEnumMap[constraintType] == 'FinishNoEarlierThan'
+				|| planItemConstraintIdToEnumMap[constraintType] == 'FinishNoLaterThan')
+			{
+				titleText += ': ' + formattedConstraintDate;
+				constraintIndClass += ' ' + calendarIcon + ' fixed-constraint';
+			}
+
+			if(ignoreNBD) titleText += ' (' + kimble.labels['ignore-nbd'] + ')';
+
+			constraintHtml += '<i class="fa ' + constraintIndClass + '" title="' + titleText + ' "></i>';
+
+			return constraintHtml;
+		}
+
+		function buildExternalDependencyQtipHtml(theIndicator)
+		{
+			var html = '<div class="external-dep-details-container">';
+
+			html += '<table class="list external-dep-list">';
+			html += '<thead>';
+
+			html += '<th>' + l['DeliveryElement'] + '</th>';
+			html += '<th>' + l['ItemName'] + '</th>';
+			html += '<th>' + l['PlanItemType'] + '</th>';
+			html += '<th>' + l['StartDate'] + '</th>';
+			html += '<th>' + l['EndDate'] + '</th>';
+
+			html += '</thead>';
+			html += '<tbody>';
+
+			var depKey = theIndicator.attr('ind-pos');
+
+			var thisItemDeps = thePlans.ExternalPlanItemDs[depKey];
+
+			if(thisItemDeps != null)
+			{
+				for(var j = 0; j < thisItemDeps.length; j++)
+				{
+					var externalPlanItem = thisItemDeps[j];
+
+					html += '<tr>';
+
+					html += '<td>' + externalPlanItem.ExtElementName + '</td>';
+					var jumpToPlanLink = "javascript:jumpToPlan('" + externalPlanItem.ExtTpId + "');";
+					html += '<td><a class="jump-to-plan undecorated-link" href="' + jumpToPlanLink + '">' + externalPlanItem.ExtItmName + '</a></td>';
+					html += '<td>' + externalPlanItem.ExtItmType + '</td>';
+					html += '<td>' + kimble.formatDate(externalPlanItem.ExtSDUTC) + '</td>';
+					html += '<td>' + kimble.formatDate(externalPlanItem.ExtEDUTC) + '</td>';
+
+					html += '</tr>';
+				}
+			}
+
+			html += '</tbody>';
+			html += '</table>';
+			html += '</div>';
+
+			return html;
+		}
+
+		function jumpToPlan(trackingPlanId)
+		{
+			safeNavigateToSForceURL(trackingPlanUrl + trackingPlanId + '&filterId=' + trackingPlanId);
+		}
+
+		function initialiseActions()
+		{
+			jQuery(document).off('click', '.pitm-name').on('click', '.pitm-name', function (event) {
+	 	        scrollAndShowPlanItem(jQuery(this).parent().attr('pi-id'));
+            });
+
+			jQuery(document).off('click', '.tp-name').on('click', '.tp-name', function (event) {
+			    scrollAndShowPlan(jQuery(this).parent().attr('tp-id'));
+            });
+
+			jQuery(document).off('click', '.jump-to-plan').on('click', '.jump-to-plan', function (event) {
+			    safeNavigateToSForceURL(trackingPlanUrl + jQuery(this).parent().parent().attr('tp-id') + '&filterId=' + jQuery(this).parent().parent().attr('tp-id'));
+            });
+
+			jQuery(document).off('click', '.indent').on('click', '.indent', function (event) {
+			    toggleTreeNode(jQuery(this));
+            });
+            
+			jQuery(document).off('click', '#printGridButton').on('click', '#printGridButton', printGrid);
+			jQuery(document).off('click', '#printGanttButton').on('click', '#printGanttButton', printGantt);
+		}
+
+		function setLayoutHeight()
+		{
+		    var salesforceHeaderFooterHeight = jQuery('#layout-container').offset().top;
+			jQuery('#layout-container').height(jQuery(window).height() - salesforceHeaderFooterHeight);
+  		}
+
+		function setGanttHeight()
+		{
+		    var maxGanttSectionHeight = jQuery('#layout-container').height() - jQuery('#gantt-header-container').height();
+			jQuery('#gantt-body-container, #grid-body-container').css('max-height', maxGanttSectionHeight);
+			jQuery('#gantt-body-container, #grid-body-container').css('height', maxGanttSectionHeight);
+			var topOffset = (isSFClassic() ? -7 : 107);
+			jQuery('#gantt-vertical-scroll-container').height(maxGanttSectionHeight - 20).css('top', jQuery('#layout-container').offset().top - jQuery('#gantt-header-container').height() + topOffset);
+			jQuery('.week-divider, .non-bus-day-overlay, .non-bus-day-strip').height(jQuery('#layout-container').height() - jQuery('.day-head').height());
+  		}
+
+  		function handleResize(resizing)
+  		{
+			if(resizing)
+			{
+			    setGanttRowHeights();
+			    setHeaderWidths();
+			}
+  		    setLayoutHeight();
+			setGanttHeight();
+			setDepContainerDimensions();
+			refreshVerticalScroll();
+
+			screenLayout.sizePane( 'east', jQuery('#layout-container').width() - jQuery('.plan-grid-container').width() - 10);
+
+			if(resizing) drawDependencies();
+    	}
+
+    	function setDepContainerDimensions()
+    	{
+    		jQuery('#dep-container').css('height', Math.max(1, jQuery('.plan-grid-container .pitm, .plan-grid-container .phdr').length * 27));
+     	}
+
+     	function setHeaderWidths()
+     	{
+			var dayHeaderWidth = getComputedWidth('#days-header div:first()');
+			document.documentElement.style.setProperty('--dw', dayHeaderWidth + 'px');
+      	}
+
+     	function setGanttRowHeights()
+		{
+			matchComputedHeight('.phdr','.phdr-g');
+			matchComputedHeight('.pitm','.pitm-g');
+		}
+
+		var screenLayout;
+		function initialiseLayout()
+		{
+		    setLayoutHeight();
+
+		   	screenLayout = jQuery('#layout-container').layout({
+				maskIframesOnResize: true,
+				livePaneResizing:   true,
+				east__size: .70
+			});
+
+		  	setGanttHeight();
+
+			jQuery(window).resize(function() {
+				handleResize(true);
+			});
+  		}
+
+		function refreshVerticalScroll()
+		{
+			if (jQuery('#grid-body-container .plan-grid-container').height() > jQuery('#grid-body-container').height())
+				jQuery('#verticalScroll').height(jQuery('#grid-body-container .plan-grid-container').height()).show();
+			else
+				jQuery('#verticalScroll').hide();
+		}
+
+		function toggleTreeNode(node)
+		{
+			var planItem = node.parent('div');
+
+			if (!planItem.hasClass('branch')) return;
+
+			if (planItem.hasClass('exp'))
+			{
+				hideNodes(planItem);
+				planItem.removeClass('exp');
+			}
+			else
+			{
+				showNodes(planItem);
+				planItem.addClass('exp');
+				if(isCollapsed == true)
+				{
+					isCollapsed = false;
+				    setCookie();
+    			}
+			}
+
+			handleResize();
+			drawDependencies();
+		}
+
+		function expandAll()
+		{
+			jQuery('.pitm, .pitm-g').removeClass('clpsd-node');
+			jQuery('.branch').addClass('exp');
+			drawDependencies();
+			handleResize();
+			if(isCollapsed == true)
+			{
+				isCollapsed = false;
+			    setCookie();
+   			}
+  		}
+
+		function collapseAll()
+		{
+			jQuery('.pitm, .pitm-g').addClass('clpsd-node');
+			jQuery('.branch').removeClass('exp');
+			drawDependencies();
+			handleResize();
+			isCollapsed = true;
+  		}
+
+		function showNodes(node)
+		{
+		    if(node.hasClass('phdr'))
+		    {
+		        jQuery('.pitm[tp-id="' + node.attr('tp-id') + '"], .pitm-g[tp-id="' + node.attr('tp-id') + '"]').removeClass('clpsd-node');
+      		}
+      		else
+      		{
+      		    //expand all child tasks and recurse to their children
+      		    var childNodes = jQuery('.pitm[pip-id="' + node.attr('pi-id') + '"], .pitm-g[pip-id="' + node.attr('pi-id') + '"]');
+      		    jQuery.each(childNodes, function (i, child) {
+					var childNode = jQuery(child);
+					childNode.removeClass('clpsd-node');
+					showNodes(childNode);
+				});
+        	}
+		}
+
+		function hideNodes(node)
+		{
+		    // if this is plan header hide all the children
+		    if(node.hasClass('phdr'))
+		    {
+		        jQuery('.pitm[tp-id="' + node.attr('tp-id') + '"], .pitm-g[tp-id="' + node.attr('tp-id') + '"]').addClass('clpsd-node');
+      		}
+      		else
+      		{
+      		    //collapse all child tasks and recurse to their children
+      		    var childNodes = jQuery('.pitm[pip-id="' + node.attr('pi-id') + '"], .pitm-g[pip-id="' + node.attr('pi-id') + '"]');
+      		    jQuery.each(childNodes, function (i, child) {
+					var childNode = jQuery(child);
+					childNode.addClass('clpsd-node');
+					hideNodes(childNode);
+				});
+        	}
+		}
+
+		function resizeTrackingPlan(obj)
+		{
+			toggleTrackingPlan(obj.hasClass('standard-view'));
+
+			obj.toggleClass('standard-view');
+			obj.find('i').toggleClass('fa-expand');
+			obj.find('i').toggleClass('fa-compress');
+			obj.toggleClass('maximised-view');
+
+			obj.prop('title', (obj.hasClass('maximised-view') ? obj.attr('restore-title') : obj.attr('maximise-title')));
+		}
+
+		function toggleTrackingPlan(maximise)
+		{
+			jQuery('#side-bar-container, #kimble-page-header-container').toggleClass('hide-for-maximised', maximise);
+
+			jQuery('.sfdcBody').toggleClass('prevent-scroll', maximise);
+			if(isSFLightning()) jQuery('.sfdcBody').closest('html').toggleClass('prevent-scroll', maximise);
+
+			jQuery(window).resize();
+		}
+
+		function zoomTo(newVal)
+		{
+			document.documentElement.style.setProperty('--hdw', newVal + 'px');
+			var dayHeaderWidth = getComputedWidth('#days-header div:first()');
+			document.documentElement.style.setProperty('--dw', (dayHeaderWidth != 0 ? dayHeaderWidth : newVal) + 'px');
+
+		    drawDependencies();
+		    
+			jQuery('div#days-header').toggleClass('days-hidden', newVal <= 14);
+			jQuery('div#weeks-header').toggleClass('hidden-item', newVal <= 8 || newVal > 14);
+			jQuery('div#quarters-header').toggleClass('hidden-item', newVal > 8);
+			
+			jQuery('div#days-header').toggleClass('hide-text', newVal < 24);
+			jQuery('div#weeks-header').toggleClass('hide-text', newVal < 10);
+  		}
+
+		function hideWorking()
+		{
+			jQuery('#data-loading').addClass('hidden-item');
+		}
+		
+		function showWorking()
+		{
+			jQuery('#data-loading').removeClass('hidden-item');
+		}
+		
+		function printGrid()
+		{
+		    jQuery('#gantt-layout').hide();
+		    window.print();
+		    jQuery('#gantt-layout').show();
+  		}
+		
+		function printGantt()
+		{
+		    jQuery('#grid-layout').hide();
+		    window.print();
+		    jQuery('#grid-layout').show();
+  		}
+        
+        function applyPlansFilter()
+        {
+  		    jQuery('.pitm-g.T:not(.smry),.pitm.T:not(.smry)').toggleClass('hidden-item', !jQuery('#show-tasks').prop('checked'));
+  		    jQuery('.pitm-g.T.smry,.pitm.T.smry').toggleClass('hidden-item', !jQuery('#show-smry').prop('checked'));
+  		    jQuery('.pitm-g.PM,.pitm.PM,.pitm-g.RM,.pitm.RM').toggleClass('hidden-item', !jQuery('#show-ms').prop('checked'));
+			jQuery('.phdr-g-bar:not(.filter-key),.phdr-g-bar-lbl').toggleClass('hidden-item', !jQuery('#show-smry-bar').prop('checked'));
+
+			// show external dependencies
+			if(jQuery('#show-ext').prop('checked') && (!jQuery('#show-tasks').prop('checked') || !jQuery('#show-ms').prop('checked')))
+			{
+				for(var i = 0; i < Object.keys(thePlans.ExternalPlanItemDs).length; i++)
+				{
+				    var planItem = thePlans.ExternalPlanItemDs[Object.keys(thePlans.ExternalPlanItemDs)[i]];
+				    
+				    for(var j = 0; j < planItem.length; j++)
+				    {
+						var dep = planItem[j];
+						jQuery('[pi-id="' + dep.PIPId + '"], [pi-id="' + dep.PISId + '"]').toggleClass('hidden-item', !jQuery('#show-ext').prop('checked'));
+       				}
+				}
+			}
+			
+  		    finishFilter();
+        }
+        
+        function finishFilter()
+        {
+    		jQuery('#PlansFilterPopup').hide();
+  		    drawDependencies();
+			setFilterHighlight();
+            handleResize();
+            setCookie();
+        }
+        
+        function initialiseFilter()
+        {
+            jQuery('.filter-row input[type="checkbox"]').prop('checked', true);
+        }
+        
+        function setFilterHighlight()
+        {
+            var filterApplied = false;
+			            
+            jQuery.each(jQuery('.filter-row input[type="checkbox"]'), function (i, s) {
+                if(!jQuery(this).prop('checked'))
+                {
+                    filterApplied = true;
+                    return false;
+                }
+            });
+            
+			jQuery('.filterPlanButton').toggleClass('toolbar-button-selected', filterApplied);
+        }
+        
+        var isCollapsed = false;
+        
+        function setCookie()
+        {
+            // cookie: IsCollapsed; Plan Summaries filter; Summary Tasks filter; Tasks filter; Milestones filter; External Dependencies filter
+            
+            var planSumFltr = jQuery('#show-smry-bar').prop('checked');
+            var sumTasksFltr = jQuery('#show-smry').prop('checked');
+            var tasksFltr = jQuery('#show-tasks').prop('checked');
+            var msFltr = jQuery('#show-ms').prop('checked');
+            var extDependenciesFltr = jQuery('#show-ext').prop('checked');
+            
+            var cookie = isCollapsed + ';' + planSumFltr + ';'  + sumTasksFltr + ';'  + tasksFltr + ';'  + msFltr + ';'  + extDependenciesFltr;
+   		    createCookie('kimble.trackingplanfilterpreferences', cookie);
+        }
+        
+        function applyCookie()
+        {
+            // cookie: IsCollapsed; Plan Summaries filter; Summary Tasks filter; Tasks filter; Milestones filter; External Dependencies filter
+            var theCookie = readCookie('kimble.trackingplanfilterpreferences');
+            
+            if(theCookie != null)
+            {
+				theCookie = theCookie.split(';');
+				
+				// IsCollapsed
+				if(theCookie[0] == "true") collapseAll();
+				
+				// Plan Summaries filter
+				if(theCookie[1] == "false") jQuery('#show-smry-bar').prop('checked', false);
+				
+				// Summary Tasks filter
+				if(theCookie[2] == "false") jQuery('#show-smry').prop('checked', false);
+				
+				// Tasks filter
+				if(theCookie[3] == "false") jQuery('#show-tasks').prop('checked', false);
+				
+				// Milestones filter
+				if(theCookie[4] == "false") jQuery('#show-ms').prop('checked', false);
+				
+				// External Dependencies filter
+				if(theCookie[5] == "false") jQuery('#show-ext').prop('checked', false);
+				
+				applyPlansFilter();
+            }
+        }
+        
+        function zoomIn()
+        {
+            var val = jQuery( "#zoom-slider" ).slider('value');
+            if(val < 28)
+            {
+				val = Math.min(val + 2, 28);
+				jQuery( "#zoom-slider" ).slider('value', val);
+				zoomTo(val);
+            }
+        }
+        
+        function zoomOut()
+        {
+            var val = jQuery( "#zoom-slider" ).slider('value');
+            if(val > 1)
+            {
+				val = Math.max(val - 2, 1);
+				jQuery( "#zoom-slider" ).slider('value', val);
+				zoomTo(val);
+            }
+        }
+        
+        function selectAllCheckboxes()
+        {
+            var allSelected = true;
+            jQuery.each(jQuery('.filter-row input[type="checkbox"]'), function (i, s) {
+                if(!jQuery(this).prop('checked'))
+                {
+    	    		jQuery('.filter-row input[type="checkbox"]').prop('checked', true);
+    	    		allSelected = false;
+                    return false;
+                }
+            });
+            
+			if(allSelected) jQuery('.filter-row input[type="checkbox"]').prop('checked', false);
+        }
+        
+	</script>
+
+	<apex:outputPanel id="ErrorMessages">
+		<apex:pageMessages escape="false"/>
+	</apex:outputPanel>
+	<div id="remote-action-error" style="display:none"><span><div class="message errorM3"><table border="0" cellpadding="0" cellspacing="0" class="messageTable" style="padding:0px;margin:0px;"><tbody><tr valign="top"><td><img alt="error" class="msgIcon" src="/s.gif" title="{!$Label.Error}"/></td><td class="messageCell"><div class="messageText" id="remote-action-error-text"><br/></div></td></tr><tr><td></td><td></td></tr></tbody></table></div></span></div>
+
+
+	<div id="data-loading" class="hidden-item"><i class="fa fa-circle-o-notch fa-spin"></i></div>
+
+	<div id="layout-container">
+		<div id="grid-layout" class="ui-layout-center">
+			<div id="grid-header-container">
+				<div id="toolbar-container">
+					<div class="toolbar">
+						<div class="control-cell no-select" id="toolbar-buttons">
+							<a class="toolbar-button-single" href="javascript:void(0);" onclick="expandAll();" title="{!JSENCODE($Label.ExpandAll)}"><div class="toolbar-button toggle-btn bigger-btn" id="expand-all"><i class="fa fa-plus-square"></i></div></a>
+							<a class="toolbar-button-single" href="javascript:void(0);" onclick="collapseAll();setCookie();" title="{!JSENCODE($Label.CollapseAll)}"><div class="toolbar-button toggle-btn bigger-btn" id="collapse-all"><i class="fa fa-minus-square"></i></div></a>
+							<a href="javascript:void(0);" onclick="resizeTrackingPlan(jQuery(this));" title="{!$Label.MaximiseLabel}" maximise-title="{!$Label.MaximiseLabel}" restore-title="{!$Label.RestoreLabel}" class="standard-view toolbar-button-single"><div class="toolbar-button toggle-btn bigger-btn" id="resizeTrackingPlanButton"><i class="fa fa-expand"></i></div></a>
+							<a class="toolbar-button-double" href="javascript:void(0);" onclick="window.print();" title="{!JSENCODE($Label.Print)}"><div class="toolbar-button bigger-btn" id="print-all"><i class="fa fa-print"></i></div></a>
+							<a data-floating-dropdown="#print-button-floating-dropdown" class="toolbar-button button-right addButton toolbar-button-single" title="{!$Label.Print}" href="#"><div class="toolbar-button toggle-btn bigger-btn" id="print-2"><i class="fa fa-caret-down"></i></div></a>
+                            <a class="toolbar-button-single" href="javascript:void(0);" onclick="jQuery('#PlansFilterPopup').show();" title="{!JSENCODE($Label.Filter)} {!($ObjectType.PlanItem__c.Label)}"><div class="toolbar-button toggle-btn bigger-btn filterPlanButton"><i class="fa fa-filter"></i></div></a>
+							
+                            <div id="print-button-floating-dropdown" class="floating-dropdown floating-dropdown-relative" style="margin-top:1px">
+                                <ul class="floating-dropdown-menu"> 
+                                    <li><a href="#" id="printGridButton">{!$Label.Gridview}</a></li>
+                                    <li><a href="#" id="printGanttButton">{!$Label.GanttViewButton}</a></li>
+                                </ul>
+                            </div>
+						</div>
+					</div>
+				</div>
+				<div id="zoom-slider-key"><i class="fa fa-search-minus zoom-out" onclick="zoomOut();"></i><i class="fa fa-search-plus zoom-in" onclick="zoomIn();"></i></div>
+				<div id="zoom-slider" title="{!JSENCODE($Label.ZoomLevel)}"></div>
+
+				<div class="tracking-plan-charms">
+				<i class="charm-external-links cardIconInfo fa fa-external-link-square"></i>
+				</div>
+			</div>
+			<div id="grid-body-container">
+			</div>
+		</div>
+		<div id="gantt-layout" class="ui-layout-east">
+			<div id="gantt-view">
+				<div id="gantt-header-container">
+				</div>
+				<div id="gantt-body-container">
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="gantt-vertical-scroll-container">
+		<div id="verticalScroll"></div>
+	</div>
+	
+    <div id="PlansFilterPopup" style="display:none;">
+        <div id="PlanFilters">
+
+            <div class="plans-filter-header">{!$ObjectType.PlanItem__c.LabelPlural} {!$Label.Filter}<i onclick="jQuery('#PlansFilterPopup').hide();" class="filter-collapse-btn fa fa-angle-double-up" title="{!$Label.Close}"></i></div>
+
+            <div style="height: 5px;"/>
+
+			<div class="filter-row" style="padding-left: 4px;">
+				<a id="select-all-checkboxes" onclick="selectAllCheckboxes();">{!$Label.SelectAllLabel}</a>
+			</div>
+			
+			<div class="filter-row">
+				<input id="show-smry-bar" type="checkbox"/>
+				<label for="show-smry-bar">{!$Label.PlanSummariesLabel}</label>
+				<div id="filter-key-smry-bar" class="phdr-g-bar filter-key"/>
+			</div>
+
+			<div class="filter-row">
+				<input id="show-smry" type="checkbox"/>
+				<label for="show-smry">{!$Label.SummaryTasksLabel}</label>
+				<div id="filter-key-smry" class="pitm-g-bar T"/>
+			</div>
+            
+            <div class="filter-row">
+                <input id="show-tasks" type="checkbox"/>
+                <label for="show-tasks">{!$ObjectType.Task__c.LabelPlural}</label>
+				<div id="filter-key-task" class="pitm-g-bar T"/>
+            </div>
+
+			<div class="filter-row">
+				<input id="show-ms" type="checkbox"/>
+				<label for="show-ms">{!$ObjectType.Milestone__c.LabelPlural}</label>
+				<div id="filter-key-ms" class="pitm-g-bar PM"/>
+			</div>
+
+			<div class="filter-row">
+				<input id="show-ext" type="checkbox"/>
+				<label for="show-ext">{!$Label.ExternalDependenciesLabel}</label>
+				<i id="filter-key-ext" class="fa fa-external-link-square"/>
+			</div>
+
+            <div class="filter-row">
+                <input class="btn" id="applyFilterButton" onclick="applyPlansFilter();" type="Button" value="{!$Label.ApplyLabel}"/>
+            </div>
+        </div>
+    </div>
+
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

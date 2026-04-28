@@ -1,0 +1,1020 @@
+<apex:page controller="KimbleOne.ResourceSelfProfileController" extensions="KimbleOne.TooltipsController" sidebar="false" tabStyle="CapabilityProfile__tab" >
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+	<c:Menu DefaultHelpPage="ManageOwnProfileCapabilitiesSkil.html" MenuContextName="{!IF(learningMode, $Label.kimbleone__mylearningobjectives, $Label.kimbleone__mycapabilitieslabel)}" BreadCrumbLink="{!IF(ShowRCaEBreadcrumb, $Page.KimbleOne__ResourceCapabilitiesAndExperience, '')}" BreadCrumbName="{!IF(ShowRCaEBreadcrumb, $Label.kimbleone__myskillsandexperience, '')}" />
+</apex:define>
+    
+<apex:define name="Content">
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleJS, 'Charm.js')}"/>
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+
+	<!-- Kimble Guidance -->
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+	<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/ResourceProfileNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+		<apex:outputPanel layout="none" rendered="{!ResourceProfileTipOverrideEnabled}">
+			<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+		</apex:outputPanel>
+	</apex:outputPanel>
+	
+	<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ResourceCapability__c.accessible}">
+	<style>
+		input#capability-type-filter {
+			border: none;
+			height: 30px;
+			font-size: 15px;
+			padding-left: 20px;
+			border-radius: 4px;
+    		width: 390px;
+		}
+		.title-card-body {
+			background-color: initial;
+    	}
+		.breadcrumb-header {
+		    font-weight: bold;
+		    font-size: 14px;
+		    padding: 8px;
+		    background-color: #F5F5F5;
+		    border: 1px solid #DDD;
+		    border-radius: 4px;
+		    margin-left: 2px;
+		    margin-right: 2px;
+		}
+		#capability-search-results .cap-row {
+		    cursor: pointer;
+		}
+		.header-row {
+		    height: 20px;
+		    font-weight: bold;
+		}
+		.cap-row {
+	        position: relative;
+            display: table;
+    		width: 100%;
+		}
+		.cap-row div {
+	        display: table-cell;
+		}
+		i.cap-state {
+		    font-size: 20px;
+		    position: absolute;
+		    right: 12px;
+		    top: 8px;
+		}
+		i.cap-state.fa-check-square {
+		    color: green;
+		}
+		.cap-state.fa-plus-square-o {
+/* 		    margin-right: 11px; */
+		}
+		.cap-row .type-name {
+		    font-size: 14px;
+		    padding: 8px 40px 8px 10px;
+		}
+		.cap-row.collapsed {
+			display: none;
+		}
+		.cap-row:not(.header-row):hover {
+		    background: #e1f6ff;
+		}
+		.browse-btn , .save-btn {
+		    margin-right: 11px;
+    		margin-bottom: 2px;
+		    font-size: 26px;
+		}
+		.top-right-search-icon {
+	        position: absolute;
+		    right: 10px;
+    		top: 7px;
+		    font-size: 26px;
+		}
+		.clear-capability-filter {
+			position: relative;
+			right: 24px;
+			font-size: 18px;
+			top: 1px;
+			color: #aaa;
+			cursor: pointer;
+		}
+		.search-container {
+            display: table-cell;
+	        padding: 0px 5px 5px 5px;
+		    width: 500px;
+		}
+		.search-container-header.title-card {
+		    padding-left: 5px;
+	        margin-bottom: 5px;
+            position: relative;
+		}
+		.action-btn {
+			color: #BBB;
+			cursor: pointer;
+		}
+		.action-btn:hover {
+			color: #333;
+		}
+		.self-rating-cell input {
+		    transform: scale(1.3);
+		}
+		#resource-capabilities .cap-row:not(.last-row) {
+		    border-bottom: 1px solid #dcdcdc;
+		}
+		.browse-btn.action-btn.top-right-search-icon {
+		    right: 32px;
+		}
+		#capability-search-results .breadcrumb-header {
+			cursor: pointer;
+			margin-bottom: 5px;
+		}
+		#resource-capabilities div {
+		    vertical-align: middle;
+		}
+		#resource-capabilities .expiry-date-cell {
+		    text-align: center;
+		    width: 100px;
+		}
+		#resource-capabilities .expiry-date {
+		    width: 83px;
+		    text-align: center;
+		}
+		#resource-capabilities .self-rating-cell {
+		    width: 80px;
+		    text-align: center;
+		}
+		#resource-capabilities .self-rating-cell span {
+		    font-size: 16px;
+		}
+		#resource-capabilities .convert-label-cell {
+			width: 270px;
+			text-align: center;
+  		}
+		.save-btn.has-changes {
+		    color: #ffa500;
+		}
+		.remove-cap {
+		    width: 10px;
+		    padding-left: 5px;
+		    cursor: pointer;
+		    font-size: 14px;
+		}
+		.cap-row.is-deleted {
+		    text-decoration: line-through;
+		    background-color: #dcdcdc;
+		}
+		.cap-row.is-deleted input, .cap-row.is-deleted select {
+		    display: none;
+		}		
+		.cap-row.has-changes div.action-btn, .cap-row.new div.action-btn {
+		    border-left: 4px solid #ffa500;
+	        padding-left: 6px;
+		}
+		.expiry-ind, .expired-ind {
+		    display: inline-block !important;
+		    font-style: italic;
+		    font-size: 12px;
+		    font-weight: bold;
+		    float: right;
+		}
+		.expiry-ind {
+		    color: orange;
+		}
+		.expired-ind {
+		    color: red;
+		}
+		.page-container {
+			display: table;
+			width: 100%
+		}
+
+		/* rating key */
+  		i.rating-info {
+			color: #428BCA;
+			font-size: 16px;
+			margin-left: 3px;
+			cursor: pointer;
+		}
+		.rating-qtip {
+			max-width: unset !important;
+			width: 550px !important;
+  		}
+		.rating-key-container {
+			display: none;
+			height: 250px;
+    		overflow: auto;
+  		}
+		.rating-key-container .rating-key {
+			display: table;
+			padding: 6px;
+			background-color: whitesmoke;
+			border-radius: 4px;
+			border: 1px solid #dddddd;
+			width: 500px;
+		}
+		.rating-key-container .rating-key-hdr {
+			display: table-row;
+			font-size: 16px;
+			font-weight: bold;
+		}
+		.rating-key-container .rating-key-hdr-col {
+			display: table-cell;
+			padding: 6px;
+			background-color: whitesmoke;
+		}
+		.rating-key-container .rating-key-row {
+			display: table-row;
+			height: 24px;
+			font-size: 14px;
+		}
+		.rating-key-container .ratingVal {
+			display: table-cell;
+			padding: 6px;
+			background-color: white;
+			border-top: 1px solid #dddddd;
+			font-weight: bold;
+		}
+		.rating-key-container .ratingValInfo {
+			display: table-cell;
+			font-style: italic;
+			background-color: white;
+			border-top: 1px solid #dddddd;
+			padding: 6px;
+			font-size: 12px;
+			width: 75%;
+		}
+		.nothing-here {
+			padding: 20px;
+			font-size: 14px;
+			border: 2px dashed #bbbbbb;
+			margin: 11px 2px;
+			background-color: lemonchiffon;
+			text-align: center;
+		}
+		.convert-to-capability {
+			font-size: 20px;
+			cursor: pointer;
+			position: absolute;
+		    right: 22px;
+		    top: 8px;
+  		}
+  		.learningmode-icon {
+			background-color: #FF9800;
+			color: white;
+  		    margin-right:5px;
+  		    padding: 4px;
+  		    border-radius: 2px;
+  		    font-size: 16px;
+    	}
+		.capmode-icon {
+			background-color: #8bc34a;
+			color: white;
+  		    margin-right:5px;
+  		    padding: 4px 6px 4px 6px;
+  		    border-radius: 3px;
+  		    font-size: 16px;
+    	}
+		/* Winter 18 Lightning Style Overrides - START */
+		/* Only required to format the pageBlock which is required to maintain fonts and styling in Lightning */
+		div[id$='sf-formatting-container'] .pbBody {
+		    margin: 0px !important;
+		    background-color: white;
+		}
+		div[id$='sf-formatting-container'].bPageBlock {
+		    border: none !important;
+			overflow-x: hidden;
+		}
+		/* Winter 18 Lightning Style Overrides - END */
+	</style>
+	
+	<apex:pageBlock id="sf-formatting-container">
+	<div class="page-container">
+		<div class="search-container">
+			<div class="search-container-header title-card" kimble-tip="SearchIcon" kimble-tip-help-link="ResourceProfilingLink" kimble-tip-extended-text="SearchIconExtendedText">
+	  			<input id="capability-type-filter" placeholder="{!$Label.CapabilitySearchPlaceholder}"/>
+				<i class="clear-capability-filter fa fa-times hidden-item"></i>
+				<i class="searching-ind top-right-search-icon hidden-item fa fa-spin fa-circle-o-notch"></i>
+				<i class="browse-btn action-btn top-right-search-icon fa fa-list-ul" title="{!$Label.Browse}"></i>
+			</div>
+			<div id="capability-search-results">
+			</div>
+		</div>
+
+		<div class="resource-capabilities-container">
+			<div id="capabilities-title">
+				<div class="title-card-container">
+				<div class="title-card">
+					<div class="title-card-heading" >
+						<div class="title-card-heading-text">
+							<apex:outputPanel layout="none" rendered="{!learningMode}">
+								<div>
+									<span class=" learningmode-icon"><i class="fa fa-graduation-cap"></i></span>
+									<span><apex:outputText title="{!$Label.kimbleone__mylearningobjectives}" value="{!$Label.kimbleone__mylearningobjectives}"/></span>
+								</div>
+							</apex:outputPanel>
+
+							<apex:outputPanel layout="none" rendered="{!!learningMode}">
+								<div>
+									<span class="capmode-icon"><i class="fa fa-check-square"></i></span>
+									<span><apex:outputText title="{!$Label.kimbleone__mycapabilitieslabel}" value="{!$Label.kimbleone__mycapabilitieslabel}"/></span>
+								</div>
+							</apex:outputPanel>
+
+						</div>
+					</div>
+					
+					<div class="title-card-body">
+						<i class="save-btn action-btn fa fa-save" kimble-tip="SaveIcon" kimble-tip-help-link="ResourceProfilingLink" title="{!$Label.Save}"></i>
+					</div>
+				</div>
+				</div>
+	  		</div>		
+			<div id="resource-capabilities">
+			</div>
+		</div>
+	</div>
+	</apex:pageBlock>	
+	<apex:variable value="{!Resource.ResourceType__r.KimbleOne__ResourceClass__c}" var="resourceClass"/>
+
+	<apex:form >
+		<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialiseTips();"/>
+	</apex:form>
+		
+	<script>
+		var defaultNumericRating = <apex:outputText value="{!DefaultNumericRating}"/>;
+		var numericRatingOptions;
+
+		var isLearnMode = {!learningMode};
+
+		var capabilityExpiryWarningMonths = <apex:outputText value="{!CapabilityExpiryWarningMonths}"/>;
+
+		var capLbl = {};
+		capLbl['Expiring'] = '{!JSENCODE($Label.ExpiringCapabilityLabel)}';
+		capLbl['Expired'] = '{!JSENCODE($Label.ExpiredCapabilityLabel)}';
+
+		// learning objective labels
+		capLbl['noobj'] = '{!JSENCODE($Label.MLONoObjectives)}';
+		capLbl['nocaps'] = '{!JSENCODE($Label.MLONoCapabilities)}';
+		capLbl['coverttocap'] = '{!JSENCODE($Label.MLOConvertToCapability)}';
+
+		var capabilityHierarchyDelimiter = '{!JSENCODE(CapabilityHierarchyDelimiter)}';
+		var noneLabel = '<apex:outputText value="{!$Label.kimbleone__none}"/>';
+		
+		var resourceCapabilityMap = {};
+		var resourceCapabilityIdsMap = {};
+		
+		jQuery(window).load(function()
+		{
+			initialise();
+			getResourceCapabilities();
+		});
+		
+		function initialise()
+		{
+			jQuery(document).off('click', '.browse-btn').on('click', '.browse-btn', fetchAllCapabilities);
+			jQuery(document).off('click', '.clear-capability-filter').on('click', '.clear-capability-filter', fetchAllCapabilities);
+
+			jQuery(document).off('click', '.save-btn.fa-save').on('click', '.save-btn.fa-save', saveAll);
+
+			jQuery(document).off('click', '.remove-cap.action-btn').on('click', '.remove-cap.action-btn', toggleRemoveCapRow);
+			
+			jQuery(document).off('keyup', '#capability-type-filter').on('keyup', '#capability-type-filter', lookupCapabilities);
+			jQuery(document).off('click', '#capability-search-results .cap-row').on('click', '#capability-search-results .cap-row', toggleSelect);
+			jQuery(document).off('click', '#capability-search-results .breadcrumb-header').on('click', '#capability-search-results .breadcrumb-header', toggleCapabilityHeader);
+
+			jQuery(document).off('change', '.expiry-date').on('change', '.expiry-date', expiryDateChange);
+			jQuery(document).off('change', '.self-rating-cell.BooleanRating input').on('change', '.self-rating-cell.BooleanRating input', booleanRatingChange);
+			jQuery(document).off('change', '.self-rating-cell.NumericRating select').on('change', '.self-rating-cell.NumericRating select', numericRatingChange);
+
+			jQuery(document).off('click', '.convert-to-capability').on('click', '.convert-to-capability', toggleFlagForCapability);
+		}
+		
+		var capabilityLookupTimeout;
+		
+		function toggleRemoveCapRow()
+		{
+			var capabilityTypeId = jQuery(this).closest('div.cap-row').attr('cap-id');
+			resourceCapabilityIdsMap[capabilityTypeId].HasChanges = true;
+			jQuery(this).closest('div.cap-row').addClass('has-changes');
+
+			// remove
+			if(jQuery(this).closest('div.cap-row').find('i.fa-trash').length)
+			{
+				resourceCapabilityIdsMap[capabilityTypeId].IsDeleted = true;
+				jQuery(this).closest('div.cap-row').addClass('is-deleted');
+				jQuery(this).closest('div.cap-row').find('.fa-trash').removeClass('fa-trash').addClass('fa-undo');
+			}
+			else
+			{
+				// undo
+				resourceCapabilityIdsMap[capabilityTypeId].IsDeleted = false;
+				jQuery(this).closest('div.cap-row').removeClass('is-deleted');
+				if(resourceCapabilityIdsMap[capabilityTypeId].RatingType == 'BooleanRating')
+				{
+					resourceCapabilityIdsMap[capabilityTypeId].SelfBooleanRating = true;
+					jQuery(this).closest('div.cap-row').find('.self-rating-cell.BooleanRating input').prop('checked', true);
+				}
+				jQuery(this).closest('div.cap-row').find('.fa-undo').removeClass('fa-undo').addClass('fa-trash');
+			}
+
+			setHasChanges();
+		}
+				
+		function expiryDateChange()
+		{
+			var capabilityTypeId = jQuery(this).closest('div.cap-row').attr('cap-id');
+			resourceCapabilityIdsMap[capabilityTypeId].ExpiryDate = kimble.parseDate(jQuery(this).val());
+			resourceCapabilityIdsMap[capabilityTypeId].HasChanges = true;
+
+			jQuery(this).closest('div.cap-row').addClass('has-changes');
+			setHasChanges();
+		}
+		
+		function booleanRatingChange()
+		{
+			var capabilityTypeId = jQuery(this).closest('div.cap-row').attr('cap-id');
+			resourceCapabilityIdsMap[capabilityTypeId].SelfBooleanRating = jQuery(this).is(':checked');
+			resourceCapabilityIdsMap[capabilityTypeId].HasChanges = true;
+
+			if(!resourceCapabilityIdsMap[capabilityTypeId].SelfBooleanRating) jQuery(this).closest('div.cap-row').find('.remove-cap').click();
+
+			jQuery(this).closest('div.cap-row').addClass('has-changes');
+			setHasChanges();
+		}
+		
+		function numericRatingChange()
+		{
+			var capabilityTypeId = jQuery(this).closest('div.cap-row').attr('cap-id');
+			resourceCapabilityIdsMap[capabilityTypeId].SelfNumericRating = jQuery(this).val();
+			resourceCapabilityIdsMap[capabilityTypeId].HasChanges = true;
+
+			jQuery(this).closest('div.cap-row').addClass('has-changes');
+			setHasChanges();
+		}
+		
+		function setHasChanges()
+		{
+			jQuery(window).off('.has-changes').on('beforeunload.has-changes', function(){
+		        return kimble.labels['UnsavedChangesHeading'] + "\n\n" + kimble.labels['UnsavedChangesMessage']; 
+		    });
+			
+			jQuery('.save-btn').addClass('has-changes');
+		}
+		
+		function resetHasChanges()
+		{
+			jQuery('.save-btn').removeClass('has-changes');
+			jQuery(window).off('.has-changes');
+		}
+
+		function toggleSelect()
+		{
+			var theCapabilityRow = jQuery(this);
+			
+			theCapabilityRow.find('.cap-state').toggleClass('fa-check-square');
+			theCapabilityRow.find('.cap-state').toggleClass('fa-plus-square-o');
+
+			var breadcrumb = jQuery('.breadcrumb-header[header-id="' + theCapabilityRow.attr('header-id') + '"]').text();
+			var capTypeId = theCapabilityRow.attr('cap-id');
+			
+			if(theCapabilityRow.find('.cap-state').hasClass('fa-check-square'))
+			{
+				setHasChanges();
+				
+				var capability = {IsNew: true};
+				capability.TypeId = capTypeId; 
+				capability.TypeName = theCapabilityRow.find('.type-name').text();
+				capability.IsExpirable = theCapabilityRow.hasClass('expirable');
+				
+				capability.CanSelfRate = theCapabilityRow.hasClass('selfreviewable');
+				capability.SelfRatingRequiresReview = theCapabilityRow.hasClass('requiresreview');
+				
+				capability.RatingType = (theCapabilityRow.hasClass('NumericRating') ? 'NumericRating' : 'BooleanRating');
+				
+				if(capability.RatingType == 'BooleanRating')
+				{
+					capability.SelfBooleanRating = true;
+				}
+				else if(capability.RatingType == 'NumericRating')
+				{
+					capability.SelfNumericRating = defaultNumericRating;
+				}
+				
+				if(!(breadcrumb in resourceCapabilityMap)) resourceCapabilityMap[breadcrumb] = [];
+           		
+           		resourceCapabilityMap[breadcrumb].push(capability);
+           		resourceCapabilityIdsMap[capTypeId] = capability;
+			}
+			else
+			{
+				var remainingCapabilityMap = [];
+				
+				for(var capabilityCounter = 0; capabilityCounter < resourceCapabilityMap[breadcrumb].length; capabilityCounter++)
+			    {
+					var capability = resourceCapabilityMap[breadcrumb][capabilityCounter];
+					if(capability.TypeId != capTypeId)
+					{
+						remainingCapabilityMap.push(capability);
+					}
+			    }
+			    
+			    if(remainingCapabilityMap.length)
+			    {
+			    	resourceCapabilityMap[breadcrumb] = remainingCapabilityMap;
+		    	}
+		    	else
+		    	{
+		    		// nothing left - remove the header
+		    		delete resourceCapabilityMap[breadcrumb];
+		    	}
+			    
+           		delete resourceCapabilityIdsMap[capTypeId];
+			}	
+
+			drawResourceCapabilities();
+			initialiseTips();
+		}
+
+		function toggleFlagForCapability()
+		{
+			jQuery(this).find('.fa').toggleClass('fa-square-o');
+			jQuery(this).find('.fa').toggleClass('fa-check-square-o');
+
+			jQuery(this).parent().addClass('has-changes');
+			jQuery('.save-btn').addClass('has-changes');
+
+			capId = jQuery(this).parent().attr('cap-id');
+			resourceCapabilityIdsMap[capId].ForConvert = true;
+			resourceCapabilityIdsMap[capId].HasChanges = true;
+		}
+		
+		function toggleCapabilityHeader()
+		{
+			var theCapabilityHeaderRow = jQuery(this);
+			jQuery('.cap-row[header-id="' + theCapabilityHeaderRow.attr('header-id') + '"]').toggle();
+		}
+
+		function getResourceCapabilities()
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ResourceSelfProfileController.GetResourceCapabilities}',
+				'{!Resource.Id}', isLearnMode,
+				function(result, event)
+				{          
+					if (event.status) 
+					{
+						numericRatingOptions = result.NumericRatingOptions;
+						buildCapabilityMap(result.Capabilities, resourceCapabilityMap);
+						drawResourceCapabilities(true);
+						initialiseTips();
+					} 
+					else if (event.type === 'exception') 
+					{
+						alert(event.message);
+					} 
+					else 
+					{
+						alert(event.message);
+					}
+				}, 
+				{escape: true, timeout: 60000});
+		}
+		
+		var showRatingKey = false;
+		function drawResourceCapabilities(andSearch)
+		{
+			var html = '';
+			
+			var sortedCapabilityMapKeys = [];
+
+			var ratingKeyHtml = '';
+			for(var optionCounter = 0; optionCounter < Object.keys(numericRatingOptions).length; optionCounter++)
+			{
+				var theOption = numericRatingOptions[Object.keys(numericRatingOptions)[optionCounter]];
+				ratingKeyHtml += '<div class="rating-key-row">';
+				ratingKeyHtml += '<div class="ratingVal">' + theOption.text + '</div>';
+				ratingKeyHtml += '<div class="ratingValInfo">' + (theOption.info != undefined && theOption.info != '' ? theOption.info : '') + '</div>';
+				ratingKeyHtml += '</div>';
+				if(theOption.info != undefined && theOption.info != '' && !showRatingKey) showRatingKey = true;
+			}
+
+			if(ratingKeyHtml != '' && showRatingKey)
+			{
+				html += '<div class="rating-key-container">';
+				html += '<div class="rating-key">';
+				html += '<div class="rating-key-hdr">';
+				html += '<div class="rating-key-hdr-col">' + '<apex:outputText value="{!$ObjectType.KimbleOne__ResourceCapability__c.Fields.KimbleOne__SelfNumericRating__c.Label}"/>' + '</div>';
+				html += '<div class="rating-key-hdr-col">' + '<apex:outputText value="{!$ObjectType.KimbleOne__CapabilityRating__c.Fields.KimbleOne__Notes__c.Label}"/>' + '</div>';
+				html += '</div>';
+				html += ratingKeyHtml;
+				html += '</div>';
+				html += '</div>';
+			}
+
+			if(Object.keys(resourceCapabilityMap).length)
+			{
+				html += '<div class="cap-row header-row">';
+				html += '<div class="type-name"></div>';
+
+				if(!isLearnMode)
+				{
+					html += '<div class="expiry-date-cell" kimble-tip="ExpiryDate" kimble-tip-help-link="ResourceProfilingLink" kimble-tip-extended-text="ExpiryDateExtendedText">' + '<apex:outputText value="{!$ObjectType.KimbleOne__ResourceCapability__c.Fields.KimbleOne__ExpiryDate__c.Label}"/>' + '</div>';
+					html += '<div class="self-rating-cell" kimble-tip="SelfRating" kimble-tip-help-link="ResourceProfilingLink" kimble-tip-extended-text="SelfRatingExtendedText">' + '<apex:outputText value="{!$ObjectType.KimbleOne__ResourceCapability__c.Fields.KimbleOne__SelfNumericRating__c.Label}"/>' + (showRatingKey ? '<i class="rating-info fa fa-info-circle"></i>' : '') + '</div>';
+				}
+
+				if(isLearnMode)
+				{
+				    html+= '<div class="convert-label-cell"> <apex:outputText value="{!$Label.kimbleone__mloconverttocapability}"/> </div>';
+    			}
+
+				html += '</div>';
+				
+				sortedCapabilityMapKeys = Object.keys(resourceCapabilityMap).sort();
+			}
+			else
+			{
+			    html += '<div class="nothing-here">' + capLbl['nocaps'] + '</div>';
+			}
+			
+			for(var breadcrumbCounter = 0; breadcrumbCounter < sortedCapabilityMapKeys.length; breadcrumbCounter++)
+			{
+			    var breadcrumb = sortedCapabilityMapKeys[breadcrumbCounter];
+				html += '<div class="breadcrumb-header">' + breadcrumb + '</div>';
+			
+				if(resourceCapabilityMap[breadcrumb].length)
+				{
+					var sortedCapabilities = resourceCapabilityMap[breadcrumb].sort(typeNameSort);
+					
+				    for(var capabilityCounter = 0; capabilityCounter < sortedCapabilities.length; capabilityCounter++)
+				    {
+						var capability = sortedCapabilities[capabilityCounter];
+						html += '<div class="cap-row ' + (capabilityCounter == sortedCapabilities.length - 1 ? 'last-row' : '') + (capability.IsNew ? ' new' : '') + (capability.HasChanges ? ' has-changes' : '') + (capability.IsDeleted ? ' is-deleted' : '') + (capability.IsExpirable ? ' expirable' : '') + (capability.SelfRatingRequiresReview ? ' requiresreview' : '') + (capability.RatingType ? ' ' + capability.RatingType : '') + '" cap-id="' + capability.TypeId + '"' + (capability.Id ? ' res-cap-id="' + capability.Id + '"' : '') + '>';
+						html += '<div class="remove-cap action-btn"><i class="fa fa-trash"></i></div>';
+					
+						var expiryHtml = '';
+						if(capability.IsExpirable && capability.ExpiryDate) 
+						{
+							var expiryDateAsDate = kimble.parseDate(kimble.formatDate(capability.ExpiryDate), true);
+							var expiryDateWithoutTime = new Date(expiryDateAsDate.getFullYear(), expiryDateAsDate.getMonth(), expiryDateAsDate.getDate(), 0, 0, 0, 0);
+			    
+			    			if(expiryDateWithoutTime < new Date())
+			    			{
+			    				expiryHtml += '<div class="expired-ind">' + capLbl['Expired'] + '</div>';
+			    			}
+			    			else
+			    			{
+							    expiryDateWithoutTime.setMonth(expiryDateWithoutTime.getMonth() - capabilityExpiryWarningMonths);
+							    
+							    if(expiryDateWithoutTime < new Date())
+							    {
+									expiryHtml += '<div class="expiry-ind">' + capLbl['Expiring'] + '</div>';
+								}
+							}
+						}
+	
+						html += '<div class="type-name">' + capability.TypeName + expiryHtml + '</div>';
+
+						if(!isLearnMode)
+						{
+							html += '<div class="expiry-date-cell" kimble-tip="ExpiryDate" kimble-tip-help-link="ResourceProfilingLink" kimble-tip-extended-text="ExpiryDateExtendedText">' + (capability.IsExpirable ? '<input type="text" class="expiry-date kimbleDatePicker" value="' + (capability.ExpiryDate ? kimble.formatDate(capability.ExpiryDate) : '') + '"/>' : '') + '</div>';
+							html += '<div class="self-rating-cell ' + capability.RatingType + '" kimble-tip="SelfRating" kimble-tip-help-link="ResourceProfilingLink" kimble-tip-extended-text="SelfRatingExtendedText">';
+
+							if(capability.RatingType == 'NumericRating')
+							{
+								html += '<select>';
+								html += '<option ' + (capability.SelfNumericRating ? '' : ' selected') + '>' + noneLabel + '</option>';
+								for(var optionCounter = 0; optionCounter < Object.keys(numericRatingOptions).length; optionCounter++)
+								{
+									var theOption = numericRatingOptions[Object.keys(numericRatingOptions)[optionCounter]];
+									html += '<option value="' + theOption.id + '"' + (capability.SelfNumericRating == theOption.id ? ' selected' : '') + ( theOption.info != undefined && theOption.info != '' ? ' title="' + theOption.info + '"' : '') + '>' + theOption.text + '</option>';
+								}
+								html += '</select>';
+							}
+							else if(capability.RatingType == 'BooleanRating')
+							{
+								html += '<input type="checkbox"' + (capability.SelfBooleanRating ? ' checked="checked"' : '') + '/>';
+							}
+						}
+
+						if(isLearnMode)
+						{
+						    if(!capability['ForConvert']){capability.ForConvert = false;}
+						    var selectionIndicator = capability.ForConvert ? 'fa-check-square-o' : 'fa-square-o';
+						    html += '<div class="convert-to-capability"> <i class="fa ' + selectionIndicator + '"></i> </div>';
+      					}
+						html += '</div>';
+						html += '</div>';
+
+						resourceCapabilityIdsMap[capability.TypeId] = capability;
+				    }
+			    }
+			}
+			
+			jQuery('#resource-capabilities').html(html);
+			
+			if(andSearch) fetchAllCapabilities();
+			
+			initialiseResourceCapabilityActions();		
+		}
+
+		function typeNameSort(a,b)
+		{
+			if (a.TypeName < b.TypeName)
+				return -1;
+			
+			if (a.TypeName > b.TypeName)
+				return 1;
+		  
+			return 0;
+		}		
+		
+		function initialiseResourceCapabilityActions()
+		{
+			jQuery('.kimbleDatePicker').datepicker({
+		   		dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true,
+					selectOtherMonths: true
+			});
+
+			if(showRatingKey)
+			{
+			    jQuery('.rating-info').qtip({
+					overwrite: true,
+                    show: {
+                        event: 'click',
+                        solo: true
+                    },
+                    hide: 'unfocus',
+					style: {
+						classes: 'qtip-light qtip-shadow qtip-rounded rating-qtip'
+					},
+					content: {text: jQuery('.rating-key-container')
+					},
+					position: {my: 'top right', at: 'center center'}
+				}, event);
+   			}
+		}
+		
+		function lookupCapabilities()
+		{
+			window.clearTimeout(capabilityLookupTimeout);
+			
+			var term = jQuery(this).val();
+			
+			if(term.length < 2)
+			{
+				return;
+			}
+			
+			capabilityLookupTimeout = window.setTimeout(function() {
+			
+				jQuery('.searching-ind').removeClass('hidden-item');
+				jQuery('#capability-type-filter').prop('readonly', true);
+			
+				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ResourceSelfProfileController.LookupCapabilities}',
+					term, '{!JSENCODE(resourceClass)}', isLearnMode, '{!Resource.Id}',
+					function(result, event)
+					{          
+						if (event.status) 
+						{
+							var capabilityMap = {};
+							buildCapabilityMap(result, capabilityMap, resourceCapabilityIdsMap);
+							drawSearchResult(capabilityMap);
+						} 
+						else if (event.type === 'exception') 
+						{
+							alert(event.message);
+						} 
+						else 
+						{
+							alert(event.message);
+						}
+						
+						jQuery('.searching-ind').addClass('hidden-item');
+						jQuery('#capability-type-filter').prop('readonly', false);
+						jQuery('.clear-capability-filter').removeClass('hidden-item');
+					}, 
+					{escape: true, timeout: 60000}
+			)}, 1000);
+		}
+		
+		function fetchAllCapabilities()
+		{
+			jQuery('.searching-ind').removeClass('hidden-item');
+			jQuery('#capability-type-filter').prop('readonly', true);
+			jQuery('.clear-capability-filter').addClass('hidden-item');
+		
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ResourceSelfProfileController.LookupCapabilities}',
+				'', '{!JSENCODE(resourceClass)}', isLearnMode, '{!Resource.Id}',
+				function(result, event)
+				{          
+					if (event.status) 
+					{
+						var capabilityMap = {};
+						buildCapabilityMap(result, capabilityMap, resourceCapabilityIdsMap);
+						drawSearchResult(capabilityMap, true);
+					} 
+					else if (event.type === 'exception') 
+					{
+						alert(event.message);
+					} 
+					else 
+					{
+						alert(event.message);
+					}
+					
+					jQuery('.searching-ind').addClass('hidden-item');
+					jQuery('#capability-type-filter').prop('readonly', false);
+					jQuery('#capability-type-filter').val('');
+				}, 
+				{escape: true, timeout: 60000});
+		}
+		
+		function drawSearchResult(capabilityMap, collapsed)
+		{
+			var html = '';
+			
+			for(var breadcrumbCounter = 0; breadcrumbCounter < Object.keys(capabilityMap).length; breadcrumbCounter++)
+			{
+			    var breadcrumb = Object.keys(capabilityMap)[breadcrumbCounter];
+				html += '<div class="breadcrumb-header" header-id="' + breadcrumbCounter + '">' + breadcrumb + '</div>';
+			
+			    for(var capabilityCounter = 0; capabilityCounter < capabilityMap[breadcrumb].length; capabilityCounter++)
+			    {
+					var capability = capabilityMap[breadcrumb][capabilityCounter];
+
+					html += '<div header-id="' + breadcrumbCounter + '" class="cap-row' + (collapsed ? ' collapsed' : '') + (capability.IsExpirable ? ' expirable' : '') + (capability.CanSelfRate ? ' selfreviewable' : '') + (capability.SelfRatingRequiresReview ? ' requiresreview' : '') + (capability.RatingType ? ' ' + capability.RatingType : '') + '" cap-id="' + capability.TypeId + '">';
+					html += '<div class="type-name">' + capability.TypeName + '</div>';
+					html += '<i class="cap-state fa fa-plus-square-o"></i>';
+					html += '</div>';
+			    }
+			}
+			
+			jQuery('#capability-search-results').html(html);
+			
+			jQuery("#capability-search-results ").animate({ scrollTop: 0 }, "fast");
+		}
+		
+		function buildCapabilityMap(result, capabilityMap, excludeCapabilityIdsMap)
+		{			
+			var input = result;
+			var output = [];
+			
+			for (var i = 0; i < input.length; i++)
+			{
+				var theCapabilityType = input[i];
+
+				// restricted capability details will not be returned
+    			if(theCapabilityType.TypeSearchName == undefined) continue;
+
+			    var chain = theCapabilityType.TypeSearchName.split(capabilityHierarchyDelimiter);
+			    var currentNode = output;
+			    
+			    for (var j = 0; j < chain.length; j++)
+			    {
+			        var wantedNode = chain[j];
+			        var lastNode = currentNode;
+			        
+			        for (var k = 0; k < currentNode.length; k++)
+			        {
+			            if (currentNode[k].name == wantedNode)
+			            {
+			                currentNode = currentNode[k].children;
+			                break;
+			            }
+			        }
+			        
+			        // If we couldn't find an item in this list of children
+			        // that has the right name, create one:
+			        if (lastNode == currentNode)
+			        {
+			            var newNode = currentNode[k] = {name: wantedNode, children: []};
+			            
+			            if(j == (chain.length - 1))
+			            {
+			            	newNode.capabilityId = theCapabilityType.TypeId;
+			            	var breadcrumb = chain.slice(0, chain.length-1).join(' > ');
+			            	
+			            	// only push if not excluded (already selected)
+			            	if(excludeCapabilityIdsMap == undefined || excludeCapabilityIdsMap && !(newNode.capabilityId in excludeCapabilityIdsMap)) 
+			            	{
+				            	if(!(breadcrumb in capabilityMap)) capabilityMap[breadcrumb] = [];
+			            		capabilityMap[breadcrumb].push(theCapabilityType);
+		            		}
+		            	}
+			            currentNode = newNode.children;
+			        }
+			    }
+			}
+		}
+		
+		function saveAll()
+		{
+			var saveBtn = jQuery(this)
+			
+			// build list of capabilities from page
+			var theRows = jQuery('#resource-capabilities .cap-row.has-changes, #resource-capabilities .cap-row.new');
+			
+			var capabilitiesToUpsert = [];
+			for(var rowCounter = 0; rowCounter < theRows.length; rowCounter++)
+		    {
+				var theCapabilityRow = jQuery(theRows[rowCounter]);
+				
+				var capability = {};
+				
+				if(theCapabilityRow.attr('res-cap-id') != undefined && theCapabilityRow.attr('res-cap-id') != '')
+				{
+					capability.Id = theCapabilityRow.attr('res-cap-id');
+				}
+				capability.TypeId = theCapabilityRow.attr('cap-id'); 
+				if(theCapabilityRow.find('.expiry-date').length)
+				{
+					capability.IsExpirable = true;
+					capability.ExpiryDate = kimble.parseDate(theCapabilityRow.find('.expiry-date').val());
+				}
+				
+				capability.SelfRatingRequiresReview = theCapabilityRow.hasClass('requiresreview');
+
+				if(theCapabilityRow.find('.self-rating-cell.NumericRating').length && theCapabilityRow.find('.self-rating-cell.NumericRating select').val() != noneLabel) capability.SelfNumericRating = theCapabilityRow.find('.self-rating-cell.NumericRating select').val();
+				if(theCapabilityRow.find('.self-rating-cell.BooleanRating').length) capability.SelfBooleanRating = theCapabilityRow.find('.self-rating-cell.BooleanRating input').prop('checked');
+				
+				capability.IsDeleted = theCapabilityRow.hasClass('is-deleted');
+
+				capability.ForConvert = resourceCapabilityIdsMap[theCapabilityRow.attr('cap-id')].ForConvert;
+				if(capability.ForConvert && jQuery(theCapabilityRow).hasClass('NumericRating')){capability.SelfNumericRating = {!DefaultNumericRating};}
+				
+	    		capabilitiesToUpsert.push(capability);
+		    }
+			
+			if(!capabilitiesToUpsert.length)
+			{
+				resetHasChanges();
+				return;
+			}
+			
+			saveBtn.removeClass('fa-save').addClass('fa-circle-o-notch').addClass('fa-spin');
+			jQuery('#capability-type-filter').prop('readonly', true);
+			
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ResourceSelfProfileController.SaveResourceCapabilities}',
+				'{!Resource.Id}', capabilitiesToUpsert, isLearnMode,
+				function(result, event)
+				{          
+					if (event.status) 
+					{
+						resetHasChanges();
+						resourceCapabilityMap = {};
+						numericRatingOptions = result.NumericRatingOptions;
+						buildCapabilityMap(result.Capabilities, resourceCapabilityMap);
+						drawResourceCapabilities();
+					} 
+					else if (event.type === 'exception') 
+					{
+						alert(event.message);
+					} 
+					else 
+					{
+						alert(event.message);
+					}
+					
+					saveBtn.addClass('fa-save').removeClass('fa-circle-o-notch').removeClass('fa-spin');
+					jQuery('#capability-type-filter').prop('readonly', false);
+				}, 
+				{escape: true, timeout: 60000});
+		}
+		
+		/* Tooltips */
+		var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+		var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+		var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+		var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+		var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+		var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+		
+		function updateTipsConfigSetting(newTipSetting)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+				newTipSetting,
+					function(result, event){
+						if (event.status)
+						{
+							var data = {};
+							data.results = result;
+							loadGuidance();
+						}
+						else
+						{
+							alert(event.message);
+						}
+				},
+				{escape: false, timeout: 60000}
+			);
+		}
+	</script>
+	</apex:outputPanel>
+</apex:define>
+</apex:composition>
+</apex:page>

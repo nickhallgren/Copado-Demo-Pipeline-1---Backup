@@ -1,0 +1,259 @@
+<apex:page Controller="KimbleOne.ActivityAssignmentNewEditController" extensions="KimbleOne.ActivityAssignmentRemoteActions" showHeader="false" sidebar="false">
+
+<div id="ActivityAssignmentSnip" style="display:none">
+<div id="assignment-snip-error" style="display:none"><span><div class="message errorM3"><table border="0" cellpadding="0" cellspacing="0" class="messageTable" style="padding:0px;margin:0px;"><tbody><tr valign="top"><td><img alt="error" class="msgIcon" src="/s.gif" title="{!$Label.Error}"/></td><td class="messageCell"><div class="messageText" id="assignment-snip-error-text"><br/></div></td></tr><tr><td></td><td></td></tr></tbody></table></div></span></div>		
+<apex:pageBlock title="{!$Label.kimbleone__snipassignmentlabel}" mode="edit">
+	<apex:pageBlockButtons location="bottom">
+		<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.updateable}">
+			<input class="btn save-assignment-button" onclick="saveSnip()" type="button" value="{!$Label.Save}" style="width:60px;"/>
+		</apex:outputPanel>
+		<input class="btn" onclick="cancelSnip()" type="button" value="{!$Label.Cancel}" style="width:60px;"/>
+	</apex:pageBlockButtons>
+	<apex:form >
+	<apex:pageblockSection collapsible="false" showheader="false" columns="2" >		
+		
+		<apex:pageBlockSectionItem labelstyle="width:30%" dataStyle="width:70%">
+			<apex:outputLabel for="ResourceList">
+				<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__Resource__c.Label}" />
+			</apex:outputLabel>
+			<apex:outputPanel layout="none">
+				<div class="requiredInput" id="resource-snip">
+					<div class="requiredBlock"></div>
+
+					<apex:selectList id="simple-input-resource" value="{!DummyAssignment.KimbleOne__Resource__c}" size="1" onchange="ActivityAssignmentNewEdit.resourceInputChange('Resource');" rendered="{!!UseResourceEnhancedLookup}" >
+						<apex:selectOptions value="{!TheResourceOptions}" />
+					</apex:selectList>
+
+					<apex:actionRegion >
+						<apex:outputPanel id="resource-panel">
+							<apex:inputField id="enhanced-input-resource" value="{!DummyAssignment.KimbleOne__Resource__c}" styleclass="kimbleSearch "  rendered="{!UseResourceEnhancedLookup}">
+								<apex:actionSupport onsubmit="ActivityAssignmentNewEdit.disableButtons();" event="onchange" action="{!ValidateInput}" rerender="resource-panel, Error-panel" oncomplete="ActivityAssignmentNewEdit.resourceInputChange('Resource');"/>
+							</apex:inputField>
+						</apex:outputPanel>
+					</apex:actionRegion>
+
+				</div>
+			</apex:outputPanel>
+
+		</apex:pageBlockSectionItem>
+		
+		<apex:pageBlockSectionItem >
+			<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ActivityRole__c.Label}" />
+			<span id="ActivityRole-snip"></span>								
+		</apex:pageBlockSectionItem>
+		
+		<apex:pageBlockSectionItem >
+			<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UsageBehaviourRule__c.Label}" />
+			<span id="UsageBehaviourRule-snip"></span>								
+		</apex:pageBlockSectionItem>
+		
+		<apex:pageBlockSectionItem >
+			<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UtilisationPercentage__c.Label}" />
+			<span id="Utilisation-snip"></span>								
+		</apex:pageBlockSectionItem>
+		
+	</apex:pageBlockSection>
+	</apex:form>
+	<apex:pageblockSection collapsible="false" showheader="true" columns="1" title="{!$Label.kimbleone__endingonlabel}">
+		<apex:pageBlockSectionItem >
+			<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__StartDate__c.Label}" />
+			<span id="StartDate-snip-ending"></span>								
+		</apex:pageBlockSectionItem>
+		
+		<apex:pageBlockSectionItem >
+			<apex:outputText value="{!$Label.kimbleone__endingonlabel}" />
+			<span id="EndDate-snip-ending"></span>								
+		</apex:pageBlockSectionItem>
+		
+		<apex:pageBlockSectionItem >
+			<apex:outputText value="{!$Label.kimbleone__assignmententryremainingeffort}" />
+			<div id="RemainingUsage-snip-ending" actual=""></div>								
+		</apex:pageBlockSectionItem>
+
+	</apex:pageblockSection> 
+	
+	<apex:pageblockSection collapsible="false" showheader="true" columns="1" title="{!$Label.kimbleone__startingfromlabel}">
+		<apex:pageBlockSectionItem >
+			<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__StartDate__c.Label}" />
+			<span id="StartDate-snip-starting"></span>								
+		</apex:pageBlockSectionItem>
+		
+		<apex:pageBlockSectionItem >
+			<apex:outputText value="{!$Label.kimbleone__endingonlabel}" />
+			<span id="EndDate-snip-starting"></span>								
+		</apex:pageBlockSectionItem>
+		
+		<apex:pageBlockSectionItem >
+			<apex:outputText value="{!$Label.kimbleone__assignmententryremainingeffort}" />
+			<div id="RemainingUsage-snip-starting" actual=""></div>								
+		</apex:pageBlockSectionItem>
+				
+	</apex:pageblockSection> 
+</apex:pageBlock>
+</div>
+
+<script>
+
+	enableSnip = {!$ObjectType.KimbleOne__ActivityAssignment__c.updateable};
+	var enableSnipWithoutActuals =  <apex:outputText value="{!EnableSnipWithoutActuals}"/>;
+		
+	var theAssignmentToSnip;
+	var newAssignmentStarting;
+	
+	function getAssignmentToSnip(assignmentEnding)
+	{
+		jQuery('#assignment-snip-error').hide();
+		
+		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.GetAssignmentToSnip}',
+       		assignmentEnding.Id,
+      			function(result, event){          
+             		
+             		if (event.status) 
+		            {
+		             	theAssignmentToSnip = result;
+
+		             	//validate can snip
+		             	if (!theAssignmentToSnip.ActivityAllowsNewItems)
+		             	{
+		             		//show error
+		             		jQuery('#assignment-snip-error').show();
+       						jQuery('#assignment-snip-error-text').text('Cannot snip assignment - delivery stage prevents new assignments');
+       						
+		             		//disable save button
+		             		jQuery('.save-assignment-button').hide();
+		             		
+		             		showModalBoxy();
+		             		
+		             		return;		             		
+		             	}
+
+		             	//validate can snip
+		             	if (theAssignmentToSnip.LatestTimeEntryDate != null && newAssignmentStarting.valueOf() <= theAssignmentToSnip.LatestTimeEntryDate.toDate().valueOf())
+		             	{
+		             		//show error
+		             		jQuery('#assignment-snip-error').show();
+       						jQuery('#assignment-snip-error-text').text('Cannot snip assignment actual time exists before ' + kimble.formatDate(newAssignmentStarting.toKimbleUTC()));
+       						
+		             		//disable save button
+		             		jQuery('.save-assignment-button').hide();
+		             		
+		             		showModalBoxy();
+		             		
+		             		return;		             		
+		             	}
+		             	
+		             	if (theAssignmentToSnip.CanEditAssignment)
+		             		jQuery('.save-assignment-button').show();
+		             	
+		             	var assignmentUsage = new ActivityAssignmentUsagePattern(theAssignmentToSnip.HoursPerDay, theAssignmentToSnip.StartDate.toDate(), theAssignmentToSnip.UsagePattern, theAssignmentToSnip.Utilisation, theAssignmentToSnip.BaselineUtilisation);
+		
+						jQuery('#resource-snip input:text').val(unescapeHTML(theAssignmentToSnip.ResourceName));
+						jQuery('#resource-snip input:hidden[id$="lkid"],#resource-snip select').val(theAssignmentToSnip.ResourceId);
+
+						jQuery('#ActivityRole-snip').html(theAssignmentToSnip.Role);
+						
+						if (theAssignmentToSnip.UsageBehaviourRule != null)
+							jQuery('#UsageBehaviourRule-snip').html(theAssignmentToSnip.UsageBehaviourRule.Name);
+						
+						jQuery('#Utilisation-snip').text(jQuery.formatNumber(theAssignmentToSnip.Utilisation, {format: "#", locale:kimble.locale, isFullLocale:false}) + '%');
+						
+						jQuery('#StartDate-snip-ending').text(jQuery.datepicker.formatDate(kimble.regional.dateFormat, theAssignmentToSnip.StartDate.toDate()));
+						
+						var oldAssignmentEnding = new Date(newAssignmentStarting.getFullYear(), newAssignmentStarting.getMonth(), newAssignmentStarting.getDate() - 1, 0, 0, 0, 0);
+						
+						jQuery('#EndDate-snip-ending').text(jQuery.datepicker.formatDate(kimble.regional.dateFormat, oldAssignmentEnding));
+						
+						var endingRemainingUsage = assignmentUsage.getUsageInHoursForDateRange(theAssignmentToSnip.StartDate.toDate(), oldAssignmentEnding) / theAssignmentToSnip.ForecastToHourConversionFactor;
+								
+						jQuery('#RemainingUsage-snip-ending').text(jQuery.formatNumber(endingRemainingUsage, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+						
+						jQuery('.invoicing-units').text(theAssignmentToSnip.InvoicingUnits);
+						jQuery('#base-currency-ending').text(theAssignmentToSnip.BaseCurrencyISOCode);
+						jQuery('#base-currency-starting').text(theAssignmentToSnip.BaseCurrencyISOCode);
+						
+						jQuery('#StartDate-snip-starting').text(jQuery.datepicker.formatDate(kimble.regional.dateFormat, newAssignmentStarting));
+						
+						jQuery('#EndDate-snip-starting').text(jQuery.datepicker.formatDate(kimble.regional.dateFormat, theAssignmentToSnip.EndDate.toDate()));
+						
+						var startingRemainingUsage = assignmentUsage.getUsageInHoursForDateRange(newAssignmentStarting, theAssignmentToSnip.EndDate.toDate()) / theAssignmentToSnip.ForecastToHourConversionFactor;
+						
+						jQuery('#RemainingUsage-snip-starting').text(jQuery.formatNumber(startingRemainingUsage, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false}));
+						
+						showModalBoxy();
+		             	
+		         	} 
+		         	else if (event.type === 'exception') 
+		         	{
+		             	alert(event.message);
+		         	} 
+		         	else
+		         	{
+		             	alert(event.message);
+		         	}		         	
+         }, 
+         {escape: true, timeout: 60000});
+	}
+	
+	function snipAssignment(obj, e)
+	{
+		var evt = jQuery.event.fix(e);
+		
+		newAssignmentStarting = new Date(new Number(jQuery(document.elementFromPoint(Math.ceil(evt.clientX), Math.ceil(jQuery('#days-header').offset().top) - jQuery(window).scrollTop())).parent().prop('id').substring(3))); 
+		
+		newAssignmentStarting = new Date(newAssignmentStarting.getFullYear(), newAssignmentStarting.getMonth(), newAssignmentStarting.getDate() + 1, 0, 0, 0, 0);
+		
+		initialiseModalBoxy('#ActivityAssignmentSnip', '{!JSENCODE($Label.Edit)} {!$ObjectType.ActivityAssignment__c.label}');
+		
+		var assignmentEnding = assignmentGanttMap[jQuery(obj).prop('id')];
+		
+		getAssignmentToSnip(assignmentEnding);
+	}
+
+	function snipAssignmentNew(assignmentId, starting)
+	{
+		newAssignmentStarting = new Date(starting);
+
+		newAssignmentStarting = new Date(newAssignmentStarting.getFullYear(), newAssignmentStarting.getMonth(), newAssignmentStarting.getDate() + 1, 0, 0, 0, 0);
+
+		initialiseModalBoxy('#ActivityAssignmentSnip', '{!JSENCODE($Label.Edit)} {!$ObjectType.ActivityAssignment__c.label}');
+
+		getAssignmentToSnip({Id:assignmentId});
+	}
+	
+	function saveSnip()
+	{
+		jQuery('.save-assignment-button').addClass('btnDisabled').prop('disabled','disabled');
+
+		var resourceId = kimble.parseId(jQuery('#resource-snip input:hidden[id$="lkid"], #resource-snip select').val());
+
+		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.EndAssignment}',
+       		theAssignmentToSnip.Id, newAssignmentStarting.toKimbleUTC(), resourceId, ganttViewStartDate, ganttViewEndDate,
+      			function(result, event){          
+             		
+             		hideModalBoxy();
+             		
+             		if (event.status) 
+		            {
+		             	//Raise event to re-paint resources
+		             	jQuery.publish('kimble.assignmentEndDated', result);
+		             	
+		             	jQuery('.save-assignment-button').removeClass('btnDisabled').prop('disabled','');
+		         	} 
+		         	else if (event.type === 'exception') 
+		         	{
+		             	alert(event.message);
+		         	} 
+		         	else
+		         	{
+		             	alert(event.message);
+		         	}		         	
+         }, 
+         {escape: true, timeout: 60000});	
+	}
+	
+	function cancelSnip()
+	{
+		hideModalBoxy();
+	}
+</script>
+</apex:page>

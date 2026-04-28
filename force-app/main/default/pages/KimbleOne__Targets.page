@@ -1,0 +1,1117 @@
+<apex:page controller="KimbleOne.TargetsController" sidebar="false"> 
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+	
+  	<div id="filterContainer" style="width:245px;float:left;height:auto;margin-right:10px;">
+	
+	<div class="handlebarContainer k-handlebar" id="handlebarContainer">
+		<div class="indicator" id="pinIndicator"></div>
+		<div class="indicator" id="pinIndicator2"></div>
+		<div class="pinBox" id="handle">&nbsp;</div>
+	</div>
+
+	<apex:form >
+	<div id="sidebarDiv"  class="fixed">
+		<div style="position:relative;" class="sidebarModuleHeader"><h2><div>{!$Label.TargetFiltersHeader}</div><input type="button" class="apply-button  btn" onclick="getTargets();" value="{!$Label.GoButton}" /></h2></div>
+		<br/>
+			
+		<!-- Fix Filters Panel -->
+		<apex:outputPanel id="FixFiltersPanel">
+	    	<apex:pageBlock id="FixFiltersBlock">
+	    	 <apex:pageBlockSection columns="1">
+				
+				<apex:pageBlockSectionItem >
+			 		<apex:outputLabel >{!$ObjectType.KimbleOne__PerformanceAnalysis__c.Fields.KimbleOne__AnalysisFact__c.Label}</apex:outputLabel>
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem > 
+					<apex:outputPanel >   	 
+						<div class="requiredInput">
+							<div class="requiredBlock"/>
+				 			<apex:selectList value="{!idAnalysisFact}" onchange="startLoadingfilter(); getAnalysisFact()" size="1" styleclass="AnalysisFact">
+				 				<apex:selectOptions value="{!AnalysisFactOptions}"/>
+				 			</apex:selectList>
+			 			</div>
+					</apex:outputPanel>   	 
+				</apex:pageBlockSectionItem>					
+	
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel >{!$ObjectType.KimbleOne__PerformanceAnalysis__c.Fields.KimbleOne__AnalysisDimension__c.Label}</apex:outputLabel>
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem > 
+					<apex:outputPanel >   	 
+						<div class="requiredInput">
+							<div class="requiredBlock"/>
+				 			<apex:selectList value="{!idAnalysisDimension}" size="1" onchange="startLoadingfilter(); getAnalysisDimension();" styleclass="AnalysisDimensions">
+				 				<apex:selectOptions value="{!DimensionOptions}"/>
+				 			</apex:selectList>
+			 			</div>
+					</apex:outputPanel>   	 
+				</apex:pageBlockSectionItem>	
+				
+				<apex:pageBlockSectionItem >
+						<apex:outputLabel value="{!$Label.kimbleone__fromlabel} "/>
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem > 
+					<apex:outputPanel >   
+						<div class="requiredInput">
+							<div class="requiredBlock"/>	 
+				 			<apex:selectList value="{!idTimePeriod}" size="1" styleclass="StartTimePeriod">
+				 				<apex:selectOptions value="{!TimePeriodOptions}"/>
+				 			</apex:selectList>
+				 		</div>
+					</apex:outputPanel>   	 
+				</apex:pageBlockSectionItem>			
+				
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$Label.kimbleone__tolabel} "/>
+				</apex:pageBlockSectionItem>
+				<apex:pageBlockSectionItem > 
+					<apex:outputPanel > 			
+						<div class="requiredInput">
+							<div class="requiredBlock"/>	 
+					  	 	<apex:selectList value="{!idTimePeriod2}" size="1" styleclass="EndTimePeriod">
+				 				<apex:selectOptions value="{!TimePeriodOptions}"/>
+				 			</apex:selectList>
+				 		</div>
+					</apex:outputPanel>   	 
+				</apex:pageBlockSectionItem>	
+									
+			 </apex:pageBlockSection>
+			</apex:pageBlock>
+	        
+	      	<apex:actionFunction action="{!getAnalysisDimension}" name="getAnalysisDimension" rerender="FiltersPanel" oncomplete="endLoadingfilter();autoTogglerStretchTargets();"/>
+	      	<apex:actionFunction action="{!getAnalysisFact}" name="getAnalysisFact" rerender="FixFiltersPanel" oncomplete="endLoadingfilter();autoTogglerStretchTargets();"/>
+	        
+		</apex:outputPanel>
+	
+		<apex:outputPanel id="FiltersPanel" >
+			<div>
+				<div id="loadingIndicatorOuterContainer" class="loadingIndicator">
+		    	<div id="loadingIndicatorInnerContainer">
+		        	<img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+		  		 </div>
+			</div>
+	    	<apex:pageBlock id="FiltersBlock">
+				<apex:pageBlockSection columns="1">
+	
+					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasBusinessUnit__c}">
+						<apex:outputLabel value="{!$ObjectType.KimbleOne__BusinessUnit__c.Label}"/>
+					</apex:pageBlockSectionItem>
+					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasBusinessUnit__c}">
+						<apex:outputPanel >   	 
+				 			<apex:selectList value="{!selectedBusinessUnitIds}" size="5" multiselect="true" styleclass="BusinessUnits">
+				 				<apex:selectOptions value="{!BusinessUnitOptions}"/>
+				 			</apex:selectList>
+						</apex:outputPanel>   	 
+					</apex:pageBlockSectionItem>	
+					
+					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasGrade__c}">
+						<apex:outputLabel value="{!$ObjectType.KimbleOne__Grade__c.Label}"/>
+					</apex:pageBlockSectionItem>
+					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasGrade__c}"> 
+						<apex:outputPanel >   	 
+				 			<apex:selectList value="{!selectedGradeIds}" size="5" multiselect="true" styleclass="Grades">
+				 				<apex:selectOptions value="{!GradeOptions}"/>
+				 			</apex:selectList>
+						</apex:outputPanel>   	 
+					</apex:pageBlockSectionItem>	
+	
+					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasResourceType__c}">
+						<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourceType__c.Label}"/>
+					</apex:pageBlockSectionItem>
+					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasResourceType__c}">
+						<apex:outputPanel >   	 
+				 			<apex:selectList value="{!selectedResourceTypeIds}" size="5" multiselect="true" styleclass="ResourceTypes">
+				 				<apex:selectOptions value="{!ResourceTypeOptions}"/>
+				 			</apex:selectList>
+						</apex:outputPanel>   	 
+					</apex:pageBlockSectionItem>	
+	
+					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasResource__c}">
+						<apex:outputLabel value="{!$ObjectType.KimbleOne__Resource__c.Label}"/>
+					</apex:pageBlockSectionItem>
+					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasResource__c && NumberOfResources > 0 && NumberOfResources < ResourcesThreshold}">
+						<apex:outputPanel >   	 
+				 			<apex:selectList value="{!selectedResourceIds}" multiselect="true" styleclass="Resources">
+				 				<apex:selectOptions value="{!ResourceOptions}"/>
+				 			</apex:selectList>
+						<script>
+       						jQuery('.Resources').select2();
+						</script>
+						</apex:outputPanel>   	 
+					</apex:pageBlockSectionItem>	
+					
+					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasResource__c && NumberOfResources = ResourcesThreshold}"> 							
+						<apex:outputPanel layout="none" >
+							<input type="text" id="dynamicResources" class="resources-dynamic" />
+					    	
+							<script>
+       						jQuery('.resources-dynamic').select2({
+				            		minimumInputLength: 2,
+				            		multiple: true,
+				            		query: function (params) {
+				            			var find = function() {findResources(params);};        		
+				        				find();
+				            		},
+				            		initSelection : function (element, callback) {
+								        var data = {id: element.val(), text: element.attr('data-name')};
+								        callback(data);
+								    }
+			  				});
+							</script>
+
+						</apex:outputPanel>   	 
+					</apex:pageBlockSectionItem>	
+				
+					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasAccount__c}">
+						<apex:outputLabel value="{!$ObjectType.Account.Label}"/>
+					</apex:pageBlockSectionItem>
+					
+  					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasAccount__c && NumberOfAccounts > 0 && NumberOfAccounts < AccountsThreshold}">
+						<apex:outputPanel >   	 
+				 			<apex:selectList value="{!selectedAccountIds}" multiselect="true" styleclass="Accounts" >
+				 				<apex:selectOptions value="{!AccountOptions}"/>
+				 			</apex:selectList>
+						<script>
+       						jQuery('.Accounts').select2();
+						</script>
+						</apex:outputPanel>   	 
+					</apex:pageBlockSectionItem>	
+					
+					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasAccount__c && NumberOfAccounts = AccountsThreshold}"> 							
+						<apex:outputPanel layout="none" >
+							<input type="text" id="dynamicAccounts" class="accounts-dynamic" />
+					    	
+							<script>
+       						jQuery('.accounts-dynamic').select2({
+				            		minimumInputLength: 2,
+				            		multiple: true,
+				            		query: function (params) {
+				            			var find = function() {findAccounts(params);};        		
+				        				find();
+				            		},
+				            		initSelection : function (element, callback) {
+								        var data = {id: element.val(), text: element.attr('data-name')};
+								        callback(data);
+								    }
+			  				});
+							</script>
+						</apex:outputPanel> 	 
+					</apex:pageBlockSectionItem>	
+						
+					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasProduct__c}">
+						<apex:outputLabel value="{!$ObjectType.KimbleOne__Product__c.Label}"/>
+					</apex:pageBlockSectionItem>
+					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasProduct__c}">
+						<apex:outputPanel >   	 
+				 			<apex:selectList value="{!selectedProductIds}" size="5" multiselect="true" styleclass="Products">
+				 				<apex:selectOptions value="{!ProductOptions}"/>
+				 			</apex:selectList>
+						</apex:outputPanel>   	 
+					</apex:pageBlockSectionItem>
+
+					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasProposition__c}">
+						<apex:outputLabel value="{!$ObjectType.KimbleOne__Proposition__c.Label}"/>
+					</apex:pageBlockSectionItem>
+					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasProposition__c}">
+						<apex:outputPanel >   	 
+				 			<apex:selectList value="{!selectedPropositionIds}" size="5" multiselect="true" styleclass="Propositions">
+				 				<apex:selectOptions value="{!PropositionOptions}"/>
+				 			</apex:selectList>
+						</apex:outputPanel>   	 
+					</apex:pageBlockSectionItem>
+
+					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasUser__c}">
+						<apex:outputLabel value="{!$ObjectType.User.Label}"/>
+					</apex:pageBlockSectionItem>
+  					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasUser__c && NumberOfUsers > 0 && NumberOfUsers < UsersThreshold}">
+						<apex:outputPanel >   	 
+				 			<apex:selectList value="{!selectedUserIds}" multiselect="true" styleclass="Users" >
+				 				<apex:selectOptions value="{!UserOptions}"/>
+				 			</apex:selectList>
+						<script>
+       						jQuery('.Users').select2();
+						</script>
+						</apex:outputPanel>   	 
+					</apex:pageBlockSectionItem>	
+					
+					<apex:pageBlockSectionItem rendered="{!aDimension.KimbleOne__HasUser__c && NumberOfUsers = UsersThreshold}"> 							
+						<apex:outputPanel layout="none" >
+							<input type="text" id="dynamicUsers" class="users-dynamic" />
+					    	
+							<script>
+       						jQuery('.users-dynamic').select2({
+				            		minimumInputLength: 2,
+				            		multiple: true,
+				            		query: function (params) {
+				            			var find = function() {findUsers(params);};        		
+				        				find();
+				            		},
+				            		initSelection : function (element, callback) {
+								        var data = {id: element.val(), text: element.attr('data-name')};
+								        callback(data);
+								    }
+			  				});
+							</script>
+						</apex:outputPanel> 	 
+					</apex:pageBlockSectionItem>
+
+					<apex:pageBlockSectionItem >
+						<apex:outputPanel >
+							<div align="right">
+								<input id="toggleButton" type="button" class="btn" value="{!$Label.ShowStretchTargets}" onclick="toggleStretchTargets();"/>
+							</div>
+						</apex:outputPanel>
+					</apex:pageBlockSectionItem>
+
+					<script>
+
+
+						function autoTogglerStretchTargets()
+						{
+							var block = jQuery('#StretchTargetsDiv');
+						    var hasStretchTargets = jQuery('.stretchAmount').filter(function(){return parseNumericValue(jQuery(this).val()) != null}).length > 0 ? true : false;
+
+						    if(hasStretchTargets)
+						    {
+								if(jQuery(block).hasClass('hidden')){jQuery(block).removeClass('hidden');}
+								jQuery('#toggleButton').attr('value','{!JSENCODE($Label.HideStretchTargets)}');
+          					}
+          					else
+          					{
+								if(!jQuery(block).hasClass('hidden')){jQuery(block).addClass('hidden');}
+								jQuery('#toggleButton').attr('value','{!JSENCODE($Label.ShowStretchTargets)}');
+               				}
+      					}
+
+						function toggleStretchTargets()
+						{
+							var block = jQuery('#StretchTargetsDiv');
+							jQuery(block).toggleClass('hidden');
+							var btnLabel = jQuery(block).hasClass('hidden') ? '{!JSENCODE($Label.ShowStretchTargets)}' : '{!JSENCODE($Label.HideStretchTargets)}';
+							jQuery('#toggleButton').attr('value',btnLabel);
+      					}
+
+					</script>
+
+				</apex:pageBlockSection>	    	
+	
+			</apex:pageBlock>
+			</div>
+		</apex:outputPanel>
+
+		</div><!-- sidebarDiv End -->
+    </apex:form>	
+	</div><!-- filterContainer End -->   
+</apex:define>
+   
+<apex:define name="Content">
+
+ 	<style>
+ 		/* Lightning overrides body:not(.Custom299Tab) excludes classic */
+		body:not(.Custom299Tab) .sidebarCollapsed #handlebarContainer.k-handlebar {
+			left: 0px;
+		}
+		.boxy-content 
+		{
+			display:none;
+		}
+		.target-cell {
+			text-align: center;		
+		}
+		.targetAmount, .stretchAmount{
+			width: 80px;
+			text-align: center;		
+		}
+		.loadingIndicator img {
+	    	margin-right:9px;
+		}
+	
+		.loadingIndicator {
+		   top:0;
+		   right:0;
+		   width:100%;
+		   height:100%;
+		   font-weight: bold;
+		   position:absolute;
+		   text-align:center;
+		   /* IE filter */
+		   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+		   -moz-opacity:0.7;    /* Mozilla extension */
+		   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+		   opacity:0.7; /* CSS3 */
+		   z-index:1000;
+		   background-color:white;
+		}
+	
+		#loadingIndicatorInnerContainer, #loadingIndicatorInnerContainerResults { 
+		    position:absolute; 
+		    top:50%;
+		    height:10em; 
+		    margin-top:-2em;
+		    width:100%;
+		}
+		#loadingIndicatorOuterContainer, #loadingIndicatorOuterContainerResults { 
+			display:none;
+		}
+		.analysisHeader{
+		   	font-weight: bold;
+    		height: 28px;
+    		background-color: #EDEDED;
+		}
+		tr.analysisHeader td {
+		    vertical-align: middle !important;
+		}
+		.analysisTable {
+		    display: table;
+	    	border-collapse: separate;
+	    	border-spacing: 2px;
+	    	border-color: grey;
+	    	border: 1px solid white;
+    	}
+    	.analysisTable  td{
+    		border: 1px solid white;
+    	}
+    	
+    	input.apply-button {
+		    position: absolute;
+		    right: 5px;
+		}		
+		.sidebarModuleHeader h2 {
+		    height: 25px;
+		}
+		.sidebarModuleHeader h2 div {
+		    padding-top: 5px;
+		}
+		input.apply-button {
+			position: absolute;
+			right: 5px;
+			top: 6px;
+			min-width: 36px;
+		}
+		div#content-pane {
+		    padding-left: 5px;
+		}
+		div#sidebarDiv label {
+		    font-weight: bold;
+		}
+		div#sidebarDiv select {
+		    width: 230px;
+		}
+		#sidebarDiv .sidebarModuleHeader {
+		    background: #1797c0 !important;
+		    border-radius: 4px;
+		}
+		#sidebarDiv .sidebarModuleHeader h2 {
+		    background: initial;
+		}		
+		div#sidebarDiv .pbBody, div#sidebarDiv .bPageBlock {
+		    border: none !important;
+		    background-color: initial !important;
+		    margin: 0px !important;
+		    padding: 0px !important;
+		}
+		div#sidebarDiv td.data2Col {
+		    border-bottom: none;
+		}
+		div#sidebarDiv {
+		    width: 245px;
+		}
+		div#handlebarContainer {
+		    left: 258px;
+		}
+		.pbBottomButtons {
+		    margin-top: inherit !important;
+		}
+		.pbBody {
+		    background-color: white !important;
+		    margin: 0px !important;
+		}
+		span[id$='PerformAnalysisPanel'] td.data2Col.first.last {
+		    padding: 5px;
+		}
+		.analysisTable td {
+		    vertical-align: middle !important;
+		}
+		.save-button.has-changes {
+			background: #ffa500;
+		}
+		span[id$='PerformAnalysisPanel'] .pbButton, span[id$='PerformAnalysisPanel'] .pbButtonb {
+		    text-align: right;
+		}
+		div#PerformanceAnalysisContainer th {
+		    background-color: #ededed;
+		    vertical-align: middle;
+		}		
+		.save-button {
+		    min-width: 55px;
+		}
+		
+		.fixed-table {
+		    border: none;
+		    border-right: solid 1px #DDEFEF;
+		    border-collapse: separate;
+		    border-spacing: 0;
+		}
+		.fixed-wrapper {
+		    position: relative;
+		}
+		.fixed-scroller.two-col {
+	        margin-left: 250px;
+        }
+		.fixed-scroller.one-col {
+			margin-left: 126px;
+        }
+		.fixed-scroller {
+		    overflow-x: scroll;
+		    overflow-y: visible;
+		    padding-bottom: 5px;
+/* 	        width: 880px; TODOL: calc this based on available width */
+		}
+		td.fixed-col {
+		    font-weight: normal;
+		}
+		tr.analysisHeader td.fixed-col {
+		    background-color: #ededed;
+		    height: 25px;
+		    width: 120px;
+		}		
+		.fixed-table .fixed-col {
+		    border-left: solid 1px #DDEFEF;
+		    border-right: solid 1px #DDEFEF;
+		    position: absolute;
+		    top: auto;
+		    padding-top: 5px;
+		}
+		.fixed-table .fixed-col.first {
+		    left: 0px
+		}
+		.fixed-table .fixed-col.second {
+		    left: 124px;
+		}
+		.scaling-col {
+		    padding: 4px;
+		    white-space: normal;
+		    border: none !important;
+		}
+		.scaling-col div {
+		    opacity: 0;
+		    padding: 2px;
+		}
+		.scaling-col div,
+		.fixed-col div {
+		    width: 120px;
+		}
+		/* Make select2 dropdowns look like conventional dropdowns */
+		a.select2-choice {
+		    height: 18px !important;
+		    line-height: 18px !important;
+		    background-image: none !important;
+		    border-radius: 0px !important;
+		    color: black !important;
+		    padding-left: 4px !important;
+   			text-align: left;
+    		font-weight: normal;
+    		
+		    letter-spacing: normal;
+		    word-spacing: normal;
+		    text-transform: none;
+		    text-indent: 0px;
+		    text-shadow: none;
+		    display: inline-block;
+		    text-align: start;
+		    margin: 0em;
+		    font: 400 13.3333px Arial; 
+		}
+		.select2-choice div {
+		    <!-- border-left: none !important; -->
+		}
+		#dynamicAccounts {
+   			width: 227px;
+		}
+		#dynamicResources {
+   			width: 227px;
+		}
+		#dynamicUsers {
+   			width: 227px;
+		}
+		/* SELECT 2 STYLING */
+		.select2-results li {margin-left:0px;}
+		.select2-container-multi .select2-choices
+		{
+			border: 2px solid rgb(224,224,224);
+			background-image:none;
+		}
+		.select2-container-multi .select2-choices .select2-search-choice {
+			border: 1px solid #aaaaaa;
+			border-radius: 4px;
+			padding: 5px 20px 5px 5px;
+			background-image:none;
+		}
+		
+		.select2-container-multi .select2-search-choice-close {
+			background-image:  url({!URLFOR($Resource.AssignmentImages, 'assignmentSprite.png')});
+			background-position: -2px -29px;
+			background-repeat: no-repeat;
+			left:auto;
+		}
+		
+		.select2-container-multi .select2-choices .select2-search-choice .select2-search-choice-close:hover {
+			background-position: -2px -1px;
+		}
+		
+	</style>
+	<script>
+		var theTarget;
+		
+		jQuery(window).load(function () {
+		
+			jQuery('#handlebarContainer').click(function () {
+				jQuery(this).parent().toggleClass('sidebarCollapsed');
+			})
+			.mouseenter(function () {
+				jQuery(this).toggleClass('hover');
+			})
+			.mouseleave(function () {
+				jQuery(this).toggleClass('hover');
+			});
+		});
+		
+		function startLoadingfilter() {
+			jQuery('#loadingIndicatorOuterContainer').show();
+		}
+		function endLoadingfilter() {
+			jQuery('#loadingIndicatorOuterContainer').hide();
+		}
+		function startLoadingResults() {
+			jQuery('#loadingIndicatorOuterContainerResults').show();
+		}
+		function endLoadingResults() {
+			jQuery('#loadingIndicatorOuterContainerResults').hide();
+		}
+		
+		function clearResults() {
+			jQuery('#PerformanceAnalysisContainer').html('');
+			TPage.disableSave();
+		}
+		
+		function formatNumericValue(theValue) {
+			if(theValue == undefined || theValue == null || theValue == ''){return '';}
+			if (theTarget.FactIsCurrency) return kimble.formatNumber(theValue, '#,##0.##');
+			else return kimble.formatNumber(theValue, '#,##0.###');
+		}
+		
+		function parseNumericValue(theValue) {
+			if(theValue == undefined || theValue == null || theValue == ''){return null;}
+			if (theTarget.FactIsCurrency) return kimble.parseNumber(theValue, '#,##0.##');
+			return kimble.parseNumber(theValue, '#,##0.###');
+		}
+		
+		function targetChanged() {
+			var theVal = parseNumericValue(jQuery(this).val());
+			jQuery(this).val(formatNumericValue(theVal));
+
+			if(jQuery(this).hasClass('targetAmount')){jQuery(this).addClass('targetAmountChanged');}
+			if(jQuery(this).hasClass('stretchAmount')){jQuery(this).addClass('stretchAmountChanged');}
+
+			targetsChanged();
+		}
+
+		function currencyChanged() {
+
+		    var rowNumber = jQuery(this).attr('Id').replace('CurrencySelect','');
+
+			jQuery('[html-data-rownumber="'+rowNumber+'"].targetAmount').addClass('currencyChanged');
+
+		    jQuery('.save-button').addClass('has-changes');
+  		}
+		
+		var saveTimer;
+		var autoSaveInd = true;
+		
+		function targetsChanged() {
+			jQuery(window).off('.has-changes').on('beforeunload.has-changes', function () {
+				return kimble.labels['UnsavedChangesHeading'] + "\n\n" + kimble.labels['UnsavedChangesMessage'];
+			});
+		
+			// start a timer and then save on expiry - compensates for the user probably wanting to change the state of many items
+			clearTimer();
+		
+			if (autoSaveInd) {
+				saveTimer = setTimeout(saveTargets, 4000);
+			}
+		
+			jQuery('.save-button').addClass('has-changes');
+		}
+		
+		function clearTimer() {
+			clearTimeout(saveTimer);
+		}
+		
+		function resetTargetsChanged() {
+			jQuery(window).off('.has-changes');
+			jQuery('.save-button').removeClass('has-changes');
+		}
+		
+		function getTargets() {
+			var continueGet = true;
+		
+			if (jQuery('.save-button').hasClass('has-changes')) {
+				continueGet = confirm(kimble.labels['UnsavedChangesPlan'] + "\n\n" + 'Click OK to lose your changes or Cancel to return');
+			}
+		
+			if (!continueGet) {
+				return;
+			} else {
+				clearTimer();
+			}
+		
+			startLoadingResults();
+		
+			var AnalysisFact = $('.AnalysisFact').length > 0 ? $('.AnalysisFact').val() : null;
+			var StartTimePeriod = $('.StartTimePeriod').length > 0 ? $('.StartTimePeriod').val() : null;
+			var EndTimePeriod = $('.EndTimePeriod').length > 0 ? $('.EndTimePeriod').val() : null;
+			var AnalysisDimensions = $('.AnalysisDimensions').length > 0 ? $('.AnalysisDimensions').val() : null;
+			var BusinessUnits = $('.BusinessUnits').length > 0 ? $('.BusinessUnits').val() : null;
+			var Grades = $('.Grades').length > 0 ? $('.Grades').val() : null;
+			var ResourceTypes = $('.ResourceTypes').length > 0 ? $('.ResourceTypes').val() : null;
+			var Resources = $('.Resources.select2-offscreen').length > 0 ? $('.Resources.select2-offscreen').val() : $('#dynamicResources').length > 0 ? $('#dynamicResources').val().split(',') : null;
+			var Accounts = $('.Accounts.select2-offscreen').length > 0 ? $('.Accounts.select2-offscreen').val() : $('#dynamicAccounts').length > 0 ? $('#dynamicAccounts').val().split(',') : null;
+			var Products = $('.Products').length > 0 ? $('.Products').val() : null;
+			var Propositions = $('.Propositions').length > 0 ? $('.Propositions').val() : null;
+			var Users = $('.Users.select2-offscreen').length > 0 ? $('.Users.select2-offscreen').val() : $('#dynamicUsers').length > 0 ? $('#dynamicUsers').val().split(',') : null;
+		
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TargetsController.GetTarget}',
+				AnalysisFact, StartTimePeriod, EndTimePeriod, AnalysisDimensions, BusinessUnits, Grades, ResourceTypes, Resources, Accounts, Products, Propositions, Users,
+				function (result, event) {
+				if (event.status) {
+					//console.log(result);
+					theTarget = result;
+					drawGrid('targetAmount','#PerformanceAnalysisContainer');
+					drawGrid('stretchAmount','#StretchTargetsContainer');
+
+					autoTogglerStretchTargets();
+
+					resetTargetsChanged();
+					endLoadingResults();
+				} else {
+					alert(event.message);
+					resetTargetsChanged();
+					endLoadingResults();
+				}
+			}, {
+				escape: false,
+				timeout: 60000
+			});
+		}
+		
+		jQuery(window).resize(function() {
+			resizeGrid();
+		});
+
+		function resizeGrid() {
+			jQuery('.fixed-scroller').width(0);
+			jQuery('.fixed-scroller.one-col').width(jQuery('.fixed-wrapper').width() - 125);
+			jQuery('.fixed-scroller.two-col').width(jQuery('.fixed-wrapper').width() - 251);
+		}
+		
+		function drawGrid(targetType,targetContainer) {
+			jQuery('#TargetErrors').hide();
+		
+			if (theTarget.errors.length > 0) {
+				var errorMessages = '';
+				jQuery.each(theTarget.errors, function (i, errorMessage) {
+					errorMessages += '<li>' + errorMessage + '</li>';
+				});
+				jQuery('#TargetErrorsMsg').html(errorMessages);
+				jQuery('#TargetErrors').show();
+				return;
+			} else {
+				TPage.enableSave();
+			}
+		
+			var theHtml = '';
+			theHtml += '<div class="fixed-wrapper">';
+			theHtml += '<div class="fixed-scroller one-col">';
+			theHtml += '<table class="analysisTable fixed-table">';
+		
+			theHtml += drawHeader(theTarget);
+		
+			jQuery.each(theTarget.performanceAnalysisRows, function (i, roe) {
+				theHtml += drawPerformanceAnalysis(roe,targetType);
+			});
+		
+			theHtml += '</table>';
+			theHtml += '</div>';
+			theHtml += '</div>';
+			jQuery(targetContainer).html(theHtml);
+
+			if (jQuery('.fixed-col.second').length > 0)
+			{
+				jQuery('.fixed-scroller').removeClass('one-col').addClass('two-col');
+			}
+			else if(jQuery('.fixed-scroller').hasClass('two-col'))
+			{
+				jQuery('.fixed-scroller').removeClass('two-col').addClass('one-col');
+   			}
+			resizeGrid();
+		
+			jQuery.each($('[useToSetSelected]'), function (i, value) {
+				$(value).val($(value).attr('useToSetSelected'));
+			});
+		}
+		
+		function drawHeader() {
+		
+			var headerHtml = '<thead>';
+		
+			headerHtml += '<tr class="analysisHeader">';
+			if (theTarget.HasBusinessUnit)
+				headerHtml += '<td class="fixed-col first">{!JSENCODE($ObjectType.PerformanceAnalysis__c.Fields.BusinessUnit__c.Label)}</td>';
+			if (theTarget.HasGrade)
+				headerHtml += '<td class="fixed-col second">{!JSENCODE($ObjectType.PerformanceAnalysis__c.Fields.Grade__c.Label)}</td>';
+			if (theTarget.HasResourceType)
+				headerHtml += '<td class="fixed-col second">{!JSENCODE($ObjectType.PerformanceAnalysis__c.Fields.ResourceType__c.Label)}</td>';
+			if (theTarget.HasResource)
+				headerHtml += '<td class="fixed-col first">{!JSENCODE($ObjectType.PerformanceAnalysis__c.Fields.Resource__c.Label)}</td>';
+			if (theTarget.HasAccount)
+				headerHtml += '<td class="fixed-col first">{!JSENCODE($ObjectType.PerformanceAnalysis__c.Fields.Account__c.Label)}</td>';
+			if (theTarget.HasProduct)
+				headerHtml += '<td class="fixed-col first">{!JSENCODE($ObjectType.PerformanceAnalysis__c.Fields.Product__c.Label)}</td>';
+			if (theTarget.HasProposition)
+				headerHtml += '<td class="fixed-col first">{!JSENCODE($ObjectType.PerformanceAnalysis__c.Fields.Proposition__c.Label)}</td>';
+			if (theTarget.HasUser)
+				headerHtml += '<td class="fixed-col first">{!JSENCODE($ObjectType.PerformanceAnalysis__c.Fields.User__c.Label)}</td>';
+			if (!(theTarget.HasBusinessUnit || theTarget.HasGrade || theTarget.HasResourceType || theTarget.HasResource || theTarget.HasAccount || theTarget.HasProduct || theTarget.HasProposition || theTarget.HasUser))
+				headerHtml += '<td class="fixed-col first"></td>';
+			
+			if (theTarget.FactIsCurrency)
+				headerHtml += '<td>{!JSENCODE($Label.Currency)}</td>';
+		
+			jQuery.each(theTarget.Periods, function (i, period) {
+				headerHtml += '<td class="target-cell">' + period.Name + '</td>';
+			});
+		
+			/* SCALING COLS */
+			if (theTarget.HasBusinessUnit)
+				headerHtml += '<td class="scaling-col"><div>{!JSENCODE($ObjectType.PerformanceAnalysis__c.Fields.BusinessUnit__c.Label)}</div></td>';
+			if (theTarget.HasGrade)
+				headerHtml += '<td class="scaling-col"><div>{!JSENCODE($ObjectType.PerformanceAnalysis__c.Fields.Grade__c.Label)}</div></td>';
+			if (theTarget.HasResourceType)
+				headerHtml += '<td class="scaling-col"><div>{!JSENCODE($ObjectType.PerformanceAnalysis__c.Fields.ResourceType__c.Label)}</div></td>';
+			if (theTarget.HasResource)
+				headerHtml += '<td class="scaling-col"><div>{!JSENCODE($ObjectType.PerformanceAnalysis__c.Fields.Resource__c.Label)}</div></td>';
+			if (theTarget.HasAccount)
+				headerHtml += '<td class="scaling-col"><div>{!JSENCODE($ObjectType.PerformanceAnalysis__c.Fields.Account__c.Label)}</div></td>';
+			if (theTarget.HasProduct)
+				headerHtml += '<td class="scaling-col"><div>{!JSENCODE($ObjectType.PerformanceAnalysis__c.Fields.Product__c.Label)}</div></td>';
+			if (theTarget.HasProposition)
+				headerHtml += '<td class="scaling-col"><div>{!JSENCODE($ObjectType.PerformanceAnalysis__c.Fields.Proposition__c.Label)}</div></td>';
+			if (theTarget.HasUser)
+				headerHtml += '<td class="scaling-col"><div>{!JSENCODE($ObjectType.PerformanceAnalysis__c.Fields.User__c.Label)}</div></td>';
+			if (!(theTarget.HasBusinessUnit || theTarget.HasGrade || theTarget.HasResourceType || theTarget.HasResource || theTarget.HasAccount || theTarget.HasProduct || theTarget.HasProposition || theTarget.HasUser))
+				headerHtml += '<td class="scaling-col"><div></div></td>';
+			/* SCALING COLS */
+		
+			headerHtml += '</tr>';
+			headerHtml += '</thead>';
+			return headerHtml;
+		
+		}
+		
+		function drawPerformanceAnalysis(thePerformanceAnalysisRow,targetType) {
+		
+			var rowHtml = '<tr>';
+		
+			if (theTarget.HasBusinessUnit)
+				rowHtml += '<td class="fixed-col first"><div>' + thePerformanceAnalysisRow.BusinessUnitName + '</div></td>';
+			if (theTarget.HasGrade)
+				rowHtml += '<td class="fixed-col second"><div>' + thePerformanceAnalysisRow.GradeName + '</div></td>';
+			if (theTarget.HasResourceType)
+				rowHtml += '<td class="fixed-col second"><div>' + thePerformanceAnalysisRow.ResourceTypeName + '</div></td>';
+			if (theTarget.HasResource)
+				rowHtml += '<td class="fixed-col first"><div>' + thePerformanceAnalysisRow.ResourceName + '</div></td>';
+			if (theTarget.HasAccount)
+				rowHtml += '<td class="fixed-col first"><div>' + thePerformanceAnalysisRow.AccountName + '</div></td>';
+			if (theTarget.HasProduct)
+				rowHtml += '<td class="fixed-col first"><div>' + thePerformanceAnalysisRow.ProductName + '</div></td>';
+			if (theTarget.HasProposition)
+				rowHtml += '<td class="fixed-col first"><div>' + thePerformanceAnalysisRow.PropositionName + '</div></td>';
+			if (theTarget.HasUser)
+				rowHtml += '<td class="fixed-col first"><div>' + thePerformanceAnalysisRow.UserName + '</div></td>';
+			if (!(theTarget.HasBusinessUnit || theTarget.HasGrade || theTarget.HasResourceType || theTarget.HasAccount || theTarget.HasProduct || theTarget.HasProposition || theTarget.HasUser))
+				rowHtml += '<td class="fixed-col first"><div></div></td>';
+						
+			if (theTarget.FactIsCurrency) {
+
+			    var currency = thePerformanceAnalysisRow.TargetValues[theTarget.Periods[0].Id].CurrencyCode;
+
+			    if(targetType == 'targetAmount')
+			    {
+					var newSelect = $('.Currency').clone();
+					rowHtml += '<td><select id="CurrencySelect' + thePerformanceAnalysisRow.Id + '" class="currencySelector" useToSetSelected="' + currency + '">' + newSelect.html() + '</select></td>';
+				}
+				else
+				{
+				    rowHtml += '<td><input type="text" value="' + currency + '" disabled style="width:50px; text-align: center;" /></td>'
+    			}
+			}
+			jQuery.each(theTarget.Periods, function (i, period) {
+				var value = thePerformanceAnalysisRow.TargetValues[period.Id];
+				var amountType = targetType == 'targetAmount' ? 'Amount' : 'StretchAmount';
+				rowHtml += '<td class="target-cell"><input type="text" class="' + targetType +'" title="' + period.Name + '" html-data-rownumber="'+thePerformanceAnalysisRow.Id+'" value="' + formatNumericValue(value[amountType]) + '" specialId="' + value.Id + '"/></td>';
+			});
+		
+			/* SCALING COLS */
+			if (theTarget.HasBusinessUnit)
+				rowHtml += '<td class="scaling-col"><div>' + thePerformanceAnalysisRow.BusinessUnitName + '</div></td>';
+			if (theTarget.HasGrade)
+				rowHtml += '<td class="scaling-col"><div>' + thePerformanceAnalysisRow.GradeName + '</div></td>';
+			if (theTarget.HasResourceType)
+				rowHtml += '<td class="scaling-col"><div>' + thePerformanceAnalysisRow.ResourceTypeName + '</div></td>';
+			if (theTarget.HasResource)
+				rowHtml += '<td class="scaling-col"><div>' + thePerformanceAnalysisRow.ResourceName + '</div></td>';
+			if (theTarget.HasAccount)
+				rowHtml += '<td class="scaling-col"><div>' + thePerformanceAnalysisRow.AccountName + '</div></td>';
+			if (theTarget.HasProduct)
+				rowHtml += '<td class="scaling-col"><div>' + thePerformanceAnalysisRow.ProductName + '</div></td>';
+			if (theTarget.HasProposition)
+				rowHtml += '<td class="scaling-col"><div>' + thePerformanceAnalysisRow.PropositionName + '</div></td>';
+			if (theTarget.HasUser)
+				rowHtml += '<td class="scaling-col"><div>' + thePerformanceAnalysisRow.UserName + '</div></td>';
+			if (!(theTarget.HasBusinessUnit || theTarget.HasGrade || theTarget.HasResourceType || theTarget.HasResource || theTarget.HasAccount || theTarget.HasProduct || theTarget.HasProposition || theTarget.HasUser))
+				rowHtml += '<td class="scaling-col"><div></div></td>';
+			/* SCALING COLS */
+		
+			rowHtml += '</tr>';
+			return rowHtml;
+		
+		}
+		
+		function saveTargets() {
+		
+			clearTimer();
+			startLoadingResults();
+		
+			jQuery.each(theTarget.performanceAnalysisRows, function (i, thePerformanceAnalysisRow) {
+				jQuery.each(thePerformanceAnalysisRow.TargetValues, function (i, value) {
+
+					var targetCell = jQuery('[specialid="' + value.Id + '"].targetAmount');
+					var stretchCell = jQuery('[specialid="' + value.Id + '"].stretchAmount');
+
+					value.CurrencyChanged = jQuery(targetCell).hasClass('currencyChanged') ? true : false;
+					value.CurrencyCode = jQuery();
+
+					value.Amount = parseNumericValue(jQuery(targetCell).val());
+					value.AmountChanged = jQuery(targetCell).hasClass('targetAmountChanged') ? true : false;
+
+					value.StretchAmount = parseNumericValue(jQuery(stretchCell).val());
+					value.StretchAmountChanged = jQuery(stretchCell).hasClass('stretchAmountChanged') ? true : false;
+				});
+		
+				if (theTarget.FactIsCurrency)
+					thePerformanceAnalysisRow.DefaultCurrency = $('#CurrencySelect' + thePerformanceAnalysisRow.Id).val();
+			});
+		
+			var AnalysisFact = $('.AnalysisFact').length > 0 ? $('.AnalysisFact').val() : null;
+			var StartTimePeriod = $('.StartTimePeriod').length > 0 ? $('.StartTimePeriod').val() : null;
+			var EndTimePeriod = $('.EndTimePeriod').length > 0 ? $('.EndTimePeriod').val() : null;
+			var AnalysisDimensions = $('.AnalysisDimensions').length > 0 ? $('.AnalysisDimensions').val() : null;
+			var BusinessUnits = $('.BusinessUnits').length > 0 ? $('.BusinessUnits').val() : null;
+			var Grades = $('.Grades').length > 0 ? $('.Grades').val() : null;
+			var ResourceTypes = $('.ResourceTypes').length > 0 ? $('.ResourceTypes').val() : null;
+			var Resources = $('.Resources.select2-offscreen').length > 0 ? $('.Resources.select2-offscreen').val() : $('#dynamicResources').length > 0 ? $('#dynamicResources').val().split(',') : null;
+			var Accounts = $('.Accounts.select2-offscreen').length > 0 ? $('.Accounts.select2-offscreen').val() : $('#dynamicAccounts').length > 0 ? $('#dynamicAccounts').val().split(',') : null;
+			var Products = $('.Products').length > 0 ? $('.Products').val() : null;
+			var Propositions = $('.Propositions').length > 0 ? $('.Propositions').val() : null;
+			var Users = $('.Users.select2-offscreen').length > 0 ? $('.Users.select2-offscreen').val() : $('#dynamicUsers').length > 0 ? $('#dynamicUsers').val().split(',') : null;
+		
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TargetsController.SaveTarget}',
+				AnalysisFact, StartTimePeriod, EndTimePeriod, AnalysisDimensions, BusinessUnits, Grades, ResourceTypes, Resources, Accounts, Products, Propositions, Users, theTarget,
+				function (result, event) {
+				if (event.status) {
+					//debugger;
+					//console.log(result);
+					theTarget = result;
+
+					resetTargetsChanged();
+					endLoadingResults();
+				} else {
+					alert(event.message);
+					endLoadingResults();
+				}
+		
+			}, {
+				escape: false,
+				timeout: 60000
+			});
+		}
+		
+       	// Called by select2 to dynamically populate selects with large lists 
+		function findAccounts(params) {
+			
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TargetsController.FindAccounts}',
+		      			params.term,
+		     			function(result, event){          
+		            		if (event.status) 
+			            {
+			             	var data = {};
+			             	data.results = result;
+			             	params.callback(data);
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+		        	}, 
+		        	{escape: false, timeout: 60000}
+		    	);
+		}
+		
+		function findResources(params) {
+			
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TargetsController.FindResources}',
+		      			params.term,
+		     			function(result, event){          
+		            		if (event.status) 
+			            {
+			             	var data = {};
+			             	data.results = result;
+			             	params.callback(data);
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+		        	}, 
+		        	{escape: false, timeout: 60000}
+		    	);
+		}
+		
+		function findUsers(params) {
+			
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TargetsController.FindUsers}',
+		      			params.term,
+		     			function(result, event){          
+		            		if (event.status) 
+			            {
+			             	var data = {};
+			             	data.results = result;
+			             	params.callback(data);
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+		        	}, 
+		        	{escape: false, timeout: 60000}
+		    	);
+		}
+    </script>
+	<apex:messages />
+
+    <div id="TargetErrors" style="display:none">
+		<apex:pageMessage summary="{!$Label.kimbleone__errors}" severity="warning" strength="2" rendered="true">
+			<ul id="TargetErrorsMsg" style=" margin:0px ;padding:0">
+				
+			</ul>
+		</apex:pageMessage>
+	</div>
+
+	
+
+	<!--  Performance Analysis Table for the selected filters -->	
+	<apex:outputPanel id="PerformAnalysisPanel" >
+    <apex:form >
+		
+		<apex:pageBlock id="PerformanceAnalysisBlock" title="{!$Label.kimbleone__targetsheader}">
+			<apex:pageBlockButtons location="top">
+           		<input type="button" class="save-button btnDisabled" onclick="saveTargets(false);" value="{!$Label.Save}" disabled='disabled' />
+			</apex:pageBlockButtons>
+			
+			<apex:pageBlockSection columns="1" >		
+				<div>
+					<div id="loadingIndicatorOuterContainerResults" class="loadingIndicator">
+				    	<div id="loadingIndicatorInnerContainerResults">
+				        	<img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+				  		 </div>
+					</div>
+					<div id="PerformanceAnalysisContainer">
+					</div>
+				</div>
+			</apex:pageBlockSection>
+		</apex:pageBlock>
+			
+		<!--  Currency list template -->
+		<apex:outputPanel style="display:none">   	 
+			<div class="requiredInput">
+				<div class="requiredBlock"/>
+				<apex:selectList size="1" styleclass="Currency">
+				 	<apex:selectOptions value="{!TheActiveCurrencies}"/>
+				</apex:selectList>
+			</div>
+		</apex:outputPanel>
+
+	</apex:form>
+	</apex:outputPanel>
+
+	<div id="StretchTargetsDiv" class="hidden">
+		<apex:outputPanel id="StretchTargetsPanel">
+			<apex:form >
+
+				<apex:pageBlock id="StretchTargetsBlock" title="{!$Label.kimbleone__stretchtargetsheader}">
+
+					<apex:pageBlockSection columns="1">
+						<div>
+							<div id="StretchTargetsContainer">
+							</div>
+						</div>
+					</apex:pageBlockSection>
+
+				</apex:pageBlock>
+
+			</apex:form>
+		</apex:outputPanel>
+	</div>
+
+</apex:define>
+</apex:composition>
+<script>
+	var TPage = {
+		enableSave : function() { 
+			jQuery('.save-button').prop('disabled', '').addClass('btn').removeClass('btnDisabled'); 
+		},
+		disableSave : function() { 
+			jQuery('.save-button').prop('disabled', 'disabled').addClass('btnDisabled').removeClass('btn'); 
+		},
+	};
+	
+	function initialiseActions()
+	{
+		jQuery(document).off('change', '.targetAmount').on('change', '.targetAmount', targetChanged);
+		jQuery(document).off('change', '.stretchAmount').on('change', '.stretchAmount', targetChanged);
+		jQuery(document).off('change', '.Currency').on('change', '.currencySelector', currencyChanged);
+	}
+
+	jQuery(document).ready(
+		initialiseActions()
+	);	
+</script>
+
+</apex:page>

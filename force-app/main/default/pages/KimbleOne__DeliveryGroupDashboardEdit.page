@@ -1,0 +1,741 @@
+<apex:page controller="KimbleOne.DeliveryGroupDashboardEditController" extensions="KimbleOne.SecurityController" sidebar="false" >
+
+	<apex:composition template="KimbleOne__SiteMaster">
+
+		<apex:define name="Menu">
+			<c:Menu DefaultHelpPage="DeliveryEngagements.html"/>
+		</apex:define>
+		     
+		<apex:define name="Content">
+			<!-- Ajax loaded pages don't load external resources so they have to be loaded in the parent page -->
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__jQueryBarGraph, 'jqBarGraph.1.1.min.js')}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'RiskStyle.css')}"/>
+ 			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleJS, 'Charm.js')}"/>
+
+			<apex:outputPanel rendered="{!ICSEnabled}">
+				<apex:includeScript value="{!URLFOR($Resource.KimbleOne__ChartJs)}"/>
+			</apex:outputPanel>
+
+			<chatter:feedWithFollowers entityId="{!TheDeliveryGroup.Id}"/>
+
+			<div id="edit-layout-side-bar-container">
+				<div class="button-header"><apex:outputText value="{!$Label.kimbleone__actions}"/></div>
+
+				<apex:outputPanel rendered="{!HasPermission['EditOrgWideUserInterfaceConfiguration']}">
+					<div class="action-btn admin-mode-button" style="margin-bottom: 30px;">
+						<i class="fa fa-cog"></i><apex:outputText value="{!$Label.kimbleone__view}"/>
+						<div class="adminmode-toggle" style="padding-left: 9px; padding-top: 5px;">
+							<apex:outputText value="{!$Label.kimbleone__mylayout}"/>
+							<i class="admin-mode-toggle k-tgl fa fa-toggle-off" onclick="handleAdminToggle();"/>
+							<apex:outputText value="{!$Label.kimbleone__orgdefault}"/>
+						</div>
+					</div>
+				</apex:outputPanel>
+
+				<apex:form >
+					<apex:actionFunction name="toggleAdminMode" action="{!ToggleView}" onComplete="refreshAdminViewToggle();initialise();" reRender="dashboard-layout-panel" status="LayoutLoadingStatus"/>
+					<apex:actionFunction name="reInitialise" action="{!initialise}" onComplete="initialise();"  reRender="dashboard-layout-panel" status="LayoutLoadingStatus" />
+				</apex:form>
+
+				<div class="action-btn add-group-btn"><i class="fa fa-plus-square"></i><apex:outputText value="{!$Label.kimbleone__addlayoutgroup}"/></div>
+				<div class="action-btn">
+				<i class="fa fa-arrows-v"></i><apex:outputText value="{!$Label.kimbleone__statussummaryheight}"/>
+				<div class=" show-summary-toggle" style="padding-left: 9px; padding-top: 5px;">
+					<span class="ShowSummaryToggle">	
+						<apex:outputText styleClass="show-hide-btn"  value=" {!$Label.kimbleone__fixedlabel} " />
+						<i class="show-summary-setting show-summary-tgl k-tgl fa" onclick="toggleShowSummary()"/>
+						<apex:outputText styleClass="show-hide-btn"  value=" {!$Label.kimbleone__statussummaryheightauto} " />
+					</span>	
+				</div>
+				</div>
+				<div class="action-btn save-layout-btn"><i class="fa fa-save"></i><apex:outputText value="{!$Label.kimbleone__savelayout}"/></div>
+				<div class="action-btn save-and-close-btn"><i class="fa fa-save"></i><apex:outputText value="{!$Label.kimbleone__saveandclose}"/></div>
+
+				<div class="action-btn reset-layout-btn"><i class="fa fa-undo"></i><apex:outputText value="{!$Label.kimbleone__resetlayout}"/></div>
+
+				<div class="action-btn cancel-btn"><i class="fa fa-times"></i><apex:outputText value="{!$Label.kimbleone__cancel}"/></div>
+			</div>
+
+
+				<div id="dashboard-layout" class="dashboardLayout">
+					<apex:outputPanel id="dashboard-layout-panel">
+
+						<apex:actionStatus id="LayoutLoadingStatus">
+							<apex:facet name="start">
+								<div id="loadingIndicatorOuterContainer" class="loadingIndicator">
+									<div id="loadingIndicatorInnerContainer">
+										<img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+									</div>
+								</div>
+							</apex:facet>
+						</apex:actionStatus>
+
+					<div id="dashboardContainer" class="dashboardContainer editing">
+						<div id="delivery-group-title">
+							<apex:outputPanel id="DeliveryGroupCard" layout="none">
+							<div class="title-card-container">
+							<div class="title-card">
+								<div class="title-card-heading" >
+									<div class="title-card-heading-icon">
+										<apex:variable value="{!TheDeliveryGroup.ForecastStatus__r.KimbleOne__StyleClass__c}" var="StyleClassValue"/>
+										<apex:variable value="{!TheDeliveryGroup.ForecastStatus__r.Name}" var="GroupForecastStatus"/>
+										<div class="fa fa-square kimble-probability {!JSENCODE(StyleClassValue)}" title="{!JSENCODE(GroupForecastStatus)}"></div>
+									</div>
+									<div class="title-card-heading-text">
+										<apex:outputText title="{!TheDeliveryGroup.Name}" value="{!TheDeliveryGroup.Name}"/>
+									</div>
+								</div>
+							</div>
+							</div>
+							</apex:outputPanel>
+						</div>
+						<apex:pageMessages escape="false"/>
+
+						<apex:repeat value="{!DashboardLayout.Rows}" var="dashboardRow">
+						<div class="sortableContainer dropContainer cardRowContainer" dgde-tip="{!$Label.kimbleone__editlayoutnarrative01}">
+						<div class="container-title"><apex:outputText value="{!$Label.kimbleone__groupedlayoutitems}"/></div>
+							<apex:repeat value="{!dashboardRow.Itms}" var="dashboardItem">
+							<div context-id="{!ContextId}" pageSource="{!dashboardItem.Src}" class="cardContainer"></div>
+							</apex:repeat>
+						</div>
+						</apex:repeat>
+
+						<div class="dropContainer ungroupedItems" dgde-tip="{!$Label.kimbleone__editlayoutnarrative03}">
+						<div class="container-title"><apex:outputText value="{!$Label.kimbleone__ungroupedlayoutitems}"/></div>
+						<apex:repeat value="{!DashboardLayout.Itms}" var="dashboardItem">
+						<div context-id="{!ContextId}" pageSource="{!dashboardItem.Src}" class="cardContainer"></div>
+						</apex:repeat>
+						</div>
+
+						<div class="dropContainer hiddenItems" dgde-tip="{!$Label.kimbleone__editlayoutnarrative04}">
+						<div class="container-title"><apex:outputText value="{!$Label.kimbleone__hiddenlayoutitems}"/></div>
+						<apex:repeat value="{!DashboardLayout.HiddenItms}" var="dashboardItem">
+						<div context-id="{!ContextId}" pageSource="{!dashboardItem.Src}" class="cardContainer"></div>
+						</apex:repeat>
+						</div>
+					</div>
+					</apex:outputPanel>
+				</div>
+
+
+			<script>
+				
+				function isStatusVariableHeightEnabled()
+				{
+					if(variableHeightEnabled == "true") return true;
+					else return false;
+				}
+				
+				var hasChanges = false;
+				function setHasChanges()
+				{
+					jQuery(window).off('.has-changes').on('beforeunload.has-changes', function(){
+				        return kimble.labels['UnsavedChangesHeading'] + "\n\n" + kimble.labels['UnsavedChangesMessage']; 
+				    });
+
+				    hasChanges = true;
+				}
+				
+				function resetHasChanges()
+				{
+					jQuery(window).off('.has-changes');
+					hasChanges = false;
+				}
+
+				var isAdminView = false;
+
+				function refreshAdminViewToggle()
+				{
+				    if(isAdminView)
+				    {
+				        jQuery('.admin-mode-toggle').removeClass('fa-toggle-on').addClass('fa-toggle-off');
+				        isAdminView = false;
+        			}
+        			else
+        			{
+        			    jQuery('.admin-mode-toggle').removeClass('fa-toggle-off').addClass('fa-toggle-on');
+        			    isAdminView = true;
+           			}
+    			}
+
+    			function handleAdminToggle()
+    			{
+    			    if(hasChanges)
+    			    {
+    			        var confirmToggle = confirm(kimble.labels['UnsavedChangesHeading'] + "\n\n" + kimble.labels['UnsavedChangesMessage']);
+
+    			        if(confirmToggle)
+    			        {
+    			            toggleAdminMode();
+               			}
+           			}
+           			else
+           			{
+           			    toggleAdminMode();
+              		}
+       			}
+				
+				function toggleShowSummary()
+				{
+					if(variableHeightEnabled != "true") 
+					{
+						variableHeightEnabled = "true";
+						jQuery(".show-summary-tgl").removeClass('fa-toggle-off');
+						jQuery(".show-summary-tgl").addClass('fa-toggle-on');
+						$('#summaryCardBody').css('height', 'auto');
+					}
+					else
+					{
+						variableHeightEnabled = "false";
+						jQuery(".show-summary-tgl").addClass('fa-toggle-off');
+						jQuery(".show-summary-tgl").removeClass('fa-toggle-on');
+						$('#summaryCardBody').css('height', '150px');
+					}
+					setHasChanges();
+				}
+				
+				function initialiseShowSummaryToggle()
+				{
+					variableHeightEnabled = '<apex:outputText value="{!StatusCardVariableHeight}"/>';
+					
+					if(variableHeightEnabled != "true") 
+					{
+						jQuery(".show-summary-tgl").addClass('fa-toggle-off');
+						jQuery(".show-summary-tgl").removeClass('fa-toggle-on');
+						$('#summaryCardBody').css('height', '150px');
+					}
+					else
+					{
+						jQuery(".show-summary-tgl").removeClass('fa-toggle-off');
+						jQuery(".show-summary-tgl").addClass('fa-toggle-on');
+						$('#summaryCardBody').css('height', 'auto');
+					}
+				}
+				
+				var l = {};
+				l['GroupRow'] = '<apex:outputText value="{!$Label.kimbleone__groupedlayoutitems}"/>';
+				l['narrative1'] = '<apex:outputText value="{!$Label.kimbleone__editlayoutnarrative01}"/>';
+				l['narrative2'] = '<apex:outputText value="{!$Label.kimbleone__editlayoutnarrative02}"/>';
+				l['narrative3'] = '<apex:outputText value="{!$Label.kimbleone__editlayoutnarrative03}"/>';
+				l['narrative4'] = '<apex:outputText value="{!$Label.kimbleone__editlayoutnarrative04}"/>';
+				
+				var returnURL = '{!$Page.DeliveryGroupDashboard}?id={!TheDeliveryGroup.Id}';
+				var variableHeightEnabled;
+				
+				jQuery(document).ready(function()
+				{							
+					initialise();
+				});
+
+				function initialise()
+				{
+					jQuery.each( jQuery('.dashboardContainer'), function(i, dashboardContainer) {
+						jQuery('div[pageSource]', dashboardContainer).each(function() {
+							loadDashboardComponent(jQuery( this ));
+					   });
+					})
+
+					initialiseActions();
+					initialiseShowSummaryToggle();
+					resetHasChanges();
+    			}
+				
+				function initialiseTips()
+				{
+					jQuery('.card').attr('dgde-tip','{!$Label.kimbleone__editlayoutnarrative02}');
+			   		initialiseDeliveryGroupEditTips();	
+				}
+
+				function initialiseDeliveryGroupEditTips()
+				{
+					jQuery('[dgde-tip]').qtip('destroy', true).each(function()
+					{
+					   jQuery(this).qtip({
+						   	content: jQuery(this).attr('dgde-tip'), 
+						   	position: {my: 'bottom center', at: 'top center'},
+						   	style: {classes: 'qtip-light qtip-shadow qtip-rounded dgde-tip-qtip'},
+							show: { solo: true }
+					   });
+					});
+				}
+				
+				function initialiseActions()
+				{
+					jQuery(document).off('click', '.add-group-btn').on('click', '.add-group-btn', addGroupingRow);
+					jQuery(document).off('click', '.save-layout-btn').on('click', '.save-layout-btn', buildAndSaveLayout);
+					jQuery(document).off('click', '.reset-layout-btn').on('click', '.reset-layout-btn', resetLayout);
+					jQuery(document).off('click', '.save-and-close-btn').on('click', '.save-and-close-btn', saveLayoutAndClose);
+					jQuery(document).off('click', '.cancel-btn').on('click', '.cancel-btn', cancelAndBack);
+					jQuery(document).off('click', '.show-hide-btn').on('click', '.show-hide-btn', toggleShowSummary);
+				}
+				
+				var loadCounter = 0;
+				function loadDashboardComponent(dashboardComponent)
+				{
+					var pageSourceName = dashboardComponent.attr('pageSource');
+					   		
+			   		// kick off the population of the page with an ajax call - always provide ID, only provide currency if on the source element
+			   		var displayCurrencyParam = '';
+			   		
+			   		if(dashboardComponent.attr('display-currency') != null)
+			   		{
+			   			displayCurrencyParam = '&currencyISOCode=' + dashboardComponent.attr('display-currency');
+			   		}
+			   		
+			   		loadCounter += 1;
+			   		
+			   		jQuery.ajax({ url: kimble.pages[pageSourceName] + dashboardComponent.attr('context-id') + displayCurrencyParam})
+						.done(function(html) {
+							dashboardComponent.empty();
+							
+							if(html != null && html != '')
+							{
+								jQuery(html).appendTo(dashboardComponent);
+							}
+							else
+							{
+								// nothing to render in the component
+								// note that we don't remove the container as we do in the main Dashboard as we still want the
+								// ghost version of it to stay in the page so that it's not removed from the display preferences
+							}
+							loadCounter -= 1;
+							if(loadCounter <= 0) initialiseEditLayout();
+						})
+						.fail(function(xhr, status, error) {
+							if(error !=null && error !="") {
+								console.log('ajax component load error: ' + error);
+								// hide the container for this component
+								dashboardComponent.hide();
+							}
+							loadCounter -= 1;
+							if(loadCounter <= 0) initialiseEditLayout();
+						})
+				}
+				
+				function initialiseEditLayout()
+				{
+					editLayout();
+					initialiseTips();
+				}
+				
+				function addGroupingRow()
+				{
+					var html = '';
+					
+					html += '<div class="sortableContainer dropContainer cardRowContainer ui-sortable">';
+					html += '<div class="container-title">' + l['GroupRow'] + '</div>';
+					html += '</div>';
+					
+					if(jQuery('.cardRowContainer').length) 
+						jQuery('.cardRowContainer').last().after(html);
+					else
+						jQuery('.ungroupedItems').last().before(html)
+						
+					setHasChanges();
+					
+					initialiseEditLayout();
+				}
+				
+				function editLayout()
+				{
+					jQuery('.dropContainer').sortable({
+						connectWith: '.dropContainer',
+						tolerance: "pointer",
+						scroll: true,
+						change: setHasChanges
+					}).disableSelection();
+					
+					jQuery('.dashboardContainer').sortable({
+						items: '.sortableContainer',
+						tolerance: "pointer",
+						scroll: true,
+						change: setHasChanges
+					}).disableSelection();
+				}
+				
+				function buildAndSaveLayout()
+				{
+					var theLayout = buildLayout();
+					saveLayout(theLayout, false);
+				}
+				
+				function resetLayout()
+				{
+					var r = confirmDelete();
+					
+					if(r) 
+					{
+						Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupDashboardEditController.ResetLayout}',
+						isAdminView,
+				      			function(result, event){          
+				             		if (event.status) 
+						            {
+						             	//reload screen
+						             	reInitialise();
+						         	} 
+						         	else 
+						         	{
+						             	alert(event.message);
+						             	//TODO not working
+						         	}
+				         }, 
+				         {escape: true, timeout: 60000});
+			         }
+				}
+				
+				function saveLayoutAndClose()
+				{
+					var theLayout = buildLayout();
+					saveLayout(theLayout, true);
+				}				
+									
+				function buildLayout()
+				{
+					var theLayout = new Object();
+
+					jQuery('.cardRowContainer').each(function() {
+						var theRow = jQuery(this);
+						
+						var newRow = new Object();
+
+						if(jQuery(theRow).find('.cardContainer').length)
+						{
+							if(typeof theLayout.Rows === 'undefined') theLayout.Rows = [];
+							theLayout.Rows.push(newRow);
+							
+							jQuery(theRow).find('.cardContainer').each(function() {
+								var theItm = jQuery(this);
+								var pageSrc = theItm.attr('pagesource');
+															
+								var newItem = new Object();
+								newItem.Src = pageSrc;
+								
+								if(newItem.Src == 'DeliveryGroupStatusCard')
+								{
+									if(variableHeightEnabled == 'true') newItem.Mode = 'VH';
+									else newItem.Mode = 'fixedHeight';
+								}
+								
+								if(typeof newRow.Itms === 'undefined') newRow.Itms = [];
+								newRow.Itms.push(newItem);
+							});
+						}
+					});
+					
+					jQuery('.ungroupedItems .cardContainer').each(function() {
+						var theItm = jQuery(this);
+						var pageSrc = theItm.attr('pagesource');
+					
+						var newItem = new Object();
+						newItem.Src = pageSrc;
+								
+						if(newItem.Src == 'DeliveryGroupStatusCard')
+						{
+							if(variableHeightEnabled == 'true') newItem.Mode = 'variableHeight';
+							else newItem.Mode = 'fixedHeight';
+						}
+
+						if(typeof theLayout.Itms === 'undefined') theLayout.Itms = [];
+						theLayout.Itms.push(newItem);
+					});
+					
+					return theLayout;
+				}
+
+				function saveLayout(theLayout, redirect)
+				{
+					// can abandon if there are no changes
+					if(!hasChanges)
+					{
+						(redirect ? safeNavigateToSForceURL(returnURL) : reInitialise());
+					}
+					else
+					{
+					    if(isAdminView)
+					    {
+							if(!confirm('{!$Label.SaveAsOrgDefaultConfirmMsg}'))
+							{
+							    return;
+       						}
+						}
+						//TODO Working
+						
+						Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupDashboardEditController.SaveLayout}',
+				       		theLayout, isAdminView,
+				      			function(result, event){          
+				             		if (event.status) 
+						            {
+						            	resetHasChanges();
+						             	//reload screen
+						             	(redirect ? safeNavigateToSForceURL(returnURL) : reInitialise());
+						         	} 
+						         	else 
+						         	{
+						             	alert(event.message);
+						             	//TODO not working
+						         	}
+				         }, 
+				         {escape: true, timeout: 60000});
+			         }
+				}
+				
+				function cancelAndBack()
+				{
+					safeNavigateToSForceURL(returnURL);
+				}
+			</script>	
+			
+			<style>
+				#summaryCardBody {
+				    height: 150px;
+				    overflow-y: auto;
+				}
+				i.show-summary-setting {
+				    font-size: 18px;
+				    margin-left: 4px;
+				    margin-right: 3px;
+				    cursor: pointer;
+				}
+				.show-hide-btn {
+					color: black;
+					cursor: pointer;
+					text-decoration: none !important;
+					font-size: 13px;
+				}
+				div.cardRowContainer {
+					display: table;
+ 					width: 100%;
+				  	margin-bottom: 2px;
+				    padding-top: 30px;
+				    position: relative;
+				}
+				div.cardRowContainer div.cardContainer[pagesource] {
+					display: table-cell;
+				}
+				div.cardRowContainer div.cardContainer .card
+				{
+					display: block;
+				    min-width: unset;
+				}				
+				div.cardContainer[pagesource="DeliveryGroupStatusCard"] {
+ 					width: 100%;
+					overflow:hidden;
+				}
+				div.cardContainer[pagesource="RevenueSummaryCard"] {
+					min-width: 440px;
+					height: 208px;
+				}
+				div.cardContainer[pagesource="CostSummaryCard"] {
+					min-width: 440px;
+				}
+				div.cardContainer[pagesource="MarginSummaryCard"] {
+					min-width: 160px;
+					height: 208px;
+				}
+				div.cardContainer[pagesource="IntercompanySummaryCard"] {
+					min-width: 160px;
+					height: 208px;
+				}
+				/* edittable dashboard */
+				#edit-layout-side-bar-container {
+				    padding-right: 10px;
+				    display: table-cell;
+				    width: 200px;
+			        min-width: 200px;
+				    min-height: 100px;
+				}
+				#dashboard-layout {
+					display: table-cell;
+				}
+				.title-card {
+				    height: 40px;
+				}
+				.title-card-heading {
+				    padding-top: 13px;
+				}				
+				.button-header {
+				    padding: 11px;
+				    background-color: #8B8B8B;
+				    border-radius: 2px;
+				    color: #FFF;
+				    font-weight: bold;
+				    margin-bottom: 5px;
+				}
+				.action-btn {
+				    display: block;
+				    position: relative;
+				    margin: 0;
+				    font-family: Helvetica, Arial, sans-serif;
+				    text-decoration: none;
+				    font-size: 12px;
+				    font-weight: 300;
+				    color: #0F0F0F;
+				    background: #EDEDED;
+				    border-bottom: 2px solid #FFF;
+				    cursor: pointer;
+				    background-color: white;
+				    border: 1px solid #ccc;
+				    border-radius: 2px;
+				    cursor: pointer;
+				    padding: 11px 8px 11px 8px;
+				    margin-bottom: 2px;
+				}
+				.action-btn:hover {
+				    background-color: #f4f6f9;
+				}
+				.save-layout-btn {
+				    margin-top: 30px;
+				}
+				.reset-layout-btn {
+				    margin-top: 30px;
+				}
+				.action-btn i {
+				    font-size: 16px;
+				    margin-right: 5px;
+				}							
+				.dashboardContainer.editing .hiddenItems .cardContainer .cardBody {
+				    opacity: 0.5;
+				}
+				.ungroupedItems {
+				    display: table;
+				    width: 100%;
+				    margin-bottom: 2px;
+				    background-color: #fff6a4;
+				    padding-top: 30px;
+				    position: relative;
+				    min-height: 44px;
+				}
+				.hiddenItems {
+				    display: table;
+				    width: 100%;
+				    margin-bottom: 2px;
+				    background-color: #ffc2bd;
+				    padding-top: 30px;
+			        margin-top: 30px;
+				    position: relative;
+				    min-height: 44px;
+				}
+				.dashboardContainer.editing .cardRowContainer {
+				    background-color: #99ffff;
+				    min-height: 44px;
+				}
+				.container-title {
+				    position: absolute;
+				    top: 9px;
+				    left: 6px;
+				    font-weight: bold;
+				    font-style: italic;
+				}
+				.ui-sortable-placeholder {
+				    border: 2px dashed blue;
+				    visibility:visible !important;
+				}
+				.ui-sortable:not(.dashboardContainer) {
+				    cursor: move;
+				}				
+				/*
+				    layout control
+				*/
+				
+				.ui-layout-center,.ui-layout-east, .ui-layout-west {
+				    padding: 0;
+				}
+				
+				.ui-layout-pane {
+					border: none;
+				}
+				
+				.ui-layout-east
+				{
+/* 					background-color: #F5F5F5; */
+				}
+				
+				.ui-layout-resizer
+				{
+					background: none;
+				}
+				
+				.ui-layout-content {
+				    padding: 0px;
+				}
+								
+				.cardBodyTable
+				{
+					width: 100%;
+				}
+				
+				/* override SF .message to fit in with dashboard style */
+				.message
+				{
+					margin: 3px 2px;
+				}
+				.dashboard-footer {
+					text-align: center;
+					background-color: #F5F5F5;
+					border-radius: 4px;
+					-webkit-box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+					box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+					padding-top: 3px;
+					margin-left: 2px;
+					margin-right: 2px;
+				}
+				.delivery-group-print-icon {
+					font-size: 18px;
+					position: relative;
+					left: -26px;
+					top: -8px;
+					color: #6F6F6F;
+				}
+				.delivery-program-indicator,
+				.delivery-portfolio-indicator {
+					margin-left: 10px;
+					color: #428BCA;
+					font-size: 16px;
+				}
+				.delivery-portfolio-indicator {
+					cursor: pointer;
+				}
+				.dgde-tip-qtip {
+					background-color: lemonchiffon;
+					padding: 2px;
+					font-size: 12px;
+				}
+				i.card-filter-icon {
+				    display: none;
+				}
+
+				.loadingIndicator {
+				   top:0;
+				   right:0;
+				   width:100%;
+				   height:100%;
+				   font-weight: bold;
+				   position:absolute;
+				   text-align:center;
+				   /* IE filter */
+				   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+				   -moz-opacity:0.7;    /* Mozilla extension */
+				   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+				   opacity:0.7; /* CSS3 */
+				   z-index:1000;
+				   background-color:white;
+				}
+
+				.loadingIndicator img {
+					margin-right:9px;
+				}
+
+				#loadingIndicatorInnerContainer {
+					position:absolute;
+					top:50%;
+					height:10em;
+					margin-top:-2em;
+					width:100%;
+				}
+			</style>
+			
+		</apex:define>
+	</apex:composition>
+</apex:page>

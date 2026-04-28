@@ -1,0 +1,4309 @@
+<apex:page standardController="KimbleOne__Resource__c" extensions="KimbleOne.TimesheetGridController" showHeader="true" sidebar="{!ShowSideNavBar && ISBLANK($CurrentPage.parameters.id)}" standardStylesheets="true" tabStyle="MyTimesheet__tab">
+
+	<apex:composition template="KimbleOne__SiteMaster"> 
+		<apex:define name="Menu">
+			<c:Menu DefaultHelpPage="TimeEntryGrid.html" MenuContextName="{!TheResource.Name} - {!TheResourceTrackingPeriod.Name} ({!TheResourceTrackingPeriod.KimbleOne__StartDate__c} {!$Label.kimbleone__to} {!TheResourceTrackingPeriod.KimbleOne__EndDate__c})"/> 
+		</apex:define>
+		<apex:define name="Content">
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+    		<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__HoursAndMinsHelper)}"/>
+
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryTimePicker, 'jquery.timepicker.min.js')}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQueryTimePicker, 'jquery.timepicker.css')}"/>
+
+			<apex:outputPanel layout="none" rendered="{!EnhancedView}">
+			<!-- Kimble Guidance -->
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, TTipNarrativesResource)}" />
+			
+			<apex:outputPanel layout="none" rendered="{!TTOverrideNarrative}">
+			<apex:includeScript value="{!URLFOR($Resource[TTipNarrativesOverrideResource])}" />
+			</apex:outputPanel>
+
+			<!-- Period Summary -->
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'TimeEntryPeriodSummary.css')}"/>
+ 			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleJS, 'TimeEntryPeriodSummary.js')}"/>
+			</apex:outputPanel>
+
+			<div id="ContentBody">
+			<apex:outputPanel layout="none" rendered="{!EnhancedView}">		
+				<div id="toolbar-container">
+					<div class="toolbar">
+						<div id="nav-bar" class="control-cell no-select">
+							<apex:outputLink value="javascript:void(0);" onclick="GoPreviousPeriod()" title="{!$Label.kimbleone__previousperiod}"><div id="previous-period" class="toolbar-button bigger-btn"><i class="fa fa-angle-double-left"></i></div></apex:outputLink>
+							<apex:outputLink styleClass="period-summary-btn" value="javascript:void(0);" onclick="getPeriodSummary()" title="{!$Label.kimbleone__timeentrysummary}"><div id="period-summary" t-tip="TESummary" class="toolbar-button bigger-btn"><i class="fa fa-circle-o-notch fa-spin period-summary-working-ind"></i><i class="fa fa-calendar period-summary-ind"></i></div></apex:outputLink>
+							<apex:outputLink value="javascript:void(0);" onclick="GoNextPeriod()" title="{!$Label.kimbleone__nextperiod}"><div id="next-period" class="toolbar-button bigger-btn"><i class="fa fa-angle-double-right"></i></div></apex:outputLink>
+
+							<apex:outputLink value="javascript:void(0);" onclick="window.open('{!$Page.KimbleOne__TimesheetPrint}?periodId={!TheResourceTrackingPeriod.Id}{!If($CurrentPage.parameters.id!=null,'&id='+$CurrentPage.parameters.id,'')}', '_printview');" title="{!$Label.kimbleone__print}"><div class="print-btn toolbar-button bigger-btn"><i class="fa fa-print"></i></div></apex:outputLink>
+
+							<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ExpenseItem__c.createable}">
+								<apex:outputLink value="{!$Page.KimbleOne__ExpenseClaimEdit}?periodId={!TheResourceTrackingPeriod.Id}&resourceId={!TheResource.id}&{!If($CurrentPage.parameters.id!=null,'ts=1','ts=2')}&src=g"><div class="toolbar-button bigger-btn expense-summary-header-btn"><i class="fa fa-money"></i><i class="fa fa-plus-square"></i></div></apex:outputLink>
+							</apex:outputPanel>
+						</div>
+						<div id="action-buttons" class="control-cell no-select">
+							<apex:outputPanel layout="none" rendered="{!!AdjustMode && CanAddEditTimeAndExpenseEntries && $ObjectType.KimbleOne__TimeEntry__c.updateable && ShowCopyFromPreviousPeriodButton}">
+								<label class="hover-mutton copy-btn" t-tip="TEGridCopyAssignments">
+									<div class="dd-btn toolbar-button">{!JSENCODE($Label.kimbleone__copylink)}
+										<ul class="dd-menu">
+											<li id="copy-items">{!$Label.kimbleone__copyassignmentsfrompreviousperiod}</li>
+										</ul>
+									</div>
+								</label>
+							</apex:outputPanel>
+							<apex:outputPanel layout="none" rendered="{!!AdjustMode && CanAddEditTimeAndExpenseEntries && $ObjectType.KimbleOne__Timesheet__c.createable && SubmitEnabled}">
+							<div class="cancel-select-btn hidden-item toolbar-button">{!JSENCODE($Label.Cancel)}<i class="fa fa-times"></i></div>
+							<label class="hover-mutton select-btn" t-tip="TESelectDropdown">
+								<div class="dd-btn toolbar-button">{!JSENCODE($Label.SelectModeLabel)}
+									<ul class="dd-menu">
+										<li id="select-all" t-tip-right="SelectAll" class="disabled">{!JSENCODE($Label.All)}</li>
+										<li id="select-items" t-tip-right="SelectIndividual" class="disabled">{!JSENCODE($Label.SelectIndividualTimeEntries)}</li>
+									</ul>
+								</div>
+							</label>
+							<div class="save-btn toolbar-button disabled" title="{!JSENCODE($Label.SaveToolTip)}" t-tip="TEGridSave">{!JSENCODE($Label.SaveGrid)}</div>
+							<label class="hover-mutton" t-tip="TESubmitDropdown">
+								<div class="dd-btn toolbar-button">{!JSENCODE($Label.Submit)}
+									<ul class="dd-menu">
+										<li id="submit-all" t-tip-right="SubmitAll" class="disabled">{!JSENCODE($Label.SubmitAllTimeEntries)}</li>
+										<li id="submit-for-approval" t-tip-right="SubmitSelected" class="submit-for-approval hidden-item">{!JSENCODE($Label.SubmitForApprovalButton)}</li>
+										<li id="submit-items" t-tip-right="SubmitSelected" class="disabled">{!JSENCODE($Label.SubmitSelectedTimeEntries)}</li>
+									</ul>
+								</div>
+							</label>
+							</apex:outputPanel>
+						    <apex:outputPanel layout="none" rendered="{!!AdjustMode && CanAdjustEntries && $ObjectType.KimbleOne__Timesheet__c.createable && $ObjectType.KimbleOne__TimeAdjustment__c.createable}">
+							<div class="adjust-time-btn toolbar-button" t-tip="TEAdjustTime" title="{!$Label.kimbleone__timeadjustmenttitle}">{!$Label.kimbleone__adjusttimeentrieslabel}</div>
+						    </apex:outputPanel>
+   						    <apex:outputPanel layout="none" rendered="{!AdjustMode && CanAddEditTimeAndExpenseEntries && $ObjectType.KimbleOne__Timesheet__c.createable && SubmitEnabled}">
+							<div class="save-submit-adjusted-btn toolbar-button" title="{!JSENCODE($Label.SaveSubmitToolTip)}" t-tip="TEGridSave">{!JSENCODE($Label.SaveSubmit)}</div>
+						    </apex:outputPanel>
+						</div>
+						<div id="period-totals" class="control-cell no-select"></div>
+						<div id="ttips-switch" class="control-cell">
+							<apex:outputPanel >
+								<div class="show-t-tips">
+									<span class="TTipsShowTipsToggle">	
+										<apex:outputLink onclick="toggleTTips()" styleClass="show-hide-btn"><apex:outputText value=" {!$Label.kimbleone__kimbleguidancetimesheettooltips} "/></apex:outputLink> <i class="t-tip-setting show-tips-tgl k-tgl fa" onclick="toggleTTips()"/>
+									</span>	
+								</div>
+							</apex:outputPanel>
+						</div>
+						<div id="view-controls" class="control-cell no-select">
+							<apex:outputLink value="{!$Page.KimbleOne__Timesheet}?periodId={!TheResourceTrackingPeriod.Id}{!If($CurrentPage.parameters.id!=null,'&id='+$CurrentPage.parameters.id,'')}"><div id="calendar-view" t-tip="CalendarView" class="toolbar-button toggle-btn bigger-btn"><i class="fa fa-calendar"></i>{!$Label.CalendarLabel}</div></apex:outputLink>
+							<a href="javascript:void(0);"><div id="grid-view" class="toolbar-button toggle-btn bigger-btn active" t-tip="GridView"><i class="fa fa-th-list"></i>{!$Label.GridView}</div></a>
+						</div>
+					</div>
+				</div>
+				<div class="period-summary-container"></div>
+			</apex:outputPanel>			
+			<apex:form id="TimeForm">
+			<div>
+				<apex:outputPanel layout="none" rendered="{!!EnhancedView}">
+				<div Id="TimesheetHeader" style="position:relative">
+					
+					<apex:outputLink value="#" onclick="GoPreviousPeriod()" title="{!$Label.kimbleone__previousperiod}"><apex:image url="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'PreviousButtonSquare.png')}" alt="{!$Label.kimbleone__previousperiod}" /></apex:outputLink> 
+					<apex:inputText styleClass="datepicker" style="width:0px;border:0px; margin:0px; padding:0px;height:0px;cursor:none;" value="{!GoDate.KimbleOne__InputDate__c}">
+						<apex:actionSupport event="onchange" action="{!ResourceTrackingPeriodChange}" />
+					</apex:inputText>
+
+					<apex:outputLink value="#" onclick="GoNextPeriod()" title="{!$Label.kimbleone__nextperiod}"><apex:image url="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'NextButtonSquare.png')}"	alt="{!$Label.kimbleone__nextperiod}" /></apex:outputLink>
+					&nbsp;
+					<apex:outputLink style="text-decoration: none;" value="#" onclick="window.open('{!$Page.KimbleOne__TimesheetPrint}?periodId={!TheResourceTrackingPeriod.Id}{!If($CurrentPage.parameters.id!=null,'&id='+$CurrentPage.parameters.id,'')}', '_printview');" title="{!$Label.kimbleone__print}">
+						<apex:image url="{!URLFOR($Resource.KimbleOne__TimesheetIcons, 'Blank_BtnSqShdw.png')}" />
+						<i class="fa fa-print" style="font-size: 18px;position: relative;left: -26px;top: -8px;color: #6F6F6F;"></i>
+					</apex:outputLink>
+					
+					<span style="display:inline-block;vertical-align:top;margin-left:100px;">	
+						<apex:outputPanel layout="none" rendered="{!!AdjustMode && CanAddEditTimeAndExpenseEntries && $ObjectType.KimbleOne__TimeEntry__c.updateable}">
+						    <input type="button" class="btn timesheet-submission-btn" value="{!$Label.SaveGrid}" onclick="saveTimesheet(false, false)" title="{!$Label.SaveToolTip}"/>
+						</apex:outputPanel>
+						
+					    <apex:outputPanel layout="none" rendered="{!CanAddEditTimeAndExpenseEntries && $ObjectType.KimbleOne__Timesheet__c.createable && SubmitEnabled}">
+					        <input type="button" class="btn timesheet-submission-btn" value="{!$Label.SaveSubmit}" onclick="saveTimesheet(true, false)" title="{!$Label.SaveSubmitToolTip}"/>
+					    </apex:outputPanel>
+
+					    <apex:outputPanel layout="none" rendered="{!!AdjustMode && CanAdjustEntries && $ObjectType.KimbleOne__Timesheet__c.createable && $ObjectType.KimbleOne__TimeAdjustment__c.createable}">
+					   		<input type="button" class="btn" value="{!$Label.AdjustTimeEntriesLabel}" onclick="AdjustPeriod()" title="{!$Label.TimeAdjustmentTitle}"/>
+					    </apex:outputPanel>					    
+					</span>			
+					
+					<div class="timesheet-view-toggle" style="position: absolute;right:6px;top: 0px;" >
+						<span class="clickable left"><a href="{!$Page.KimbleOne__Timesheet}?periodId={!TheResourceTrackingPeriod.Id}{!If($CurrentPage.parameters.id!=null,'&id='+$CurrentPage.parameters.id,'')}" class="toggleLink" ><i class="fa fa-calendar" style="font-size: 14px;color: #6f6f6f;position: relative;left: -76px;"></i><span class="toggleIcon"></span><span class="linkText">{!$Label.CalendarLabel}</span></a></span><span class="selected right"><a href="{!$Page.TimesheetGrid}?periodId={!TheResourceTrackingPeriod.Id}{!If($CurrentPage.parameters.id!=null,'&id='+$CurrentPage.parameters.id,'')}" class="toggleLink" ><i class="fa fa-th-list" style="font-size: 14px;color:white;position: relative;left: -80px;top: 2px;"></i><span class="toggleIcon"></span><span class="linkText">{!$Label.Gridview}</span></a></span>
+					</div>
+					         				
+         		</div>
+         		</apex:outputPanel>
+         		<div id="loadingIndicatorOuterContainer" class="loadingIndicator">
+	                        <div id="loadingIndicatorInnerContainer">
+	                            <img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+	                        </div>
+	                </div>
+
+				<div class="period-summary-container">
+				</div>
+
+	            <div id="timesheet-error" class="cardTileAlert" style="display:none">
+	            	<div class="error-icon cardIconAlert fa fa-exclamation-circle"></div>
+					<div class="messageText" id="timesheet-error-text"></div>
+      			</div>
+	            <div id="timesheet-warning" class="cardTileWarn" style="display:none">
+	            	<div class="warning-icon cardIconWarn fa fa-exclamation-triangle"></div>
+					<div class="messageText" id="timesheet-warning-text"></div>
+      			</div>
+         		<div id="timesheetBody">
+	         		<table id="timesheet-grid" cellpadding="0" cellspacing="0" border="0">
+         				<thead>
+         				</thead>
+         				<tbody>
+         				</tbody>
+         			</table>
+         		</div>
+         		
+			</div>
+			<script>jQuery(window).load(function(){initialise();});</script>
+			
+			<apex:actionFunction action="{!JumpToDate}" name="jumpToDate" oncomplete="setupDatePicker();initialiseDynamicElements();" rerender="TimeForm">
+				<apex:param name="jumpToDateUTC" value=""/>
+
+			</apex:actionFunction>			
+			<apex:actionFunction action="{!JumpToTrackingPeriod}" name="jumpToTrackingPeriod" oncomplete="setupDatePicker();initialiseDynamicElements();" rerender="TimeForm">
+				<apex:param name="trackingPeriodId" value=""/>
+			</apex:actionFunction>
+			
+			<apex:actionFunction action="{!GoPreviousPeriod}" name="GoPreviousPeriod" />
+			<apex:actionFunction action="{!GoNextPeriod}" name="GoNextPeriod"/ >
+			<apex:actionFunction action="{!AdjustPeriod}" name="AdjustPeriod"/ >
+			</apex:form>
+			</div>
+			
+			<script>
+				var l = {};
+				l['activeTimers'] = '<apex:outputText value="{!$Label.kimbleone__timermessage01}"/>';
+
+				var periodStatus = '{!JSENCODE(TheResourceTrackingPeriod.Status__r.Enum__c)}';
+				var adjustMode = '{!IF(AdjustMode, 'true','false')}';
+				var startTimeLabel = '{!$ObjectType.TimeEntry__c.Fields.StartTime__c.Label}';
+				var endTimeLabel = '{!$ObjectType.TimeEntry__c.Fields.EndTime__c.Label}';
+				var stopTimerLabel = '<apex:outputText value="{!$Label.kimbleone__stoptimerlabel}"/>';
+				var enhancedView = {!EnhancedView};
+				var enableTimers = {!EnableTimers};
+				
+				var hideSuggestedTimeOnceActualExists = {!HideSuggestedTimeOnceActualExists};
+				var reduceSuggestedTimeOnceActualExists = {!ReduceSuggestedTimeOnceActualExists};
+  	    		var preserveSuggestedTimeOnceActualExists = {!PreserveSuggestedTimeOnceActualExists};
+				
+				var currentRemainingUsageLabel = '{!$Label.CurrentRemainingUsageLabel}';  
+
+				var autoDecrementRemainingEffort = <apex:outputText value="{!AutoDecrementRemainingEffort}"/>;
+				var autoDecDRETracker = {};
+				var showCurrentRemainingUsageInTimeEntry = <apex:outputText value="{!ShowCurrentRemainingUsageInTimeEntry}"/>;
+				var headerDateFormat = '<apex:outputText value="{!DayNameFormat}"/>';
+
+				var hoursAndMinsHelper;
+
+				function initialise() {
+					jQuery('.datepicker').datepicker({
+							dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+							showOtherMonths: true,
+							selectOtherMonths: true,
+							buttonText: '{!JSENCODE($Label.OpenTimePeriodDropdownToolTip)}',
+							buttonImageOnly: true,
+							buttonImage: '{!URLFOR($Resource.AssignmentImages, 'CalendarButtonSquare.png')}',
+							showOn: "button",
+							});
+							
+					getTimesheet();
+
+					hoursAndMinsHelper = initialiseHoursAndMinsHelper('{!JSENCODE($Label.HoursPart)}','{!JSENCODE($Label.MinutesPart)}', '{!JSENCODE($Label.HoursAndMinsEntryHelp)}');
+
+					if(enhancedView)
+					{
+						initialiseTTipsToggle();
+						
+						if({!ShowTimesheetTooltips}) jQuery('.TTipsShowTipsToggle').attr('t-tip-default','ShowTipsToggleOn');
+						else jQuery('.TTipsShowTipsToggle').attr('t-tip-default','ShowTipsToggleOff');
+						
+						initialiseTTips();
+					}
+				}
+
+				function initialiseTTipsToggle()
+				{
+					
+					var ShowTTips = <apex:outputText value="{!ShowTimesheetTooltips}"/>; 
+				
+					if(ShowTTips)
+					{
+						jQuery(".show-tips-tgl").removeClass('fa-toggle-off');
+						jQuery(".show-tips-tgl").addClass('fa-toggle-on');
+					}
+					else
+					{
+						jQuery(".show-tips-tgl").addClass('fa-toggle-off');
+						jQuery(".show-tips-tgl").removeClass('fa-toggle-on');
+					}
+				}
+				
+				function toggleTTips()
+				{
+					var ShowTTipsOld = <apex:outputText value="{!ShowTimesheetTooltips}"/>; 
+					var ShowTTipsNew = false;
+					if(ShowTTipsOld == ShowTTipsNew) ShowTTipsNew = true;
+				
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TimesheetGridController.UpdateToolTipSetting}',
+			       		ShowTTipsNew,
+			      			function(result, event){          
+			             		if (event.status) 
+					            {
+					             	var data = {};
+					             	data.results = result;
+					             	location.reload();
+					         	} 
+					         	else if (event.type === 'exception') 
+					         	{
+					             	alert(event.message);
+					         	} 
+					         	else 
+					         	{
+					             	alert(event.message);
+					         	}
+			         	}, 
+			         	{escape: false, timeout: 60000}
+			     	);
+				}
+				
+				var theGrid;
+				
+				function getTimesheet(includeTimeFromPreviousPeriod, oncomplete)
+				{
+					 showWorking();
+
+					 includeTimeFromPreviousPeriod = includeTimeFromPreviousPeriod || false;
+
+					 Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TimesheetGridController.GetTimesheet}', 
+ 						'{!JSENCODE(TheResource.Id)}','{!JSENCODE(CalendarId)}','{!JSENCODE(TheResourceTrackingPeriod.TrackingTimePeriod__c)}', includeTimeFromPreviousPeriod,
+	        				function(result, event) {
+		             		if (event.status) 
+				            {
+				             	//console.log(result);
+				             	theGrid = result;
+
+				             	if(autoDecrementRemainingEffort) initialiseDRETracker();
+
+				             	drawGrid();
+
+				             	if (oncomplete != null) oncomplete();
+
+				             } 
+				         	else if (event.type === 'exception') 
+				         	{
+				             	alert(event.message);
+				         	} 
+				         	else 
+				         	{
+				             	alert(event.message);
+				         	}
+				         	
+				         	hideWorking();			         	
+				         }, 
+				         {escape: false, timeout: 60000}
+				     );
+				}
+				
+				function saveTimesheet(andSubmit, submitSelected)
+				{
+					 showWorking();
+					 
+					 Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TimesheetGridController.SaveTimesheet}', 
+ 						'{!JSENCODE(TheResource.Id)}','{!JSENCODE(CalendarId)}','{!JSENCODE(TheResourceTrackingPeriod.TrackingTimePeriod__c)}',
+ 						theGrid, andSubmit, (submitSelected != undefined && submitSelected),
+	        				function(result, event) {
+			             		
+			             		if (event.status) 
+					            {
+					             	theGrid = {};
+					             	
+					             	theGrid = result;
+
+				             		if(autoDecrementRemainingEffort && !theGrid.HasSaveProblem) initialiseDRETracker();
+
+				             		drawGrid();
+
+				             		hideWorking();
+
+				             		jQuery('.save-btn').addClass('disabled');
+					         	} 
+					         	else if (event.type === 'exception') 
+					         	{
+					             	if (checkRemoteActionSuccess(event, function(){saveTimesheet(andSubmit);}))
+					             	{
+					             		hideWorking();
+					             		
+					             		alert(event.message);
+					         		} 
+					         	} 
+					         	else 
+					         	{
+					             	hideWorking();	
+					             	
+					             	alert(event.message);
+					         	}
+				         },
+				         {escape: false, timeout: 60000}
+				     );
+				}
+				
+				var periodSummary = {};
+				var currentPeriodId = '{!JSENCODE(TheResourceTrackingPeriod.Id)}';
+				var timesheetPageUrl = '{!$Page.TimesheetGrid}?periodId=';
+				
+	            var summaryLabel = [];
+				summaryLabel['active-timer'] = '<apex:outputText value="{!$Label.kimbleone__timermessage02}"/>';				
+
+				var resourceParam = ((getQueryVariable('id') != '') ? '&id={!TheResource.id}' : '');
+
+				function jumpToTimesheetPage(periodId)
+            	{
+                	safeNavigateToSForceURL(timesheetPageUrl + periodId + resourceParam);
+            	}
+
+				function getPeriodSummary(relativeToDate)
+				{
+					jQuery('.period-summary-working-ind').show();
+					jQuery('.period-summary-ind').addClass('working');
+					var trackingPeriodStartDateUTC = '{!YEAR(TheResourceTrackingPeriod.StartDate__c)}-{!MONTH(TheResourceTrackingPeriod.StartDate__c)}-{!DAY(TheResourceTrackingPeriod.StartDate__c)}';
+					
+					Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TimesheetGridController.GetTimeEntrySummary}',
+			       		(relativeToDate == null ? trackingPeriodStartDateUTC : relativeToDate), true, '{!TheResource.Id}',
+			      			function(result, event){          
+			             		if (event.status) 
+					            {
+					             	periodSummary = result;
+					             	
+					             	if(periodSummary.ForecastingPeriodIds.length 
+					             		&& periodSummary.ForecastingPeriodMap[periodSummary.ForecastingPeriodIds[0]].TrackingPeriodIds.length)
+					             	{	
+					             		refreshPeriodSummary();
+					             		showPeriodSummary();
+				             		}
+					         	} 
+					         	else 
+					         	{
+					             	alert(event.message);
+					         	}
+
+				             	jQuery('.period-summary-working-ind').hide();
+								jQuery('.period-summary-ind').removeClass('working');
+			         	}, 
+			         	{escape: false, timeout: 60000}
+			     	);				
+				}				
+
+function initialiseDRETracker()
+{
+    // store the original remaining effort as any change of task on the draft line
+	// will need to revert back to this value as the basis
+
+	autoDecDRETracker = {};
+
+	jQuery.each(theGrid.Activities, function (i, act) {
+		jQuery.each(Object.keys(act.Rows), function(i, key){
+			var rowObject = act.Rows[key];
+			if(rowObject.CanUpdate && rowObject.ActivityAssignmentId != null && rowObject.TaskId != null)
+			{
+			    var thisAss;
+				for (var i=0;i<act.Assignments.length;i++)
+				{
+					var ass = act.Assignments[i];
+
+					if(ass.ActivityAssignmentId == rowObject.ActivityAssignmentId)
+					{
+					    thisAss = ass;
+					    break;
+					}
+				}
+
+				if(thisAss != null)
+				{
+				    var thistask;
+
+					for (var i=0;i<thisAss.Tasks.length;i++)
+					{
+						var task = thisAss.Tasks[i];
+
+						if (task.Id == rowObject.TaskId)
+						{
+							thistask = task;
+							break;
+      					}
+					}
+
+					if (task != null)
+					{
+						var remainingEffort = ((task.RemainingEffort != null) ? task.RemainingEffort : 0);
+
+						autoDecDRETracker[rowObject.Key + task.Id] = remainingEffort + rowObject.Total;
+					}
+				}
+			}
+		});
+	});
+}
+
+function restoreTaskRemainingEffort(timesheetRow)
+{
+    var task = timesheetRow.getTask();
+
+	if (task != null && task.CanEditRemainingEffort)
+	{
+		var ass =  timesheetRow.getAssignment();
+
+		// having changed the value we now revert back to the current value + the total value of hours on this row already
+		task.RemainingEffort = task.RemainingEffort + timesheetRow.Total;
+
+		autoDecDRETracker[timesheetRow.Key + task.Id] = task.RemainingEffort;
+	}
+}
+
+function decorateRowObject(activity, row)
+{
+	row.isAdjustmentRow = function()
+	{
+		return this.Key.substring(0,1) == '-';
+	}
+	
+	row.setAssignment = function(newId)
+	{
+		var oldRateBand;
+		var oldActivityId;
+		var newActivityId;
+
+		if (this.ActivityAssignmentId != null)
+		{
+			oldRateBand = this.getRateBand();
+			oldActivityId = this.getAssignment().ActivityId;
+		}
+
+		this.ActivityAssignmentId = newId;
+
+		var newActivityId = this.getAssignment().ActivityId;
+
+		if (oldRateBand == null)
+		{
+			this.setAssignmentRate(this.getAssignment().RateBands[0].ActivityRateBandId);
+		}
+		else
+		{
+			this.setAssignmentRate(this.getDefaultRateBand(oldRateBand.ActivityRateBandId).ActivityRateBandId, oldRateBand);
+		}
+
+		if (oldActivityId != newActivityId) {
+		    this.Cat1 = null;
+			this.Cat2 = null;
+			this.Cat3 = null;
+			this.Cat4 = null;
+			this.Cat5 = null;
+			this.Cat6 = null;
+			this.Reference = null;
+  		}
+
+		var ass = this.getAssignment();
+
+		this.Status = 'Draft';
+		this.DisplayStatus = 'Draft';
+		this.StatusLabel = '{!UPPER($Label.TEStatusDraft)}';
+		if (ass.CanActualise)
+			this.RowType = 'Actual';
+		else
+			this.RowType = 'Forecast';
+
+		//Raise event timesheet changed
+		timesheetChanged(activity);
+		
+		return true;
+	}
+	
+	row.setAssignmentRate = function (newId, oldRateBand)
+	{
+		// if period type changed
+		this.ActivityRateBandId = newId;
+
+		var newRateBand = this.getRateBand();
+		
+		var redraw = false;
+
+		if (oldRateBand == null || oldRateBand.PeriodTypeEnum != newRateBand.PeriodTypeEnum)
+		{
+			redraw = true;
+
+			this.Entries = {};
+		}
+		
+		if (oldRateBand == null || oldRateBand.ShowRevenueUnits != newRateBand.ShowRevenueUnits)
+		{
+			redraw = true;
+		}
+		
+		if (oldRateBand == null || oldRateBand.AllocationModeEnum != newRateBand.AllocationModeEnum)
+		{
+			redraw = true;
+			
+			// clear all
+			this.Cat1 = null;
+			this.Cat2 = null;
+			this.Cat3 = null;
+			this.Cat4 = null;
+			this.Cat5 = null;
+			this.Cat6 = null;
+			this.Reference = null;
+			
+			if (newRateBand.AllocationModeEnum == 'Task' || newRateBand.AllocationModeEnum == 'CategoryAndTask')
+			{
+				var ass = this.getAssignment();
+				
+				if (ass.Tasks.length > 0) this.TaskId = ass.Tasks[0].Id;
+			}
+			else
+			{
+				this.TaskId = null;
+			}
+		}
+		
+		//Raise event timesheet changed
+		timesheetChanged(activity);
+		
+		return redraw;
+	}
+	
+	row.getAssignment = function()
+	{
+		for (var i=0;i<activity.Assignments.length;i++)
+		{
+			var ass = activity.Assignments[i];
+				
+			if(ass.ActivityAssignmentId == this.ActivityAssignmentId) return ass;
+		}
+		
+		return null;
+	}
+	
+	row.getRateBand = function()
+	{
+		var ass = this.getAssignment();
+		
+		if (ass == null) return null;
+		
+		for (var i=0;i<ass.RateBands.length;i++)
+		{
+			var rate = ass.RateBands[i];
+
+			if (this.RowType == 'Forecast' && rate.Priority == 1 && rate.PeriodTypeEnum == 'BusDay') return rate;
+
+			if(rate.ActivityRateBandId == this.ActivityRateBandId) return rate;
+		}
+		
+		return null;
+	}
+	
+	row.getAdjustmentRow = function()
+	{
+		var thisRow = this;
+		
+		var match = null;	
+				
+		//if another row exists with the same match key but key starts with '-'
+		for (var i=0;i<theGrid.Activities.length;i++)
+		{
+			var activity = theGrid.Activities[i];
+			jQuery.each(Object.keys(activity.Rows), function(i, key){
+				var r = activity.Rows[key];
+				
+				if (r.Key != thisRow.Key && r.MatchKey == thisRow.MatchKey && r.Key.substring(0,1) == '-')
+					match = r;
+			});
+		}
+		
+		return match;
+	
+	}
+	
+	row.findMatchingDraftRows = function()
+	{
+		var thisRow = this;
+		
+		var matches = new Array();	
+				
+		//if another row exists with the same match key but key starts with '-'
+		for (var i=0;i<theGrid.Activities.length;i++)
+		{
+			var activity = theGrid.Activities[i];
+			jQuery.each(Object.keys(activity.Rows), function(i, key){
+				var r = activity.Rows[key];
+				
+				if (r.Key != thisRow.Key && r.MatchKey == thisRow.Key && r.Status == 'Draft' && !r.IsDeleted)
+					matches.push(r);
+			});
+		}
+		
+		return matches;
+	
+	}
+	
+	row.findMatchingUnCompletedRows = function()
+	{
+		var thisRow = this;
+		
+		var matches = new Array();	
+				
+		//if another row exists with the same match key but key starts with '-'
+		for (var i=0;i<theGrid.Activities.length;i++)
+		{
+			var activity = theGrid.Activities[i];
+			jQuery.each(Object.keys(activity.Rows), function(i, key){
+				var r = activity.Rows[key];
+				
+				if (r.Key != thisRow.Key && r.MatchKey == thisRow.MatchKey && r.Status != 'Draft' && r.Status != 'Rejected' && !r.IsDeleted)
+					matches.push(r);
+			});
+		}
+		
+		return matches;
+	
+	}
+	
+	row.getDefaultRateBand = function(activityRateBandId)
+	{
+		var ass = this.getAssignment();
+		
+		if (ass == null) return null;
+	
+		var defaultRateBand;
+	
+		for (var i=0;i<ass.RateBands.length;i++)
+		{
+			var rate = ass.RateBands[i];
+			
+			if (i == 0) defaultRateBand = rate;
+			
+			if(rate.ActivityRateBandId == activityRateBandId) return rate;
+		}
+		
+		return defaultRateBand;
+	}
+	
+	row.getTask = function()
+	{
+		var ass = this.getAssignment();
+		
+		if (ass == null) return null;
+		
+		for (var i=0;i<ass.Tasks.length;i++)
+		{
+			var task = ass.Tasks[i];
+			
+			if (task.Id == this.TaskId) return task;
+		}
+		
+		return null;
+	}
+}
+
+function drawGrid()
+{
+	for (var i=0;i<theGrid.Activities.length;i++)
+	{
+		var activity = theGrid.Activities[i];
+
+		if (activity.Id == 'Other')
+		{
+		    activity.AllowNewTimeEntries = false;
+
+		    for(var a=0;a<activity.Assignments.length;a++)
+		    {
+		        if (activity.Assignments[a].AllowSelect) activity.AllowNewTimeEntries = true;
+            }
+        }
+
+		jQuery.each(Object.keys(activity.Rows), function(i, key){
+			decorateRowObject(activity, activity.Rows[key]);
+		});
+	}
+	
+	theGrid.findDay = function(dayId)
+	{
+		for (var i=0;i<this.TheDays.length;i++)
+		{
+			if (this.TheDays[i].Id == dayId) return this.TheDays[i];
+		}
+		
+		return null;
+	}
+	
+	theGrid.findActivity = function(activityId)
+	{
+		for (var i=0;i<this.Activities.length;i++)
+		{
+			var act = this.Activities[i];
+			if(act.Id == activityId) return act;
+		}
+
+		return null;
+	}
+
+	theGrid.findResourcedActivity = function(activityId)
+	{
+		for (var i=0;i<this.Activities.length;i++)
+		{
+			var act = this.Activities[i];
+
+			for (var j=0;j<act.Assignments.length;j++)
+			{
+				if(act.Assignments[j].ActivityId == activityId) return act;
+   			}
+		}
+
+		return null;
+	}
+
+	theGrid.findTimesheetRow = function(activity, key)
+	{
+		if (activity.Rows == null) return null;
+		
+		return activity.Rows[key];
+	}
+	
+	theGrid.calculateTotals = function()
+	{
+		var actualPerDayInHours = {};
+		var actualPerAssignment = {};
+
+		this.Total = 0;
+		this.DayTotals = {};
+		
+		for (var i=0;i<this.TheDays.length;i++)
+		{
+			this.DayTotals[this.TheDays[i].Id] = 0;
+		}
+		
+		var dayTotals = this.DayTotals;
+		
+		for (var i=0;i<this.Activities.length;i++)
+		{
+			var act = this.Activities[i];
+			act.ActivityTotal = 0;
+			act.Total = {};
+			
+			jQuery.each(Object.keys(act.Rows), function(j, rowKey){
+				var row = act.Rows[rowKey];
+				
+				if (!row.IsDeleted)
+				{
+					row.Total = 0;
+					var assignment = row.getAssignment();
+
+					jQuery.each(Object.keys(row.Entries), function(k, entryKey){
+						var entry = row.Entries[entryKey];
+						
+						var entryVal = (entry.HasPendingAdjustment ? 0 : entry.Units);
+						
+						row.Total += entryVal;
+						
+						if (act.Total[entry.Id] == null)
+							act.Total[entry.Id] = 0;
+						
+						if (row.RowType != 'Forecast')
+						{
+							dayTotals[entry.Id] += (assignment.UnitTypeConversionFactor * entryVal);
+							act.Total[entry.Id] += entryVal;
+
+							if (actualPerDayInHours[entry.Id] == null) actualPerDayInHours[entry.Id] = 0;
+
+							actualPerDayInHours[entry.Id] += (row.Entries[entry.Id].Units * assignment.UsageToHoursFactor);
+
+							if (row.Entries[entry.Id].Units > 0)
+							{
+								if (actualPerAssignment[assignment.ActivityAssignmentId] == null) actualPerAssignment[assignment.ActivityAssignmentId] = {};
+
+								actualPerAssignment[assignment.ActivityAssignmentId][entry.Id] = true;
+							}
+						}
+					});
+				
+					jQuery.each(jQuery('tr[activity-id="' + act.Id + '"]'), function (r, obj) {
+						
+						if (jQuery(obj).prop('id') == row.Key)
+						{
+							var ass = row.getAssignment();
+
+							var origValue;
+
+							if (ass != null && ass.ShowUsageAsHoursAndMins) {
+							    origValue = hoursAndMinsHelper.parseHours(jQuery(obj).find('.row-total-value').val());
+       						} else {
+       							origValue = kimble.parseNumber(jQuery(obj).find('.row-total-value').val());
+             				}
+
+							var newTotal = kimble.formatNumber(row.Total, '0.###');
+
+
+							if (ass != null && ass.ShowUsageAsHoursAndMins) {
+							    jQuery(obj).find('.row-total-value').val(hoursAndMinsHelper.formatHours(row.Total));
+       						} else {
+       							jQuery(obj).find('.row-total-value').val(newTotal);
+             				}
+
+							// config switch for auto-decrementing remaining effort
+							if(autoDecrementRemainingEffort && jQuery(obj).find('.remaining-effort').length && row.CanUpdate)
+							{
+								var task = row.getTask();
+
+								var currentRemaining = jQuery(obj).find('.remaining-effort').attr('orig-value');
+							    // store the original remaining effort as any change of task on the draft line
+							    // will need to revert back to this value as the basis
+							    // if the remaining value not currently in the tracker it's because this row has just been added into the grid
+							    if(task != null && !(Object.keys(autoDecDRETracker).includes(row.Key + task.Id))) autoDecDRETracker[row.Key + task.Id] = kimble.parseNumber(currentRemaining);
+
+								var newRemaining = autoDecDRETracker[row.Key + task.Id] - row.Total;
+
+								// floor the remaining at 0
+								var realRemaining = Math.max(0, newRemaining);
+
+								if (ass != null && ass.ShowUsageAsHoursAndMins) {
+									jQuery(obj).find('.remaining-effort').val(hoursAndMinsHelper.formatHours(realRemaining));
+								} else {
+								    jQuery(obj).find('.remaining-effort').val(kimble.formatNumber(realRemaining, '0.###'));
+        						}
+
+								if (task != null) task.RemainingEffort = realRemaining;
+							}
+						}
+					});
+					
+					if (row.RowType != 'Forecast') act.ActivityTotal += row.Total;
+				}
+			});
+			
+			jQuery('tr#' + act.Id + ' .activity-total-value').text(kimble.formatNumber(act.ActivityTotal, '0.###'));
+			
+			jQuery.each(jQuery('tr#' + act.Id + ' .activity-day-total-value'), function (l, obj) {
+				var val = replaceNull(act.Total[jQuery(obj).prop('id')], 0);
+				
+				jQuery(obj).text(kimble.formatNumber(val, '0.###'));
+			});
+		}
+		
+		this.DayTotals = dayTotals;
+		
+		for(i=0;i<this.TheDays.length;i++)
+		{
+			var day = this.TheDays[i];
+		
+			var dayTot = this.DayTotals[day.Id];
+			jQuery('.day-total#' + day.Id).val(kimble.formatNumber(dayTot, '0.##'));
+
+			this.Total += dayTot;
+		}
+
+		jQuery('.grid-total').val(kimble.formatNumber(this.Total, '0.##'));
+
+		//update other forecast
+		for (var i=0;i<theGrid.Activities.length;i++)
+		{
+			var activity = theGrid.Activities[i];
+			jQuery.each(Object.keys(activity.Rows), function(i, key) {
+				var r = activity.Rows[key];
+
+				if (r.RowType == 'Forecast' && r.CanActualise == true)
+				{
+					var assignment = r.getAssignment();
+					r.Total = 0;
+
+					jQuery.each(Object.keys(r.Entries), function(j, id) {
+
+						r.Entries[id].Units = r.Entries[id].ForecastUnits;
+
+						if (actualPerAssignment[assignment.ActivityAssignmentId] != null && actualPerAssignment[assignment.ActivityAssignmentId][id] != null)
+						{
+							r.Entries[id].Units = 0;
+						}
+						else if (!r.Entries[id].IsScheduled && reduceSuggestedTimeOnceActualExists)
+						{
+							//erode forecast if more than HoursPerDay!
+							//convert forecast units into hours
+							var forecastInHours = r.Entries[id].ForecastUnits * assignment.UsageToHoursFactor;
+
+							if (actualPerDayInHours[id] == null) actualPerDayInHours[id] = 0;
+
+							if (actualPerDayInHours[id] + forecastInHours > assignment.HoursPerDay)
+							{
+								var hoursToRemove = actualPerDayInHours[id] + forecastInHours - assignment.HoursPerDay;
+								r.Entries[id].Units = Math.max(0, (forecastInHours - hoursToRemove) / assignment.UsageToHoursFactor);
+							}
+						}
+
+						r.Total += r.Entries[id].Units;
+					});
+
+					jQuery('#' + r.Key).replaceWith(getTimesheetRowHtml(activity,r));
+				}
+			});
+		}
+	}
+	
+	jQuery('#timesheetBody').empty();
+	
+	var html = '<table id="timesheet-grid" cellpadding="0" cellspacing="0" border="0"><thead>';
+	
+	html += getHeaderHtml();
+	
+	html += '</thead>';
+	
+	html += '<tbody>';
+	
+	html += getBodyHtml();
+	
+	html += '</tbody>';
+	
+	html += '</table>';
+	
+	jQuery('#timesheetBody').append(jQuery(html));
+	
+	theGrid.calculateTotals();
+	
+	jQuery('#find-activity').select2({
+	            		minimumInputLength: 2,
+	            		multiple: false,
+	            		query: function (params) {
+	            			var find = function() {findMatchingAssignments(params);};        		
+	        				find();
+	            		},
+	            		initSelection : function (element, callback) {
+					        var data = {id: element.val(), text: element.attr('data-name')};
+					        callback(data);
+					    }
+    });
+
+	initialiseDynamicElements();
+
+	if(!theGrid.HasUsageAllocationInfo)
+	{
+		jQuery(".usage-allocation-info").hide();
+	}
+	else
+	{
+		jQuery(".activity-heading").css("min-width", "669px");
+	}	
+	
+	jQuery('#timesheet-error').hide();
+	jQuery('#timesheet-warning').hide();
+	
+	if (theGrid.WarningMessages != null && theGrid.WarningMessages.length > 0)
+	{
+		jQuery('#timesheet-warning').show();
+		jQuery('#timesheet-warning-text').html(theGrid.WarningMessages[0]);
+	}
+						
+	if (theGrid.ErrorMessages != null && theGrid.ErrorMessages.length > 0)
+	{
+		jQuery('#timesheet-error').show();
+		jQuery('#timesheet-error-text').html(theGrid.ErrorMessages[0]);
+	}
+						
+	jQuery(document).off('click', '#add-non-forecast-activity-button');
+	jQuery(document).on('click', '#add-non-forecast-activity-button', function () {
+		
+		var val = jQuery('#find-activity').val();
+		
+		if (val == null || val == '') return;
+		
+		addActivity(val);
+	});
+
+	jQuery(document).off('change', '.select-row input');
+	jQuery(document).on('change', '.select-row input', function (){
+	    var j = jQuery(this);
+
+	    var activity = theGrid.findActivity(j.closest('tr').attr('activity-id'));
+	    var row = theGrid.findTimesheetRow(activity, j.closest('tr').prop('id'));
+
+	    row.Selected = j.prop('checked');
+
+	    timesheetChanged(activity);
+	    
+		selectItem(j.closest('.timesheet-row'), j.closest('.timesheet-row').find('input').is(':checked'));
+    });
+
+	jQuery(document).off('click', '.delete-button');
+	jQuery(document).on('click', '.delete-button', function () {
+		
+		var del = false;
+    
+        del = confirmDelete();
+     
+        if (del)
+        {		
+			var j = jQuery(this);
+			
+			var activity = theGrid.findActivity(j.closest('tr').attr('activity-id'));
+			
+			var row = theGrid.findTimesheetRow(activity, j.closest('tr').prop('id'));
+
+			// if the row was for a task and autodecrementing is configured then remove any cached
+			// values that we had for the last task and restore the original remaining effort
+			// back to as it would be if this row hadn't existed
+			if(autoDecrementRemainingEffort && row.TaskId != null)
+			{
+				restoreTaskRemainingEffort(row);
+			}
+
+			row.IsDeleted = true;
+			
+			j.closest('tr').remove();
+			
+			theGrid.calculateTotals();
+			
+			jQuery('tr#' + activity.Id).removeClass(function (index, css) {
+	    		return (css.match (/(^|\s)children-\S+/g) || []).join(' ');
+			}).addClass(getActivityClass(activity));
+			
+			timesheetChanged(activity);
+		}		
+	});
+	
+	jQuery(document).off('click', '.clear-forecast-button');
+	jQuery(document).on('click', '.clear-forecast-button', function () {
+		
+		var del = false;
+    
+        del = confirmDelete();
+     
+        if (del)
+        {		
+			var j = jQuery(this);
+			
+			var activity = theGrid.findActivity(j.closest('tr').attr('activity-id'));
+			
+			var row = theGrid.findTimesheetRow(activity, j.closest('tr').prop('id'));
+			
+			row.IsDeleted = true;
+			
+			j.closest('tr').remove();
+			
+			theGrid.calculateTotals();
+			
+			jQuery('tr#' + activity.Id).removeClass(function (index, css) {
+	    		return (css.match (/(^|\s)children-\S+/g) || []).join(' ');
+			}).addClass(getActivityClass(activity));
+			
+			timesheetChanged(activity);
+		}		
+	});
+	
+	
+	jQuery(document).off('click', '.clone-button');
+	jQuery(document).on('click', '.clone-button', function () {
+		
+		var j = jQuery(this);
+		
+		var parentRow = j.closest('tr');
+		
+		var activity = theGrid.findActivity(parentRow.attr('activity-id'));
+		
+		var row = theGrid.findTimesheetRow(activity, parentRow.prop('id'));
+		
+		var clone = jQuery.extend(true, {}, row);
+		
+		clone.Key = getUniqueId();
+		clone.DraftTimeEntries = null;
+		clone.CanUpdate = true;
+		clone.CanDelete = true;
+		clone.Status = 'Draft';
+		clone.DisplayStatus = 'Draft';
+		clone.StatusLabel = '{!UPPER($Label.TEStatusDraft)}';
+		clone.IsDeleted = false;
+		clone.IsUpdated = true;
+		clone.Problems = {};
+		clone.IsActualising = true;
+
+		activity.Rows[clone.Key] = clone;
+		
+		var newRowHtml = getTimesheetRowHtml(activity, clone);
+		
+		parentRow.after(jQuery(newRowHtml));
+		
+		jQuery('tr#' + activity.Id).removeClass(function (index, css) {
+	    		return (css.match (/(^|\s)children-\S+/g) || []).join(' ');
+			}).addClass(getActivityClass(activity));
+		
+		initialiseDynamicElements();
+		
+		theGrid.calculateTotals();
+		
+		timesheetChanged(activity);
+		
+	});
+	
+	jQuery(document).off('click', '.create-draft-button');
+	jQuery(document).on('click', '.create-draft-button', function () {
+		
+		var j = jQuery(this);
+		
+		var parentRow = j.closest('tr');
+		
+		var activity = theGrid.findActivity(parentRow.attr('activity-id'));
+		
+		var row = theGrid.findTimesheetRow(activity, parentRow.prop('id'));
+		
+		row.Status = 'Draft';
+		row.DisplayStatus = 'Draft';
+		row.StatusLabel = '{!UPPER($Label.TEStatusDraft)}';
+		row.RowType = 'Actual';
+		row.CanUpdate = true;
+		row.CanDelete = true;
+		row.IsDeleted = false;
+		row.IsUpdated = true;
+		row.ActivityRateBandId = row.getDefaultRateBand().ActivityRateBandId;
+		row.IsActualising = true;
+
+		var ass = row.getAssignment();
+		
+		if (row.TaskId == null && ass.Tasks.length == 1) row.TaskId = ass.Tasks[0].Id;
+
+		if (ass.CaseId != null) {
+			row.CaseId = ass.CaseId;
+			row.CaseReference = ass.CaseReference;
+  		}
+
+		var newRowHtml = getTimesheetRowHtml(activity, row);
+		
+		parentRow.replaceWith(jQuery(newRowHtml));
+		
+		initialiseDynamicElements();
+		
+		theGrid.calculateTotals();
+		
+		timesheetChanged(activity);
+	});
+
+	jQuery(document).off('click', '.edit-forecast-button');
+	jQuery(document).on('click', '.edit-forecast-button', function () {
+
+		var j = jQuery(this);
+
+		var parentRow = j.closest('tr');
+
+		var activity = theGrid.findActivity(parentRow.attr('activity-id'));
+
+		var row = theGrid.findTimesheetRow(activity, parentRow.prop('id'));
+        row.CanUpdate = true;
+
+		var newRowHtml = getTimesheetRowHtml(activity, row);
+
+		parentRow.replaceWith(jQuery(newRowHtml));
+
+		initialiseDynamicElements();
+
+		timesheetChanged(activity);
+	});
+
+	
+	jQuery(document).off('click', '.quick-entry-button');
+	jQuery(document).on('click', '.quick-entry-button', function () {
+		
+		var j = jQuery(this);
+		
+		var parentRow = j.closest('tr');
+		
+		var activity = theGrid.findActivity(parentRow.attr('activity-id'));
+		
+		var row = theGrid.findTimesheetRow(activity, parentRow.prop('id'));
+		
+		// for each task option
+		var ass = row.getAssignment();
+		
+		var newRows = [];
+		
+		for (var i=0;i<ass.Tasks.length;i++)
+		{
+			if(ass.Tasks[i].Id != row.TaskId)
+			{
+				var clone = jQuery.extend(true, {}, row);
+				
+				clone.Key = getUniqueId();
+				clone.DraftTimeEntries = null;
+				clone.CanUpdate = true;
+				clone.CanDelete = true;
+				clone.Status = 'Draft';
+				clone.DisplayStatus = 'Draft';
+				clone.StatusLabel = '{!UPPER($Label.TEStatusDraft)}';
+				clone.IsDeleted = false;
+				clone.IsUpdated = true;
+				clone.Problems = {};
+
+				activity.Rows[clone.Key] = clone;
+				
+				clone.TaskId = ass.Tasks[i].Id
+				
+				var newRowHtml = getTimesheetRowHtml(activity, clone);
+				
+				newRows.push(newRowHtml);
+			}
+		}
+
+		for (var i=0;i<newRows.length;i++)
+		{
+			parentRow.after(jQuery(newRows[i]));
+		}
+
+		jQuery('tr#' + activity.Id).removeClass(function (index, css) {
+	    		return (css.match (/(^|\s)children-\S+/g) || []).join(' ');
+			}).addClass(getActivityClass(activity));
+		
+		initialiseDynamicElements();
+		
+		theGrid.calculateTotals();
+		
+		timesheetChanged(activity);
+		
+	});	
+	
+	jQuery(document).off('click', '.add-activity-button');
+	jQuery(document).on('click', '.add-activity-button', function() {
+		
+		// Creates a new timesheet row beneath current row
+		var j = jQuery(this);
+		var parentRow = j.closest('tr');
+		var activity = theGrid.findActivity(j.prop('id'));
+
+		// Status could be forecast
+
+		var row = {Key:getUniqueId(), IsDeleted:false, IsUpdated:true, CanUpdate:true, CanDelete:true, Entries:{} , Total:0, Problems:{}, Status:'Draft', DisplayStatus:'Draft', StatusLabel:'{!UPPER($Label.TEStatusDraft)}'};
+		
+		decorateRowObject(activity, row);
+		
+		if (activity.Assignments.length == 1)
+		{
+			row.setAssignment(activity.Assignments[0].ActivityAssignmentId);
+		}
+		
+		var newRowHtml = getTimesheetRowHtml(activity, row);
+		
+		activity.Rows[row.Key] = row;
+		
+		parentRow.after(jQuery(newRowHtml));
+		
+		parentRow.removeClass(function (index, css) {
+    		return (css.match (/(^|\s)children-\S+/g) || []).join(' ');
+		}).addClass(getActivityClass(activity));
+		
+		initialiseDynamicElements();
+		
+		timesheetChanged(activity);
+		
+		if({!EnhancedView}) initialiseTTips();
+		
+	});
+	
+	jQuery(document).off('change', '.assigment-select');
+	jQuery(document).on('change', '.assigment-select', function() {
+		var j = jQuery(this);
+		var row = j.closest('tr');
+		
+		var activity = theGrid.findActivity(row.attr('activity-id'));
+		
+		var timesheetRow = theGrid.findTimesheetRow(activity, row.prop('id'));
+		
+		var redraw = timesheetRow.setAssignment(j.val());
+		
+		if (!redraw) return;
+		
+		row.replaceWith(jQuery(getTimesheetRowHtml(activity, timesheetRow)));
+		
+		initialiseDynamicElements();
+		
+		enableSelectAndSubmit();
+	});
+	
+	jQuery(document).off('change', '.rate-select');
+	jQuery(document).on('change', '.rate-select', function() {
+		var j = jQuery(this);
+		
+		var row = j.closest('tr');
+		
+		var activity = theGrid.findActivity(row.attr('activity-id'));
+		var timesheetRow = theGrid.findTimesheetRow(activity, row.prop('id'));
+		
+		var redraw = timesheetRow.setAssignmentRate(j.val(), timesheetRow.getRateBand());
+		
+		if (!redraw) return;
+		
+		var newRowHtml = getTimesheetRowHtml(activity, timesheetRow);
+		
+		row.replaceWith(jQuery(newRowHtml));
+		
+		initialiseDynamicElements();
+		
+		theGrid.calculateTotals();		
+	});
+
+
+	jQuery(document).off('change', '.case-entry');
+	jQuery(document).on('change', '.case-entry', function() {
+		var j = jQuery(this);
+
+		var row = j.closest('tr');
+
+		var activity = theGrid.findActivity(row.attr('activity-id'));
+		var timesheetRow = theGrid.findTimesheetRow(activity, row.prop('id'));
+
+		timesheetRow.CaseId = j.attr('data-id');
+		timesheetRow.CaseReference = j.val();
+
+		var newRowHtml = getTimesheetRowHtml(activity, timesheetRow);
+
+		row.replaceWith(jQuery(newRowHtml));
+
+		timesheetChanged(activity);
+
+		initialiseDynamicElements();
+	});
+
+	jQuery(document).off('click', '.clear-case-id');
+	jQuery(document).on('click', '.clear-case-id', function() {
+		var j = jQuery(this);
+		j.prev().val('').attr('data-id', null).change();
+		var row = j.closest('tr');
+	});
+
+	jQuery(document).off('change', '.task-select');
+	jQuery(document).on('change', '.task-select', function() {
+		var j = jQuery(this);
+		
+		var row = j.closest('tr');
+		
+		var activity = theGrid.findActivity(row.attr('activity-id'));
+		var timesheetRow = theGrid.findTimesheetRow(activity, row.prop('id'));
+
+		// if the task is changing and autodecrementing is configured then remove any cached
+		// values that we had for the last task and restore the original remaining effort
+		// back to as it would be if this row hadn't existed
+		if(autoDecrementRemainingEffort && j.val() != timesheetRow.TaskId)
+		{
+			restoreTaskRemainingEffort(timesheetRow);
+		}
+
+		timesheetRow.TaskId = j.val();
+		
+		var newRowHtml = getTimesheetRowHtml(activity, timesheetRow);
+
+		row.replaceWith(jQuery(newRowHtml));
+
+		theGrid.calculateTotals();
+		
+		timesheetChanged(activity);
+		
+		initialiseDynamicElements();
+	});
+	
+	jQuery(document).off('change', '.row-day-entry');
+	jQuery(document).on('change', '.row-day-entry', function() {
+
+		var j = jQuery(this);
+		var activity = theGrid.findActivity(j.closest('tr').attr('activity-id'));
+		var row = theGrid.findTimesheetRow(activity, j.closest('tr').prop('id'));
+		row.IsUpdated = true;
+		validateUsageUnitsChange(this);
+		
+		timesheetChanged(activity);
+
+		// only fire this change if we are showing time fields for time entry
+		if(row.getAssignment().DateAndTimeRequired)
+		{
+			usageUnitsChange(this);
+		}
+	});
+	
+	jQuery(document).off('change', '.row-day-revenue-entry');
+	jQuery(document).on('change', '.row-day-revenue-entry', function() {
+		var j = jQuery(this);
+		
+		var activity = theGrid.findActivity(j.closest('tr').attr('activity-id'));
+		
+		var row = theGrid.findTimesheetRow(activity, j.closest('tr').prop('id'));
+		
+		var dayId = j.attr('day-id');
+		var theDate = j.attr('entry-date');
+		
+		var entry = row.Entries[dayId];
+		
+		if (entry == null) entry = {Id:dayId, TheDate:theDate, Units:0, RevenueUnits:0, Notes:null};
+		
+		entry.RevenueUnits = kimble.parseNumber(j.val());
+		
+		row.Entries[dayId] = entry;
+		
+		timesheetChanged(activity);
+		
+	});
+
+	jQuery(document).off('change', '.remaining-effort');
+	jQuery(document).on('change', '.remaining-effort', function() {
+		var j = jQuery(this);
+		
+		var row = j.closest('tr');
+		
+		var activity = theGrid.findActivity(row.attr('activity-id'));
+		var timesheetRow = theGrid.findTimesheetRow(activity, row.prop('id'));
+		
+		var task = timesheetRow.getTask();
+		
+		if (task != null)
+		{
+			var ass =  timesheetRow.getAssignment();
+
+			if (ass != null && ass.ShowUsageAsHoursAndMins) {
+				task.RemainingEffort = hoursAndMinsHelper.parseHours(j.val());
+   			} else {
+   			    task.RemainingEffort = kimble.parseNumber(j.val());
+      		}
+
+			// having changed the value we now track against this for auto decrement purposes
+			// this needs to be the current value + the total value of hours on this row already
+			// if autodecrement is active
+			var currentTotal = (autoDecrementRemainingEffort ? timesheetRow.Total: 0);
+			j.attr('orig-value', task.RemainingEffort + currentTotal);
+			autoDecDRETracker[timesheetRow.Key + task.Id] = task.RemainingEffort + currentTotal;
+		}
+			
+		timesheetChanged(activity);
+	});
+	
+	jQuery(document).off('change', '.note');
+	jQuery(document).on('change', '.note', function() {
+		var j = jQuery(this);
+		
+		var activity = theGrid.findActivity(j.attr('activity-id'));
+		
+		var row = theGrid.findTimesheetRow(activity, j.attr('row-key'));
+		
+		var dayId = j.attr('day-id');
+		var theDate = j.attr('entry-date');
+		
+		var entry = row.Entries[dayId];
+		
+		if (entry == null) entry = {Id:dayId, TheDate:theDate, Units:0, RevenueUnits:0, Notes:null};
+		
+		entry.Notes = j.val();
+		
+		row.Entries[dayId] = entry;
+
+		timesheetChanged(activity);
+	});
+	
+	jQuery(document).off('change', '.start-time.inline-time-picker, .end-time.inline-time-picker');
+	jQuery(document).on('change', '.start-time.inline-time-picker, .end-time.inline-time-picker', function() {
+		var j = jQuery(this);
+		
+		var activity = theGrid.findActivity(j.attr('activity-id'));
+		
+		var row = theGrid.findTimesheetRow(activity, j.attr('row-key'));
+		
+		var dayId = j.attr('day-id');
+		var theDate = j.attr('entry-date');
+		
+		var entry = row.Entries[dayId];
+		var newEntry = false;
+		if (entry == null)
+		{
+			entry = {Id:dayId, TheDate:theDate, Units:0, RevenueUnits:0, Notes:null};
+			newEntry = true;
+		}
+		
+		var container = j.parent().parent();
+		container.find('.validation').remove();
+
+		var theQtip = j.closest('.qtip');
+		var currentStartTime = theQtip.find('.start-time.inline-time-picker[day-id="' + dayId + '"]').val();
+		var currentEndTime = theQtip.find('.end-time.inline-time-picker[day-id="' + dayId + '"]').val();
+		var theUsageUnits = jQuery('input.row-day-entry[aria-describedby=' + theQtip.attr('id') + ']');
+		
+		if(j.hasClass('start-time'))
+		{
+			if (currentEndTime != '' && currentEndTime < j.val())
+			{
+				var invalidTimeMsg = '{!JSENCODE($Label.StartTimeAfterEndTimeMessage)}';
+				
+				j.prev().before(jQuery('<div class="validation error-message">' + invalidTimeMsg + '</div>'));
+			}
+			else
+			{
+				entry.StartTime = j.val();
+				
+				if(currentEndTime == '')
+				{
+					entry.EndTime = timeAddHours(j.val(), kimble.parseNumber(theUsageUnits.val()));
+					theQtip.find('.end-time.inline-time-picker[day-id="' + dayId + '"]').val(entry.EndTime);
+				}
+				
+				timeChange(this);
+			}
+		}
+		else if(j.hasClass('end-time'))
+		{
+			if (currentStartTime != '' && currentStartTime > j.val())
+			{
+				var invalidTimeMsg = '{!JSENCODE($Label.EndTimeBeforeStartTimeMessage)}';
+				
+				j.prev().before(jQuery('<div class="validation error-message">' + invalidTimeMsg + '</div>'));
+			}
+			else
+			{
+				entry.EndTime = j.val();
+				timeChange(this);
+			}
+		}
+		
+		if(newEntry)
+			row.Entries[dayId] = entry;
+		
+		timesheetChanged(activity);
+	});
+	
+	jQuery(document).off('change', '.reference-entry');
+	jQuery(document).on('change', '.reference-entry', function() {
+		var j = jQuery(this);
+		
+		var activity = theGrid.findActivity(j.closest('tr').attr('activity-id'));
+	   
+		var row = theGrid.findTimesheetRow(activity, j.closest('tr').prop('id'));
+	   		
+		row.Reference = j.val();
+		
+		timesheetChanged(activity);
+	});
+	
+	jQuery(document).off('click', '.category-entry');
+	jQuery(document).on('click', '.category-entry', function (event) {
+		 var j = jQuery(this);
+		 
+		 var activity = theGrid.findActivity(j.closest('tr').attr('activity-id'));
+		 
+		 var row = theGrid.findTimesheetRow(activity, j.closest('tr').prop('id'));
+		 
+		 if (row.ActivityAssignmentId == null) return;
+		 
+		 var ass = row.getAssignment();
+		 
+		 var categoryHtml = getCategoryPopupHtml(activity, ass, row);
+		 j.qtip('destroy', true);
+		 
+		 j.qtip({
+            overwrite: true,
+			show: {
+                solo:true,
+ 			    event: 'click', // Use the same event type as above
+                ready: true // Show immediately - important!
+            },
+			hide: {
+				event: 'unfocus'
+			},
+			style: {
+				classes: 'qtip-light qtip-shadow'
+	        },
+			content: { 
+				text: categoryHtml,
+				title: '<apex:outputText value="{!$Label.kimbleone__selectlabel} {!$ObjectType.KimbleOne__ActivityTimeCategory__c.LabelPlural}"/>'
+			},
+	        position: {
+			   	my: 'top left',
+				at: 'bottom right',
+			   	target: jQuery(this)
+			},
+			events: {
+				render: function(event, api) {
+					//initialiseDynamicElements();
+				},
+				hidden: function(event, api) {
+					var j = jQuery(this);
+					
+					var activity = theGrid.findActivity(j.find('.category-edit').attr('activity-id'));
+					var timesheetRow = theGrid.findTimesheetRow(activity, j.find('.category-edit').prop('id'));
+
+					// check the activity which launched this popup is the same as the one when being dismissed as if different we should null the category values
+					var actValid = (j.find('.category-edit').attr('res-act-id') == timesheetRow.getAssignment().ActivityId);
+					
+					jQuery.each(j.find('.cat-text, select.cat-select'), function (i, opt) {
+					
+						var pos = jQuery(opt).attr('cat-display-seq');
+						if (pos != undefined && pos != null && pos != '') timesheetRow['Cat' + pos] = actValid ? jQuery(opt).val() : null;
+				
+					});
+					
+					var row = jQuery('tr#' + timesheetRow.Key);
+					
+					row.find('.usage-allocation-info').replaceWith(jQuery(getUsageAllocationInfoHtml(timesheetRow.getAssignment(), timesheetRow.getRateBand(), timesheetRow)));
+					
+					initialiseDynamicElements();
+					
+					timesheetChanged(activity);
+				},
+				
+			}
+        });
+	});
+	
+	jQuery(document).off('click', '.undo-entry-adjustment');
+	jQuery(document).on('click', '.undo-entry-adjustment', function (event) {
+		
+		//removes the value from the adjustment row from day - if all days are 0 then remove the row
+		var j = jQuery(this).parent().find('input');
+		
+		jQuery(this).parent().find('.remove-entry, .edit-entry').show();
+		jQuery(this).parent().find('.undo-entry-adjustment').hide();
+		
+		var parentRow = j.closest('tr');
+		
+		// if this is a row-total cell do the click for all cells
+		if (jQuery(this).parent().parent().hasClass('row-total'))
+		{
+			parentRow.find('.undo-entry-adjustment:not(:hidden)').click();
+			
+			jQuery(this).parent().removeClass('strikethrough');
+			return;
+		}
+		
+		jQuery(this).parent().removeClass('strikethrough');
+		
+		// if the all adjustable cells on the row have been adjusted, mark the parent
+		if(parentRow.find('input.day-cell[value!=""]').length > parentRow.find('td.row-day div.day-cell-container.strikethrough').length)
+		{
+			parentRow.find('input.row-total-value').parent().removeClass('strikethrough');
+			parentRow.find('input.row-total-value').parent().find('span.edit-entry').show();
+			parentRow.find('input.row-total-value').parent().find('span.remove-entry').show();
+			parentRow.find('input.row-total-value').parent().find('span.undo-entry-adjustment').hide();			
+		}
+		
+		var activity = theGrid.findActivity(j.closest('tr').attr('activity-id'));
+		
+		var row = theGrid.findTimesheetRow(activity, j.closest('tr').prop('id'));
+		var dayId = j.attr('day-id');
+		
+		row.Entries[dayId].HasPendingAdjustment = false;
+		
+		var adjustmentRows = row.findMatchingDraftRows();
+				
+		if (adjustmentRows.length == 1) 
+		{
+			// Adjustment edit row
+			var adjustmentRow = adjustmentRows[0];
+			
+			delete adjustmentRow.Entries[dayId];
+			
+			if (Object.keys(adjustmentRow.Entries).length == 0)
+			{
+				//remove the row
+				delete activity.Rows[adjustmentRow.Key];
+				
+				jQuery('#' + adjustmentRow.Key).remove();
+			}
+			else
+			{
+				var newRowHtml = getTimesheetRowHtml(activity, adjustmentRow);
+				
+				jQuery('#' + adjustmentRow.Key).replaceWith(newRowHtml);
+			}
+		}
+		
+		theGrid.calculateTotals();
+		
+		timesheetChanged(activity);
+	});
+	
+	jQuery(document).off('click', '.remove-entry, .edit-entry');
+	jQuery(document).on('click', '.remove-entry, .edit-entry', function (event) {
+	
+		var j = jQuery(this).parent().find('input');
+		
+		jQuery(this).parent().find('.remove-entry, .edit-entry').hide();
+		jQuery(this).parent().find('.undo-entry-adjustment').show();
+		
+		var parentRow = j.closest('tr');
+		
+		// if this is a row-total cell do the click for all cells
+		if (jQuery(this).parent().parent().hasClass('row-total'))
+		{
+			if(jQuery(this).hasClass('remove-entry'))
+			{
+				parentRow.find('.remove-entry:not(:hidden)').click();
+			}
+			else if(jQuery(this).hasClass('edit-entry'))
+			{
+				parentRow.find('.edit-entry:not(:hidden)').click();
+			}
+			
+			jQuery(this).parent().addClass('strikethrough');
+			
+			return;
+		}
+		
+		jQuery(this).parent().addClass('strikethrough');
+		
+		// if the all adjustable cells on the row have been adjusted, mark the parent
+		if(parentRow.find('input.day-cell[value!=""]').length == parentRow.find('td.row-day div.day-cell-container.strikethrough').length)
+		{
+			parentRow.find('input.row-total-value').parent().addClass('strikethrough');
+			parentRow.find('input.row-total-value').parent().find('span.edit-entry').hide();
+			parentRow.find('input.row-total-value').parent().find('span.remove-entry').hide();
+			parentRow.find('input.row-total-value').parent().find('span.undo-entry-adjustment').show();
+		}
+		
+		var activity = theGrid.findActivity(j.closest('tr').attr('activity-id'));
+		
+		var row = theGrid.findTimesheetRow(activity, j.closest('tr').prop('id'));
+		
+		var editRow;
+		
+		var matchingRows = row.findMatchingDraftRows();
+		
+		for (var i=0;i<=matchingRows.length-1;i++)
+		{
+			editRow = matchingRows[i];		
+		}
+		
+		var dayId = j.attr('day-id');
+		var theDate = j.attr('entry-date');
+		
+		var entry = row.Entries[dayId];
+		entry.HasPendingAdjustment = true;
+		row.HasPendingAdjustments = true;
+		
+		if (jQuery(this).hasClass('edit-entry'))
+		{
+			if (editRow == null)
+			{
+				var newRow = jQuery.extend(true, {}, row);
+				newRow.Key = getUniqueId();
+				newRow.MatchKey = row.Key;
+				newRow.DraftTimeEntries = null;
+				newRow.Entries = {};
+				newRow.CanDelete = true;
+				newRow.CanUpdate = true;
+				newRow.Status = 'Draft';
+				newRow.DisplayStatus = 'Draft';
+				newRow.StatusLabel = '{!UPPER($Label.TEStatusDraft)}';
+				newRow.IsDeleted = false;
+				newRow.IsUpdated = true;
+				newRow.Problems = {};
+			
+				newRow.Entries[dayId] = {Id:dayId, TheDate:theDate, Units:entry.Units, RevenueUnits:entry.RevenueUnits, Notes:null, StartTime:entry.StartTime, EndTime:entry.EndTime};
+			
+				activity.Rows[newRow.Key] = newRow;
+			
+				var newRowHtml = getTimesheetRowHtml(activity, newRow);
+			
+				parentRow.after(jQuery(newRowHtml));
+			}
+			else
+			{
+				editRow.Entries[dayId] = {Id:dayId, TheDate:theDate, Units:entry.Units, RevenueUnits:entry.RevenueUnits, Notes:null, StartTime:entry.StartTime, EndTime:entry.EndTime};
+			
+				var newRowHtml = getTimesheetRowHtml(activity, editRow);
+
+				jQuery('#' + editRow.Key).replaceWith(newRowHtml);
+			}
+		}
+		
+		theGrid.calculateTotals();
+		
+		timesheetChanged(activity);
+	
+	});
+	
+	jQuery(document).off('focus', 'input.row-day-entry');
+	jQuery(document).on('focus', 'input.row-day-entry', function (event) {
+				
+        var j = jQuery(this);
+		
+		var activity = theGrid.findActivity(j.closest('tr').attr('activity-id'));
+		
+		var row = theGrid.findTimesheetRow(activity, j.closest('tr').prop('id'));
+		
+		var dayId = j.attr('day-id');
+		var theDate = j.attr('entry-date');
+		
+		var entry = row.Entries[dayId];
+		
+		var notes = '';
+		var startTime = '';
+		var endTime = '';
+
+		if (entry != null)
+		{
+		  	if(entry.Notes != null) notes = jDecode(entry.Notes);
+			if(entry.StartTime != null) startTime = entry.StartTime;
+			if(entry.EndTime != null) endTime = entry.EndTime;
+		}
+		var readonly;
+		
+		if (!row.CanUpdate)
+			readonly = 'readonly';
+		
+		var popupHtml = '';
+		
+		var container = j.parent();
+		
+		jQuery.each(container.find('.error'), function (i, obj) {
+			popupHtml += '<div class="error-message">' + jQuery(obj).prop('title') + '</div>';
+		});
+
+		var ass = row.getAssignment();
+
+		// optional start and end time
+		if(ass.DateAndTimeRequired)
+		{
+			var mandatoryIndicatorHtml = '<div class="time-required"/>';
+			popupHtml += '<div class="time-entry-time"><div class="popup-field-label">' + startTimeLabel + ':</div>' + mandatoryIndicatorHtml + '<input ' + readonly + ' activity-id="' + activity.Id + '" row-key="' + row.Key + '" day-id="' + dayId + '" entry-date="' + theDate + '" type="text" class="start-time inline-time-picker kimbleTimePicker" value="' + startTime + '"/></div>';
+			popupHtml += '<div class="time-entry-time"><div class="popup-field-label">' + endTimeLabel + ':</div>' + mandatoryIndicatorHtml + '<input ' + readonly + ' activity-id="' + activity.Id + '" row-key="' + row.Key + '" day-id="' + dayId + '" entry-date="' + theDate + '" type="text" class="end-time inline-time-picker kimbleTimePicker" value="' + endTime + '"/></div>';
+		}
+
+		if(showCurrentRemainingUsageInTimeEntry && row.Status != undefined && row.Status != 'Approved')
+		{
+			var theUsageUnits = ass.EntryUnitTypeSuffix;
+			var raCurrentRemaining = theGrid.AssignmentCurrentRemainingUsage[ass.ActivityAssignmentId];
+			var raCurrentRemainingFormatted;
+
+			if (ass != null && ass.ShowUsageAsHoursAndMins) {
+				raCurrentRemainingFormatted = hoursAndMinsHelper.formatHours(raCurrentRemaining);
+   			} else {
+   				raCurrentRemainingFormatted = kimble.formatNumber(raCurrentRemaining, '#.##') + ' ' + theUsageUnits;
+      		}
+
+			var remUsageHtml = (raCurrentRemaining != undefined ? '<div class="rem-usage-details"><div class="popup-field-label">' + currentRemainingUsageLabel + ':</div><span class="curr-rem-usage">' + raCurrentRemainingFormatted + '</span></div>' : '');
+			popupHtml += remUsageHtml;	
+		}
+
+		popupHtml += '<textarea ' + readonly + ' activity-id="' + activity.Id + '" row-key="' + row.Key + '" day-id="' + dayId + '" entry-date="' + theDate + '" rows="3" cols="40" class="note" placeholder="--{!$ObjectType.TimeEntry__c.Fields.Notes__c.Label}--">' + notes + '</textarea>';
+
+		j.qtip('destroy', true);
+
+        if (!row.getAssignment().DateAndTimeRequired || !row.CanUpdate)
+        {
+ 	       if (row.getRateBand().TimeEntryNotesMandatory == true)
+	        {	
+				j.qtip({
+		            overwrite: true,
+					show: {
+		                solo:true,
+		 			    event: 'focus', // Use the same event type as above
+		                ready: true // Show immediately - important!
+		            },
+					hide: {
+						event: 'unfocus'
+					},
+					style: {
+						classes: 'qtip-light qtip-shadow notesQtip notes-required'
+			        },
+					content: { 
+						text: popupHtml
+					},
+			        position: {
+					   	my: 'top left',
+						at: 'bottom right',
+					   	target: jQuery(this)
+					}
+		        });
+	        }
+ 	        else
+	        {	
+				j.qtip({
+		            overwrite: true,
+					show: {
+		                solo:true,
+		 			    event: 'focus', // Use the same event type as above
+		                ready: true // Show immediately - important!
+		            },
+					hide: {
+						event: 'unfocus'
+					},
+					style: {
+						classes: 'qtip-light qtip-shadow notesQtip'
+			        },
+					content: { 
+						text: popupHtml
+					},
+			        position: {
+					   	my: 'top left',
+						at: 'bottom right',
+					   	target: jQuery(this)
+					}
+		        });
+	        }
+	    }
+        else
+        {
+			j.qtip({
+	            overwrite: true,
+				show: {
+	                solo:true,
+	 			    event: 'focus', // Use the same event type as above
+	                ready: true // Show immediately - important!
+	            },
+				hide: false,
+				style: {
+					classes: 'qtip-light qtip-shadow'
+		        },
+				content: { 
+					text: popupHtml
+				},
+		        position: {
+				   	my: 'top left',
+					at: 'bottom right',
+				   	target: jQuery(this)
+				},
+				events: {
+					render: function() {jQuery(".kimbleTimePicker").timepicker({ "timeFormat": "H:i", "show2400": "true" });},
+					hide: function(event, api) {var j = jQuery(this); validateTimeFields(j);}
+				}
+	        });
+        }
+    });
+
+	jQuery(document).off('click', 'li#copy-items').on('click', 'li#copy-items', getActivitiesBookedLastPeriod);
+	jQuery(document).off('click', 'li#select-all').on('click', 'li#select-all', selectAll);
+	jQuery(document).off('click', 'li#select-items').on('click', 'li#select-items', selectModeOn);
+	jQuery(document).off('click', 'tr.selecting').on('click', 'tr.selecting', selectRow);
+	jQuery(document).off('click', '.cancel-select-btn').on('click', '.cancel-select-btn', selectModeOff);
+	jQuery(document).off('click', 'li#submit-all:not(.disabled)').on('click', 'li#submit-all:not(.disabled)', submitAllTime);
+	jQuery(document).off('click', 'li#submit-items:not(.disabled)').on('click', 'li#submit-items:not(.disabled)', submitSelectedTime);
+	jQuery(document).off('click', '.save-btn:not(.disabled)').on('click', '.save-btn:not(.disabled)', saveOnly);
+	jQuery(document).off('click', '.submit-for-approval').on('click', '.submit-for-approval', saveOnly);	
+
+	jQuery(document).off('click', '.adjust-time-btn').on('click', '.adjust-time-btn', AdjustPeriod);
+	jQuery(document).off('click', '.save-submit-adjusted-btn').on('click', '.save-submit-adjusted-btn', submitAllTime);
+    
+	enableSelectAndSubmit();
+	
+	if({!EnhancedView})
+	{
+		initialiseTTips();
+
+		if(enableTimers)
+		{
+			jQuery(document).off('click', '.te-timer i.stop-timer').on('click', '.te-timer i.stop-timer', stopTimer);
+			
+			jQuery.fn.timer = function() {
+				this.each(function(){
+					var t = jQuery(this);
+					var intervalId = setInterval(function() {
+						var eTime = t.attr('timer-elapsed-time-s');
+						
+						// add a second
+						var totalSeconds = parseInt(eTime) + 1;
+						var seconds = totalSeconds + 1;
+						var minutes = Math.floor(seconds/60);
+						var hours = Math.floor(minutes/60);
+						var days = Math.floor(hours/24);
+						
+						minutes = minutes-(hours*60);
+						seconds = (seconds-(hours*60*60)-(minutes*60)).toFixed(0);
+	
+						t.attr('timer-elapsed-time-s', totalSeconds);
+						var formattedTimer = padPart(hours) + ':' + padPart(minutes) + ':' + padPart(seconds);
+						t.text(formattedTimer);
+				    }, 1000);
+				    t.data('int-id', intervalId);
+				    t.addClass('ticking');
+				});
+			}
+	
+			jQuery.fn.stopTimer = function() {
+				this.each(function(){
+					var t = jQuery(this);
+					clearInterval(t.data('int-id'));
+					t.removeClass('ticking');
+				});
+			}
+			
+			initialiseTimers();
+		}
+	}
+    
+    if (!theGrid.HasSaveProblem)
+    	jQuery(window).off('.has-changes');
+}
+
+var padPart = function(n) { return ('' + n).length < 2? padPart('0' + n) : n;};
+				
+function initialiseTimers()
+{
+    
+    jQuery('.ticker').each(function() {
+    	var t = jQuery(this);
+		// time the timer was started
+		var sDateTime = t.attr('timer-start-time');
+		var sTime = sDateTime.getTimeFromDateTime(true);
+		var sTimeParts = sTime.split(':');
+		var sDate = sDateTime.toDateDiscardTime();
+		sDate.setHours(sTimeParts[0], sTimeParts[1], sTimeParts[2]);
+		
+		// current time
+		var cDate = new Date();
+
+		// difference between start time and current time stored as counted time
+		// adjust for timezone
+		var tzAdj = new Date(new Date() - new Date()).getTimezoneOffset() * 60 * 1000
+
+		// work out the difference in seconds and add one
+		var diff = cDate.getTime() - sDate.getTime();
+		var totalSeconds = diff / 1000;
+		var seconds = totalSeconds;
+		var minutes = Math.floor(seconds/60);
+		var hours = Math.floor(minutes/60);
+		var days = Math.floor(hours/24);
+		
+		minutes = minutes-(hours*60);
+		seconds = (seconds-(hours*60*60)-(minutes*60)).toFixed(0);						
+
+		t.attr('timer-elapsed-time-s', totalSeconds);
+		
+		var formattedTimer = padPart(hours) + ':' + padPart(minutes) + ':' + padPart(seconds);
+		t.text(formattedTimer);
+    });
+	                
+	jQuery('.ticker:not(.ticking)').timer();
+}
+
+function buildDateFromDateTimeUTC(dtUTC)
+{
+	var datetimeparts = dtUTC.split('T');
+	var dateparts = datetimeparts[0].split('-');
+	var timeparts = datetimeparts[1].split(':');
+
+	if (dateparts.length != 3 || timeparts.length != 3) return null;
+	
+	return new Date(dateparts[0], dateparts[1] - 1, dateparts[2], timeparts[0].padToTwoDigits(), timeparts[1].padToTwoDigits(), timeparts[2].replace('Z', '').padToTwoDigits());
+}
+
+function addSecondsToDate(dt, seconds)
+{
+	return new Date(dt.setSeconds(dt.getSeconds() + seconds));
+}
+
+function getSimpleTimeFromDate(dt, includeSeconds)
+{
+	var min = dt.getMinutes();
+	
+	if (min < 10) {
+		min = "0" + min;
+	}
+
+	var hour = dt.getHours();
+	if (hour < 10) {
+		hour = "0" + hour;
+	}
+
+	var sec = dt.getSeconds();
+	if (sec < 10) {
+		sec = "0" + sec;
+	}
+
+	var newTime = hour + ':' + min + (includeSeconds ? ':' + sec : '');
+
+	return newTime;
+}
+
+function stopTimer(e)
+{
+	jQuery(this).removeClass('fa-stop-circle').addClass('fa-circle-o-notch').addClass('fa-spin');
+	
+	var theTicker = jQuery(this).closest('.te-timer').find('.ticker');
+	
+	theTicker.stopTimer();
+	
+	var timerStart = theTicker.attr('timer-start-time');
+	var timerElapsedSeconds = parseInt(theTicker.attr('timer-elapsed-time-s'));
+	var endDateTime = new Date();
+	
+	// work out the entry this relates to
+	// get the max usage in seconds
+	var activity = theGrid.findActivity(theTicker.closest('tr').attr('activity-id'));
+	var row = theGrid.findTimesheetRow(activity, theTicker.closest('tr').prop('id'));
+	var assignment = row.getAssignment();
+	var conversionFactor = assignment.UsageToHoursFactor;
+	var rateBand = row.getRateBand();
+	var maxUsageHrs = rateBand.MaxUsage * conversionFactor;
+	var usageFormat = rateBand.UsageEntryFormat;
+
+	var dayId = theTicker.attr('day-id');
+	var entry = row.Entries[dayId];
+	
+	entry.HasActiveTimer = false;
+	var activeTimer = getActiveTimer(entry.Timers)
+	activeTimer.EndDateUTC = endDateTime.toKimbleUTC();
+	activeTimer.EndTime = getSimpleTimeFromDate(endDateTime, true);
+	activeTimer.IsActive = false;
+	
+	if(assignment.DateAndTimeRequired)
+	{
+		entry.StartTime = timerStart.getTimeFromDateTime(false);
+		entry.EndTime = getSimpleTimeFromDate(endDateTime, false);
+	}
+	
+	// entry units derived from the timers
+	// rounded to closest units based on usage format
+	var hoursElapsed = timerElapsedSeconds / (60 * 60);
+	var multiples = Math.round((hoursElapsed * conversionFactor) / usageFormat);
+	// note we cap the usage at the max number of hours for the assignment - TODO129 - rounding and capping are not currently not surfaced to the user
+	entry.Units = Math.min((multiples * usageFormat), maxUsageHrs);
+
+	theTicker.closest('td.row-day').find('.row-day-entry').val(kimble.formatNumber(entry.Units)).change();
+	// show the entry input box instead of timer	
+	theTicker.closest('td.row-day').removeClass('timer-active');
+}
+				
+function selectModeOn()
+{
+	jQuery('#timesheetBody').addClass('show-select');
+	jQuery('.timesheet-row.selectable').addClass('selecting');
+	jQuery('.timesheet-row:not(.selectable)').addClass('not-selecting');
+	jQuery('.select-btn').addClass('hidden-item');
+	jQuery('.cancel-select-btn').removeClass('hidden-item');
+}
+
+function selectAll()
+{
+	selectModeOn();
+	jQuery('.timesheet-row.selectable').addClass('selected');
+	enableSelectAndSubmit();
+	jQuery('.select-row input[type="checkbox"]').prop('checked', true).change();
+}
+
+function enableSelectAndSubmit()
+{
+	jQuery('li#select-all').toggleClass('disabled', jQuery('.select-row input').length == 0);
+	jQuery('li#submit-for-approval').toggleClass('hidden-item', jQuery('.timesheet-row.Draft.Forecast').length == 0);
+	jQuery('li#select-items').toggleClass('disabled', jQuery('.select-row input').length == 0);
+
+	jQuery('li#submit-items').toggleClass('disabled', jQuery('.selected').length == 0);
+	jQuery('li#submit-all').toggleClass('disabled', jQuery('.select-row input').length == 0);
+}
+
+function selectRow()
+{
+	var clickedItem = jQuery(this).closest('tr.timesheet-row');
+	selectItem(clickedItem);
+}
+
+function selectItem(clickedItem, forceState)
+{
+	if(forceState != undefined)
+	{
+		clickedItem.toggleClass('selected', forceState);
+	}
+	else
+	{
+		clickedItem.toggleClass('selected');
+		clickedItem.find('input[type="checkbox"]').prop('checked', clickedItem.hasClass('selected'));
+		clickedItem.find('input[type="checkbox"]').change();
+	}
+
+	enableSelectAndSubmit();
+}
+
+function selectModeOff()
+{
+	jQuery('#timesheetBody').removeClass('show-select');
+	jQuery('tr.selecting').removeClass('selecting').removeClass('selected');
+	jQuery('.not-selecting').removeClass('not-selecting');
+	jQuery('.select-btn').removeClass('hidden-item');
+	jQuery('.cancel-select-btn').addClass('hidden-item');
+	enableSelectAndSubmit();
+	jQuery('.select-row input[type="checkbox"]').prop('checked', false).change();
+}
+
+function hideWorking()
+{
+	jQuery('#loadingIndicatorOuterContainer').hide();
+}
+
+function showWorking()
+{
+	jQuery('#loadingIndicatorOuterContainer').show();
+}
+
+function saveOnly()
+{
+	showWorking();
+	selectModeOff();
+	saveTimesheet(false, false);
+}
+
+function submitAllTime()
+{
+	if(checkActiveTimers())
+	{
+		showWorking();
+		selectModeOff();
+		saveTimesheet(true, false);
+	}
+}
+
+function submitSelectedTime()
+{
+	if(checkActiveTimers(true))
+	{
+		showWorking();
+		saveTimesheet(true, true);
+	}
+}
+
+function checkActiveTimers(selectedOnly)
+{
+	var timerCount = (selectedOnly ? jQuery('.timesheet-row.selected .row-day.timer-active').length : jQuery('.row-day.timer-active').length);
+	
+	if(timerCount > 0) alert(l['activeTimers']);
+	
+	return timerCount == 0;
+}
+				
+function initialiseDynamicElements()
+{
+	jQuery('#timesheetBody select').not('.select2-offscreen, select.cat-select').select2();
+	
+	// if the timesheet has a mixture of entry and revenue units invoke qtips to make the usage of the box appear on hover
+	if(jQuery('.row-day-revenue-entry').size() > 0)
+	{
+		jQuery('.row-day-revenue-entry, .row-day-entry').qtip({style: {classes: 'qtip-light qtip-shadow'}});
+	}	
+}
+
+function validateTimeFields(qtipContainer)
+{
+	var theQtip = jQuery(qtipContainer);
+	var currentStartTime = theQtip.find('.start-time.inline-time-picker').val();
+	var currentEndTime = theQtip.find('.end-time.inline-time-picker').val();
+	var theUsageUnits = jQuery('input.row-day-entry[aria-describedby=' + theQtip.attr('id') + ']');
+	
+	if(theUsageUnits.val() != '' && (currentStartTime == '' || currentEndTime == ''))
+	{
+		//var invalidTimeMsg = '{!JSENCODE($Label.StartTimeAfterEndTimeMessage)}';
+		var invalidTimeMsg = 'Start and End Time are required';
+		
+		theUsageUnits.before(jQuery('<div title="' + invalidTimeMsg + '" class="validation error times-required"/>'));
+		
+		return false;
+	}
+	else
+	{
+		var container = theUsageUnits.parent();
+		container.find('.times-required').remove();
+	}
+	
+	return true;
+}
+
+function validateUsageUnitsChange(field)
+{
+	var j = jQuery(field);
+	
+	var activity = theGrid.findActivity(j.closest('tr').attr('activity-id'));
+	
+	var row = theGrid.findTimesheetRow(activity, j.closest('tr').prop('id'));
+
+	var ass = row.getAssignment();
+
+	var dayId = j.attr('day-id');
+	var theDate = j.attr('entry-date');
+	
+	var entry = row.Entries[dayId];
+	
+	if (entry == null) entry = {Id:dayId, TheDate:theDate, Units:0, RevenueUnits:0, Notes:null};
+
+	//validate entry
+	var container = j.parent();
+
+	container.find('.validation').remove();
+	//remove validation messages from this
+
+	if (ass != null && ass.ShowUsageAsHoursAndMins) {
+		entry.Units = hoursAndMinsHelper.parseHours(j.val());
+
+		if (entry.Units == null) {
+			j.before(jQuery('<div title="' + hoursAndMinsHelper.helpMessage + '" class="validation error"/>'));
+  		}
+  		else {
+  			j.val(hoursAndMinsHelper.formatHours(entry.Units));
+    	}
+
+ 	} else {
+
+		//if any letter entered then mark as invalid number
+ 		if (/[a-zA-Z]/.test(j.val())) {
+ 			j.before(jQuery('<div title="Invalid number" class="validation error"/>'));
+ 		 	entry.Units = 0;
+ 		} else {
+ 		    entry.Units = kimble.parseNumber(j.val());
+   		}
+  	}
+
+	var rateBand = row.getRateBand();
+
+	if (entry.Units > rateBand.MaxUsage  || entry.Units < 0)
+		{
+			var maxUsageProblem = '{!JSENCODE($Label.CannotBeGreaterThan)}'.replace('{0}', rateBand.UnitType).replace('{1}',kimble.formatNumber(rateBand.MaxUsage));
+
+			j.before(jQuery('<div title="' + maxUsageProblem + '" class="validation error"/>'));
+		}
+
+	if (row.RowType == 'Forecast')
+	{
+	    var valDec = (entry.Units / rateBand.UsageEntryFormat).toFixed(3);
+
+		if (valDec > parseInt(valDec))
+		{
+			var usageFormatProblem = '{!JSENCODE($Label.InvalidMultipleOfValue)}'.replace('{0}', rateBand.UnitType).replace('{1}',kimble.formatNumber(rateBand.ForecastEntryFormat));
+			j.before(jQuery('<div title="' + usageFormatProblem + '" class="validation error"/>'));
+		}
+ 	}
+ 	else
+ 	{
+		if (!hoursAndMinsHelper.isFactor(entry.Units, rateBand.UsageEntryFormat))
+		{
+			var usageFormatProblem;
+
+			if (ass != null && ass.ShowUsageAsHoursAndMins) {
+		    	usageFormatProblem = '{!JSENCODE($Label.InvalidMultipleOfValue)}'.replace('{0}', rateBand.UnitType).replace('{1}',hoursAndMinsHelper.formatHours(rateBand.UsageEntryFormat));
+			} else {
+				usageFormatProblem = '{!JSENCODE($Label.InvalidMultipleOfValue)}'.replace('{0}', rateBand.UnitType).replace('{1}',kimble.formatNumber(rateBand.UsageEntryFormat));
+			}
+
+			j.before(jQuery('<div title="' + usageFormatProblem + '" class="validation error"/>'));
+		}
+	}
+
+	row.Entries[dayId] = entry;
+	
+	theGrid.calculateTotals();
+}
+
+function usageUnitsChange(theField)
+{
+	var j = jQuery(theField);
+
+	// update the underlying time entry - note we don't fire the change event in the previous statement as that would result in an infinite loop
+	var activity = theGrid.findActivity(j.closest('tr').attr('activity-id'));
+	var row = theGrid.findTimesheetRow(activity, j.closest('tr').prop('id'));
+	var dayId = j.attr('day-id');
+	var entry = row.Entries[dayId];
+
+	// we need to find the right start and end times relative to the cell being changed
+	var theQtip = jQuery('div#' + j.attr('aria-describedby'));
+	var currentStartTime = theQtip.find('.start-time.inline-time-picker[day-id="' + dayId + '"]').val();
+	var currentEndTime = theQtip.find('.end-time.inline-time-picker[day-id="' + dayId + '"]').val();
+	var currentEntryUnits = j.val();
+
+	if(currentEntryUnits == '')
+	{
+		theQtip.find('.start-time.inline-time-picker[day-id="' + dayId + '"]').val('');
+		theQtip.find('.end-time.inline-time-picker[day-id="' + dayId + '"]').val('');
+		entry.StartTime = '';
+		entry.EndTime = '';		
+	}
+	else if (currentStartTime != undefined && currentStartTime != '')
+	{
+		// we only update the end time if the value is blank or the calculated value is greater
+		// meaning that you can update the usage to less than the difference
+		var newEndTime = timeAddHours(currentStartTime, kimble.parseNumber(currentEntryUnits));
+		if(currentEndTime == undefined || currentEndTime == '' || currentEndTime < newEndTime)
+		{
+			theQtip.find('.end-time.inline-time-picker[day-id="' + dayId + '"]').val(newEndTime);
+			entry.Units = kimble.parseNumber(currentEntryUnits)
+			entry.EndTime = timeAddHours(currentStartTime, kimble.parseNumber(currentEntryUnits));
+			theGrid.calculateTotals();
+		}	
+	}
+}
+
+function timeChange(theField)
+{
+	var j = jQuery(theField);
+	var activity = theGrid.findActivity(j.attr('activity-id'));
+	var row = theGrid.findTimesheetRow(activity, j.attr('row-key'));
+	var dayId = j.attr('day-id');
+	var theDate = j.attr('entry-date');
+	var entry = row.Entries[dayId];
+	
+	if (entry == null) entry = {Id:dayId, TheDate:theDate, Units:0, RevenueUnits:0, Notes:null};
+
+	var theQtip = j.closest('.qtip');
+	var theUsageUnits = jQuery('input.row-day-entry[aria-describedby=' + theQtip.attr('id') + ']');
+	var currentStartTime = theQtip.find('.start-time.inline-time-picker[day-id="' + dayId + '"]').val();
+	var currentEndTime = theQtip.find('.end-time.inline-time-picker[day-id="' + dayId + '"]').val();
+
+	var ass = row.getAssignment();
+
+	// given a end time and a start time work out the usage
+	// also update the underlying time entry - note we don't fire the change event in the previous statement as that would result in an infinite loop
+	if ((jQuery(theField).hasClass('start-time') && currentStartTime != '' && currentEndTime != '') || (jQuery(theField).hasClass('end-time') && currentStartTime != '' && currentEndTime != '')) {
+		var t = timeDiff(currentStartTime, currentEndTime).toFixed(3);
+		entry.Units = t;
+
+		if (ass != null && ass.ShowUsageAsHoursAndMins) {
+		    theUsageUnits.val(hoursAndMinsHelper.formatHours(t));
+  		} else {
+  			theUsageUnits.val(kimble.formatNumber(t, '0.###'));
+    	}
+
+		validateUsageUnitsChange(theUsageUnits);
+	}
+}
+
+function timeDiff(startTime, endTime)
+{
+	// date is unimportant, using Date construct to do time maths
+	return (new Date(2000, 0, 1, parseTime(endTime).hh, parseTime(endTime).mm) - new Date(2000, 0, 1, parseTime(startTime).hh, parseTime(startTime).mm)) / 1000 / 60 / 60;
+}
+
+function timeAddHours(startTime, hours)
+{
+	var newDateTime = addHours(new Date(2000, 0, 1, parseTime(startTime).hh, parseTime(startTime).mm), hours);
+
+	var min = newDateTime.getMinutes();
+	if (min < 10) {
+		min = "0" + min;
+	}
+
+	var hour = newDateTime.getHours();
+	if (hour < 10) {
+		hour = "0" + hour;
+	}
+
+	var newTime = hour + ':' + min;
+	
+	// special case - if the result is 00:00 and we are adding >0 hours then this must be 24:00
+	newTime = (newTime == "00:00" && hours > 0 ? "24:00" : newTime);
+	
+	return newTime;
+}
+
+function addHours(theDate, hours)
+{
+	theDate.setTime(theDate.getTime() + (hours * 60 * 60 * 1000));
+	return theDate;
+}
+
+function parseTime(s)
+{
+	var part = s.match(/(\d+):(\d+)(?: )?(am|pm)?/i);
+	var hh = parseInt(part[1], 10);
+	var mm = parseInt(part[2], 10);
+	var ap = part[3] ? part[3].toUpperCase() : null;
+	if (ap === "AM") {
+		if (hh == 12) {
+			hh = 0;
+		}
+	}
+	if (ap === "PM") {
+		if (hh != 12) {
+			hh += 12;
+		}
+	}
+	return {
+		hh : hh,
+		mm : mm
+	};
+}
+
+function getCategoryPopupHtml(activity, ass, rowObject)
+{
+	var html = '<div class="category-edit" activity-id="' + activity.Id + '" res-act-id="' + ass.ActivityId + '" id="' + rowObject.Key + '"><table cellpadding="0" cellspacing="0" border="0">';
+	
+	jQuery.each(ass.TimeCategories, function (i, cat){
+		html += '<tr class="activity-time-category-row"><td class="cat-label-col"><label class="cat-label">' + jDecode(cat.Label) + '</label></td><td class="cat-val-col">';
+		
+		if (!rowObject.CanUpdate)
+		{
+			html += '<span class="selected-cat">' + replaceNull(rowObject['Cat' + cat.DisplaySequence], '') + '</span>';
+		}
+		else
+		{
+			if (cat.IsMandatory) html += '<span class="required-container"><span class="cat-required"/></span>';
+
+			if (cat.CategoryTypeEnum == 'Text')
+			{
+				var val = replaceNull(rowObject['Cat' + cat.DisplaySequence], '');
+				
+				html += '<input type="text" class="cat-text" cat-display-seq="' + cat.DisplaySequence + '" value="' + val + '"/>';
+			}
+			else //dropdown
+			{
+				html += '<select class="cat-select" cat-display-seq="' + cat.DisplaySequence + '"><option></option>';
+				
+				for(j=0;j<cat.Values.length;j++)
+				{
+					html += '<option value="' + jDecode(cat.Values[j]) + '" ' + (cat.Values[j] == replaceNull(rowObject['Cat' + cat.DisplaySequence], '') ? ' selected ' : '') + '>' + jDecode(cat.Values[j]) + '</option>'; 
+				}
+				
+				html += '</select>';
+			}
+		}
+		
+		html += '</td></tr>';
+	});
+	
+	html += '</table></div>';
+	
+	return html;
+}
+
+function getTimesheetRowHtml(activity, rowObject)
+{
+	var rowClass = 'timesheet-row ' + rowObject.Status + ' ' + rowObject.RowType;
+	if (rowObject.RowType != 'Forecast' && rowObject.CanUpdate && !rowObject.HasActiveTimers) rowClass += ' selectable';
+
+	var ass = rowObject.getAssignment();
+
+	var html = '<tr activity-id="' + activity.Id + '" id="' + rowObject.Key + '" class="' + rowClass + '" t-tip-grid-row="' + rowObject.DisplayTTipNarrative + '">';
+	
+	//action status assignment select rate select, other....
+	html += '<td>';
+
+	if (rowObject.RowType == 'Forecast')
+	{
+		if (rowObject.CanActualise)
+		{
+		    html += '<span class="create-draft-button inline-button fa fa-pencil"></span>';
+			html += '<span class="clear-forecast-button inline-button fa fa-times"></span>';
+		}
+		else if (!rowObject.CanUpdate && ass.AllowSelect && !ass.RequiresApproval && !ass.IsAutoActualise)
+		{
+			html += '<span class="edit-forecast-button inline-button fa fa-pencil"></span>';
+			if (ass.CanSelfForecast)
+				html += '<span class="clear-forecast-button inline-button fa fa-times"></span>';
+  		}
+  		else if (ass.RequiresApproval && rowObject.Status == 'Completed')
+  		{
+  		    html += '<span class="clear-forecast-button inline-button fa fa-times"></span>';
+    	}
+	}
+	else
+	{
+		if (rowObject.CanUpdate && !rowObject.HasActiveTimers)
+		{
+		     html += '<span class="select-row"><input type="checkbox"/></span>';
+        }
+
+		//action delete
+		if (rowObject.CanDelete)
+		{
+			html += '<span class="delete-button inline-button fa fa-trash-o" t-tip="TSGridDelete"></span>';
+		}
+		else
+		{
+			html += '<span class="delete-button-placeholder">&nbsp;</span>';
+		}
+	
+		//action copy
+		<apex:outputPanel layout="none" rendered="{!CanAddEditTimeAndExpenseEntries && $ObjectType.KimbleOne__TimeEntry__c.updateable}">
+			if (periodStatus != 'Closed' && activity.AllowNewTimeEntries && !rowObject.HasActiveTimers)
+			{
+			    html += '<span class="clone-button inline-button fa fa-files-o" t-tip="TEGridCopyButton"></span>';
+			}
+		</apex:outputPanel>
+	}
+	
+	var assignmentHtml = '';
+	
+
+	
+	if (rowObject.RowType != 'Forecast' && activity.Assignments.length > 1 && rowObject.CanUpdate)
+	{
+		//select assignment
+		assignmentHtml = '<select class="assigment-select">';
+	
+		if (activity.Assignments.length > 1 && rowObject.ActivityAssignmentId == null)
+		{
+			var label;
+			
+			if (activity.Id == 'Other')
+				label = '<apex:outputText value="{!$Label.kimbleone__activitynotchoosentext}"/>';
+			else
+				label = '<apex:outputText value="{!$Label.kimbleone__rolenotchoosentext}"/>';
+			
+			assignmentHtml += '<option>' + label + '</option>';
+		}
+		
+		jQuery.each(activity.Assignments, function (i, ass) {
+			
+			if (ass.AllowSelect) assignmentHtml += '<option value="' + ass.ActivityAssignmentId + '" ' + (ass.ActivityAssignmentId == rowObject.ActivityAssignmentId ? ' selected ' : '') + '>' + ass.Name + '</option>';
+		});
+		
+		assignmentHtml += '</select>';
+	}
+	else
+	{
+		assignmentHtml += '<div class="selected-assignment">' + ass.Name  + '</div>';
+	}
+	
+	html += assignmentHtml;
+	
+	
+	//select rate
+	html += getAssignmentRateHtml(rowObject);
+	
+	var rate = rowObject.getRateBand();
+	
+	//other info
+	html += getUsageAllocationInfoHtml(ass, rate, rowObject);
+
+	//Days totals
+	jQuery.each(theGrid.TheDays, function(i, day){
+		var val = 0;
+		
+		if (ass == null || (day.TheDate.toDate().valueOf() > ass.EndDate.toDate().valueOf() || day.TheDate.toDate().valueOf() < ass.StartDate.toDate().valueOf()))
+		{
+			html += '<td class="not-assigned"></td>';
+		
+			return true;
+		}
+		
+		if (rowObject.Entries != null && rowObject.Entries[day.Id] != null)
+		{
+			val = rowObject.Entries[day.Id].Units;		 
+		}
+
+		var dayHasActiveTimer = (enableTimers && rowObject.Entries != null && rowObject.Entries[day.Id] != null && rowObject.Entries[day.Id].HasActiveTimer);
+		
+		var readonly = '';
+		var cellClass = 'row-day' + (dayHasActiveTimer ? ' timer-active' : '');
+		
+		var problemType = '';
+		var cellContent = '';
+		
+		if (rowObject.Problems != null && rowObject.Problems[day.Id] != null)
+		{
+			cellContent += '<div title="' + rowObject.Problems[day.Id].Description + '" class="error"/>';			
+		}
+		
+		if (!rowObject.CanUpdate)
+			readonly = 'readonly';
+		
+		var hasAdjustment = false;
+		
+		if (rowObject.Entries != null && rowObject.Entries[day.Id] != null && rowObject.Entries[day.Id].HasPendingAdjustment)
+			hasAdjustment = true;
+			
+		if (periodStatus == 'Closed' && adjustMode == 'true' && rowObject.Status == 'Approved' && val > 0 && rowObject.CanAdjust) 
+		{
+			cellContent += ('<span class="edit-entry fa fa-pencil" title="{!$Label.EditEntryLabel}" style="display:' + (hasAdjustment?'none':'inline-block') + '"></span>');
+			cellContent += ('<span class="remove-entry fa fa-times-circle" title="{!$Label.RemoveEntryLabel}" style="display:' + (hasAdjustment?'none':'inline-block') + '"></span>');
+			cellContent += ('<span class="undo-entry-adjustment fa fa-undo" title="{!$Label.UndoEntryAdjustmentLabel}" style="display:' + (hasAdjustment?'inline-block':'none') + '"></span>');
+		}
+		
+		var ActiveTimerStartDateTimeUTC = (dayHasActiveTimer ? getActiveTimer(rowObject.Entries[day.Id].Timers).TimerStartDateTimeUTC : '');
+
+		var formattedVal;
+
+		if (ass != null && ass.ShowUsageAsHoursAndMins) {
+		    formattedVal = hoursAndMinsHelper.formatHours(val);
+  		} else {
+  			formattedVal = kimble.formatNumber(val, '#.###')
+    	}
+
+		cellContent += '<input ' + readonly + ' title="<apex:outputText value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__EntryUnits__c.Label}"/>" type="text" day-id="' + day.Id + '" entry-date="' + day.TheDate + '" class="day-cell row-day-entry" value="' + formattedVal + '"/>';
+		
+		if(dayHasActiveTimer) cellContent += '<span class="te-timer" t-tip-grid-row="TETimerActive"><span class="ticker" timer-start-time="' + ActiveTimerStartDateTimeUTC + '" day-id="' + day.Id + '" entry-date="' + day.TheDate + '"></span><i class="fa fa-stop-circle timer-item stop-timer" title="' + stopTimerLabel + '"></i></span>';
+		
+		if (rowObject.RowType != 'Forecast' && rate != null && rate.PeriodTypeEnum != day.PeriodTypeEnum)
+		{
+			cellContent = '';
+			cellClass = 'no-entry-day';
+		}		
+		
+		var divClass = 'day-cell-container';
+		
+		if (hasAdjustment)
+			divClass += ' strikethrough';
+		
+		html += '<td class="' + cellClass + '"><div class="' + divClass + '">';
+		
+		html += cellContent;
+		
+		if (rate != null && rate.ShowRevenueUnits && rate.PeriodTypeEnum == day.PeriodTypeEnum)
+		{
+			var revVal = 0;
+			if (rowObject.Entries != null && rowObject.Entries[day.Id] != null)
+				revVal = rowObject.Entries[day.Id].RevenueUnits;
+			
+			html += '<div><input ' + readonly + ' title="<apex:outputText value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__RevenueUnits__c.Label}"/>" type="text" day-id="' + day.Id + '" entry-date="' + day.TheDate + '" class="day-cell row-day-revenue-entry ' + problemType + '" value="' + kimble.formatNumber(revVal, '#.###') + '"/></div>';
+		}
+		
+		html += '</div></td>';
+	}); 
+	
+	html += '</td>';
+	
+	//Total + task remaining effort
+	var adjustRowHtml = '';
+	
+	if (periodStatus == 'Closed' && adjustMode == 'true' && rowObject.Status == 'Approved' && rowObject.Total > 0 && rowObject.CanAdjust) 
+	{
+		adjustRowHtml += '<span class="edit-entry fa fa-pencil" title="{!$Label.EditRowLabel}" ></span>';
+		adjustRowHtml += '<span class="remove-entry fa fa-times-circle" title="{!$Label.RemoveRowLabel}"></span>';
+		adjustRowHtml += '<span class="undo-entry-adjustment fa fa-undo" title="{!$Label.UndoRowAdjustmentLabel}"></span>';
+	}
+
+	var rowTotalFormatted;
+
+	if (ass != null && ass.ShowUsageAsHoursAndMins) {
+	    rowTotalFormatted = hoursAndMinsHelper.formatHours(rowObject.Total);
+ 	} else {
+ 	    rowTotalFormatted = kimble.formatNumber(rowObject.Total, '0.###');
+  	}
+
+
+	html += '<td class="row-total"><div class="day-cell-container">' + adjustRowHtml + '<input readonly type="text" class="row-total-value" value="' + rowTotalFormatted + '"/></div><span class="row-units">' + (ass == null || ass.ShowUsageAsHoursAndMins ? '' : ass.EntryUnitTypeSuffix) + '</span>';
+	
+	var task = rowObject.getTask();
+	
+	if (task != null && task.CanEditRemainingEffort)
+	{
+		var readonly = '';
+		
+		if (!rowObject.CanUpdate)
+			readonly = 'readonly';	
+		
+		html += '<div class="total-container">';
+		
+		var remainingEffort = ((task.RemainingEffort != null) ? task.RemainingEffort : '');
+
+		var remainingEffortFormatted;
+		if (ass != null && ass.ShowUsageAsHoursAndMins) {
+			remainingEffortFormatted = hoursAndMinsHelper.formatHours(remainingEffort);
+		} else {
+			remainingEffortFormatted = kimble.formatNumber(remainingEffort, '0.###')
+		}
+
+		html += '<input task-id="' + task.Id + '" ' + readonly + ' type="text" class="remaining-effort" value="' + remainingEffortFormatted + '" orig-value="' + remainingEffort + '"/>';
+
+		html += '<span class="row-units"><apex:outputText value="{!$ObjectType.KimbleOne__PlanTaskAssignment__c.Fields.KimbleOne__DraftRemainingEffort__c.Label}"/></span>';
+		html += '</div>';
+	}
+	
+	html += '</td>';
+
+	var statusIcon = '';
+
+	if (rowObject.DisplayStatus == 'RequestApproved')
+		statusIcon = '<i class="te-icon fa fa-calendar-check-o RequestApproved"></i>'
+	if (rowObject.DisplayStatus == 'RequiresApproval')
+		statusIcon = '<i class="te-icon fa fa-calendar-plus-o RequiresApproval"></i>'
+	if (rowObject.DisplayStatus == 'Suggested')
+		statusIcon = '<i class="te-icon fa fa-lightbulb-o Suggested"></i>';
+
+	var secondaryStatus = (rowObject.SecondaryStatusLabel != undefined ? '<span class="status-pill secondary-status-pill ' + rowObject.SecondaryDisplayStatus + '" t-tip-grid-row="' + rowObject.SecondaryDisplayTTipNarrative + '"> ' + rowObject.SecondaryStatusLabel + '</span>' : '');
+	html += '<td class="timesheet-status ' + rowObject.DisplayStatus + '"><div>' + statusIcon + '<span class="status-pill ' + rowObject.DisplayStatus + '"> ' + rowObject.StatusLabel + '</span>' + secondaryStatus + '</div></td>';
+	html += '</tr>';
+	
+	return html;
+}
+
+function getActiveTimer(timers)
+{
+	var activeTimer;
+	
+	jQuery.each(timers, function (i, timer) {
+		if(timer.IsActive) activeTimer = timer;
+	});
+	
+	return activeTimer;
+}
+
+function getUsageAllocationInfoHtml(ass, rate, rowObject)
+{
+	if (ass == null || rate == null || !theGrid.HasUsageAllocationInfo || rowObject.RowType == 'Forecast') return '<span/>';
+	
+	var usageAllocationClass = '';
+	if(rate.AllocationModeEnum == 'CategoryAndTask')
+	{
+		usageAllocationClass = ' with-task-and-category';
+	}
+	
+	var html = '<div class="usage-allocation-info' + usageAllocationClass + '">';
+
+	if (ass.TimeCategories.length > 0 && rate.AllocationModeEnum == 'Category' || rate.AllocationModeEnum == 'CategoryAndTask')
+	{
+		var categoryCombination = '';
+		
+		for(i=1;i<=6;i++)
+		{
+			var catVal = rowObject['Cat' + i];
+			if (catVal != null && catVal != '')
+			{
+				categoryCombination += (catVal + ',');
+			}
+		}
+		
+		if (categoryCombination != '') categoryCombination = categoryCombination.substring(0, categoryCombination.length - 1);
+
+		var mandCat = false;
+		jQuery.each(ass.TimeCategories, function (i, cat){
+		    if(cat.IsMandatory != undefined && cat.IsMandatory) mandCat = true;
+		});
+
+		var categoryClass = "category-entry";
+		if (!rowObject.CanUpdate)
+			categoryClass += ' category-readonly';
+
+ 		if(mandCat) html += '<span class="required-container"><span class="cat-required"/></span>';
+		html += '<input type="text" class="' + categoryClass + '" readonly placeholder="--<apex:outputText value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__CategoryCombination__c.Label}"/>--" value="' + categoryCombination + '"/>';
+	}
+
+	if (ass.HasCases) {
+        var caseClass = '';
+		if(rate.AllocationModeEnum == 'Category')
+		{
+			caseClass = ' with-category';
+		}
+
+        var caseInpClass = "case-entry";
+		if (!rowObject.CanUpdate) caseInpClass += ' case-readonly';
+
+        if (rowObject.CanUpdate){
+            html += '<div class="' + caseClass + '"><input id="case_'+ getUniqueId() + '" ' + (rowObject.CanUpdate?'onclick="setLastMousePosition(event);kimbleOpenCaseLookup(this, \'' + ass.ActivityId + '\',\'' + ass.DeliveryGroupId + '\');"':'') + ' type="text" class="' + caseInpClass + '" readonly placeholder="--<apex:outputText value="{!$ObjectType.Case.Fields.CaseNumber.Label}"/>--" value="' + (rowObject.CaseReference == null ? '' : rowObject.CaseReference) + '"/>' + (rowObject.CaseReference == null ? '' : '<i class="fa fa-times clear-case-id"></i>') + '</div>';
+		}
+		else {
+		    html += '<div>' + rowObject.CaseReference + '</div>';
+        }
+ 	}
+
+	if (rate.AllocationModeEnum == 'Task' || rate.AllocationModeEnum == 'CategoryAndTask')
+	{
+		//build task select html
+		var taskClass = '';
+		if(rate.AllocationModeEnum == 'CategoryAndTask')
+		{
+			taskClass = ' with-category';
+		}
+		
+		if (rowObject.getTask() == null)
+		{
+			if (ass.Tasks.length == 1)
+			{
+				rowObject.TaskId = ass.Tasks[0].Id;
+				timesheetChanged(theGrid.findActivity(ass.ActivityId));
+			}
+			else
+				rowObject.TaskId = null;
+		}
+		
+		if (ass.Tasks.length == 1 || !rowObject.CanUpdate)
+		{
+			var taskName = rowObject.getTask() != null ? rowObject.getTask().Name : '';
+			html += '<span class="selected-task' + taskClass + '">' + taskName + ' </span>';
+		}
+		else
+		{
+			html += '<select class="task-select' + taskClass + '">';
+			
+			// sort the tasks by Name using a custom object sorter (maps used to populate so more straightforward to sort in UI)
+			ass.Tasks.sort(taskNameSort);
+			
+			if (rowObject.TaskId == null) html += '<option></option>';
+			
+			for (var i=0;i<ass.Tasks.length;i++)
+			{
+				html += '<option value="' + ass.Tasks[i].Id + '" ' + (ass.Tasks[i].Id == rowObject.TaskId ? ' selected ' : '') + '>' + ass.Tasks[i].Name + '</option>';
+			}
+			
+			html += '</select>';
+			html += '<span class="quick-entry-button inline-button fa fa-tasks" title="{!$Label.TimesheetCreateDraftEntryForTask}"></span>';
+		}
+	}
+				
+	if (rate.AllocationModeEnum == 'Reference')
+	{
+		var disabledHtml = rowObject.CanUpdate ? '' : ' disabled ';
+		html += '<input type="text"' + disabledHtml + 'class="reference-entry" placeholder="--<apex:outputText value="{!$ObjectType.KimbleOne__TimeEntry__c.Fields.KimbleOne__Reference__c.Label}"/>--" value="' + (rowObject.Reference == null ? '' : rowObject.Reference) + '"/>';
+	}
+	
+	html += '</div>';
+	
+	return html;
+}
+
+var kimblePopup;
+
+function kimbleOpenCaseLookup(obj, activityId, groupId)
+{
+	var inp = jQuery(obj);
+
+	kimblePopup = window.open(KimbleLookupPage + '?lknm=' + inp.attr('id') + '&lktp=500&lksrch=' + escape(inp.val()) + '&filter=TimesheetCaseFilter;' + activityId + ':' + groupId + '&typename=LookupObjectCase&lksrch=' + escape(inp.val()), "lookup", "width=670,height=480,toolbar=no,status=no,directories=no,menubar=no,resizable=yes,scrollable=no", false);
+}
+
+function closeKimblePopup()
+{
+	if (kimblePopup != null) kimblePopup.close();
+}
+
+//Generic response
+function kimblePickValue(objId, resultId, resultName)
+{
+	closeKimblePopup();
+
+	var obj = jQuery('#' + objId);
+	obj.attr('data-id', resultId).val(resultName);
+	obj.change();
+}
+
+function taskNameSort(a,b)
+{
+	if (a.Name < b.Name)
+		return -1;
+	
+	if (a.Name > b.Name)
+		return 1;
+  
+	return 0;
+}
+
+function getAssignmentRateHtml(rowObject)
+{
+	var html = '';
+	
+	var ass = rowObject.getAssignment();
+	
+	if (ass == null || rowObject.RowType == 'Forecast') return html;
+	
+	if (ass.RateBands.length == 1  || !rowObject.CanUpdate)
+	{
+		// work through the rate bands and find a match
+		jQuery.each(ass.RateBands, function (i, rate) {			
+			if(rate.ActivityRateBandId == rowObject.ActivityRateBandId)
+			{
+				html += '<span class="selected-rate-band">' + rate.Name + '</span>';
+				return false;
+			}
+		});
+	}
+	else
+	{
+		html += '<select class="rate-select">';
+	
+		jQuery.each(ass.RateBands, function (i, rate) {
+		    const len = Object.keys(rowObject.Entries).length;
+			if((len == 0 && rate.IsActive) || (len > 0 && (rate.IsActive || rate.ActivityRateBandId == rowObject.ActivityRateBandId)))
+			html += '<option value="' + rate.ActivityRateBandId + '" ' + (rate.ActivityRateBandId == rowObject.ActivityRateBandId ? ' selected ' : '') + '>' + rate.Name + '</option>';
+		});
+	
+	
+		html += '</select>';
+	}
+	
+	return html;
+}
+
+function getBodyHtml()
+{
+	var html = '';
+	
+	var otherActivity = null;
+	
+	jQuery.each(theGrid.Activities, function (i, act) {
+		html += getActivityHtml(act);
+	});
+	
+	if (theGrid.HasNonForecastActivities)
+	{
+		//lookup to find and add non-forecast activities
+		var activityLookup = '<tr id="activity-lookup" class="activity-row" t-tip-grid-row="TEGridActivityRow">';
+	
+		//Add + Name
+		activityLookup += '<td class="activity-heading add-non-forecast-activity"><span id="add-non-forecast-activity-button" class="inline-button fa fa-plus-square" title="{!$Label.Add}"></span><input type="text" id="find-activity"/></td>';
+	
+		//Days totals
+		jQuery.each(theGrid.TheDays, function(i, day){
+			activityLookup += '<td class="activity-day-total row-day"></td>';
+		});
+	
+		activityLookup += '<td class="activity-total"></td>';
+	
+		activityLookup += '</tr>';
+		
+		html += activityLookup;
+	}
+	
+	return html;
+}
+
+function getActivityHtml(activity)
+{
+	var hasChildrenClass = getActivityClass(activity);
+	
+	var activityRowHtmlPart1 = '<tr id="' + activity.Id + '" class="activity-row ' + hasChildrenClass + '" t-tip-grid-row="TEGridActivityRow">';
+	
+	//Add + Name
+	activityRowHtmlPart1 += '<td class="activity-heading">';
+	
+	var activityRowHtmlPart2 = '';
+	<apex:outputPanel layout="none" rendered="{!CanAddEditTimeAndExpenseEntries && $ObjectType.KimbleOne__TimeEntry__c.updateable}">
+	if ((adjustMode == 'false' && activity.AllowNewTimeEntries) || (adjustMode == 'true' && activity.AllowNewTimeAdjustments)) activityRowHtmlPart2 = '<span class="add-activity-button inline-button fa fa-plus-square" id="' + activity.Id + '"></span>';
+	</apex:outputPanel>
+	
+	var activityRowHtmlPart3 = '<span class="activity-name">' + activity.Name + '</span>';
+	
+	activityRowHtmlPart3 += '</td>';
+	
+	//Days totals
+	jQuery.each(theGrid.TheDays, function(i, day){
+		activityRowHtmlPart3 += '<td class="activity-day-total row-day"><span id="' + day.Id + '" class="activity-day-total-value">' + kimble.formatNumber(replaceNull(activity.Total[day.Id], 0), '0.###') + '</span></td>';
+	});
+	
+	activityRowHtmlPart3 += '<td class="activity-total"><div class="activity-total-value">' + kimble.formatNumber(activity.ActivityTotal, '0.###') + '</div><span class="row-units">' + activity.Assignments[0].EntryUnitTypeSuffix + '</span></td>';
+
+	activityRowHtmlPart3 += '<td class="timesheet-status"></td>';
+	
+	activityRowHtmlPart3 += '</tr>';
+	
+	//TODO:TimeAdjustment - should we sort the rows?
+	jQuery.each(Object.keys(activity.Rows), function(i, key){
+		activityRowHtmlPart3 += getTimesheetRowHtml(activity, activity.Rows[key]);
+		
+		// if an adjustment is being approved we don't want the user to be able to add another row
+		if((periodStatus == 'Closed' && adjustMode == 'true' && activity.Rows[key].Status == 'ReadyForApproval') 
+			|| (activity.Rows[key].HasPendingAdjustments && !activity.Rows[key].CanAdjust))
+		{
+			activityRowHtmlPart2 = '';
+		}
+	});
+	
+	return activityRowHtmlPart1 + activityRowHtmlPart2 + activityRowHtmlPart3;
+}
+
+function getActivityClass(activity)
+{
+	var numberOfChildRows = 0;
+	
+	jQuery.each(Object.keys(activity.Rows), function(i, key){
+		 if (!activity.Rows[key].IsDeleted)
+		 {
+		 	numberOfChildRows++;
+		 }
+	});
+	
+	if (numberOfChildRows == 0)
+		return 'children-0';
+	else if (numberOfChildRows == 1)
+		return 'children-1';
+	
+	return 'children-m';
+}
+
+function replaceNull(val, def)
+{
+	return (val == null ? def : val);
+}
+
+function getHeaderHtml()
+{
+	var html = '<tr class="period-header"><td rowspan="2">';
+	
+	html += '</td>';
+	
+	jQuery.each(theGrid.TheDays, function(i, day){
+		var className = "day";
+		if(day.StyleClass != null)
+		{
+			className = className + " " + day.StyleClass;
+		}
+		html += '<td class="' + className + '" id="' + day.Id + '">' + kimble.formatDateWithFormat(day.TheDate, headerDateFormat)  + '</td>';
+	});
+	
+	html += '<td id="grid-total" t-tip="TotalTime"><apex:outputText value="{!$Label.kimbleone__total}"/></td>'
+
+	html += '<td class="timesheet-status"></td>'
+	
+	html += '</tr>';
+	
+	html += '<tr class="period-header-totals">';
+	
+	jQuery.each(theGrid.TheDays, function(i, day){
+		html += '<td class="row-day" t-tip="TotalTimeDay"><input readonly type="text" class="day-cell day-total" id="' + day.Id + '" value="' + kimble.formatNumber(theGrid.DayTotals[day.Id], '0.###') + '"/></td>';
+	});
+	
+	html += '<td><input readonly type="text" class="grid-total" t-tip="TotalTime" value="' + kimble.formatNumber(theGrid.Total, '0.###') + '"/><span class="row-units">' + theGrid.EntryUnitTypeSuffix + '</span></td>';
+	
+	html += '</tr>';
+	
+	
+	return html;
+}
+
+function timesheetChanged(row)
+{
+	if (row != null) row.HasChanges = true;
+
+	jQuery(window).off('.has-changes').on('beforeunload.has-changes', function(){
+        return kimble.labels['UnsavedChangesHeading'] + "\n\n" + kimble.labels['UnsavedChangesMessage']; 
+    });
+
+	jQuery('.save-btn').removeClass('disabled');
+
+	enableSelectAndSubmit();
+	//if (!jQuery('#saveButton').is(':animated')) jQuery('#saveButton').effect('highlight', {color: '#ff7819'}, 3000);
+}
+
+// Called by select2 to dynamically populate selects with large lists 
+function findMatchingAssignments(params)
+{
+	var activityIds = [];
+	
+	for(i=0;i<theGrid.Activities.length;i++)
+	{	
+		var activity = theGrid.Activities[i];
+		
+		for (j=0;j<activity.Assignments.length;j++)
+		{
+			activityIds.push(activity.Assignments[j].ActivityId);
+		}
+	}
+	
+	Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TimesheetGridController.FindMatchingAssignments}',
+      		'{!JSENCODE(TheResource.Id)}', activityIds, '{!JSENCODE(TheResourceTrackingPeriod.Id)}', params.term,
+     			function(result, event){          
+            		if (event.status) 
+	            {
+	             	var data = {};
+	             	data.results = result;
+	             	params.callback(data);
+	         	} 
+	         	else if (event.type === 'exception') 
+	         	{
+	             	alert(event.message);
+	         	} 
+	         	else 
+	         	{
+	             	alert(event.message);
+	         	}
+        	}, 
+        	{escape: false, timeout: 60000}
+    	);
+}
+
+var oldRowsCount;
+
+function getActivitiesBookedLastPeriod()
+{
+    if(!jQuery('.save-btn').hasClass('disabled'))
+	{
+		alert(kimble.labels['UnsavedChangesPlan']);
+	}
+	else
+	{
+    	oldRowsCount = 0;
+
+    	for(i=0;i<theGrid.Activities.length;i++)
+	    {
+		    var activity = theGrid.Activities[i];
+
+		    if (activity.Rows != null) oldRowsCount += Object.keys(activity.Rows).length;
+    	}
+
+    	getTimesheet(true, function(){
+    	    var newRowsCount = 0;
+
+    	    for(i=0;i<theGrid.Activities.length;i++)
+            {
+                var activity = theGrid.Activities[i];
+
+                if (activity.Rows != null) newRowsCount += Object.keys(activity.Rows).length;
+            }
+
+    	    if (newRowsCount > oldRowsCount)
+    	        timesheetChanged();
+    	    else
+    	        alert('{!JSENCODE($Label.NoTimeEntriesToCopy)}');
+        });
+	}
+}
+
+function addActivity(Id)
+{
+	if (theGrid.findActivity(Id) != null) return;
+	
+	Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TimesheetGridController.GetActivity}',
+      		Id, '{!JSENCODE(TheResource.Id)}', '{!JSENCODE(TheResourceTrackingPeriod.Id)}', 
+     			function(result, event){          
+            		if (event.status) 
+		            {
+		             	//console.log(result);
+		             	var activity = result;
+		             	theGrid.Activities.push(result);
+		             	
+		             	for (var i=0;i<activity.Assignments.length;i++)
+						{
+							var ass = activity.Assignments[i];
+							theGrid.AssignmentCurrentRemainingUsage[ass.ActivityAssignmentId] = ass.CurrentRemainingUsage;
+							
+							if(!theGrid.HasUsageAllocationInfo && ass.RateBands != undefined && ass.RateBands != null)
+							{
+								for (var rb=0;rb<ass.RateBands.length;rb++)
+								{
+									var rate = ass.RateBands[rb];
+									if (rate.AllocationModeEnum != undefined && rate.AllocationModeEnum != null && rate.AllocationModeEnum != 'Activity')
+									{
+										theGrid.HasUsageAllocationInfo = true;
+										break;
+									}
+								}
+							}
+						}
+		             			             	
+		             	var activityHtml = getActivityHtml(activity);
+		          		
+		          		var newRow = jQuery(activityHtml);
+		          		
+		          		var beforeRow;
+		          		
+		          		if(jQuery('#Other').length == 0)
+		          			beforeRow = jQuery('#activity-lookup');
+		          		else
+		          			beforeRow = jQuery('#Other');
+		          		
+		             	beforeRow.before(newRow);
+		             	
+		             	newRow.find('.add-activity-button').click();
+		             	
+		             	newRow.effect('highlight', {color: '#FFAA6F'}, 2000);
+		         	} 
+		         	else if (event.type === 'exception') 
+		         	{
+		             	alert(event.message);
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		         	}
+	        	}, 
+	        	{escape: false, timeout: 60000}
+	    	);
+}
+
+function getUniqueId()
+{
+	  // Math.random should be unique because of its seeding algorithm.
+	  // Convert it to base 36 (numbers + letters), and grab the first 9 characters
+	  // after the decimal.
+	  return '__' + Math.random().toString(36).substr(2, 9);
+}
+
+function jDecode(str) {
+    return jQuery("<div/>").html(str).text();
+}
+
+function destroyTTips()
+{
+	jQuery('[t-tip]').qtip('destroy', true);
+	jQuery('[t-tip-right]').qtip('destroy', true);
+	jQuery('[t-tip-grid-row]').qtip('destroy', true);
+}
+
+function initialiseTTips()
+{
+	var enableTTips = <apex:outputText value="{!ShowTimesheetTooltips}"/>; 
+	
+	// set up default TTips 
+	jQuery('[t-tip-default]').qtip('destroy', true).each(function()
+	{
+	   jQuery(this).qtip({
+			content: ttipLabels[jQuery(this).attr('t-tip-default')],
+			position: {my: 'bottom center', at: 'top center',viewport: $(window)},
+			style: {classes: 'qtip-light qtip-shadow qtip-rounded t-tip-qtip'},
+			show: { solo: true }
+	   });
+	});
+	
+	// set up tips if setting enabled
+	if(enableTTips)
+	{
+		jQuery('[t-tip]').qtip('destroy', true).each(function()
+		{
+		   jQuery(this).qtip({
+				content: ttipLabels[jQuery(this).attr('t-tip')],
+				position: {my: 'bottom center', at: 'top center',viewport: $(window)},
+				style: {classes: 'qtip-light qtip-shadow qtip-rounded t-tip-qtip'},
+				show: { solo: true }
+		   });
+		});
+		
+		jQuery('[t-tip-right]').qtip('destroy', true).each(function()
+		{
+			jQuery(this).qtip({
+				content: ttipLabels[jQuery(this).attr('t-tip-right')],
+				position: {my: 'left center', at: 'right center', viewport: $(window)},
+				style: {classes: 'qtip-light qtip-shadow qtip-rounded t-tip-qtip'},
+				show: { solo: true }
+		    });
+		});
+		
+		jQuery('[t-tip-grid-row]').qtip('destroy', true).each(function()
+		{
+			jQuery(this).qtip({
+				content: ttipLabels[jQuery(this).attr('t-tip-grid-row')],
+				position: {my: 'top right', at: 'bottom center', viewport: $(window)},
+				style: {classes: 'qtip-light qtip-shadow qtip-rounded t-tip-qtip'},
+				show: { solo: true }
+			});
+		});
+	}
+}	
+			</script>
+			
+			<style>
+			div.Custom299Tab#content-pane {
+                overflow-y: hidden !important;
+            }
+
+			div#timesheetBody {
+			    min-height: 360px;
+			}		
+			.add-non-forecast-activity .select2-container {
+				margin-top: -6px;
+ 				width: 600px !important;
+			}
+			tr#activity-lookup td {
+			    border-top: 15px solid #FFF;
+			}
+			
+			tr.activity-row.children-0 {
+   			    background-color: #D6EAFF;
+			}
+
+			.children-0 .activity-day-total-value, .children-0 .activity-total-value, .children-0 .row-units,
+			.children-1 .activity-day-total-value, .children-1 .activity-total-value, .children-1 .row-units 
+			{
+				display: none;
+			}
+			
+			.children-1 {
+    			
+			}
+
+			.children-m {
+    			
+			}
+			
+			td.no-entry-day {
+			    background-color: #EDEDED;
+			    border: 4px solid #FFF;
+		    }
+			td#grid-total, td.day {
+			    height: 28px;
+			    background-color: #5E5E5E;
+			    color: #FFF;
+			    text-align: center;
+			    font-weight: bold;
+			    font-size: 14px;
+			    padding-left: 4px;
+			    padding-right: 4px;
+			    white-space: nowrap;
+			    overflow: hidden;
+			    border-right: 2px solid white;
+			    border-left: 2px solid white;
+			    border-bottom: 3px solid white;
+			}
+			td.day {
+			    width: 50px;
+			}
+			td.day.NonBusDay {
+				background-color: #d3d3d3;
+    			color: #5E5E5E;
+			}
+			div.rate-select, div.assigment-select, div.task-select {
+			    margin-bottom: 3px;
+			}
+			div.rate-select, div.assigment-select, .selected-assignment, .selected-rate-band {
+			    margin-left: 5px;
+			    margin-right: 3px;
+			    width: 200px !important;
+		        display: inline-block;
+			}
+			div.task-select {
+				margin-left: auto;
+			    margin-right: auto;
+			    width: 204px !important;
+			}
+			.with-category {
+				margin-top: 2px;
+				position:relative;
+			}
+			.with-task-and-category {
+				vertical-align: middle;
+			}
+			input.category-entry, input.case-entry {
+				cursor: pointer;
+			}
+			input.category-entry:not(.category-readonly)[readonly], input.case-entry:not(.case-readonly)[readonly] {
+				background-color: white !important;
+			}
+			input.category-entry, input.reference-entry, input.case-entry {
+				width: 195px;
+			}
+			td.cat-val-col {
+				position: relative;
+			}
+			input.reference-entry {
+    			bottom: 1px;
+    		    position: relative;
+			}
+			label.cat-label {
+			    margin-right: 10px;
+			}
+			tr.activity-time-category-row td {
+			    padding-bottom: 4px;
+			}			
+			tr.period-header-totals td {
+			    border-bottom: 2px solid #FFF;
+			}
+			div.usage-allocation-info {
+			    margin-right: 5px;
+			    margin-left: 3px;
+			    width: 200px;
+			    display: inline-block;
+			    position: relative;
+			}
+			tr.timesheet-row.Draft div.usage-allocation-info span.cat-required,
+		 	tr.timesheet-row.Rejected div.usage-allocation-info span.cat-required {
+				height: 25px;
+				left: -2px;
+			}
+			span.quick-entry-button {
+			    position: absolute;
+			    bottom: 2px;
+			    right: 11px;
+			    color: #888 !important;
+			    font-size: 14px;
+			}			
+			div.day-cell-container {
+				position:relative;
+				display:inline-block;
+			}	
+			td.row-day {
+			    text-align: center;			    
+			}
+
+			input.day-cell {
+   				width: 48px;
+			}
+			span.row-units {
+				margin-left: 5px;
+			    margin-right: 5px;
+			    font-style: italic;
+			    display:inline-block;
+			}
+			input.day-cell.row-day-revenue-entry {
+			    margin-top: 2px;
+			}
+			input.grid-total, input.row-total-value {
+			    width: 50px;
+			}
+			div.activity-total-value {
+			    display: inline-block;
+			    width: 60px;
+			    text-align: center;			
+			}
+			span.activity-name {
+			    margin-left: 2px;
+			}
+			.activity-heading {
+				min-width: 461px;
+			}
+			tr.activity-row {
+			    font-style: italic;
+			    font-weight: bold;
+			    height: 28px;
+			    background-color: #EDEDED;
+			}
+			.activity-row td {
+			    border-top: 2px solid #FFF;
+			    border-bottom: 1px solid white;
+			}		
+			.activity-day-total, .grid-total, .row-total-value, input.day-cell, .remaining-effort {
+				/* normally as this is a decimal I'd think this should be right but seems to look better as center */
+				text-align: center;
+			}
+			.add-activity-button, #add-non-forecast-activity-button {
+				font-size: 18px;
+				margin: 4px;
+			}
+			.inline-button {
+				cursor: pointer;
+				color: #222;
+			}
+			.inline-button:hover {
+				color: #9FD7FF;
+			}
+			.delete-button, .clone-button, .quick-entry-button, .clear-forecast-button, .create-draft-button, .edit-forecast-button {
+			    font-size: 16px;
+			    margin: 4px;		    
+			}
+			.delete-button-placeholder {
+				margin-left: 18px;
+			}
+			/* Make select2 dropdowns look like conventional dropdowns */
+			a.select2-choice {
+			    height: 18px !important;
+			    line-height: 18px !important;
+			    background-image: none !important;
+			    border-radius: 0px !important;
+			    color: black !important;
+			    padding-left: 4px !important;
+			}
+			.select2-choice div {
+			    border-left: none !important;
+			}
+			tr.timesheet-row td {
+			    border: 1px solid white;
+			}
+			tr.timesheet-row.Draft td {
+			    background-color: white;
+			}
+			tr.timesheet-row.ReadyForApproval td {
+			    background-color: #E7E7E8;
+			    color: #0F0F0F;
+			}
+			tr.timesheet-row.Approved td {
+			    background-color: #DFEEE6;
+			    color: #008852;
+			}
+			tr.timesheet-row.Rejected td {
+			    background-color: #F6E4DE;
+			    color: #B42D34;
+			}
+			.total-container {
+				display: block;
+			}
+			.remaining-effort {
+				width: 50px;
+			    margin-top: 2px;
+			}
+			textarea.note {
+				font-family: 'Arial','Helvetica',sans-serif;
+    			font-size: 100%;
+    			color: #666;
+    			max-width: 520px;
+    			min-width: 30px;
+    			min-height: 10px;
+			}
+ 			.notesQtip {
+			    max-width: 550px;		
+			}
+			.notes-required {
+		        border-left-color: red;
+			    border-width: 3px;'
+			}
+			.error {
+			    position: absolute;
+			    top: 0px;
+			    bottom: 0px;
+			    width: 4px;
+			    background-color: #F00;
+			    left: 0px;
+			    cursor: default;
+			    z-index: 30;
+			}
+			
+			.error-message {
+			    margin: 0px 0px 8px 0px;
+			    font-size: 11px;
+			    color: red;
+			    font-weight: bold;
+			}
+			
+			tr.timesheet-row.Draft .cat-required,
+		 	tr.timesheet-row.Rejected .cat-required {
+			    position: absolute;
+			    width: 3px;
+			    top: 0px;
+			    display: block;
+			    background-color: red;
+			    height: 19px;
+			    left: -4px;
+			}
+			.time-required {
+			    position: absolute;
+			    width: 3px;
+			    display: inline-block;
+			    background-color: #f00;
+			    height: 19px;
+   			}
+   			input.btn.timesheet-submission-btn {
+			    margin-left: 3px;
+			    margin-right: 3px;
+			}
+			.period-header .timesheet-status {
+			    background-color: #5E5E5E;
+			    border-bottom: 3px solid #fff;
+			}
+			td.timesheet-status {
+			    width: 24px;
+			    background-repeat: no-repeat;
+			    background-size: 20px;
+			    background-position: 2px;
+   			}
+			td.timesheet-status.Approved{
+				background-image: url("{!URLFOR($Resource.TimesheetIcons, 'Time_Approved.png')}");
+			}
+			td.timesheet-status.Rejected{
+				background-image: url("{!URLFOR($Resource.TimesheetIcons, 'Time_Rejected.png')}");
+			}
+			td.timesheet-status.ReadyForApproval{
+				background-image: url("{!URLFOR($Resource.TimesheetIcons, 'Time_Submitted.png')}");
+			}
+			td.timesheet-status.Draft{
+				background-image: url("{!URLFOR($Resource.TimesheetIcons, 'Time_Draft.png')}");
+			}
+			td.timesheet-status.Forecast{
+				background-image: url("{!URLFOR($Resource.TimesheetIcons, 'Forecast.png')}");
+			}
+			td.timesheet-status.ForecastDraft{
+				background-image: url("{!URLFOR($Resource.TimesheetIcons, 'Forecast_ReadyForApproval.png')}");
+			}
+			.timesheet-row.Forecast:not(.PendingApproval) input[type="text"][readonly] {
+				border: 2px dashed #2196F3;
+			}
+			.status-pill
+			{
+				display: none;
+			}
+			<apex:outputPanel layout="none" rendered="{!EnhancedView}">
+			/* Enhanced view Start */
+			/* Toolbar */
+			div#nav-bar {
+			    width: 214px;
+			}
+			div#action-buttons {
+			    text-align: right;
+			}
+			.toolbar-container {
+				display: table;
+	  			background-color: #f8f8f8;
+				padding: 6px;
+				margin-bottom: 5px;
+				width: 100%;
+			    border-bottom: 1px solid #ccc;
+			}
+			div#previous-period {
+			    margin-right: 5px;
+			}
+			a.period-summary-btn {
+			    margin-right: 5px;
+			}
+			div.print-btn {
+				margin-left: 15px;
+			}
+			div.toolbar-button {
+				display: inline-block;
+				padding: 6px 10px 6px 10px;
+	 			background-color: white;
+				border: 1px solid #ccc;
+				border-radius: 2px;
+				cursor: pointer;
+			}
+			div.toolbar-button.disabled {
+				cursor:default;
+				color:lightgray;
+   			}
+			div.toolbar-button.active {
+				text-decoration: none;
+				color: white;
+				background-color: #1A9EFF;
+			}
+			div.toolbar-button:not(.active):not(.disabled):hover {
+			    background-color: #f4f6f9;
+			}
+			div.toolbar-button.bigger-btn .fa {
+				font-size: 18px;
+				width: 20px;
+	     		text-align: center;
+			}		
+			div.toolbar-button.bigger-btn{
+	    		padding: 6px;
+			}
+			div#period-totals {
+			    width: 290px;
+			    text-align: center;
+			}
+			.expense-summary-header-btn {
+				margin-left: 14px;
+				text-align: center;
+				position: relative;
+			}
+			.expense-summary-header-btn i.fa-plus-square {
+				position: absolute;
+				right: 3px;
+				bottom: 3px;
+				width: 10px !important;
+				font-size: 11px !important;
+				background-color: white;
+			}
+			.expense-summary-header-btn:hover .fa {
+				color: green !important;
+			}
+			#view-controls .toolbar-button .fa {
+			    margin-right: 7px;
+			    vertical-align: middle;
+			    font-size: 16px;
+			}
+			.toolbar {
+			    display: table;
+			    width: 100%;
+			}
+			.control-cell {
+			    display: table-cell;
+			    vertical-align: middle;
+			    position: relative;
+			}
+			div#toolbar-container {
+			    margin-bottom: 6px;
+		        max-width: 1310px;
+			}
+			div#view-controls {
+			    text-align: right;
+			    padding-right: 30px;
+			    width: 230px;
+			}
+			.hover-btn:hover .fa {
+				color: green !important;
+			}	
+			div#submit-controls {
+			    text-align: right;
+			    padding-right: 20px;
+			}
+			.bPageFooter {
+			    display: none;
+			}
+			/* Timers */
+			i.timer-item.stop-timer {
+			    color: #F44336;
+			    font-size: 18px;
+			    cursor: pointer;
+			}
+			td.row-day.timer-active .row-day-entry {
+			    display: none;
+			}
+			td.row-day:not(.timer-active) .te-timer {
+			    display: none;
+			}
+			.te-timer span.ticker {
+			    font-family: monospace;
+			    display: inline-block;
+			    margin-bottom: 2px;
+			    margin-top: 2px;
+			}
+			.row-day.timer-active .day-cell-container:hover {
+			    transform: scale(1.8);
+			    transition: all .1s linear;
+			    background-color: white;
+			    z-index: 999;
+			    -webkit-box-shadow:1px 1px 3px 1px rgba(0,0,0,.15);
+			    -moz-box-shadow:1px 1px 3px 1px rgba(0,0,0,.15);
+			    box-shadow:1px 1px 3px 1px rgba(0,0,0,.15);
+			}
+			/* Mutton */
+			.hover-mutton {
+			  display: inline-block;
+			  position: relative;
+			}
+			.dd-btn {
+				display: inline-block;
+				border: 1px solid gray;
+				border-radius: 4px;
+				padding: 10px 30px 10px 20px;
+				background-color: #ffffff;
+				cursor: pointer;
+				white-space: nowrap;
+				padding-right: 36px !important;
+			}
+			.dd-btn:after {
+			  content: '';
+			  position: absolute;
+			  top: 50%;
+			  right: 15px;
+			  transform: translateY(-50%);
+			  width: 0; 
+			  height: 0; 
+			  border-left: 5px solid transparent;
+			  border-right: 5px solid transparent;
+			  border-top: 5px solid black;
+			}
+			.dd-btn:hover {
+			  background-color: #f4f6f9;
+			}
+			.dd-menu {
+			  position: absolute;
+			  top: 23px;
+			  left: 0px;
+			  border: 1px solid #ccc;
+			  border-radius: 4px;
+			  padding: 0;
+			  margin: 2px 0 0 0;
+			  box-shadow: 0 0 6px 0 rgba(0,0,0,0.1);
+			  background-color: #ffffff;
+			  list-style-type: none;
+			  text-align: left;
+			  z-index: 99;
+			}
+			.dd-menu li.disabled {
+			    color: lightgray;
+		        cursor: default;
+			}
+			.dd-btn > .dd-menu {
+			  display: none;
+			} 
+			.dd-btn:hover > .dd-menu {
+			  display: block;
+			} 
+			.dd-menu li {
+			  padding: 10px 20px;
+			  cursor: pointer;
+			  white-space: nowrap;
+			  margin-left: 0px;
+			}
+			.dd-menu li:hover {
+			  background-color: #f4f6f9;
+			}
+			.dd-menu li a {
+			  display: block;
+			  margin: -10px -20px;
+			  padding: 10px 20px;
+			}
+			tr.timesheet-row.selected {
+			    border: 2px solid #1a9eff !important;
+			}
+			tr.timesheet-row.selecting {
+			    border: 1px dashed #1a9eff;
+			}
+			tr.timesheet-row.not-selecting {
+			    opacity:0.4;
+			}
+			tr.timesheet-row.not-selecting:hover {
+			    cursor:not-allowed;
+			}
+			.cancel-select-btn .fa {
+			    padding-left: 12px;
+			}
+			.cancel-select-btn {
+			    background-color: #1a9eff !important;
+			    color: white;
+			}			
+			input[type="text"] {
+			    padding: 2px;
+			    font-size: 13px;
+			}
+			.timesheet-row.Forecast input[value=""][readonly="false"],
+			.timesheet-row.Approved input[value=""] {
+		        opacity: 0;
+			}
+			span.row-units {
+				width: 71px;
+				vertical-align: middle;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			.timesheet-row.Forecast:not(.PendingApproval) input[type="text"][readonly] {
+			    background-color: #729bc7;
+			    border: solid #729bc7;
+			    color: white;
+			    border-radius: 2px;
+			}
+			tr.timesheet-row.Forecast:not(.PendingApproval) td {
+			    background-color: #ecf3f9;
+			}			
+			.timesheet-row.Approved input[type="text"] {
+			    background-color: #008852;
+			    border: solid #008852;
+			    color: white;
+			    border-radius: 2px;
+			}			
+			.period-header .timesheet-status {
+			    background-color: #F5F5F5;
+			    color: #5E5E5E;
+			}
+			input[type="text"][readonly] {
+			    background-color: #EDEDED;
+			    border-style: solid;
+			    border-width: 3px;
+			    border-color: #EDEDED;
+			    padding-top: 2px;
+			    padding-left: 2px;
+			}
+			td#grid-total {
+			    text-align: left;
+				padding-left: 10px;
+			}
+			td#grid-total, td.day {
+			    background-color: #F5F5F5;
+    			color: #5E5E5E;
+				border-right: 1px solid white;
+			    border-left: 1px solid white;
+		    }
+			.status-pill {
+				    font-size: 8px;
+				    padding: 4px;
+				    border-radius: 2px;
+				    display: inline-block;
+				    border: none !important;
+				    margin-left: 30px;
+				    text-align: center;
+				}
+			span.secondary-status-pill {
+				margin-top: 2px;
+			}
+			.status-pill.Approved {
+				    color: white;
+				    background-color: #008852;
+				}
+			.status-pill.Draft {
+				    color: white;
+				    background-color: #949599;
+				}
+			.status-pill.ReadyForApproval {
+				    color: white;
+				    background-color: #404041;
+				}
+			.status-pill.Rejected {
+				    color: white;
+				    background-color: #B42D34;
+				}
+			.status-pill.RequiresApproval {
+				color:white;
+				background-color:#404041;
+			}
+			.status-pill.Suggested, .status-pill.RequestApproved, .status-pill.Forecast {
+				    color: white;
+				    background-color: #729bc7;
+			}
+			.status-pill.AutoActualise {
+				color: white;
+				background-color: #008852;
+			}
+			i.t-tip-setting {
+			    font-size: 18px;
+			    margin-left: 4px;
+			    margin-right: 3px;
+			    cursor: pointer;
+			}
+/*			.show-t-tips {
+				padding: 6px 26px 8px 10px;
+				border-radius: 4px;
+				margin-top: 7px;
+				margin-right: 10px;
+			}
+*/			.show-hide-btn {
+				color: black;
+				cursor: pointer;
+				text-decoration: none !important;
+				font-size: 13px;
+			}
+			/* Enhanced view END */
+			</apex:outputPanel>
+			input.day-total {
+			    font-weight: bold;
+			}
+			.rem-usage-details .popup-field-label {
+			    width: initial;
+			    margin-bottom: 10px;
+			    margin-top: 5px;
+			}
+			.timesheet-status div {
+				position: relative;
+			}
+			.timesheet-status i {
+				left: 4px;
+				font-size: 26px;
+				top: -5px;
+				position: absolute;
+			}
+			.timesheet-status i.Suggested
+			{
+				color: #729bc7;
+			}
+			i.RequestApproved {
+			    color: #729bc7;
+			    font-size: 20px;
+			    top: 2px;
+			    left: 2px;
+			}
+			i.RequiresApproval {
+				color: #404041;
+			    font-size: 20px;
+			    top: -2px;
+			    left: 2px;
+			}
+			.t-tip-qtip {
+				background-color: lemonchiffon;
+				padding: 2px;
+				font-size: 12px;
+			}
+
+			.clear-case-id {
+				position: absolute;
+				right: 2px;
+				top: 6px;
+				cursor: pointer;
+			}
+
+			.clear-case-id:hover {
+				color: red;
+			}
+
+				/*********** CALENDAR / GRID MODE*****************/
+.timesheet-view-toggle>span
+{
+	-webkit-background-clip: border-box;
+	-webkit-background-origin: padding-box;
+	-webkit-background-size: auto;
+	background-attachment: scroll;
+	background-clip: border-box;
+	background-color: rgb(232, 232, 233);
+	background-image: url(/img/alohaSkin/togglePill_bg.png);
+	background-origin: padding-box;
+	background-size: auto;
+	display: inline-block;
+	padding-bottom: 2px;
+	padding-left: 2px;
+	padding-right: 5px;
+	padding-top: 2px;
+	border-top-color: rgb(181, 181, 181);
+	border-top-style: solid;
+	border-top-width: 1px;
+	border-bottom-color: rgb(181, 181, 181);
+	border-bottom-style: solid;
+	border-bottom-width: 1px;
+	border-collapse: separate;
+	
+	display: inline-block;
+}
+.timesheet-view-toggle span.right
+{
+	
+	border-right-color: rgb(181, 181, 181);
+	border-right-style: solid;
+	border-right-width: 1px;		
+	border-bottom-right-radius: 3px;
+	border-top-right-radius: 3px;		
+}
+.timesheet-view-toggle span.left
+{				
+	border-left-color: rgb(181, 181, 181);
+	border-left-style: solid;
+	border-left-width: 1px;		
+	border-bottom-left-radius: 3px;
+	border-top-left-radius: 3px;
+	border-right-style: solid;
+	border-right-width: 1px;
+	border-right-color: rgb(181,181,181);		
+}
+.timesheet-view-toggle span.selected
+{
+	background-color: rgb(232, 232, 233);
+	background-image: url(/img/alohaSkin/togglePill_bg.png);
+	background-position: 0% -120px;
+	background-size: auto;
+}
+.timesheet-view-toggle span a.toggleLink
+{
+	display: inline-block;				
+}
+.timesheet-view-toggle span a.toggleLink .toggleIcon
+{
+	display: block;
+	float: left;
+	height: 16px;
+	margin-left: 6px;
+	padding-right: 5px;
+	width:18px;
+}
+
+.timesheet-view-toggle span a.toggleLink .linkText
+{
+	float: left;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 11px;
+	font-weight: bold;
+	height: 14px;
+	margin-top: 1px;
+	padding-right: 5px;
+	color:#333;
+	white-space: nowrap;
+}
+.timesheet-view-toggle span.selected a.toggleLink .linkText
+{
+	color: rgb(255, 255, 255);
+	
+}
+			
+/*
+    loading panel
+*/
+
+.loadingIndicator {
+   top:0;
+   right:0;
+   width:100%;
+   height:100%;
+   font-weight: bold;
+   position:absolute;
+   text-align:center;
+   /* IE filter */
+   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+   -moz-opacity:0.7;    /* Mozilla extension */
+   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+   opacity:0.7; /* CSS3 */
+   z-index:1000;
+   background-color:white;
+   display:none; 
+}
+
+.loadingIndicator img {
+    margin-right:9px;
+}
+
+#loadingIndicatorInnerContainer { 
+    position:absolute; 
+    top:50%;
+    height:10em; 
+    margin-top:-2em;
+    width:100%;
+}
+
+.edit-entry {
+    top: -5px;
+    left: -3px;
+}
+
+.remove-entry {
+    bottom: -6px;
+    right: -5px;
+}
+
+.undo-entry-adjustment {
+    top: -6px;
+    left: -4px;
+    display: none;
+}
+
+.edit-entry, .remove-entry, .undo-entry-adjustment {
+    position: absolute;
+    color: #4A4A56;
+    cursor: pointer;
+    font-size: 16px !important;
+    background-color: #ededed;
+    z-index: 99;
+	border-radius: 8px;
+    width: 16px;
+}
+
+.remove-entry:hover, .edit-entry:hover, .undo-entry-adjustment:hover {
+	background-color: #9FD7FF;
+}
+
+.strikethrough {
+    position: relative;
+}
+
+.strikethrough:before {
+    position: absolute;
+    content: "";
+    left: 2px;
+    top: 47%;
+    right: 2px;
+    border-top: 1px solid;
+    border-color: inherit;
+    -webkit-transform: rotate(-21deg);
+    -moz-transform: rotate(-21deg);
+    -ms-transform: rotate(-21deg);
+    -o-transform: rotate(-21deg);
+    transform: rotate(-21deg);
+    z-index: 10;
+    color: #f00;
+}
+
+.adjustment {
+	display: none;
+}
+			/* error panel */
+			div#timesheet-warning, div#timesheet-error {
+			    margin: 5px 0px 10px 0px;
+			    padding: 10px;
+			    border-radius: 4px;
+			    border: 1px dashed #E58E1A;
+			}
+			div#timesheet-warning-text, div#timesheet-error-text {
+			    display: table-cell;
+			    padding-left: 10px;
+			    font-size: 16px;
+			    vertical-align: middle;
+			}
+			.warning-icon, .error-icon {
+			    font-size: 26px;
+			    display: table-cell;
+			}
+			/* start/end time time entry on day popup */
+			.kimbleTimePicker {
+			    width: 72px;
+			    margin-right: 5px;
+			    margin-bottom: 5px;
+			    padding-left: 4px;
+   			}
+			.ui-timepicker-wrapper {
+			    z-index: 100000;  /* note high level required to render above qtip */
+			}
+			div.popup-field-label {
+			    font-weight: bold;
+			    margin-right: 5px;
+			    display: inline-block;
+    			width: 60px;
+    			position: relative;
+			}
+			.time-entry-time {
+				display: block;
+			}
+			tr.timesheet-row:hover td {
+			    background-color: #e7f4f8;
+			}
+
+			span.select-row {display: none;}
+            #timesheetBody.show-select .select-row {display:inline}
+
+			<apex:outputPanel layout="none" rendered="{!IsMonthView}">
+			<!--Monthly tracking overrides-->
+                td.day {
+				width: auto !important;
+				text-align: center;
+			}
+
+			input.day-cell {
+				width: 26px;
+			}
+
+			input.grid-total {
+				width: 28px;
+			}
+
+			span.row-units {
+				display: none;
+			}
+
+			td.activity-heading {
+				min-width: 253px !important;
+			}
+			</apex:outputPanel>
+			</style>
+			
+		</apex:define>
+	</apex:composition>
+</apex:page>

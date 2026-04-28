@@ -1,0 +1,140 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.DeliveryGroupStatusesController,KimbleOne.TooltipsController" sidebar="false">
+
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+	<c:Menu DefaultHelpPage="StatusReporting.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryGroup__c.Id}" MenuContextName="{!KimbleOne__DeliveryGroup__c.Name}" />
+
+</apex:define>
+     
+<apex:define name="Content">
+
+	<!-- Kimble Guidance -->
+	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/KimbleGuidance.js')}" />
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'ToolTips.css')}"/>
+	<apex:outputPanel id="kimbleTooltipsResource" rendered="{!TooltipsEnabled}">
+		<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleGuidance, 'KimbleGuidance/DeliveryGroupStatusesNarratives/' + UserNarrativeLanguageCode + '.js')}" />
+
+		<apex:outputPanel layout="none" rendered="{!DeliveryGroupStatusesTipOverrideEnabled}">
+			<apex:includeScript value="{!JSENCODE(TooltipsOverrideResourcePath)}" />
+		</apex:outputPanel>
+	</apex:outputPanel>
+ 
+	<apex:outputPanel id="DeliveryGroupAndStatuses"> 
+     	  
+		<apex:form id="theForm">
+           	
+			<apex:pageMessages escape="False" />
+ 			
+           	<apex:pageBlock id="StatusSummaryTemplates" title="{!$ObjectType.KimbleOne__StatusSummaryTemplate__c.LabelPlural}" >
+           		 
+           		<apex:pageBlockButtons location="bottom">
+					<apex:commandButton id="save" action="{!Save}" value="{!$Label.kimbleone__save}" rerender="DeliveryGroupAndStatuses"/>
+				</apex:pageBlockButtons>
+
+				<apex:pageBlockSection >
+					<apex:inputField id="InternalTemplateInput" value="{!KimbleOne__DeliveryGroup__c.KimbleOne__StatusSummaryTemplateInternal__c}" />
+					<apex:inputField id="ExternalTemplateInput" value="{!KimbleOne__DeliveryGroup__c.KimbleOne__StatusSummaryTemplateExternal__c}" />
+				</apex:pageBlockSection>
+				
+        	</apex:pageBlock>
+
+           	<apex:pageBlock id="DeliveryGroupStatuses" title="{!$ObjectType.KimbleOne__DeliveryGroupStatusSummary__c.Label}" >
+           		 
+           		<apex:pageBlockButtons rendered="{!KimbleOne__DeliveryGroup__c.DeliveryStage__r.KimbleOne__AllowNewStatusSummaries__c}" location="top">
+					<apex:commandButton value="{!$Label.kimbleone__new} {!$ObjectType.KimbleOne__DeliveryGroupStatusSummary__c.Fields.KimbleOne__Narrative__c.Label}"  onclick="safeNavigateToSForceURL('{!$Page.KimbleOne__DeliveryGroupStatusEdit}?deliveryGroupId={!KimbleOne__DeliveryGroup__c.Id}&menuContext={!JSENCODE($CurrentPage.parameters.menuContext)}');" reRender="DeliveryGroupDashboardNarrativePopUpMainPanel"/>
+				</apex:pageBlockButtons>
+
+				<apex:pageBlockTable value="{!deliveryGroupDashboardNarrativeList}" var="dgss" >		          			
+					<apex:column id="ActionColumn" headerValue="{!$Label.kimbleone__actionlinksheader}">
+		        		<apex:outputLink value="#" onclick="safeNavigateToSForceURL('{!$Page.KimbleOne__DeliveryGroupStatusEdit}?id={!dgss.Id}&deliveryGroupId={!KimbleOne__DeliveryGroup__c.Id}&menuContext={!JSENCODE($CurrentPage.parameters.menuContext)}');">{!$Label.kimbleone__edit}</apex:outputLink>
+		        		&nbsp; | &nbsp;
+						<apex:outputLink value="#" onclick="var d = confirmDelete();if(!d) return; deleteNarrative('{!JSINHTMLENCODE(dgss.Id)}');">{!$Label.kimbleone__delete}</apex:outputLink>							
+					</apex:column>
+					<apex:column id="PeriodNameColumn" value="{!dgss.TimePeriod__r.Name}"  headerValue="{!$ObjectType.KimbleOne__TimePeriod__c.Fields.Name.Label}"/>
+					<apex:column id="SharedWithCustomerColumn" value="{!dgss.KimbleOne__SharedWithCustomer__c}"  headerValue="{!$ObjectType.KimbleOne__DeliveryGroupStatusSummary__c.Fields.KimbleOne__SharedWithCustomer__c.Label}"/>
+					<apex:column id="SummaryStatusColumn" value="{!dgss.DeliveryStatus__r.Name}"  headerValue="{!$ObjectType.KimbleOne__DeliveryGroupStatusSummary__c.Fields.KimbleOne__DeliveryStatus__c.Label}"/>
+				</apex:pageBlockTable>
+					
+        	</apex:pageBlock>
+
+			<apex:actionFunction action="{!deleteNarrative}" name="deleteNarrative" rerender="DeliveryGroupAndStatuses" oncomplete="" >
+				<apex:param name="dgssId" value="" />
+			</apex:actionFunction>
+
+			<apex:actionFunction name="loadGuidance" rerender="kimbleTooltipsResource" oncomplete="initialisePageTips();"/>
+			<div style="display:none;" kimble-tip="null"></div>
+       	</apex:form>
+
+	</apex:outputPanel> 
+
+	<style>
+		.currencyCode { margin-right: 3px; }
+		.deliveryStatus>tbody>tr>td{border:0px !important;}
+   		.deliveryStatus>tbody>tr>td.label{font-weight: bold;color: #4A4A56;font-size: 91%;text-align: right;}
+   		.deliveryStatus>tbody>tr>td>input{vertical-align:baseline !important;}
+   		.deliveryStatus>tbody>tr>td{padding:2px !important; margin:0px !important;}
+   		.deliveryStatus>tbody>tr>td>select{margin-left:0px !important;}
+	</style>
+
+	<script>
+	$(window).load(function(){
+		initialisePageTips();	
+	});
+	
+		/* Tooltips */
+	var enableTips = <apex:outputText value="{!TooltipsEnabled}"/>;
+	var BaseHelpURL = '<apex:outputText value="{!URLFOR($Resource.KimbleOne__KimbleHelp, '')}"/>';
+	var DetailedHelpLabel = '<apex:outputText value="{!$Label.kimbleone__detailedhelp}"/>';
+	var MoreLabel = '<apex:outputText value="{!$Label.kimbleone__more}"/>';
+	var TipsEnabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsenabled}"/>';
+	var TipsDisabledTip = '<apex:outputText value="{!$Label.kimbleone__tooltipsdisabled}"/>';
+
+	function initialisePageTips()
+	{
+		ApplyTipAttributes();
+		initialiseTips();
+	}
+	
+	// add tip attributes to elements
+	function ApplyTipAttributes()
+	{
+		if(enableTips)
+		{
+			jQuery('[id$="ActionColumnheader"]').attr('kimble-tip','Action');
+			jQuery('[id$="ExternalTemplateInput"]').attr('kimble-tip','ExternalTemplate').attr('kimble-tip-extended-text','ExternalTemplateExtendedText').attr('kimble-tip-help-link','StatusSummaryHelpLink');
+			jQuery('[id$="InternalTemplateInput"]').attr('kimble-tip','InternalTemplate').attr('kimble-tip-extended-text','InternalTemplateExtendedText').attr('kimble-tip-help-link','StatusSummaryHelpLink');
+			jQuery('[id$="PeriodNameColumnheader"]').attr('kimble-tip','PeriodName');
+			jQuery('[id$="SharedWithCustomerColumnheader"]').attr('kimble-tip','SharedWithCustomer').attr('kimble-tip-extended-text','SharedWithCustomerExtendedText').attr('kimble-tip-help-link','StatusReportingHelpLink');
+			jQuery('[id$="SummaryStatusColumnheader"]').attr('kimble-tip','SummaryStatus').attr('kimble-tip-help-link','StatusReportingHelpLink');
+		}
+	}
+	
+	function updateTipsConfigSetting(newTipSetting)
+	{
+		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.TooltipsController.UpdateToolTipSetting}',
+			newTipSetting,
+				function(result, event){
+					if (event.status)
+					{
+						var data = {};
+						data.results = result;
+						loadGuidance();
+					}
+					else
+					{
+						alert(event.message);
+					}
+			},
+			{escape: false, timeout: 60000}
+		);
+	}
+	
+	</script>
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

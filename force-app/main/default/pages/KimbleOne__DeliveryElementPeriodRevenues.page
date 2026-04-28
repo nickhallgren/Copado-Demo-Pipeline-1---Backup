@@ -1,0 +1,149 @@
+<apex:page standardController="KimbleOne__DeliveryElement__c" extensions="KimbleOne.DeliveryElementPeriodRevenuesController,KimbleOne.SecurityController"  sidebar="false" >
+ 
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+	<c:Menu DefaultHelpPage="PeriodRevenues.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryElement__c.KimbleOne__DeliveryGroup__c}" MenuContextName="{!KimbleOne__DeliveryElement__c.DeliveryGroup__r.Name}"/>
+
+</apex:define>
+    
+<apex:define name="Content">
+ 	<style>
+		.boxy-content {display:none;}
+	</style>
+	        
+	
+	
+	    <!-- Get field for use in controller -->
+    	<apex:outputField value="{!KimbleOne__DeliveryElement__c.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUnitGenerated__c}" rendered="false"/>
+	
+		<apex:outputPanel id="PeriodRevenues">
+        
+        <apex:form id="TheForm"> 
+          
+          <apex:pageMessages escape="False" />    
+          <apex:pageBlock id="periodRevenues__c" title="{!$Label.kimbleone__periodrevenues}"><!-- rendered="{!DeliveryElement__c.Product__r.ProductDomain__r.RevenueGenerationModel__r.IsPeriodGenerated__c}" -->
+            <apex:pageBlockButtons location="top"  >
+				<input id="addPeriodRevenue" type="button" class="btn" value="{!$Label.New} {!$ObjectType.PeriodRevenue__c.label} " onclick="initialiseModalBoxy('#PeriodRevenuePopup', '{!JSENCODE($Label.New)} {!$ObjectType.PeriodRevenue__c.label} ');newPeriodRevenue()"></input>
+            </apex:pageBlockButtons>
+
+            <apex:pageBlockTable value="{!periodRevenues}" var="pr" >
+              <apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+        		<apex:outputPanel rendered="{!pr.Status__r.KimbleOne__Enum__c == 'Open'}">
+     				
+     				<apex:outputLink value="#" onclick="initialiseModalBoxy('#PeriodRevenuePopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__PeriodRevenue__c.label}');editPeriodRevenue('{!JSINHTMLENCODE(pr.Id)}')">{!$Label.kimbleone__edit}</apex:outputLink>&nbsp;|&nbsp;
+     				<apex:outputPanel rendered="{!pr.KimbleOne__BaselineRevenue__c == 0}">
+     					<apex:outputLink value="#" onclick="var d = confirmDelete();if(d) deletePeriodRevenue('{!JSINHTMLENCODE(pr.Id)}');">{!$Label.kimbleone__delete}</apex:outputLink>&nbsp;|&nbsp;
+     				</apex:outputPanel>
+     			
+     				<apex:outputLink value="#" onclick="completePeriodRevenue('{!JSINHTMLENCODE(pr.Id)}')">{!$Label.kimbleone__complete}</apex:outputLink>
+     				
+     				
+				</apex:outputPanel>	
+				
+				<apex:outputLink value="#" onclick="revertPeriodRevenue('{!JSINHTMLENCODE(pr.Id)}')" rendered="{!pr.Status__r.KimbleOne__Enum__c == 'Completed' && pr.TimePeriod__r.ForecastingTimePeriod__r.Status__r.KimbleOne__Enum__c != 'Closed' && pr.InvoiceableItems__r.size==0 && HasPermission['RevertCompletedPeriodRevenue']}">{!$Label.kimbleone__reverttodraft}</apex:outputLink>
+				
+			  </apex:column>
+			  
+              <apex:column value="{!pr.TimePeriod__r.Name}" headerValue="{!$ObjectType.KimbleOne__TimePeriod__c.Fields.Name.Label}"/> 
+              <apex:column value="{!pr.KimbleOne__ForecastUnits__c}" rendered="{!KimbleOne__DeliveryElement__c.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUnitGenerated__c}" />
+              <apex:column headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__RecurringRevenue__c.Label}" value="{!KimbleOne__DeliveryElement__c.KimbleOne__InvoicingCurrencyRecurringRevenue__c}" rendered="{!KimbleOne__DeliveryElement__c.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUnitGenerated__c}" />
+              
+              <apex:column headerValue="{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__ForecastRevenue__c.Label}">
+              	<apex:outputPanel layout="none">
+					<apex:outputText value="{!pr.KimbleOne__InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+					<apex:outputField value="{!pr.KimbleOne__InvoicingCurrencyForecastRevenue__c}" />
+				</apex:outputPanel>
+              </apex:column>
+              
+              <apex:column value="{!pr.KimbleOne__ActualUnits__c}" rendered="{!KimbleOne__DeliveryElement__c.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUnitGenerated__c}" />
+              
+              <apex:column headerValue="{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__ActualRevenue__c.Label}">
+              	<apex:outputPanel layout="none">
+					<apex:outputText value="{!pr.KimbleOne__InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+					<apex:outputField value="{!pr.KimbleOne__InvoicingCurrencyActualRevenue__c}" />
+				</apex:outputPanel>
+              </apex:column>
+              
+              <apex:column headerValue="{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__Status__c.Label}" value="{!pr.Status__r.Name}"/>
+              <apex:column value="{!pr.KimbleOne__Approver1User__c}" headerValue="{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__Approver1User__c.Label}"/>		
+			  <apex:column value="{!pr.KimbleOne__Approver2User__c}" headerValue="{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__Approver2User__c.Label}"/>		
+			
+            </apex:pageBlockTable> 
+
+          </apex:pageBlock> 
+
+          <apex:actionFunction action="{!newPeriodRevenue}" name="newPeriodRevenue" rerender="PeriodRevenue" oncomplete="showModalBoxy()">
+       	  </apex:actionFunction>
+ 
+	      <apex:actionFunction action="{!getPeriodRevenueForEdit}" name="editPeriodRevenue" rerender="PeriodRevenue" oncomplete="showModalBoxy()">
+       		<apex:param name="prId" value="" />
+          </apex:actionFunction>
+          
+          <apex:actionFunction action="{!DeletePeriodRevenue}" name="deletePeriodRevenue" rerender="TheForm">
+       		<apex:param name="prId" value="" />
+          </apex:actionFunction>
+          
+          
+          <apex:actionFunction action="{!CompletePeriodRevenue}" name="completePeriodRevenue" rerender="TheForm">
+       		<apex:param name="prId" value="" />
+          </apex:actionFunction>
+          
+          <apex:actionFunction action="{!RevertPeriodRevenue}" name="revertPeriodRevenue" rerender="TheForm">
+       		<apex:param name="prId" value="" />
+          </apex:actionFunction>
+          
+        </apex:form>
+        
+        </apex:outputPanel>
+        
+
+      <div id="PeriodRevenuePopup" style="display:none">
+      
+        <apex:outputPanel id="PeriodRevenue">
+        
+        <apex:form >
+   
+          <apex:pageBlock >
+            <div id="periodRevenueErrors">
+				<apex:pageMessages escape="False" />
+			</div>
+			<apex:pageBlockButtons location="bottom">
+				<apex:commandButton id="savePeriodRevenue" action="{!upsertPeriodRevenue}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#periodRevenueErrors')" reRender="TheForm"/>
+				<input id="cancelPeriodRevenue" class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+            </apex:pageBlockButtons>
+            
+            <apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+               
+				<!-- Don't allow user to update Time Period. If they try to change this, they are effectively creating a different Period Revenue. -->                             
+				<apex:pageblockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__TimePeriod__c.Label}" for="timePeriodin" rendered="{!periodRevenue.KimbleOne__TimePeriod__c==null}"/>
+					<apex:selectList id="timePeriodin" value="{!periodRevenue.KimbleOne__TimePeriod__c}" size="1" required="true" rendered="{!periodRevenue.KimbleOne__TimePeriod__c==null}">
+						<apex:selectOptions value="{!ThePeriodOptions}"/>
+					</apex:selectList>
+					              
+				</apex:pageblockSectionItem>
+				<apex:outputfield id="timePeriodout" value="{!periodRevenue.KimbleOne__TimePeriod__c}" rendered="{!periodRevenue.KimbleOne__TimePeriod__c!=null}"/>
+				
+				<apex:pageBlockSectionItem >
+                   	<apex:outputLabel >{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__ForecastRevenue__c.Label} {!JSENCODE(KimbleOne__DeliveryElement__c.KimbleOne__InvoicingCurrencyIsoCode__c)}</apex:outputLabel>
+                   	<apex:inputField id="forecastRevenue" value="{! periodRevenue.InvoicingCurrencyForecastRevenue__c}" required="true"/>
+               	</apex:pageBlockSectionItem>
+               	
+			</apex:pageBlockSection>
+            
+          </apex:pageBlock>
+
+        </apex:form>
+
+</apex:outputPanel>
+
+</div>
+
+
+</apex:define>
+
+</apex:composition>
+	
+</apex:page>

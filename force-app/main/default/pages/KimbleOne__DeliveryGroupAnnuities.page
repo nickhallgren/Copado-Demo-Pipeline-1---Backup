@@ -1,0 +1,1923 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.DeliveryGroupAnnuitiesController,KimbleOne.SecurityController"  showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__DeliveryGroup__c">
+
+<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+     	
+     	<c:Menu DefaultHelpPage="Annuities.html" MenuContextType="DeliveryGroup" MenuContextId="{!KimbleOne__DeliveryGroup__c.Id}" MenuContextName="{!KimbleOne__DeliveryGroup__c.Name}" />
+     	 
+    </apex:define>
+
+    <apex:define name="Content">
+    
+    <apex:pageBlock title="{!$ObjectType.KimbleOne__Annuity__c.LabelPlural}">
+        <apex:pageBlockButtons location="top">
+            <table>
+                <tr>
+                    <td>
+                    	<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__Annuity__c.createable && TheDeliveryElement.DeliveryGroup__r.DeliveryStage__r.KimbleOne__AllowNewRevenueCostItems__c}"><input id="newAnnuityButton" class="btn" type="button" onclick="addNewAnnuity();" value="{!$Label.New} {!$ObjectType.Annuity__c.label}" /></apex:outputPanel>
+                    </td>
+                    <td class="rightAlignCell">
+                        
+                    </td>
+                    <td class="rightAlignCell">
+                        <apex:image id="btnCloseEast" style="width:26px;" html-data-floating-dropdown="#annuity-view-details-btn-menu-data" html-data-vertical-offset="-61" styleClass="btn annuity-view-pref-trigger" url="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'LHS.png')}" onclick="showDetails()" title="{!$Label.kimbleone__showdetailslabel}" />
+                        <apex:image id="btnSplitScreen" style="width:26px;" html-data-floating-dropdown="#annuity-view-both-btn-menu-data" html-data-vertical-offset="-61" styleClass="btn annuity-view-pref-trigger" url="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'Split.png')}" onclick="showBoth()" title="{!$Label.kimbleone__showdetailsandganttlabel}" />
+                        <apex:image id="btnExpandEast" style="width:26px;" html-data-floating-dropdown="#annuity-view-gantt-btn-menu-data" html-data-vertical-offset="-61" styleClass="btn annuity-view-pref-trigger" url="{!URLFOR($Resource.KimbleOne__AssignmentImages, 'RHS.png')}" onclick="showGantt()" title="{!$Label.kimbleone__showganttlabel}" />
+
+						<div id="annuity-view-details-btn-menu-data" class="annuity-view-pref floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+							<ul class="floating-dropdown-menu">
+								<li id="btnDetailsDefault"><label><input type="radio" name="view-pref-group" value="details"/>{!$Label.DefaultViewLabel}</label></li>
+							</ul>
+						</div>
+						<div id="annuity-view-both-btn-menu-data" class="annuity-view-pref floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+							<ul class="floating-dropdown-menu">
+								<li id="btnBothDefault"><label><input type="radio" checked="checked" name="view-pref-group" value="both"/>{!$Label.DefaultViewLabel}</label></li>
+							</ul>
+						</div>
+						<div id="annuity-view-gantt-btn-menu-data" class="annuity-view-pref floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+							<ul class="floating-dropdown-menu">
+								<li id="btnGanttDefault"><label><input type="radio" name="view-pref-group" value="gantt"/>{!$Label.DefaultViewLabel}</label></li>
+							</ul>
+						</div>
+					</td>
+                </tr>
+            </table>
+        </apex:pageBlockButtons>
+        
+        <div id="container" class="zoom-level-1">
+            
+            <apex:actionStatus id="AnnuityListLoadingStatus">
+                <apex:facet name="start">
+                    <div id="loadingIndicatorOuterContainer" class="loadingIndicator">
+                        <div id="loadingIndicatorInnerContainer">
+                            <img src="{!URLFOR($Resource.LoadingImageK)}" />{!$Label.Loading}
+                        </div>
+                    </div>
+                </apex:facet>
+            </apex:actionStatus>
+            <div id="layout-container"  style="margin-right:18px;">
+                <div id="grid-layout" class="ui-layout-center" style="overflow-y: hidden;">
+                    <apex:outputPanel id="AnnuitiesList" styleClass="AnnuitiesListContainer">                             
+                                 
+                    <div id="grid-header-container">
+                        
+                    </div>
+                    
+                    <div id="grid-body-container" style="overflow-y:hidden; display: inline-block;">
+                       
+                    </div>
+                    
+                    </apex:outputPanel>
+                </div><!-- grid-layout -->
+                
+                <div id="east-layout" class="ui-layout-east" style="overflow:hidden">
+                    
+                    <div id="gantt-view" style="overflow-y:hidden;height: 100%;">
+                        <div id="period-header-container" style="white-space: nowrap;"></div>
+                    
+                        <div id="gantt-container" style="position:relative; display: inline-block; overflow: hidden;">
+                            
+                        </div><!-- gantt-container -->
+                    </div>
+                
+                </div><!-- east-layout -->
+                
+            </div><!-- layout-container -->
+            
+            <div id="gantt-vertical-scroll-container">
+                <div id="verticalScroll" style="width:20px;display:none;"></div>
+            </div>
+            
+   
+        </div>
+                
+    </apex:pageBlock>
+    
+    <apex:form id="AnnuityEditForm">
+		<!--DO NOT REMOVE THE FOLLOWING LINE. THIS IS NEEDED IN ORDER TO DISPLAY DATE PICKERS IN THE POPUP CORRECTLY.
+						SALESFORCE NEEDS TO LOAD AT LEAST ONE DATEPICKER FIELD IN INITIAL PAGE SOURCE OTHERWISE IT DOESN'T WORK CORRECTLY-->
+		<span style="display:none"><apex:inputField value="{!DateHack.KimbleOne__InputDate__c}"/></span>
+	<div id="AnnuityEditPopup" style="display:none;">
+  
+		<apex:outputPanel id="AnnuityEdit">
+
+       			<div id="AnnuityEditErrors">
+           			<apex:pageMessages id="AnnuityEditMessages" escape="false" />
+           		</div>
+
+			    <apex:pageMessage summary="{!FromDateBasis}" severity="info" strength="2" rendered="{!!ISBLANK(EarliestChangeDate)}"/>
+
+           		<apex:pageBlock >
+           		 
+            		<apex:pageBlockButtons id="pageBlockButtons" location="bottom" styleClass="AnnuityEditButtonPanel">
+						<apex:commandButton id="saveAnnuity" rerender="AnnuityEdit" styleclass="DisableButtonWhileBusy" action="{!SaveAnnuity}" value="{!$Label.kimbleone__save}" oncomplete="recalculateAnnuityPeriods();SetupDatePicker();hideModalBoxyWithErrorCheck('#AnnuityEditErrors');refreshElements();" disabled="{!!TheDeliveryElement.DeliveryGroup__r.DeliveryStage__r.KimbleOne__AllowNewRevenueCostItems__c}" />
+						<apex:commandButton id="deleteAnnuity" onclick="var d = confirmDelete();if(!d) return;DisableButtonPanel('AnnuityEditButtonPanel','',[]);" rerender="AnnuityEdit" styleclass="" action="{!DeleteAnnuity}" value="{!$Label.kimbleone__deletebutton}" oncomplete="hideModalBoxyWithErrorCheck('#AnnuityEditErrors');refreshElements();" rendered="{!!ISBLANK(TheAnnuity.Id) && CanEditAnnuity && ISBLANK(EarliestChangeDate)}" disabled="{!!TheDeliveryElement.DeliveryGroup__r.DeliveryStage__r.KimbleOne__AllowNewRevenueCostItems__c}"/>
+						<input id="cancelAnnuity" class="btn"  type="button" onclick="hideModalBoxy();" value="{!$Label.kimbleone__cancel}"/>
+					</apex:pageBlockButtons>
+             		
+             		<div id="annuity-details" style="display:inline-block;width:400px;vertical-align:top;">
+             		
+             		<apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+              			
+              			<apex:pageBlockSectionItem rendered="{!!ISBLANK(TheElementOptions) && TheElementOptions.size > 1}" >
+		                   	<apex:outputLabel >{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__DeliveryElement__c.Label}</apex:outputLabel>
+		                   	<apex:actionRegion >
+			                   	<apex:selectList id="delivery-element-select" value="{!TheAnnuity.KimbleOne__DeliveryElement__c}" size="1" disabled="{!TheAnnuity.id != null}">
+			                   		<apex:selectOptions value="{!TheElementOptions}"/>
+			                   		<apex:actionSupport event="onchange" action="{!DeliveryElementChange}" rerender="AnnuitySection, AnnuityCostsPanel" oncomplete="SetupDatePicker()"/>
+			                   	</apex:selectList>
+		                   	</apex:actionRegion>
+		               	</apex:pageBlockSectionItem>
+              		</apex:pageblockSection>
+              		
+ 	              	<apex:variable var="IsPerUnit" value="{!TheDeliveryElement.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUnitGenerated__c || TheDeliveryElement.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsUnitGenerated__c}"/>
+
+              		<apex:pageblockSection id="AnnuitySection" collapsible="false" showheader="false"  columns="1">
+              			
+               			<apex:inputfield id="annuity-name" value="{!TheAnnuity.Name}" required="true" />
+               			
+               			<apex:pageBlockSectionItem rendered="{!CanEditAnnuity}">
+               				<apex:outputLabel >{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__AnnuityBehaviourRule__c.Label}</apex:outputLabel>
+               				<apex:selectList id="behaviour-rule" value="{!TheAnnuity.KimbleOne__AnnuityBehaviourRule__c}" size="1" onchange="behaviourRuleChange()">
+		                   		<apex:selectOptions value="{!TheBehaviourRules}"/>
+		                   	</apex:selectList>
+               			</apex:pageBlockSectionItem>
+
+              			<apex:inputfield id="annuity-start-date-input" value="{!TheAnnuity.KimbleOne__StartDate__c}" styleClass="kimbleDatePicker" rendered="{!CanEditAnnuity && ISBLANK(EarliestChangeDate)}" required="true" onchange="startDateChange()"/>
+              			
+              			<apex:outputField id="annuity-start-date" value="{!TheAnnuity.KimbleOne__StartDate__c}" rendered="{!!CanEditAnnuity || !ISBLANK(EarliestChangeDate)}" />
+              			
+              			<apex:pageBlockSectionItem rendered="{!CanEditAnnuity && ISBLANK(EarliestChangeDate)}">
+                   			<apex:outputLabel >{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__NumberOfPeriods__c.Label}</apex:outputLabel>
+                   			<apex:inputfield html-data-min-val="{!TheAnnuity.KimbleOne__NumberOfPeriods__c}" id="number-of-periods" value="{!TheAnnuity.KimbleOne__NumberOfPeriods__c}" onchange="numberOfPeriodsChange()"/>
+               			</apex:pageBlockSectionItem>
+               			
+               			<apex:inputfield id="annuity-end-date-input" value="{!TheAnnuity.KimbleOne__EndDate__c}" styleClass="kimbleDatePicker" rendered="{!CanEditAnnuity}" required="true" onchange="endDateChange()"/>
+              			
+              			<apex:outputField id="annuity-end-date" value="{!TheAnnuity.KimbleOne__EndDate__c}" rendered="{!!CanEditAnnuity}" />
+
+
+
+		                <apex:pageBlockSectionItem rendered="{!HasRevenue && CanEditAnnuity}">
+							<apex:outputLabel >{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__InvoicingCurrencyRevenueRate__c.Label} ({!InvoicingCurrencyISOCode})</apex:outputLabel>
+							<apex:actionRegion >
+				                <apex:inputfield id="annuity-revenue-input" value="{!TheAnnuity.KimbleOne__InvoicingCurrencyRevenueRate__c}" required="true">
+									<apex:actionSupport event="onchange" status="annuityRevenueRateCalcStatus" action="{!CalculateInternalValues}" reRender="annuity-internal-revenue-input" rendered="{!TheAnnuity.KimbleOne__IsIntercompany__c}"/>
+								</apex:inputField>
+							</apex:actionRegion>
+						</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem rendered="{!CanEditAnnuity && HasRevenue && isElementInterCompanyInvoiceable}">
+							<apex:outputLabel >{!$Label.kimbleone__intercompany} {!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__RevenueRate__c.Label} {!JSINHTMLENCODE(TheAnnuity.KimbleOne__InternalInvoicingCurrencyIsoCode__c)}</apex:outputLabel>
+							<apex:outputPanel layout="none">
+								<div class="requiredInput">
+									<apex:outputPanel layout="none" rendered="{!TheDeliveryElement.InternalRevenueBehaviourRule__r.KimbleOne__CanEditInternalRevenue__c && HasPermission['OverrideInternalRevenue']}"><div class="requiredBlock"></div></apex:outputPanel>
+									<apex:actionStatus id="annuityRevenueRateCalcStatus">
+										<apex:facet name="start">
+											<span style="font-weight: bold;color: #4A4A56;font-size: 91%;"><img src="{!URLFOR($Resource.KimbleOne__LoadingImage)}"/>{!$Label.kimbleone__loading}</span>
+										</apex:facet>
+										<apex:facet name="stop">
+											<apex:outputPanel id="annuity-internal-revenue-input" layout="none">
+												<apex:inputField value="{!TheAnnuity.KimbleOne__IntInvCcyInternalRevenueRate__c}" rendered="{!TheDeliveryElement.InternalRevenueBehaviourRule__r.KimbleOne__CanEditInternalRevenue__c && HasPermission['OverrideInternalRevenue']}"/>
+												<apex:outputField value="{!TheAnnuity.KimbleOne__IntInvCcyInternalRevenueRate__c}" rendered="{!!TheDeliveryElement.InternalRevenueBehaviourRule__r.KimbleOne__CanEditInternalRevenue__c || !HasPermission['OverrideInternalRevenue']}"/>
+											</apex:outputPanel>
+										</apex:facet>
+									</apex:actionStatus>
+								</div>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+
+               			<apex:pageBlockSectionItem rendered="{!HasRevenue && !CanEditAnnuity}" >
+                   			<apex:outputLabel >{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__InvoicingCurrencyRevenueRate__c.Label} ({!InvoicingCurrencyISOCode})</apex:outputLabel>
+                   			<apex:outputtext id="annuity-revenue" value="{!TheAnnuity.KimbleOne__InvoicingCurrencyRevenueRate__c}"  styleclass="format-currency" />
+               			</apex:pageBlockSectionItem>
+
+               			<apex:pageBlockSectionItem rendered="{!HasRevenue && !CanEditAnnuity && isElementInterCompanyInvoiceable}" >
+							<apex:outputLabel >{!$Label.kimbleone__intercompany} {!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__RevenueRate__c.Label} {!JSINHTMLENCODE(TheAnnuity.KimbleOne__InternalInvoicingCurrencyIsoCode__c)}</apex:outputLabel>
+                   			<apex:outputtext id="annuity-internal-revenue" value="{!TheAnnuity.KimbleOne__IntInvCcyInternalRevenueRate__c}"  styleclass="format-currency" />
+               			</apex:pageBlockSectionItem>
+
+               		</apex:pageBlockSection>
+						
+					<apex:pageblockSection id="AnnuityCostsPanel" collapsible="false" showheader="false"  columns="1">
+              			
+	              		<apex:variable var="IsPerUnit" value="{!TheDeliveryElement.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUnitGenerated__c || TheDeliveryElement.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsUnitGenerated__c}"/>
+ 	              		<apex:variable var="HasCost" value="{!TheDeliveryElement.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsPeriodGenerated__c}"/>
+
+              			<apex:pageBlockSectionItem rendered="{!TheDeliveryElement.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsPeriodGenerated__c && TheDeliveryElement.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsPeriodGenerated__c && CanEditAnnuity}" >
+                   			<apex:outputLabel >{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__CostRateRule__c.Label}</apex:outputLabel>
+                   			<apex:actionRegion >
+								<apex:selectRadio id="annuity-cost-rate-rule" layout="lineDirection" value="{!TheAnnuity.KimbleOne__CostRateRule__c}">
+							     	<apex:selectOptions value="{!TheCostRateRules}"/>
+							     	<apex:actionSupport event="onchange" rerender="AnnuityEditMessages, AnnuityCostsPanel" />
+							    </apex:selectRadio>
+							</apex:actionRegion>
+
+               			</apex:pageBlockSectionItem>
+              			
+              			<apex:pageBlockSectionItem rendered="{!HasCost && CanEditAnnuity && TheAnnuity.KimbleOne__CostRateRule__c = FixedCostRateId}" >
+                   			<apex:outputLabel >{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__CostRate__c.Label} ({!TheDeliveryElement.CurrencyIsoCode})</apex:outputLabel>
+                   			<apex:inputfield id="annuity-cost-input" value="{!TheAnnuity.KimbleOne__CostRate__c}" required="true"/>
+               			</apex:pageBlockSectionItem>
+               			
+               			<apex:pageBlockSectionItem rendered="{!HasCost && !CanEditAnnuity && TheAnnuity.KimbleOne__CostRateRule__c = FixedCostRateId}" >
+                   			<apex:outputLabel >{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__CostRate__c.Label} ({!TheDeliveryElement.CurrencyIsoCode})</apex:outputLabel>
+                   			<apex:outputtext id="annuity-cost" value="{!TheAnnuity.KimbleOne__CostRate__c}" styleclass="format-currency"/>
+               			</apex:pageBlockSectionItem>
+               			
+               			<apex:pageBlockSectionItem rendered="{!HasCost && CanEditAnnuity && TheAnnuity.KimbleOne__CostRateRule__c = CostFactorId}" >
+                   			<apex:outputLabel >{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__CostRateFactor__c.Label} (%)</apex:outputLabel>
+                   			<apex:inputfield id="annuity-cost-factor-input" value="{!TheAnnuity.KimbleOne__CostRateFactor__c}" required="true"/>
+               			</apex:pageBlockSectionItem>
+               			
+               			<apex:pageBlockSectionItem rendered="{!HasCost && !CanEditAnnuity && TheAnnuity.KimbleOne__CostRateRule__c = CostFactorId}" >
+                   			<apex:outputLabel >{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__CostRateFactor__c.Label} (%)</apex:outputLabel>
+                   			<apex:outputtext id="annuity-cost-factor" value="{!TheAnnuity.KimbleOne__CostRateFactor__c}" styleclass="format-currency"/>
+               			</apex:pageBlockSectionItem>
+               			 
+						<apex:pageBlockSectionItem rendered="{!IsPerUnit}" >
+                   			<apex:outputLabel >{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__UnitsUnitType__c.Label}</apex:outputLabel>
+            				<apex:selectList id="unit-type" value="{!TheAnnuity.KimbleOne__UnitsUnitType__c}" size="1">
+		                   		<apex:selectOptions value="{!TheRevenueUnitTypes}"/>
+		                   	</apex:selectList>
+						</apex:pageBlockSectionItem>
+						
+						<apex:pageBlockSectionItem rendered="{!IsPerUnit && ISBLANK(TheAnnuity.Id)}" >
+                   			<apex:outputLabel ><apex:outputText value="{!$Label.kimbleone__unitslabel}"/></apex:outputLabel>
+                   			<apex:inputfield id="number-of-units" value="{!InitialNumberOfUnits.KimbleOne__InputInteger__c}" onchange="updateNumberOfUnits();" />
+               			</apex:pageBlockSectionItem>
+						
+						&nbsp;
+						
+		            </apex:pageBlockSection>
+		            
+            		<apex:inputHidden id="annuity-units-pattern" value="{!TheAnnuity.KimbleOne__UnitsPattern__c}"/>
+            		
+            		<apex:inputHidden id="annuity-earliest-change-date" value="{!EarliestChangeDate}"/>
+            		
+            		<apex:inputHidden id="annuity-anniversary-day" value="{!TheAnnuity.KimbleOne__DayOfMonth__c}"/>
+            		
+            		</div>
+            		
+            		<apex:outputPanel style="display:inline-block;vertical-align:top;max-height:371px;overflow-y: scroll;" rendered="{!IsPerUnit}">
+            			
+            			<table id="annuity-periods" class="list" cellpadding="0" border="0" cellspacing="0" style="table-layout: fixed;border-collapse: collapse;width: 0;">
+            				<colgroup>
+            					 <col style="width: 30px;"/><!-- Pos -->
+            					 <col style="width: 180px;"/><!-- Period -->
+            					 <col style="width: 100px;"/><!-- Units -->
+            				</colgroup>
+            				<thead>
+	            				<tr class="headerRow">
+	            					<th></th>
+	            					<th><apex:outputText value="{!$Label.kimbleone__datelabel}"/></th>
+	            					<th><apex:outputText value="{!$Label.kimbleone__unitslabel}"/></th>	
+	            				</tr>
+            				</thead>
+            				<tbody>
+            				
+            				</tbody>
+            			
+            			</table>
+            			
+            		</apex:outputPanel>
+            		
+        		</apex:pageBlock>				
+         
+        </apex:outputPanel>
+  		
+  	</div>	
+	</apex:form>
+
+    <div id="PeriodRevenueEditPopup" style="display:none;">
+  
+		<apex:outputPanel id="PeriodRevenueEdit">
+				
+       			<apex:pageBlock >
+           		 
+            		<apex:pageBlockButtons id="pageBlockButtons" location="top">
+            			<apex:outputPanel layout="none" rendered="{!CanRevertRevenue}">
+							<input id="revertItemButton" class="btn" onclick="revertItem('{!ThePeriodRevenue.Id}');" type="button" value="{!$Label.ReOpenButton}"/>
+						</apex:outputPanel>
+						<input id="cancelPeriodRevenue" class="btn"  type="button" onclick="hideModalBoxy();" value="{!$Label.kimbleone__cancel}"/>
+					</apex:pageBlockButtons>
+    				<apex:pageblockSection collapsible="false" showheader="false"  columns="2">
+    				
+    					<apex:outputField value="{!ThePeriodRevenue.DeliveryElement__r.Name}"/>
+    					<apex:outputField value="{!ThePeriodRevenue.Annuity__r.Name}"/>
+    					
+    					<apex:outputField value="{!ThePeriodRevenue.TimePeriod__r.Name}"/>
+    					<apex:pageBlockSectionItem >
+    						<apex:outputLabel >{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__Status__c.Label}</apex:outputLabel>
+    						<apex:outputField value="{!ThePeriodRevenue.Status__r.Name}"/>
+    					</apex:pageBlockSectionItem>
+    					
+    					<apex:pageBlockSectionItem >
+    						<apex:outputLabel >{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__InvoicingCurrencyForecastRevenue__c.Label}</apex:outputLabel>
+    						<apex:outputPanel layout="none">
+    							<apex:outputField value="{!ThePeriodRevenue.KimbleOne__InvoicingCurrencyIsoCode__c}"/>&nbsp;
+								<apex:outputField value="{!ThePeriodRevenue.KimbleOne__InvoicingCurrencyForecastRevenue__c}"/>
+							</apex:outputPanel>
+    					</apex:pageBlockSectionItem>
+    					
+    					<apex:pageBlockSectionItem >
+    						<apex:outputLabel >{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__ApprovalStatus__c.Label}</apex:outputLabel>
+    						<apex:outputField value="{!ThePeriodRevenue.KimbleOne__ApprovalStatus__c}"/>
+    					</apex:pageBlockSectionItem>
+    					
+    					<apex:outputField value="{!ThePeriodRevenue.KimbleOne__Approver1User__c}"/>
+    					<apex:outputField value="{!ThePeriodRevenue.KimbleOne__Approver2User__c}"/>
+    					
+    				</apex:pageblockSection>
+    			</apex:pageBlock>
+    				
+    			<!-- Approval History -->
+				<apex:relatedList list="ProcessSteps" subject="{!ThePeriodRevenue}" id="PeriodRevenueApprovalHistory" ></apex:relatedList>
+				<script>
+						jQuery(document).ready(function(){
+    						jQuery(function() {
+    							hideSalesForceApprovalProcessButtons();
+    						})
+    					});
+    					function hideSalesForceApprovalProcessButtons()
+    					{
+    							jQuery('input[name="piSubmit"]').remove();
+    							jQuery('input[name="piRemove"]').remove();
+    					}
+				</script>
+    			
+    	</apex:outputPanel>
+    </div>
+    
+    <div id="PeriodCostEditPopup" style="display:none;">
+  
+		<apex:outputPanel id="PeriodCostEdit">
+				
+       			<apex:pageBlock >
+           		 
+            		<apex:pageBlockButtons id="pageBlockButtons" location="top">
+            			<apex:outputPanel layout="none" rendered="{!CanRevertCost}">
+							<input id="revertItemButton" class="btn" onclick="revertItem('{!ThePeriodCost.Id}');" type="button" value="{!$Label.ReOpenButton}"/>
+						</apex:outputPanel>
+						<input id="cancelPeriodCost" class="btn"  type="button" onclick="hideModalBoxy();" value="{!$Label.kimbleone__cancel}"/>
+					</apex:pageBlockButtons>
+    				<apex:pageblockSection collapsible="false" showheader="false"  columns="2">
+    				
+    					<apex:outputField value="{!ThePeriodCost.DeliveryElement__r.Name}"/>
+    					<apex:outputField value="{!ThePeriodCost.Annuity__r.Name}"/>
+    					
+    					<apex:outputField value="{!ThePeriodCost.TimePeriod__r.Name}"/>
+    					<apex:pageBlockSectionItem >
+    						<apex:outputLabel >{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__Status__c.Label}</apex:outputLabel>
+    						<apex:outputField value="{!ThePeriodCost.Status__r.Name}"/>
+    					</apex:pageBlockSectionItem>
+    					
+    					<apex:outputField value="{!ThePeriodCost.KimbleOne__ForecastCost__c}"/>
+    					
+    					<apex:pageBlockSectionItem >
+    						<apex:outputLabel >{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__ApprovalStatus__c.Label}</apex:outputLabel>
+    						<apex:outputField value="{!ThePeriodCost.KimbleOne__ApprovalStatus__c}"/>
+    					</apex:pageBlockSectionItem>
+    					
+    					<apex:outputField value="{!ThePeriodCost.KimbleOne__Approver1User__c}"/>
+    					<apex:outputField value="{!ThePeriodCost.KimbleOne__Approver2User__c}"/>
+    					
+    				</apex:pageblockSection>
+    			</apex:pageBlock>
+    				
+    			<!-- Approval History -->
+				<apex:relatedList list="ProcessSteps" subject="{!ThePeriodCost}" id="PeriodCostApprovalHistory" ></apex:relatedList>
+				<script>
+						jQuery(document).ready(function(){
+    						jQuery(function() {
+    							hideSalesForceApprovalProcessButtons();
+    						})
+    					});
+    					function hideSalesForceApprovalProcessButtons()
+    					{
+    							jQuery('input[name="piSubmit"]').remove();
+    							jQuery('input[name="piRemove"]').remove();
+    					}
+				</script>
+    			
+    	</apex:outputPanel>
+    </div>
+    
+    <div id="AnnuityCompletePopup" style="display:none;">
+  
+		<apex:pageBlock >
+			<apex:pageBlockButtons id="pageBlockButtons" location="bottom" styleClass="AnnuityEditButtonPanel">
+				<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__Annuity__c.updateable}">
+					<input id="completeItemsButton" class="btn" onclick="completeItems();" type="button" value="{!$Label.kimbleone__complete}"/>
+				</apex:outputPanel>
+				<input id="cancelCompleteItemsButton" class="btn"  type="button" onclick="hideModalBoxy();" value="{!$Label.kimbleone__cancel}"/>
+			</apex:pageBlockButtons>
+			<div id="annuity-complete-container"></div>			
+		</apex:pageBlock>
+	</div>
+    
+    <apex:form >
+		<apex:actionFunction action="{!NewAnnuity}" name="newAnnuity" rerender="AnnuityEdit" oncomplete="SetupDatePicker();showModalBoxy()">
+   		</apex:actionFunction>
+   		
+		<apex:actionFunction action="{!ReadAnnuity}" name="readAnnuity" rerender="AnnuityEdit" oncomplete="recalculateAnnuityPeriods();SetupDatePicker();showModalBoxy()">
+       		<apex:param name="annuityId" value="" />
+       	</apex:actionFunction>
+       	
+       	<apex:actionFunction action="{!ReadPeriodRevenue}" name="loadPeriodRevenue" rerender="PeriodRevenueEdit" oncomplete="showModalBoxy()">
+       		<apex:param name="revenueId" value="" />
+       	</apex:actionFunction>
+       	
+       	<apex:actionFunction action="{!ReadPeriodCost}" name="loadPeriodCost" rerender="PeriodCostEdit" oncomplete="showModalBoxy()">
+       		<apex:param name="costId" value="" />
+       	</apex:actionFunction>
+       	
+	</apex:form>
+    
+    <!-- POPUP SCRIPTS -->
+    <script>
+    	var showPeriodRevenue = '{!JSENCODE($CurrentPage.parameters.periodRevenueId)}';
+    	var showPeriodCost = '{!JSENCODE($CurrentPage.parameters.periodCostId)}';
+    	var earliestOpenDate = '{!EarliestOpenDate}';
+    	
+    	var behaviourRules = kimble.parseJSON("{!JSENCODE(BehaviourRulesJson)}");
+    	
+    	function addNewAnnuity()
+		{
+			initialiseModalBoxy('#AnnuityEditPopup', '{!JSENCODE($Label.New)}  {!$ObjectType.Annuity__c.label}', jQuery('form[id$=\'AnnuityEditForm\']'));
+			newAnnuity();
+		}
+		
+		function viewAnnuityDetail(annuityId)
+		{
+			initialiseModalBoxy('#AnnuityEditPopup', '{!JSENCODE($Label.Edit)}  {!$ObjectType.Annuity__c.label}', jQuery('form[id$=\'AnnuityEditForm\']'));
+			readAnnuity(annuityId);
+		}
+		
+		function AnnuityPeriod(startDate, endDate, units, locked)
+		{
+			this.startDate = startDate;
+			this.endDate = endDate;
+			this.units = units;
+			this.locked = locked;
+			
+			this.name = formatAnnuityPeriodDate(this.startDate.toDate()) + ' - ' + formatAnnuityPeriodDate(this.endDate.toDate());
+		}
+		
+		function formatAnnuityPeriodDate(theDate)
+		{
+			return theDate.getDate() + ' ' + kimble.regional.monthNamesShort[theDate.getMonth()];
+		}
+		
+		function calculateEndDate(startDate, num) 
+		{
+		    var endDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0, 0);
+		    
+		    var currentMonth = endDate.getMonth();
+		    endDate.setMonth(endDate.getMonth() + num)
+		
+		    if (endDate.getMonth() != ((currentMonth + num) % 12)){
+		        endDate.setDate(0);
+		    }
+		    
+		    return new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() -1, 0, 0, 0, 0);
+		}
+		
+		function addMonths(dateObj, num) 
+		{
+		    var newDate = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate(), 0, 0, 0, 0);
+		    var currentMonth = newDate.getMonth();
+		    
+		    newDate.setMonth(newDate.getMonth() + num)
+		
+		    if (newDate.getMonth() != ((currentMonth + num) % 12)){
+		        newDate.setDate(0);
+		    }
+		    
+		    return newDate;
+		}
+		
+		function behaviourRuleChange()
+		{
+			setAnniversaryDay();
+			
+			recalculateAnnuityPeriods();
+		}
+		
+		function getAnnuityStartDate()
+		{
+			if (jQuery('[id$="annuity-start-date-input"]').length == 1)
+			{
+				return kimble.parseDate(jQuery('[id$="annuity-start-date-input"]').val(), true);
+			}
+			else
+			{
+				return kimble.parseDate(jQuery('[id$="annuity-start-date"]').text(), true);
+			}
+		}
+		
+		function numberOfPeriodsChange()
+		{
+			var numberOfMonths = kimble.parseNumber(jQuery('[id$="number-of-periods"]').val());
+			
+			jQuery('[id$="annuity-end-date-input"]').val(kimble.formatDate(calculateEndDate(getAnnuityStartDate(), numberOfMonths).toKimbleUTC()));
+			
+			recalculateAnnuityPeriods();
+		}
+		
+		function getTheNumberOfDaysInMonth(year, month) 
+		{
+    		return new Date(year, month + 1, 0).getDate();
+		}
+		
+		function startDateChange()
+		{
+			setAnniversaryDay();
+			
+			recalculateAnnuityPeriods();
+		}
+		
+		function setAnniversaryDay()
+		{
+			var startDate = getAnnuityStartDate();
+			
+			if (startDate == null) return;
+			
+			var mode = behaviourRules[jQuery('[id$="behaviour-rule"]').val()];
+			
+			if (jQuery('[id$="annuity-end-date-input"]').val() == '')
+			{
+				//auto calc end date based on number of periods
+				var numberOfMonths = kimble.parseNumber(jQuery('[id$="number-of-periods"]').val());
+				
+				if (numberOfMonths == null || numberOfMonths == 0) numberOfMonths = 1;
+				
+				jQuery('[id$="annuity-end-date-input"]').val(kimble.formatDate(calculateEndDate(getAnnuityStartDate(), numberOfMonths).toKimbleUTC()));		
+			}
+			
+			if (jQuery('[id$="annuity-earliest-change-date"]').val() == '')
+			{
+				if (mode == 'Forward')
+				{
+					jQuery('[id$="annuity-anniversary-day"]').val(kimble.parseDate(jQuery('[id$="annuity-start-date-input"]').val(), true).getDate());
+				}
+				else if (mode == 'Backward')
+				{
+					jQuery('[id$="annuity-anniversary-day"]').val(addDays(kimble.parseDate(jQuery('[id$="annuity-end-date-input"]').val(), true),1).getDate());
+				}
+				else if (mode == 'StartOfMonth')
+				{
+				    jQuery('[id$="annuity-anniversary-day"]').val(1);
+    			}
+			}
+		}
+		
+		function endDateChange()
+		{
+			setAnniversaryDay();
+			
+			recalculateAnnuityPeriods();
+		}
+		
+		function recalculateAnnuityPeriods()
+		{
+			//recalc all periods based on anniversary day
+			
+			var range = new Array();
+			
+			var i = 1;
+			
+			var startDate = getAnnuityStartDate();
+			
+			if (startDate == null) return;
+			
+			var endDate = kimble.parseDate(jQuery('[id$="annuity-end-date-input"]').val(), true);
+			
+			if (endDate == null)
+			{
+				//auto calc end date based on number of periods
+				var numberOfMonths = kimble.parseNumber(jQuery('[id$="number-of-periods"]').val());
+				
+				if (numberOfMonths == null || numberOfMonths == 0) numberOfMonths = 1;
+				
+				jQuery('[id$="annuity-end-date-input"]').val(kimble.formatDate(calculateEndDate(getAnnuityStartDate(), numberOfMonths).toKimbleUTC()));
+				
+				endDate = kimble.parseDate(jQuery('[id$="annuity-end-date-input"]').val(), true);			
+			}
+			
+			var anniversaryDay = new Number(jQuery('[id$="annuity-anniversary-day"]').val());
+			
+			var mode = behaviourRules[jQuery('[id$="behaviour-rule"]').val()];
+			
+			var units;
+			
+			if (jQuery('[id$="number-of-units"]').length == 1)
+				units = kimble.parseNumber(jQuery('[id$="number-of-units"]').val());
+			
+			if (units == null) units = 1;
+			
+			var unitsPattern = jQuery('[id$="annuity-units-pattern"]').val();
+			
+			unitsPattern = generateUnitsPattern(startDate, endDate, unitsPattern, units);
+			
+			jQuery('[id$="annuity-units-pattern"]').val(unitsPattern);
+			
+			var unitsPatternArray = unitsPattern.split(',');
+			
+			var earliestChangeDateVal = jQuery('[id$="annuity-earliest-change-date"]').val();
+			var earliestChangeDate;
+			
+			if (earliestChangeDateVal != '')
+				earliestChangeDate = earliestChangeDateVal.toDate();
+				
+			//Re generate the periods
+			
+			var contextDate = startDate;
+			
+			var numberOfDays = daysBetween(endDate, startDate);
+			
+			var periodStartDate = startDate;
+			var periodEndDate;
+			var isComplete = false;
+			
+			for (var i=0;i<=numberOfDays;i++)
+			{
+				contextDate = addDays(startDate,i);
+				
+				var numDaysInMonth = getTheNumberOfDaysInMonth(contextDate.getFullYear(), contextDate.getMonth());
+				
+				if (addDays(contextDate,1).getDate() == anniversaryDay || (anniversaryDay > numDaysInMonth && contextDate.getDate() == numDaysInMonth)) // close this period
+				{
+					range.push(new AnnuityPeriod(periodStartDate.toKimbleUTC(), contextDate.toKimbleUTC(), unitsPatternArray[daysBetween(periodStartDate, startDate)], periodStartDate < earliestChangeDate));
+					
+					isComplete = (contextDate.valueOf() == endDate.valueOf());
+					periodStartDate = addDays(contextDate, 1);
+				}
+			}
+			
+			if (!isComplete) range.push(new AnnuityPeriod(periodStartDate.toKimbleUTC(), endDate.toKimbleUTC(), unitsPatternArray[daysBetween(periodStartDate, startDate)], periodStartDate < earliestChangeDate));
+					
+			drawAnnuityPeriods(range);
+		}
+		
+		function updateNumberOfUnits()
+		{
+			//find first editable cell
+			var firstCell = jQuery('.input-units:not([readonly]):first()');
+			
+			if (firstCell.length == 0) return;
+			
+			firstCell.val(jQuery('[id$="number-of-units"]').val());
+			
+			cascadeUnitChange(firstCell[0]);
+		}
+		
+		function isLastDayOfMonth(dte)
+		{			
+			return dte.valueOf() == new Date(dte.getFullYear(), dte.getMonth() + 1, 0, 0, 0, 0, 0).valueOf();		
+		}
+		
+		function drawAnnuityPeriods(range)
+		{
+			var html = '';
+			
+			jQuery.each(range, function (i, period){
+			
+				html += '<tr class="dataRow"><td>' + (i+1) + '</td><td>' + period.name + '</td><td><input ' + (period.locked ? 'readonly' : '') + ' start-date="' + period.startDate + '" onchange="cascadeUnitChange(this)" type="text" value="' + kimble.formatNumber(period.units,'#') + '" class="input-units"/></td></tr>';
+			
+			});
+			
+			jQuery('#annuity-periods>tbody').empty();
+			
+			jQuery(html).appendTo(jQuery('#annuity-periods>tbody'));
+		}
+		
+		function generateUnitsPattern(startDate, endDate, unitsPattern, units)
+		{
+			var existingPattern;
+			if (unitsPattern != '') existingPattern = unitsPattern.split(',');
+			
+			var newPattern = '';
+			
+			var contextDate = startDate;
+			
+			var i = 0;
+			
+			while (contextDate <= endDate)
+			{
+				var u;
+				if (existingPattern != null) u = existingPattern[i];
+				
+				if (u == null || u == '') u = units;
+				
+				newPattern += (u + ',');
+				
+				contextDate = new Date(contextDate.getFullYear(), contextDate.getMonth(), contextDate.getDate() + 1, 0, 0, 0, 0);
+				i++;
+			}
+			
+			return newPattern;
+			
+		}
+		
+		function cascadeUnitChange(obj)
+		{
+			var jObj = jQuery(obj);
+			
+			var changeStartDate = jObj.attr('start-date').toDate();
+			
+			var units = kimble.parseNumber(jObj.val());
+			
+			if (units == null) units = 1;
+			
+			var unitsPattern = jQuery('[id$="annuity-units-pattern"]').val();
+			
+			var startDate = getAnnuityStartDate();
+			
+			var newUsagePattern = '';
+			
+			//push units down from this date to inputs and units pattern
+			jQuery.each(unitsPattern.split(','), function (i, u) {
+				
+				if (u == '') return;
+				var contextDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i, 0, 0, 0, 0);	
+				
+				if (contextDate < changeStartDate) 
+					newUsagePattern += (u + ',');
+				else
+					newUsagePattern += (units + ',');
+			});
+			
+			jQuery('[id$="annuity-units-pattern"]').val(newUsagePattern);
+			
+			jQuery.each(jQuery('.input-units'), function (i, inp) {
+			
+				if (jQuery(inp).attr('start-date').toDate() >= changeStartDate)
+					jQuery(inp).val(kimble.formatNumber(units, '#'));
+			});
+		}
+		
+		function SetupDatePicker()
+		{
+			jQuery('.kimbleDatePicker').datepicker({
+					dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					minDate: earliestOpenDate.toDate(),
+					showOtherMonths: true,
+					selectOtherMonths: true});
+			
+			jQuery.each(jQuery('.format-currency'), function (i, val) {
+			
+				var j = jQuery(val);
+				j.text(kimble.formatNumber(j.text(), '#,###.00'));
+			
+			});
+		}
+		
+		function completeItems()
+		{
+			jQuery('#completeItemsButton, #revertItemsButton, #cancelCompleteItemsButton').prop('disabled', true).addClass('btnDisabled');
+			
+			var ar = new Array();
+			jQuery.each(jQuery('#items-to-status-change input:checked'), function (i, obj) {
+				ar.push(jQuery(obj).prop('id'));
+			});
+			
+			completeSelectedItems(ar);
+		}
+		
+		function revertItems()
+		{
+			jQuery('#completeItemsButton, #revertItemsButton, #cancelCompleteItemsButton').prop('disabled', true).addClass('btnDisabled');
+			
+			var ar = new Array();
+			jQuery.each(jQuery('#items-to-status-change input:checked'), function (i, obj) {
+				ar.push(jQuery(obj).prop('id'));
+			});
+			
+			revertSelectedItems(ar);
+		}
+		
+		function revertItem(id)
+		{
+			jQuery('#revertItemButton, #cancelPeriodCost, #cancelPeriodRevenue').prop('disabled', true).addClass('btnDisabled');
+			revertSelectedItems([id]);
+		}
+		
+		function completeSelectedItems(a)
+		{
+			// saving....
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupAnnuitiesController.CompleteRevenuesAndCosts}',
+	       		a,
+	      			function(result, event){          
+	             		if (event.status) 
+			            {
+			             	refreshElements();
+			             	hideModalBoxy();
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+			         	jQuery('#completeItemsButton, #revertItemsButton, #cancelCompleteItemsButton').prop('disabled', false).removeClass('btnDisabled');
+	         }, 
+	         {escape: true, timeout: 60000});
+		}
+		
+		function revertSelectedItems(a)
+		{
+			// saving....
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupAnnuitiesController.RevertRevenuesAndCosts}',
+	       		a,
+	      			function(result, event){          
+	             		if (event.status) 
+			            {
+			             	refreshElements();
+			             	hideModalBoxy();
+			         	} 
+			         	else if (event.type === 'exception') 
+			         	{
+			             	alert(event.message);
+			         	} 
+			         	else 
+			         	{
+			             	alert(event.message);
+			         	}
+			         	jQuery('#completeItemsButton, #revertItemsButton, #cancelCompleteItemsButton').prop('disabled', false).removeClass('btnDisabled');
+	         }, 
+	         {escape: true, timeout: 60000});
+		}
+    </script>
+    
+    <!-- INITIALISE GRID / GANTT -->
+    <script>
+                                      
+	var annuityData = {};
+	
+    var treeState = {};
+    
+    var annuitiesScreenLayout;
+    var scrollbarWidth = 16;
+    var salesforceHeaderFooterHeight = isSFClassic() ? 225 : 110;
+    var pageInitialising = true;
+    
+	jQuery(window).load(function(){
+	    initialise();
+	});
+    
+    function initialiseLayout()
+    {
+        // create the layout - with data-table wrapper as the layout-content element
+        annuitiesScreenLayout = jQuery('#layout-container').layout({
+            maskIframesOnResize: true, 
+            livePaneResizing:   true
+        ,   east__size:         .51
+        });
+        
+        jQuery.subscribe('kimble.menustatechange', function(){
+            annuitiesScreenLayout.resizeAll();
+        });
+    }
+    
+    function initialise()
+    {
+    	jQuery('#layout-container').height(jQuery(window).height() - salesforceHeaderFooterHeight);
+                
+        initialiseLayout(); 
+        
+        refreshElements();
+        
+        jQuery('#gantt-vertical-scroll-container').scroll(function() {
+            
+            jQuery('#gantt-container').scrollTop(jQuery('#gantt-vertical-scroll-container').scrollTop());
+            jQuery('#grid-body-container').scrollTop(jQuery('#gantt-vertical-scroll-container').scrollTop()); 
+                      
+        });
+        
+        jQuery(window).resize(function() {
+            jQuery('#layout-container').height(jQuery(window).height() - salesforceHeaderFooterHeight);
+            
+            var maxHeight = jQuery('#grid-layout').height() - jQuery('#grid-header-container').height() - 18; //scrollbar
+            jQuery('#gantt-vertical-scroll-container, #grid-body-container, #gantt-container').css('max-height',maxHeight);
+            
+            refreshVerticalScroll();
+            
+        });
+        
+        //subscribe to popup events
+        jQuery.subscribe('kimble.annuityChanged', function(){
+           refreshElements();
+        });
+ 
+        jQuery.subscribe('kimble.annuityDeleted', function(){
+            refreshElements();
+        });
+         
+        defaultDetailViewLayout();   
+        
+        if (showPeriodRevenue != '')
+		{
+			initialisePeriodRevenue(showPeriodRevenue);
+			showPeriodRevenue = '';
+		}
+		
+		if (showPeriodCost != '')
+		{
+			initialisePeriodCost(showPeriodCost);
+			showPeriodCost = '';
+		}
+    }
+    
+	function refreshElements()
+	{
+		jQuery('#loadingIndicatorOuterContainer').parent().show();
+	    
+	    Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DeliveryGroupAnnuitiesController.GetTheAnnuities}',
+			'{!JSENCODE(ContextId)}',
+				function(result, event){          
+				    if (event.status) 
+				    {
+				      	annuityData = result;
+				      	initialiseGrid();
+				  	} 
+				  	else if (event.type === 'exception') 
+				  	{
+				      	alert(event.message);
+				  	} 
+				  	else 
+				  	{
+				      	alert(event.message);
+				  	}
+				  	
+				  	 jQuery('#loadingIndicatorOuterContainer').parent().hide();
+				}, 
+				{escape: true, timeout: 60000});
+	}
+	
+	function initialiseGrid() 
+    {
+    	buildAnnuitiesTable();    
+        
+        drawGantts();
+           
+        jQuery.each(Object.keys(treeState), function (i, key) {jQuery('[node-id="' + key + '"] .indent').click();});
+        
+        jQuery(window).resize();
+        
+        if (pageInitialising) pageInitialising = false;
+    }
+    
+    var theSortedPeriods;
+
+	function drawGantts()
+	{
+			jQuery('#period-header-container').empty();
+	        
+	        jQuery('#gantt-container').empty();
+	        
+	        if (annuityData.TheDeliveryElements == null) return;
+	        
+	        var periodHeaderHtml = '';
+	        
+			firstPeriod = null;
+			
+			theSortedPeriods = Object.keys(annuityData.TheTimePeriods).sort(sortPeriods());
+			
+			jQuery.each(theSortedPeriods, function (i, periodId) {
+				var period = annuityData.TheTimePeriods[periodId];
+				periodHeaderHtml += '<div title="{!$Label.ViewAnnuitiesMessage}" class="timeline-period ' + (period.IsOpen?'open ':'') + '" data-type="period" data-id="' + periodId + '" id="' + periodId + '">' + period.Name + '</div>';
+			});
+			
+			jQuery(periodHeaderHtml).appendTo(jQuery('#period-header-container'));
+			
+			jQuery('#gantt-container').width(jQuery('#period-header-container>.timeline-period').length * 80 + 100);
+			
+			//debugger;
+			
+			jQuery.each(Object.keys(annuityData.TheDeliveryElements).sort(sortMap(annuityData.TheDeliveryElements)), function (i, eleId) {
+	            
+	            var p = jQuery('#gantt-container');
+	            var element = annuityData.TheDeliveryElements[eleId];
+	            
+	            p.append(getElementTimelineHtml(element));
+	         
+				var ganttHtml = '';
+				
+				jQuery.each(Object.keys(element.TheAnnuities).sort(sortMap(element.TheAnnuities)), function (k, annuityId) {
+				
+					var annuity = element.TheAnnuities[annuityId];
+					
+					var left = getPositionForDate(annuity.StartDate);
+					
+					ganttHtml += '<div style="left:' + left + 'px;" class="gantt-container tree-node" parent-node-id="' + eleId + '" node-id="' + annuityId + '"><div class="annuity-periods">';
+					
+					jQuery.each(annuity.ThePeriods, function (x, annuityPeriod){
+						var units = annuity.Units.split(',')[daysBetween(annuityPeriod.StartDate.toDate(), annuity.StartDate.toDate())];
+						
+						//need to calc period width as a % of 80
+						var days = Math.min(28, days_between(annuityPeriod.EndDate.toDate(), annuityPeriod.StartDate.toDate()));
+						var width = days/28 * 80;
+						
+						ganttHtml += '<div class="annuity-period" style="width:' + width + 'px"><span title="' + kimble.formatDate(annuityPeriod.StartDate) + '" class="fa fa-angle-left annuity-period-left"></span>';
+						
+						if (annuity.ShowUnits) ganttHtml += ('<span class="annuity-units">' + units + '</span>');
+						
+						ganttHtml += ('<span title="' + kimble.formatDate(annuityPeriod.EndDate) + '" class="fa fa-angle-right annuity-period-right"></span></div>');
+					});
+					
+					ganttHtml += '</div><div class="revenue-periods">';
+					
+					var revenueHtml = '';
+					var costHtml = '';
+					
+					jQuery.each(theSortedPeriods, function (i, periodId) {
+					
+						var period = annuityData.TheTimePeriods[periodId];
+						
+						if (annuity.ThePeriodRevenues[periodId] != null)
+						{
+							var rev = 0;
+							var width = 80;
+							var isOpen = false;
+							var isRejected = false;
+							
+							var revenues = annuity.ThePeriodRevenues[periodId];
+							
+							if (revenues[0].StartDate.toDate() > period.StartDate.toDate())
+							{
+								var ending = period.EndDate.toDate();
+								ending = new Date(ending.getFullYear(), ending.getMonth(), ending.getDate() + 1, 0, 0, 0, 0).toKimbleUTC();
+								width = getPositionForDate(ending) - getPositionForDate(revenues[0].StartDate);
+							}
+							
+							if (period.EndDate.toDate() > revenues[revenues.length - 1].EndDate.toDate())
+							{
+								width = getPositionForDate(revenues[revenues.length - 1].EndDate) - getPositionForDate(revenues[revenues.length - 1].StartDate);
+							}
+							
+							
+							jQuery.each(revenues, function (x, revenuePeriod) {
+								rev += revenuePeriod.Value;
+								
+								if (revenuePeriod.ApprovalStatus == 'Rejected') isRejected = true;
+								
+								if (revenuePeriod.IsOpen) isOpen = true;
+							});
+							
+							revenueHtml += '<div title="{!$Label.ViewAnnuitiesMessage}" annuity-id="' + annuity.Id + '" annuity-type="revenue" data-id="' + periodId + '" style="width:' + width + 'px;" class="revenue-period ' + (isOpen?'open':'') + (isRejected?' rejected':'') +'">' + kimble.formatNumber(rev) + '</div>';
+						}
+						
+						if (annuity.ThePeriodCosts[periodId] != null)
+						{
+							var cost = 0;
+							var width = 80;
+							var isOpen = false;
+							var isRejected = false;
+							
+							var costs = annuity.ThePeriodCosts[periodId];
+							
+							if (costs[0].StartDate.toDate() > period.StartDate.toDate())
+							{
+								var ending = period.EndDate.toDate();
+								ending = new Date(ending.getFullYear(), ending.getMonth(), ending.getDate() + 1, 0, 0, 0, 0).toKimbleUTC();
+								width = getPositionForDate(ending) - getPositionForDate(costs[0].StartDate);
+							}
+							
+							if (period.EndDate.toDate() > costs[costs.length - 1].EndDate.toDate())
+							{
+								width = getPositionForDate(costs[costs.length - 1].EndDate) - getPositionForDate(costs[costs.length - 1].StartDate);
+							}
+							
+							jQuery.each(costs, function (x, costPeriod) {
+								cost += costPeriod.Value;
+								
+								if (costPeriod.ApprovalStatus == 'Rejected') isRejected = true;
+								
+								if (costPeriod.IsOpen) isOpen = true;
+							});
+							
+							costHtml += '<div title="{!$Label.ViewAnnuitiesMessage}" annuity-id="' + annuity.Id + '" annuity-type="cost" data-id="' + periodId + '" style="width:' + width + 'px;" class="cost-period ' + (isOpen?'open':'') + (isRejected?' rejected':'') + '">' + kimble.formatNumber(cost) + '</div>';
+						}
+					
+					});
+					
+					ganttHtml += revenueHtml + '</div><div class="cost-periods">';
+					
+					ganttHtml += costHtml;
+					
+					ganttHtml += '</div><div class="annuity-name">[' + annuity.Name + ']</div></div>';
+					
+				});
+				
+				p.append(ganttHtml);
+				
+	        });
+			
+			jQuery('.timeline-period, .revenue-period, .cost-period').on('click', function() {
+				
+				initialiseModalBoxy('#AnnuityCompletePopup', '{!JSENCODE($Label.Complete)}  {!$ObjectType.Annuity__c.label}');
+				
+				jQuery('#annuity-complete-container').empty().append(generateAnnuityPeriodTipHtml(jQuery(this).attr('data-id'), jQuery(this).attr('annuity-id'), jQuery(this).attr('annuity-type')));
+
+				// checks to see if the selector contents are empty (i.e. CanComplete  false) and disables the Complete button
+				if (jQuery('#annuity-complete-container').find('td.annuity-select-col:not(:empty)').length > 0 )
+					jQuery('#completeItemsButton').prop('disabled', false);
+				else
+					jQuery('#completeItemsButton').prop('disabled', true);
+
+				showModalBoxy();
+			});
+			
+			jQuery('.timeline-period').on('mouseenter', function(e) {
+				jQuery(this).addClass('emphasise-item');
+				// get the period this belongs to and the annuity
+				var thisPeriodId = jQuery(this).attr('id');				
+				jQuery('div.revenue-period[data-id="' + thisPeriodId + '"]').addClass('emphasise-item');
+				jQuery('div.cost-period[data-id="' + thisPeriodId + '"]').addClass('emphasise-item');
+				jQuery('div.timeline-period:not(.emphasise-item)').addClass('deemphasise-item');
+				jQuery('div.revenue-period:not(.emphasise-item)').addClass('deemphasise-item');
+				jQuery('div.cost-period:not(.emphasise-item)').addClass('deemphasise-item');
+			});
+
+			jQuery('tr.dataRow[node-id]').on('mouseenter', function(e) {
+				var thisAnnuityId = jQuery(this).attr('node-id');
+
+				jQuery(this).addClass('emphasise-row');
+				jQuery('div.gantt-container[node-id!="' + thisAnnuityId + '"]').addClass('deemphasise-item');
+			});
+
+			jQuery('tr.dataRow[node-id]').on('mouseleave', function(e) {
+				jQuery(this).removeClass('emphasise-row');
+				jQuery('div.gantt-container.deemphasise-item').removeClass('deemphasise-item');
+			});
+
+			jQuery('.cost-period, .revenue-period').on('mouseenter', function(e) {
+				jQuery(this).addClass('emphasise-item');
+				// get the period this belongs to and the annuity
+				var thisPeriodId = jQuery(this).attr('data-id');
+				var thisAnnuityId = jQuery(this).closest('.gantt-container').attr('node-id');
+
+				jQuery('div#' + thisPeriodId + '.timeline-period').addClass('emphasise-item');
+				jQuery('div.timeline-period:not(.emphasise-item)').addClass('deemphasise-item');
+				jQuery('div.revenue-period:not(.emphasise-item)').addClass('deemphasise-item');
+				jQuery('div.cost-period:not(.emphasise-item)').addClass('deemphasise-item');
+
+				jQuery('tr.dataRow[node-id="' + thisAnnuityId + '"]').addClass('emphasise-row');
+			});
+
+			jQuery('.timeline-period, .cost-period, .revenue-period').on('mouseleave', function(e) {
+				jQuery('div.emphasise-item').removeClass('emphasise-item');
+				jQuery('div.deemphasise-item').removeClass('deemphasise-item');
+				jQuery('tr.dataRow.emphasise-row').removeClass('emphasise-row');
+			});
+	}
+	
+	function initialisePeriodRevenue(id)
+	{
+		hideModalBoxy();
+		
+		initialiseModalBoxy('#PeriodRevenueEditPopup', '{!$ObjectType.PeriodRevenue__c.label}');
+				
+		loadPeriodRevenue(id);
+	}
+	
+	function initialisePeriodCost(id)
+	{
+		hideModalBoxy();
+		
+		initialiseModalBoxy('#PeriodCostEditPopup', '{!$ObjectType.PeriodCost__c.label}');
+				
+		loadPeriodCost(id);
+	}
+	
+	function getElementTimelineHtml(element)
+	{
+		var timelineHtml = '<div class="gantt-timeline-container tree-node" node-id="' + element.Id + '>';
+		
+		if (element.StartDate == null || element.EndDate == null) return timelineHtml + '</div>';
+		
+		//width to first period
+		
+		var left = getPositionForDate(element.StartDate) - 4;
+		
+		var ending = element.EndDate.toDate();
+		ending = new Date(ending.getFullYear(), ending.getMonth(), ending.getDate() + 1, 0, 0, 0, 0).toKimbleUTC();
+		
+		var width = getPositionForDate(ending) - left + 4;
+		
+		timelineHtml += '<div class="day-content" style="left:' + left + 'px;width:' + width + 'px"><div class="gantt-timeline"></div><div id="left" class="gantt-timeline-left"></div><div id="right" class="gantt-timeline-right"></div></div>';
+		
+		timelineHtml += '</div>';
+	
+		return timelineHtml;		
+	}
+	
+	function getPositionForDate(dte)
+	{
+		var left;
+		var contextDate = dte.toDate();
+		
+		jQuery.each(theSortedPeriods, function (i, periodId) {
+			var period = annuityData.TheTimePeriods[periodId];
+			
+			if (contextDate <= period.EndDate.toDate())
+			{
+				left = jQuery('#' + period.Id).position().left + jQuery('#gantt-view').scrollLeft()
+				
+				var daysInPeriod = daysBetween(period.EndDate.toDate(), period.StartDate.toDate()) + 1;
+				var daysThroughPeriod = daysBetween(contextDate, period.StartDate.toDate());
+				var pctThroughPeriod =  daysThroughPeriod / daysInPeriod;
+				
+				left += (80 * pctThroughPeriod);
+				return false;
+			}
+		});
+		
+		if (left == null) left = jQuery('.timeline-period:last').position().left + jQuery('.timeline-period:last').width() + jQuery('#gantt-view').scrollLeft();
+		
+		return left;
+	}
+	
+	function generateAnnuityPeriodTipHtml(periodId, annuityId, typ)
+	{
+		var html = '<table id="items-to-status-change" class="period-tooltip" cellspacing="0" cellpadding="0" border="0">';
+		html += '<thead><tr><th class="annuity-select-col">{!$Label.SelectLabel}</th><th class="annuity-name-col">{!$ObjectType.Annuity__c.Label}</th><th class="annuity-start-dte-col">{!$ObjectType.Annuity__c.Fields.StartDate__c.Label}</th><th class="annuity-end-dte-col">{!$ObjectType.Annuity__c.Fields.EndDate__c.Label}</th><th class="annuity-type-col">{!$Label.TypeLabel}</th><th class="annuity-value-col">{!$Label.ValueLabel}</th><th class="annuity-approval-status-col">{!$ObjectType.KimbleOne__PeriodRevenue__c.Fields.KimbleOne__ApprovalStatus__c.Label}</th><th class="annuity-status-col">{!$Label.StatusLabel}</th></tr></thead>';
+		
+		jQuery.each(Object.keys(annuityData.TheDeliveryElements).sort(sortMap(annuityData.TheDeliveryElements)), function (i, eleId) {
+	            
+	           var element = annuityData.TheDeliveryElements[eleId];
+	            
+	           jQuery.each(Object.keys(element.TheAnnuities).sort(sortMap(element.TheAnnuities)), function (k, aId) {
+				
+					if (annuityId == aId || annuityId == null)
+					{
+						var annuity = element.TheAnnuities[aId];
+						
+						if ((typ == null || typ == 'revenue') && annuity.ThePeriodRevenues[periodId] != null)
+						{
+							jQuery.each(annuity.ThePeriodRevenues[periodId], function(x, periodRevenue) {
+							
+								var selectorHtml = periodRevenue.CanComplete ? '<input class="btn" id="' + periodRevenue.Id + '" type="checkbox" checked></input>' : '';
+			
+								html += '<tr><td class="annuity-select-col">' + selectorHtml + '</td><td class="annuity-name-col"><a href="javascript:initialisePeriodRevenue(\'' + periodRevenue.Id + '\')">' + annuity.Name + '</a></td><td class="annuity-start-dte-col">' + kimble.formatDate(periodRevenue.StartDate) + '</td><td class="annuity-end-dte-col">' + kimble.formatDate(addDays(periodRevenue.EndDate.toDate(), -1).toKimbleUTC()) + '</td><td class="annuity-type-col">{!$Label.RevenueLabel}</td><td class="annuity-value-col">' + kimble.formatNumber(periodRevenue.Value, annuity.InvoicingCurrencyISOCode + ' #,###.00') + '</td><td>' + (periodRevenue.ApprovalStatus || '')  + '</td><td class="annuity-status-col">' + periodRevenue.Status + '</td></tr>';		
+							});
+						}
+						
+						if ((typ == null || typ == 'cost') && annuity.ThePeriodCosts[periodId] != null)
+						{
+							jQuery.each(annuity.ThePeriodCosts[periodId], function(x, periodCost) {
+							
+								var selectorHtml = periodCost.CanComplete ? '<input class="btn" id="' + periodCost.Id + '" type="checkbox" checked></input>' : '';
+			
+								html += '<tr><td class="annuity-select-col">' + selectorHtml + '</td><td class="annuity-name-col"><a href="javascript:initialisePeriodCost(\'' + periodCost.Id + '\')">' + annuity.Name + '</a></td><td class="annuity-start-dte-col">' + kimble.formatDate(periodCost.StartDate) + '</td><td class="annuity-end-dte-col">' + kimble.formatDate(addDays(periodCost.EndDate.toDate(), -1).toKimbleUTC()) + '</td><td class="annuity-type-col">{!$Label.CostLabel}</td><td class="annuity-value-col">' + kimble.formatNumber(periodCost.Value, annuity.CurrencyISOCode + ' #,###.00') + '</td><td>' + (periodCost.ApprovalStatus || '')  + '</td><td class="annuity-status-col">' + periodCost.Status + '</td></tr>';		
+							});
+						}
+					}
+				});
+		});
+		
+		//html += '<tfoot class="rhs-button-bar"><tr><td style="text-align:center" colspan="6"><input class="btn" onclick="completeItems();" type="button" value="<apex:outputText value="{!$Label.kimbleone__complete}"/>" />&nbsp;<input class="btn" id="cancel" type="button" value="<apex:outputText value="{!$Label.kimbleone__cancel}"/>" onclick="hideModalBoxy();"/></td></tr></tfoot>';
+		
+		html += '</table>';
+		
+		return html;
+	
+	}
+
+    function addDays(dte, days)
+    {
+    	return new Date(dte.getFullYear(), dte.getMonth(), dte.getDate() + days, 0, 0, 0, 0);
+    }
+    
+    
+    function buildAnnuitiesTable()
+    {
+    	jQuery('#grid-header-container').empty();
+		jQuery('#grid-body-container').empty();
+		
+		var colArray = new Array();
+	
+		colArray.push(27); // ACTION
+		colArray.push(188); // Name
+		colArray.push(102); // REVENUE
+		colArray.push(102); // COST
+		colArray.push(102); // START DATE
+		colArray.push(102); // END DATE
+		colArray.push(102); // Forecast Revenue
+		colArray.push(102); // Forecast Cost
+	
+		var colGroup = '<colgroup>';
+	
+		jQuery.each(colArray, function (i, col) {
+			colGroup += '<col style="width: ' + col + 'px;"/>';
+		});
+		colGroup += '</colgroup>';
+	
+		var headerTbl = '<table id="AnnuitiesSummaryTableHead" class="list" border="0" cellpadding="0" cellspacing="0">';
+		headerTbl += colGroup;
+	
+		headerTbl += '<thead>';
+	
+		headerTbl += '<tr class="headerRow" style="height: 26px;">';
+		headerTbl += '<th class="headerRow"><span class="columnLabel"></span></th>';
+    	headerTbl += ('<th class="headerRow sortable " sort1="Name" sort2="StartDate" id="' + (sortBy1.name == 'Name'?'sorted':'nosort') + sortDirection + '"><span class="columnLabel"><h2>{!$ObjectType.Annuity__c.Label}</h2></span></th>');
+		headerTbl += '<th class="headerRow "><span class="columnLabel"><h2>{!$ObjectType.Annuity__c.Fields.InvoicingCurrencyRevenueRate__c.Label}</h2></span></th>';
+		headerTbl += '<th class="headerRow "><span class="columnLabel"><h2>{!$ObjectType.Annuity__c.Fields.CostRate__c.Label}</h2></span></th>';
+    	headerTbl += ('<th class="headerRow sortable " sort1="StartDate" sort2="Name" id="' + (sortBy1.name == 'StartDate'?'sorted':'nosort') + sortDirection + '"><span class="columnLabel"><h2>{!$ObjectType.Annuity__c.Fields.StartDate__c.Label}</h2></span></th>');
+    	headerTbl += ('<th class="headerRow sortable " sort1="EndDate" sort2="Name" id="' + (sortBy1.name == 'EndDate'?'sorted':'nosort') + sortDirection + '"><span class="columnLabel"><h2>{!$Label.EndDateLabel}</h2></span></th>');
+    	
+    	headerTbl += '<th class="headerRow "><span class="columnLabel"><h2>{!$ObjectType.Annuity__c.Fields.ForecastRevenue__c.Label}</h2></span></th>';
+    	headerTbl += '<th class="headerRow "><span class="columnLabel"><h2>{!$ObjectType.Annuity__c.Fields.ForecastCost__c.Label}</h2></span></th>';
+    	
+   	 	headerTbl += '</tr></thead></table>';
+	
+		jQuery(headerTbl).appendTo(jQuery('#grid-header-container'));
+	
+		var bodyTbl = '<table id="AnnuitiesSummaryTableBody" class="list" border="0" cellpadding="0" cellspacing="0">';
+		bodyTbl += colGroup;
+	
+		bodyTbl += '<tbody>';
+	
+		jQuery.each(Object.keys(annuityData.TheDeliveryElements).sort(sortMap(annuityData.TheDeliveryElements)), function (i, eleId) {
+			var indent = '<span class="indent"/>';
+			var element = annuityData.TheDeliveryElements[eleId];
+			
+			var elementRow = '<tr class="element-row tree-node branch expanded" node-id="' + element.Id + '" parent-node-id="" level="0" style="height:51px">';
+			elementRow += '<td></td>';
+			elementRow += ('<td colspan="3">' + indent + element.Name + '</td>');
+	        
+	        elementRow += ('<td>' + kimble.formatDate(element.StartDate) + '</td>');
+	        
+	        elementRow += ('<td>' + kimble.formatDate(element.EndDate) + '</td>');
+	        
+	        elementRow += ('<td>' + element.CurrencyISOCode + ' ' + kimble.formatNumber(element.ForecastRevenue) + '</td>');
+	        
+	        elementRow += ('<td>' + element.CurrencyISOCode + ' ' + kimble.formatNumber(element.ForecastCost) + '</td>');
+	        
+	        elementRow += '</tr>';
+			
+			bodyTbl += elementRow;
+			
+			jQuery.each(Object.keys(element.TheAnnuities).sort(sortMap(element.TheAnnuities)), function (k, annuityId) {
+			
+				var annuity = element.TheAnnuities[annuityId];
+				var annuityRow = '<tr class="dataRow tree-node branch expanded" parent-node-id="' + element.Id + '" node-id="' + annuityId + '" level="1" style="height:51px">';
+				
+				annuityRow += '<td class="action-col">';
+				
+				if (annuity.CanEdit) annuityRow += '<a href="javascript:viewAnnuityDetail(\'' + annuity.Id + '\')" annuity-id="' + annuity.Id + '" ><i class="fa fa-pencil"></i></a>';
+				
+				annuityRow += '</td>';
+								
+				annuityRow += ('<td><span class="indent"/>' + annuity.Name + '</td>');
+				if (annuity.InvoicingRecurringRevenue == null)
+				{
+					annuityRow += '<td></td>';
+				}
+				else
+				{
+					annuityRow += '<td>' + annuity.InvoicingCurrencyISOCode + ' ' + kimble.formatNumber(annuity.InvoicingRecurringRevenue) + '</td>';
+				}
+				
+				if (annuity.RecurringCost == null)
+				{
+					annuityRow += '<td></td>';
+				}
+				else
+				{
+					annuityRow += '<td>' + annuity.CurrencyISOCode + ' ' + kimble.formatNumber(annuity.RecurringCost) + '</td>';
+				}
+				
+				annuityRow += '<td>' + kimble.formatDate(annuity.StartDate) + '</td>';
+	        	annuityRow += ('<td>' + kimble.formatDate(annuity.EndDate) + '</td>');
+	        	annuityRow += ('<td>' + element.CurrencyISOCode + ' ' + kimble.formatNumber(annuity.ForecastRevenue) + '</td>');
+	        	annuityRow += ('<td>' + element.CurrencyISOCode + ' ' + kimble.formatNumber(annuity.ForecastCost) + '</td>');
+				
+				annuityRow += '</tr>';
+				bodyTbl += annuityRow;
+			});
+	
+		});
+	
+		bodyTbl += '</tbody></table>';
+	
+		jQuery(bodyTbl).appendTo(jQuery('#grid-body-container'));
+	
+		jQuery('.sortable').click(function(){	
+			var col = jQuery(this);
+			var new1 = sortFields[col.attr('sort1')];
+			var new2 = sortFields[col.attr('sort2')];
+			
+			if (new1 === sortBy1) //change sort direction
+			{
+				sortDirection = (sortDirection == 'ASC'?'DESC':'ASC');
+			}
+			else
+			{
+				sortBy1 = new1;
+				sortBy2 = new2;
+				sortDirection = 'ASC';
+			}
+			
+			initialiseGrid();
+		});
+    
+		//resetActions();
+    
+    }
+    
+    var datePrimer = function(d){if (d==null) return null; return d.toDate()};
+	var stringPrimer = function(s){return s};
+	
+	var sortFields = {StartDate:{name:'StartDate', primer:datePrimer}, EndDate:{name:'EndDate', primer:datePrimer}, Name:{name:'Name', primer:stringPrimer}};
+	
+	//DEFAULT SORT
+	var sortBy1 = sortFields['Name'];
+	var sortBy2 = sortFields['StartDate'];
+	var sortDirection = 'ASC';
+	
+	function sortList(a, b)
+	{
+		var x = sortBy1.primer(a[sortBy1.name]);
+		var y = sortBy1.primer(b[sortBy1.name]);
+				
+		if (sortDirection == 'ASC')
+		{
+			if (x == y) return sortBy2.primer(a[sortBy2.name]) > sortBy2.primer(b[sortBy2.name]);
+			return x > y;
+		}
+		else
+		{
+			if (x == y) return sortBy2.primer(b[sortBy2.name]) > sortBy2.primer(a[sortBy2.name]);
+			return y > x;
+		}
+	}
+	
+	function sortMap(source)
+	{
+		return function(a, b) {
+			var x = sortBy1.primer(source[a][sortBy1.name]);
+			var y = sortBy1.primer(source[b][sortBy1.name]);
+				
+			if (sortDirection == 'ASC')
+			{
+				if (x == y) return sortBy2.primer(source[a][sortBy2.name]) > sortBy2.primer(source[b][sortBy2.name]);
+				return x > y;
+			}
+			else
+			{
+				if (x == y) return sortBy2.primer(source[b][sortBy2.name]) > sortBy2.primer(source[a][sortBy2.name]);
+				return y > x;
+			}
+		}
+	}
+	
+	function sortPeriods()
+	{
+		return function(a, b) {
+			var x = annuityData.TheTimePeriods[a].StartDate.toDate().valueOf();
+			var y = annuityData.TheTimePeriods[b].StartDate.toDate().valueOf();
+			
+			if (x < y) //sort string ascending
+	  			return -1;
+	 		if (x > y)
+	  			return 1;
+	 		return 0; //default return value (no sorting)
+		}
+	}
+	
+	// remove the preference remember dropdown after a short period if not closed by clicking away or used to set a preference
+    var prefDropdownTimer;
+    jQuery('.annuity-view-pref').on('show', function(event, dropdownData) {
+    	if(prefDropdownTimer)
+    	{
+			clearTimeout(prefDropdownTimer);
+            prefDropdownTimer = null;
+		}
+        
+		prefDropdownTimer = setTimeout(function() {
+                	dropdownData.dropdown.hide();
+                	jQuery('.annuity-view-pref-trigger').removeClass('floating-dropdown-open');
+                }, 2000);
+	});
+	
+	jQuery(document).ready(function() {
+	    jQuery('input[type=radio][name=view-pref-group]').change(function() {
+	        setDefaultViewPreference(this.value);
+	    });
+	});
+    
+    function defaultDetailViewLayout() 
+    {
+    	if (readCookie('kimble.annuityscreenstate') == 'gantt')
+    	{
+    		showGantt();
+        	setDefaultViewIndicator('gantt');
+    	}
+    	else if (readCookie('kimble.annuityscreenstate') == 'details')
+    	{
+    		showDetails();
+    		setDefaultViewIndicator('details');
+    	}
+    	else
+    	{
+    		showBoth();
+    		setDefaultViewIndicator('both');
+    	}
+    }
+    
+    function setDefaultViewIndicator(viewName)
+    {
+    	jQuery("input:radio[name='view-pref-group']").filter("[value='" + viewName + "']").attr('checked', true);
+    }
+            
+    function setDefaultViewPreference(viewName)
+    {
+   		createCookie('kimble.annuityscreenstate', viewName);
+	}
+	
+	function showGantt() {
+        annuitiesScreenLayout.sizePane( 'east', jQuery('#layout-container').width() - 224 );
+        annuitiesScreenLayout.open( 'east' );
+    }
+    
+    function showBoth() {
+        annuitiesScreenLayout.sizePane( 'east', .51 );
+        annuitiesScreenLayout.open( 'east' );
+    }
+    
+    function showDetails() {
+        annuitiesScreenLayout.close( 'east' );
+    }
+	
+	function refreshVerticalScroll()
+    {
+        if (jQuery('#grid-body-container>table').height() > $('#grid-body-container').height())
+            jQuery('#verticalScroll').height(jQuery('#grid-body-container>table').height()).show();
+        else
+            jQuery('#verticalScroll').hide();
+    }
+                    </script>
+    
+    
+    <style>
+        
+body {
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -o-user-select: none;
+    user-select: none;
+}
+
+.default-view-ind {
+	position: absolute;
+	padding-left: 6px;
+	padding-top: 3px;
+}
+
+.view-pref-link {
+/* 	text-align: left; */
+	padding-right: 27px !important;
+}
+
+.annuity-row {
+    height: 51px;
+}
+
+.annuity-name-col {
+	width: 250px;
+}
+.annuity-start-dte-col, .annuity-end-dte-col, .annuity-type-col {
+	width: 58px;
+}
+
+.annuity-value-col {
+	width: 110px;
+}
+.annuity-status-col, .annuity-select-col {
+	width: 85px;
+}
+
+td .annuity-status-col, td .annuity-select-col {
+	text-align: center;
+}
+
+#items-to-status-change th {
+	padding: 1px 8px;
+}
+
+.rightAlignDataCell {
+    text-align: right;
+    padding-right: 5px;
+}
+
+.rightAlignCell {
+    text-align: right;
+}
+
+.centerAlignDataCell {
+    text-align: center;
+}
+
+.element-row {
+    font-style:italic;
+    font-weight:bold;
+    height: 25px;
+    background-color: #EDEDED;
+}
+
+.element-row:hover, .twister:hover {
+    cursor: pointer;
+}
+
+/*
+    sortable columns
+*/
+
+th.sortable {
+    cursor: pointer;
+}
+
+th.sortable:hover {
+    background-color: #E6EAEA !important;
+}
+
+#sortedASC {
+    background-image: url('/img/alohaSkin/sortArrows_sprite.png');
+    background-position: 100% -9px;
+    background-repeat: no-repeat;
+}
+
+#sortedDESC {
+    background-image: url('/img/alohaSkin/sortArrows_sprite.png');
+    background-position: 100% 7px;
+    background-repeat: no-repeat;
+}
+
+
+/*
+    loading panel
+*/
+
+.loadingIndicator {
+   top:0;
+   right:0;
+   width:100%;
+   height:100%;
+   font-weight: bold;
+   position:absolute;
+   text-align:center;
+   /* IE filter */
+   filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+   -moz-opacity:0.7;    /* Mozilla extension */
+   -khtml-opacity:0.7;  /* Safari/Conqueror extension */
+   opacity:0.7; /* CSS3 */
+   z-index:1000;
+   background-color:white;
+}
+
+.loadingIndicator img {
+    margin-right:9px;
+}
+
+#loadingIndicatorInnerContainer { 
+    position:absolute; 
+    top:50%;
+    height:10em; 
+    margin-top:-2em;
+    width:100%;
+}
+
+/*
+    layout control
+*/
+
+.ui-layout-center,.ui-layout-east, .ui-layout-west {
+    padding: 0;
+}
+
+.ui-layout-content {
+    padding: 0px;
+}
+
+/*
+    fixed width columns
+*/
+#container{position:relative;}
+
+#gantt-vertical-scroll-container {
+    overflow-y: scroll;    position: absolute;    right: 0px;    bottom: 16px;
+}
+#AnnuitiesSummaryTableHead, #AnnuitiesSummaryTableBody {
+    width: auto;
+    table-layout: fixed;
+    border-collapse: collapse;
+    width: 0; /* otherwise Chrome will not increase table size */
+}
+
+#AnnuitiesSummaryTableHead th, #AnnuitiesSummaryTableHead td, #AnnuitiesSummaryTableBody th, #AnnuitiesSummaryTableBody td { 
+     overflow: hidden;
+     white-space: nowrap;
+}
+
+.columnLabel {
+    display: inline-block;    
+}
+
+/* handle for FF */
+@-moz-document url-prefix() {
+    .resizeHelper,.ui-resizable-e {
+        position: relative;
+        float: right;
+    }
+}
+.sizeable{position:relative;}
+
+.timeline-period {
+   		padding-top: 4px;
+   		display: inline-block;
+		width: 80px;
+		text-align: center;
+		background-color: #1797C0;
+		color: #FFF !important;
+		font-weight: bold;
+		white-space: nowrap;
+		font-size: 0.75em;
+		height: 29px;
+		line-height: 23px;
+		text-align: center;
+		border-bottom: solid #FFF 2px;
+		border-right: solid #FFF 2px;
+		box-sizing: border-box;
+		-moz-box-sizing: border-box;
+		-webkit-box-sizing: border-box;
+	}
+.gantt-timeline-container {
+    white-space: nowrap;  height: 51px;position:relative;
+}
+
+.gantt-timeline {
+    background-color: #000;  height: 5px;  width: 100%;  position: absolute;  z-index: 10;  
+    bottom: 50%;
+}
+
+.gantt-timeline-left {
+    position: absolute;  left: -2px;  height: 11px;  width: 11px;  
+    bottom: 16px;  background: rgba(0, 0, 0, 0) url('/img/alohaSkin/twisty_sprite.png') 0px 0px no-repeat;  background-position: 1px -12px;  z-index: 10;
+}
+
+gantt-timeline-right {
+    position: absolute;  right: 0px;  position: absolute;  height: 11px;  width: 11px;  bottom: 4px;  background: rgba(0, 0, 0, 0) url('/img/alohaSkin/twisty_sprite.png') 0px 0px no-repeat;  background-position: 1px -12px;  z-index: 10;
+}
+
+.gantt-timeline-right {
+    position: absolute;  right: 0px;  position: absolute;  height: 11px;  width: 11px;  
+    bottom: 16px;  background: rgba(0, 0, 0, 0) url('/img/alohaSkin/twisty_sprite.png') 0px 0px no-repeat;  background-position: 1px -12px;  z-index: 10;
+}
+.gantt-container {
+    position: relative;
+    height: 51px;
+    white-space: nowrap;
+}
+
+/*.annuity-period {
+    display: inline-block;
+    height: 14px;
+    background-color: #4CC417;
+    width: 80px;
+    border-right: 1px solid white;
+    box-sizing: border-box;  -moz-box-sizing: border-box;  -webkit-box-sizing: border-box;
+    color: #FFF;
+	text-align: center;
+	vertical-align: middle;
+	line-height: 14px;
+}*/
+
+.annuity-period {
+    display: inline-block;
+	height: 1px;
+	margin-top: 6px;
+	margin-bottom: 7px;
+	background-color: #BBB;
+    width: 80px;
+    border-right: 1px solid white;
+    box-sizing: border-box;  -moz-box-sizing: border-box;  -webkit-box-sizing: border-box;
+    color: #FFF;
+	text-align: center;
+	vertical-align: middle;
+	line-height: 14px;
+}
+
+.annuity-period-left {
+    color: #bbb;
+    float: left;
+    top: -8px;
+	position: relative;
+	font-size: 17px;
+}
+
+.annuity-period-right {
+    color: #bbb;
+    float: right;
+    top: -8px;
+	position: relative;
+	font-size: 17px;
+}
+
+.annuity-units {
+    bottom: 6px;
+    position: relative;
+    font-weight: bold;
+	background: #FFF;
+	color: #000;
+	padding: 0px 3px;
+}
+
+.revenue-periods, .cost-periods {
+    white-space: nowrap;
+}
+.revenue-period, .cost-period {
+    display: inline-block;
+    border-right: 1px solid white;
+    border-top: 1px solid white;
+    box-sizing: border-box;  -moz-box-sizing: border-box;  -webkit-box-sizing: border-box;
+    color: #FFF;
+	text-align: center;
+	vertical-align: middle;
+	line-height: 14px;
+	background-color:#008752;
+	cursor:pointer;
+}
+
+.revenue-period.open {
+	background-color:#729BC7;
+}
+.cost-period.open {
+	background-color:#E68F1A;
+}
+.cost-period.rejected, .revenue-period.rejected
+{
+	background-color:#B42D34;
+}
+.emphasise-item {
+    transform: scale(1.5);
+    transition: all .1s linear;
+	width: 80px !important;
+	z-index: 999;
+}
+
+.emphasise-row {
+	background-color: #E7F4F8;
+}
+
+.revenue-period.emphasise-item {
+	transform-origin: 39px 15px;
+}
+
+.cost-period.emphasise-item {
+	transform-origin: 39px 0px;
+}
+
+.deemphasise-item {
+	opacity: 0.5;
+	transition: all .1s linear;
+}
+
+.annuity-name {
+    display: none;
+}
+table.period-tooltip td {
+	padding: 8px;
+	font-size: 11px;
+	color: #4A4A56;
+}
+
+table.period-tooltip tbody tr:nth-child(odd) {
+	background-color: #ededed;
+}
+
+/*head:first-child+body #items-to-status-change tbody {
+	display: block;
+	max-height: 380px;
+	overflow: auto;
+	width: 100%
+}*/
+.rhs-button-bar {
+	float: right;
+	padding-bottom: 4px;
+}
+input.input-units {
+    width: 80px;
+}
+</style>
+	</apex:define>
+
+</apex:composition>
+
+</apex:page>

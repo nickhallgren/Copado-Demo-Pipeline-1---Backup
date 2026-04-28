@@ -1,0 +1,882 @@
+<apex:page standardController="KimbleOne__Invoice__c" extensions="KimbleOne.InvoiceNewController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__Invoice__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+      
+    </apex:define>
+    
+    <apex:define name="Content">
+    	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__InvoiceManagement)}" />
+    	<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+    	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+    	
+    	<apex:form id="TheForm">
+    	<div id="pageErrors">
+    		<apex:pageMessages escape="False" />
+		</div>
+		
+		<apex:pageBlock title="{!IF (IsNegativeInvoiceMode, $Label.kimbleone__createnewcreditnoteheading, $Label.kimbleone__createnewinvoiceheading)}">
+           	<apex:pageBlockButtons location="bottom">
+           		<apex:commandButton action="{!Cancel}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__cancel}" rerender="TheForm" rendered="{!TheInvoiceCreationWizard.CanCancel}"/>
+           		<apex:commandButton id="goPreviousBtn" action="{!TheInvoiceCreationWizard.GoPrevious}" styleclass="DisableButtonWhileBusy" onclick="processInvoiceContacts();" value="{!$Label.kimbleone__previous}" reRender="TheForm" rendered="{!TheInvoiceCreationWizard.CanGoPrevious && TheInvoiceCreationWizard.CurrentStep.StepName != 'SelectDeliveryElements'}" oncomplete="rerenderWizardPageComplete()"/>
+            	<apex:commandButton id="goNextBtn" action="{!TheInvoiceCreationWizard.GoNext}" styleclass="DisableButtonWhileBusy theNextButton" onclick="processInvoiceContacts();" value="{!TheInvoiceCreationWizard.NextLabel}" reRender="TheForm" rendered="{!TheInvoiceCreationWizard.CanGoNext}" oncomplete="rerenderWizardPageComplete()" disabled="{!TheInvoiceCreationWizard.IsFinishDisabled}"/>
+            </apex:pageBlockButtons>
+
+            <script>
+            jQuery(window).load(function(){
+                rerenderWizardPageComplete();
+            });
+
+            function rerenderWizardPageComplete() {
+                kimble.formatCurrencies();
+               	SetupDatePicker();
+            }
+
+            function SetupDatePicker()
+            {
+				jQuery('.kimbleDatePicker:not(.filter)').datepicker({
+				dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+				showOtherMonths: true,
+				selectOtherMonths: true,
+				changeMonth: true,
+				changeYear: true});
+            }
+            </script>
+
+			<!-- SELECT ACCOUNT -->
+           	<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__selectaccountheading}" columns="1" rendered="{!TheInvoiceCreationWizard.CurrentStep.StepName == 'SelectAccountStep'}">
+				<apex:inputField value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__Account__c}"/>
+				
+			</apex:pageblockSection>
+			
+			<!--  Run the invoice schedule jobs (if any) -->
+			<apex:outputPanel layout="none" rendered="{!TheInvoiceCreationWizard.CurrentStep.StepName == 'RunInvoiceScheduleJobs'}">
+			
+				<apex:actionFunction action="{!TheInvoiceCreationWizard.GoNext}" name="GoNext" reRender="TheForm" onComplete="rerenderWizardPageComplete();"></apex:actionFunction>
+				<div id="InvoiceScheduleJobs">
+				
+				</div>
+				<script>
+					$(function () {
+		                	loadJobsInline($('#InvoiceScheduleJobs'), '{!JSINHTMLENCODE(JobContextId)}','{!JSENCODE($Label.InitialisingInvoicingdataMessage)}', invoicingJobsComplete);
+		            });
+		            
+		            function invoicingJobsComplete(ranJobs)
+		            {
+		            	if (ranJobs) // see if there are more to run
+		            		refreshJobs();
+		            	else
+		            		GoNext();
+		            }
+		            
+		        </script>
+		        
+		        <apex:actionFunction name="refreshJobs" rerender="TheForm"/>
+		        
+			</apex:outputPanel>	
+			
+           	<!-- SELECT DELIVERY ELEMENTS TO INCLUDE -->
+			<apex:outputPanel layout="none" rendered="{!TheInvoiceCreationWizard.CurrentStep.StepName == 'SelectDeliveryElements'}">
+			<apex:pageblockSection >
+				<apex:outputField value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__Account__c}"/>
+				<apex:pageBlockSectionItem >
+							<!-- render the selector but hidden if there is only one choice to preserve the layout and pass through the default to the controller -->
+							<apex:outputText value="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__Locale__c.Label}" styleClass="{!IF(TheInvoiceLocales.size == 1,'hidden-item','')}"/>
+							<apex:selectList id="invoiceLocaleSelect" value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__Locale__c}" size="1" styleClass="{!IF(TheInvoiceLocales.size == 1,'hidden-item','')}">
+								<apex:selectOptions value="{!TheInvoiceLocales}"/>
+							</apex:selectList> 
+				</apex:pageBlockSectionItem>
+				
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!IF (IsNegativeInvoiceMode, $ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__CreditNoteDate__c.Label, $ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__InvoiceDate__c.Label)}" />
+					<apex:inputField styleClass="kimbleDatePicker" value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__InvoiceDate__c}">
+						<apex:actionSupport event="onchange" action="{!TheInvoiceCreationWizard.InvoiceDateChange}" rerender="InvoiceDeliveryElements"/>
+					</apex:inputField>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem >
+						<apex:outputText value="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__InvoiceFormat__c.Label}" />
+						<apex:selectList id="invoiceFormatSelect" value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__InvoiceFormat__c}" size="1">
+							<apex:selectOptions value="{!TheInvoiceFormats}"/>
+						</apex:selectList> 
+				</apex:pageBlockSectionItem> 
+
+			</apex:pageblockSection>
+			
+			<apex:pageblockSection id="InvoiceDeliveryElements" collapsible="false" showheader="true" title="{!IF (IsNegativeInvoiceMode, $Label.kimbleone__genericlabel07, $Label.kimbleone__selectelementstoincludeoninvoiceheading)}" columns="1" >
+           		<apex:outputPanel rendered="{!TheInvoiceCreationWizard.TheGroupsAndElementsForSelection.size == 0}">
+           			<apex:outputText value="{!IF (IsNegativeInvoiceMode, $Label.kimbleone__genericlabel08, $Label.kimbleone__nothingtoinvoicemessage)}"/>
+           		</apex:outputPanel>
+           		<!--  if TheInvoiceCreationWizard.TheGroupsAndElementsForSelection.length == 1 then render list else render tree -->
+           		<apex:repeat value="{!TheInvoiceCreationWizard.TheGroupsAndElementsForSelection}" var="grp">
+           			<apex:pageBlockTable value="{!grp.DeliveryElements__r}" var="element">
+						<apex:facet name="header"><apex:outputlink value="/{!grp.Id}"><apex:outputText value="{!grp.Name}"/></apex:outputlink></apex:facet>
+						<apex:column width="2%" style="text-align:center;" headerValue="{!$Label.kimbleone__filter}">
+							<span onclick="showFilter('{!element.Id}')" class="fa fa-filter filter-items {!IF(TheInvoiceCreationWizard.DeliveryElementItemsFilter[element.Id].HasFilter, 'filter-items-on','filter-items-off')}"></span>
+						</apex:column>
+						<apex:column width="5%" style="text-align:center;" headerValue="">
+							<apex:facet name="header"><div style="text-align:center"><input type="checkbox" onclick="checkAll(this)"/></div></apex:facet>
+							<apex:inputField styleClass="include-element" value="{!TheInvoiceCreationWizard.TheDeliveryElementsForSelection[element.Id].InputCheckbox__c}"/>
+						</apex:column>
+						<apex:column width="40%" value="{!element.Name}" />
+						<apex:column width="25%" headervalue="{!IF (IsNegativeInvoiceMode, $Label.kimbleone__genericlabel05, $Label.kimbleone__invoiceableamountlabel)}">
+							<apex:outputPanel layout="block" rendered="{!!IsInterCompanyInvoice && !IsNegativeInvoiceMode}">
+								<apex:outputPanel layout="block">
+									<apex:outputText value="{!$Label.kimbleone__serviceslabel} "/>
+									<apex:outputText value="{!element.KimbleOne__InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+									<apex:outputField value="{!element.KimbleOne__InvoicingCcyServicesInvoiceableAmount__c}" />
+								</apex:outputPanel>
+								<apex:outputPanel layout="block" rendered="{!element.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsExpenseGenerated__c}">
+									<apex:outputText value="{!$Label.kimbleone__expenseslabel} "/>
+									<apex:outputText value="{!element.KimbleOne__InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+									<apex:outputField value="{!element.KimbleOne__InvoicingCcyExpensesInvoiceableAmount__c}" />
+								</apex:outputPanel>
+							</apex:outputPanel>
+							<apex:outputPanel layout="block" rendered="{!IsInterCompanyInvoice && !IsNegativeInvoiceMode}">
+								<apex:outputPanel layout="block">
+									<apex:outputText value="{!$Label.kimbleone__serviceslabel} "/>
+									<apex:outputText value="{!TheInvoiceCreationWizard.TheDeliveryElementIntercompanySummariesMap[element.Id].InternalInvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+									<apex:outputField value="{!TheInvoiceCreationWizard.TheDeliveryElementIntercompanySummariesMap[element.Id].IntInvCcyServicesInvoiceableAmount__c}" />
+								</apex:outputPanel>
+								<apex:outputPanel layout="block" rendered="{!element.InternalRevenueBehaviourRule__r.RevenueGenerationModel__r.KimbleOne__IsExpenseGenerated__c}">
+									<apex:outputText value="{!$Label.kimbleone__expenseslabel} "/>
+									<apex:outputText value="{!TheInvoiceCreationWizard.TheDeliveryElementIntercompanySummariesMap[element.Id].InternalInvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+									<apex:outputField value="{!TheInvoiceCreationWizard.TheDeliveryElementIntercompanySummariesMap[element.Id].IntInvCcyExpensesInvoiceableAmount__c}" />
+								</apex:outputPanel>
+							</apex:outputPanel>
+							<apex:outputPanel layout="block" rendered="{!!IsInterCompanyInvoice && IsNegativeInvoiceMode}">
+								<apex:outputPanel layout="none" rendered="{!TheInvoiceCreationWizard.TheDeliveryElementNegativeInvoiceAmountsMap[element.Id].ServicesAmount != 0 || TheInvoiceCreationWizard.TheDeliveryElementNegativeInvoiceAmountsMap[element.Id].ExpensesAmount != 0}">
+									<apex:outputPanel layout="block">
+										<apex:outputText value="{!$Label.kimbleone__serviceslabel} "/>
+										<apex:outputText value="{!element.KimbleOne__InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+										<apex:outputText value="{!TheInvoiceCreationWizard.TheDeliveryElementNegativeInvoiceAmountsMap[element.Id].ServicesAmount}" />
+									</apex:outputPanel>
+									<apex:outputPanel layout="block" rendered="{!element.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsExpenseGenerated__c}">
+										<apex:outputText value="{!$Label.kimbleone__expenseslabel} "/>
+										<apex:outputText value="{!element.KimbleOne__InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+										<apex:outputText value="{!TheInvoiceCreationWizard.TheDeliveryElementNegativeInvoiceAmountsMap[element.Id].ExpensesAmount}" />
+									</apex:outputPanel>
+								</apex:outputPanel>
+								<apex:outputPanel layout="none" rendered="{!TheInvoiceCreationWizard.TheDeliveryElementNegativeInvoiceAmountsMap[element.Id].ServicesAmount == 0 && TheInvoiceCreationWizard.TheDeliveryElementNegativeInvoiceAmountsMap[element.Id].ExpensesAmount == 0}">
+									<apex:outputPanel layout="block" rendered="{!element.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsExpenseGenerated__c}">
+										<apex:outputText value="{!$Label.kimbleone__all} "/>
+										<apex:outputText value="{!element.KimbleOne__InvoicingCurrencyIsoCode__c}" styleclass="kimbleCurrencyCode" />
+										<apex:outputText value="{!TheInvoiceCreationWizard.TheDeliveryElementNegativeInvoiceAmountsMap[element.Id].TotalAmount}" />
+									</apex:outputPanel>
+								</apex:outputPanel>
+							</apex:outputPanel>
+						</apex:column>
+						<apex:column headervalue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__BillingAccount__c.Label}" rendered="{!!IsInterCompanyInvoice}">
+							<apex:outputField value="{!element.KimbleOne__BillingAccount__c}"/>
+						</apex:column>
+						<apex:column headervalue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__TaxCode__c.Label}" rendered="{!!IsInterCompanyInvoice}">
+							<apex:outputField value="{!element.KimbleOne__TaxCode__c}"/>
+						</apex:column>
+						<apex:column headerValue="{!$Label.kimbleone__purchaseorderslabel}" rendered="{!!IsInterCompanyInvoice}">
+                            <div style="white-space: nowrap;">
+                                <apex:outputText value="{!element.PurchaseOrderRule__r.Name}"/>
+                            </div>
+                            <apex:outputPanel layout="none" rendered="{!!TheInvoiceCreationWizard.PurchaseOrderSelectionEnabled && !IsNegativeInvoiceMode}">
+                                <!-- The ALL cases -->
+                                <apex:outputPanel layout="block" rendered="{!TheInvoiceCreationWizard.DeliveryElementPurchaseOrderRemaining[element.id].AllRemaining.InputCurrency__c > 0}">
+                                    {!$Label.PurchaseOrderCoverRemainingLabel}&nbsp;<apex:outputField value="{!TheInvoiceCreationWizard.DeliveryElementPurchaseOrderRemaining[element.id].AllRemaining.InputCurrency__c}"/>
+                                </apex:outputPanel>
+
+                                <!--  not the ALL cases -->
+                                <apex:outputPanel layout="block" rendered="{!TheInvoiceCreationWizard.DeliveryElementPurchaseOrderRemaining[element.id].ServicesRemaining.InputCurrency__c > 0}">
+                                    {!$Label.ServicesPurchaseOrderCoverRemainingLabel}&nbsp;<apex:outputField value="{!TheInvoiceCreationWizard.DeliveryElementPurchaseOrderRemaining[element.id].ServicesRemaining.InputCurrency__c}"/>
+                                </apex:outputPanel>
+
+                                <apex:outputPanel layout="block" rendered="{!TheInvoiceCreationWizard.DeliveryElementPurchaseOrderRemaining[element.id].ExpensesRemaining.InputCurrency__c > 0}">
+                                    {!$Label.ExpensesPurchaseOrderCoverRemainingLabel}&nbsp;<apex:outputField value="{!TheInvoiceCreationWizard.DeliveryElementPurchaseOrderRemaining[element.id].ExpensesRemaining.InputCurrency__c}"/>
+                                </apex:outputPanel>
+                            </apex:outputPanel>
+                            <apex:outputPanel layout="none" rendered="{!(TheInvoiceCreationWizard.PurchaseOrderSelectionEnabled && !IsNegativeInvoiceMode) || IsNegativeInvoiceMode}">
+                                <div id="purchase-order-selection" style="max-height:100px;overflow-y:auto;white-space: nowrap;">
+                                    <apex:repeat var="alloc" value="{!TheInvoiceCreationWizard.ThePurchaseOrderAllocations[element.id]}">
+                                        <div>
+                                            <span style="vertical-align: middle;"><apex:inputField value="{!TheInvoiceCreationWizard.ThePurchaseOrdersForSelection[alloc.Id].InputCheckbox__c}"/></span>
+                                            <span><apex:outputText value="{!alloc.PurchaseOrder__r.Name}"/></span>
+                                            (<span class="kimble-format-currency" data-currency="{!JSENCODE(alloc.CurrencyISOCode)}"><apex:outputText value="{!alloc.RemainingValue__c}"/></span>&nbsp;<span><apex:outputText value="{!$Label.kimbleone__deliverygrouphomeremaining}"/></span>)
+                                        </div>
+                                    </apex:repeat>
+                                </div>
+							</apex:outputPanel>
+						</apex:column>
+					</apex:pageBlockTable>
+				
+           		</apex:repeat>
+           		<script>
+				function checkAll(obj)
+				{
+					jQuery('.include-element').prop('checked', jQuery(obj).prop('checked'));
+    			}
+				</script>
+           	</apex:pageblockSection>
+           	<div id="filter-panel-popup" style="display:none">
+           		<apex:outputPanel id="TheFilter">
+           			<apex:outputPanel rendered="{!!ISBLANK(TheInvoiceCreationWizard.CurrentFilterId)}">
+           				<apex:pageblock >
+           					<apex:pageBlockButtons location="top">
+           						<apex:commandButton id="applyFilterButton" action="{!TheInvoiceCreationWizard.ApplyElementItemsFilter}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__applyfilter}" rerender="TheForm" oncomplete="hideModalBoxy()"/>
+								<apex:commandButton action="{!TheInvoiceCreationWizard.ClearElementItemsFilter}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__clearalllabel}" rerender="TheForm" oncomplete="hideModalBoxy()"/>           						
+           					</apex:pageBlockButtons>
+           				<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+           				<apex:pageBlockSectionItem >
+           					<apex:outputText value="" />
+	           				<apex:selectRadio value="{!TheInvoiceCreationWizard.DeliveryElementItemsFilter[TheInvoiceCreationWizard.CurrentFilterId].ItemType}" layout="horizontal" border="0" styleclass="deliveryStatus" >
+								<apex:selectOptions value="{!TheInvoiceCreationWizard.FilterItemType}" />
+		 					</apex:selectRadio>
+           				</apex:pageBlockSectionItem>
+           				<apex:pageBlockSectionItem >
+           					<apex:outputText value="{!IF (IsNegativeInvoiceMode, $Label.kimbleone__genericlabel06, $Label.kimbleone__invoiceuptodate)}" />
+							<apex:inputField styleclass="kimbleDatePicker filter" id="invoiceUpToDate" value="{!TheInvoiceCreationWizard.DeliveryElementItemsFilter[TheInvoiceCreationWizard.CurrentFilterId].InvoiceUpToDate.InputDate__c}"/>
+						</apex:pageBlockSectionItem>
+						<apex:pageBlockSectionItem rendered="{!TheInvoiceCreationWizard.ElementResourcesForFilter.size > 1}">
+           					<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.LabelPlural}" />
+							<apex:selectList style="width:300px" id="filterResources" value="{!TheInvoiceCreationWizard.DeliveryElementItemsFilter[TheInvoiceCreationWizard.CurrentFilterId].ResourceIds}" multiselect="true">
+           		 				<apex:selectOptions value="{!TheInvoiceCreationWizard.ElementResourcesForFilter}"/>
+							</apex:selectList>
+						</apex:pageBlockSectionItem>
+						</apex:pageblockSection>
+						</apex:pageblock>
+					</apex:outputPanel>
+           		</apex:outputPanel>
+           	</div>
+           	<script type="text/javascript">
+				function showFilter(elementId)
+				{
+					initialiseModalBoxy('#filter-panel-popup', '{!JSENCODE($Label.Filter)}', jQuery('form[id$=\'TheForm\']'));
+					selectElementsFilter(elementId);
+				}
+				
+				function filterLoadComplete()
+				{
+					jQuery('.kimbleDatePicker.filter').datepicker({
+					   		dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+								showOtherMonths: true,
+								selectOtherMonths: true
+					});
+
+					jQuery('[id$="filterResources"]').select2();
+					showModalBoxyWithFocus(jQuery('[id$="applyFilterButton"]'));
+				}
+				
+				var l = {};
+				l['contactname'] = '<apex:outputText value="{!$ObjectType.KimbleOne__BillingContact__c.Fields.Name.Label}"/>';
+				l['primaryind'] = '<apex:outputText value="{!$Label.kimbleone__primarybillingcontact}"/>';
+				l['delete'] = '<apex:outputText value="{!$Label.kimbleone__deletebutton}"/>';
+				
+				function drawInvoiceContacts()
+				{
+					var html = '';
+					
+					html += '<table class="invoice-contacts-table list" border="0" cellpadding="0" cellspacing="0">';
+					html += '<tr class="header-row headerRow">';
+					html += '<th class="actions-col"></th>';
+					html += '<th class="invoice-contact-name-title">' + l['contactname'] + '</th>';
+					html += '<th class="primary-cell">' + l['primaryind'] + '</th>';
+					html += '</tr>';
+					
+					// existing rows
+					for(var invoiceContactCounter = 0; invoiceContactCounter < invoiceContacts.length; invoiceContactCounter++)
+					{
+						var invoiceContact = invoiceContacts[invoiceContactCounter];
+						
+						html += '<tr class="invoice-contact-row" contactId="' + invoiceContact.ContactId + '">';
+						
+						html += '<td class="remove-invoice-contact action-btn" title="' + l['delete'] + '"><i class="fa fa-trash"></i></td>';
+						html += '<td class="invoice-contact-name">' + invoiceContact.ContactName + '</td>';
+						html += '<td class="primary-cell">';
+						html += '<input type="radio" name="primary-invoice-contacts" ' + (invoiceContact.IsPrimary ? ' checked="checked"' : '') + '/>';
+						html += '</td>';
+			
+						html += '</tr>';			
+					}
+					
+					// new row
+					html += '<tr class="invoice-contact-row new-invoice-contact">';
+					
+					html += '<td class="add-invoice-contact action-btn"></td>';
+					html += '<td class="invoice-contact-name">';
+					html += '<input type="text" class="find-invoice-contact"/>';
+					html += '</td>';
+					html += '<td class="primary-cell">';
+					html += '</td>';
+		
+					html += '</tr>';
+					
+					jQuery('#invoice-contacts').html(html);
+		
+					initialiseInvoiceContactFind();
+				}
+				
+				function initialiseInvoiceContactFind()
+				{
+					jQuery('.find-invoice-contact').select2({
+						//minimumInputLength: 2,
+						multiple: false,
+						placeholder: '<apex:outputText value="{!$Label.kimbleone__defaultnonedropdownentry}"/>',
+						query: function (params) {
+							var find = function() {findInvoiceContacts(params);};        		
+							find();
+						},
+						initSelection : function (element, callback) {
+						var data = {id: element.val(), text: element.attr('data-name')};
+						callback(data);
+						}
+					});
+					
+					jQuery('.find-invoice-contact').on("select2-selecting", function(e) {
+						var asPrimary = jQuery('input[name="primary-invoice-contacts"]').length == 0;
+						var newContact = {ContactId: e.object.id, ContactName: e.object.text, IsPrimary: asPrimary};
+						invoiceContacts.push(newContact);
+						invoiceContacts.sort(sortByInvoiceContactName);
+						InvoiceContactChanges = true;
+						drawInvoiceContacts();
+					});
+					
+					jQuery(document).off('click', '.remove-invoice-contact').on('click', '.remove-invoice-contact', removeInvoiceContact);
+					jQuery(document).off('click', 'input[name="primary-invoice-contacts"]').on('click', 'input[name="primary-invoice-contacts"]', setPrimaryContact);
+				}
+				
+				function sortByInvoiceContactName(a,b)
+			   	{
+			   		return (a.ContactName < b.ContactName) ? -1 : (a.ContactName > b.ContactName) ? 1 : 0; 
+			   	}
+
+				function setPrimaryContact()
+				{
+					var contactId = jQuery(this).closest('.invoice-contact-row').attr('contactId');
+					
+					for(var invoiceContactCounter = 0; invoiceContactCounter < invoiceContacts.length; invoiceContactCounter++)
+					{
+						var invoiceContact = invoiceContacts[invoiceContactCounter];
+						invoiceContact.IsPrimary = (invoiceContact.ContactId == contactId);
+					}
+				}
+				
+				function removeInvoiceContact()
+				{
+					var contactId = jQuery(this).closest('.invoice-contact-row').attr('contactId');
+					
+					jQuery(this).closest('.invoice-contact-row').remove();
+					
+					for(var invoiceContactCounter = 0; invoiceContactCounter < invoiceContacts.length; invoiceContactCounter++)
+					{
+						var invoiceContact = invoiceContacts[invoiceContactCounter];
+						
+						if(invoiceContact.ContactId == contactId)
+						{
+							invoiceContacts.splice(invoiceContactCounter, 1);
+							break;
+						}
+					}
+					
+					drawInvoiceContacts();
+				}			   	
+				
+				$(function () {
+					getReferenceData();
+					kimble.formatCurrencies();
+				});
+			</script>
+			<apex:actionFunction action="{!TheInvoiceCreationWizard.SelectElementItemsFilter}" name="selectElementsFilter" rerender="TheFilter" oncomplete="filterLoadComplete();">
+				<apex:param name="filterId" value="" />
+   			</apex:actionFunction>
+			</apex:outputPanel>
+			<!-- SELECT DELIVERY ELEMENT ITEMS TO INCLUDE -->
+			<apex:outputPanel rendered="{!TheInvoiceCreationWizard.CurrentStep.StepName == 'SelectDeliveryElementItemsToInclude'}">
+			<apex:outputPanel id="NetAmountPanel">
+				<apex:pageblockSection collapsible="false" showheader="false" columns="3" rendered="{!TheInvoiceCreationWizard.CurrentStep.StepName != 'SelectAccountStep'}">
+	           		
+	           		<apex:pageBlockSectionItem dataStyle="width:15%">
+	           			<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__BillingAccount__c.Label}" />
+	           			<apex:outputField value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__Account__c}"/>
+	           		</apex:pageBlockSectionItem>
+	           		<apex:pageBlockSectionItem dataStyle="width:15%">
+	           			<apex:outputText value="{!IF(IsNegativeInvoiceMode, $ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__CreditNoteDate__c.Label, $ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__InvoiceDate__c.Label)}" />
+	           			<apex:outputField value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__InvoiceDate__c}"/>
+	           		</apex:pageBlockSectionItem>
+	           		<apex:pageBlockSectionItem dataStyle="width:15%">
+	           			<apex:outputText value="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__NetAmount__c.Label}" />
+	           			<span id="DeliveryElementSelectedItemsTotal"></span>	           			
+	           		</apex:pageBlockSectionItem>
+	           		
+	           	</apex:pageblockSection>
+           	</apex:outputPanel>
+
+			<apex:pageblockSection collapsible="false" showheader="true" title="{!TheInvoiceCreationWizard.SelectItemsToIncludeHeading}" columns="1"></apex:pageblockSection>
+					
+				<table cellpadding="0" cellspacing="2" border="0" width="100%">
+					<tr>
+						<td width="100%" style="vertical-align: top;">
+							<div id="jsTreeContainer" style="height:100%;overflow-y:auto">
+								<div id="selectRevenueItems" ></div>
+							</div>
+						</td>
+						<td style="vertical-align: top;">
+							<apex:outputPanel layout="none" rendered="{!!IsInterCompanyInvoice}">
+								<apex:outputPanel layout="none" rendered="{!(TheInvoiceCreationWizard.InvoiceGroupingRevenueItemAllocationMap[TheInvoiceCreationWizard.CurrentGroupByKey].TheRule.IsExpensesPOCoverRequired__c || TheInvoiceCreationWizard.InvoiceGroupingRevenueItemAllocationMap[TheInvoiceCreationWizard.CurrentGroupByKey].TheRule.IsServicesPOCoverRequired__c)}">
+									<div id="purchaseOrdersContainer" style="height:100%;width:400px;margin-left:8px;border: 1px solid #D4DADC;background-color: #FFF">
+										<div id="header" style="position:relative; background: white url('/img/alohaSkin/grid_headerbg.gif') 0 bottom repeat-x;color: black;font-weight: bold;font-size: 11px;height: 15px;padding: 5px 3px 3px 5px;border-bottom: 1px solid #CCC">{!$Label.kimbleone__availablepurchaseordersheading}
+											<span id="auto-allocate-switch" style="display:none; position: absolute;right: 6px;padding-right: 24px;"><apex:outputText value="{!$Label.kimbleone__configurationsetting15}"/><i onclick="toggleAutoAllocate();" class="fa fa-toggle-off" style="font-size: 16px;position: absolute;right: 0px;top: -2px;cursor:pointer;"></i></span></div>
+									</div>
+								</apex:outputPanel>
+							</apex:outputPanel>
+						</td>
+					</tr>
+				</table>
+				<style>
+					.poContainer{float:left; margin-left:10px;}
+					.poAllocationContainer{height:258px;min-width: 102px;}
+					.poAllocationItemContainer{position: relative;height: 258px;display: inline-block;width: 102px;}
+					.poName {text-align: center; font-weight:bold; font-size:0.8em;margin-bottom: 3px;position:relative;}
+					.allocationItem{position:absolute; bottom:0px; width:100px;text-align: center;margin-right:2px;}
+					.remainingAmount{position:relative; top:-16px; text-align: center; width:100%; font-weight:bold; font-size:0.8em;}
+					.Services{background-color:#729BC7}
+					.Expenses{background-color:#E68F1A}
+					.Deposit {background-color:#B42B33}
+					.All {background-color:#028753}
+					.errorItem {background-image: url('{!URLFOR($Resource.KimbleOne__JobImages, 'failed16.gif')}') !important;	background-repeat: no-repeat !important; background-position: center right !important;}
+					.select-for-allocation {opacity: 0.3;cursor: pointer;}
+					.select-for-allocation:hover {opacity:0.8;}
+					.selected-for-allocation {opacity:1; cursor:default;}
+					.selected-for-allocation:hover {opacity:1;}
+				</style>
+				
+				<apex:inputText styleClass="TheInvoiceableItemsJson" style="display:none" value="{!TheInvoiceCreationWizard.InvoiceGroupingRevenueItemAllocationMap[TheInvoiceCreationWizard.CurrentGroupByKey].TheInvoiceableItemsJson}"/>
+				<apex:inputText styleClass="ThePOAllocationsJson" style="display:none"  value="{!TheInvoiceCreationWizard.InvoiceGroupingRevenueItemAllocationMap[TheInvoiceCreationWizard.CurrentGroupByKey].ThePOAllocationsJson}"/>
+				<apex:inputText styleClass="TheDepositsJson" style="display:none"  value="{!TheInvoiceCreationWizard.InvoiceGroupingRevenueItemAllocationMap[TheInvoiceCreationWizard.CurrentGroupByKey].TheDepositsJson}"/>
+				
+				<script type="text/javascript">
+
+				var theData;
+				var thePOAllocations;
+				//var theDeposits;
+				var purchaseOrderTitleLabel = '{!$ObjectType.PurchaseOrder__c.label}';
+				var selectAPOLabel = '{!$Label.YouMustSelect}'.format(purchaseOrderTitleLabel);
+
+				var theCurrencyCode = '<apex:outputText value="{!TheInvoiceCreationWizard.TheInvoice.CurrencyISOCode}"/>';
+
+				var allowPartItemInvoicing = {!IF(TheInvoiceCreationWizard.TheAccountInvoicingModel.AllowPartItemInvoicing__c,'true','false')};
+
+				var allocations = new Array();
+
+				$(function () {
+
+					theData = jQuery.parseJSON($('.TheInvoiceableItemsJson').val());
+
+					thePOAllocations = jQuery.parseJSON($('.ThePOAllocationsJson').val());
+
+					//theDeposits = jQuery.parseJSON($('.TheDepositsJson').val());
+
+					jQuery.each(theData, function(i, obj){
+						updateFormattedAmount(obj);
+					});
+
+					initialisePurchaseOrders();
+
+					var isInterCompanyInvoice = {!IF(IsInterCompanyInvoice,'true','false')};
+
+					buildRevenueItemsTree(isInterCompanyInvoice);
+
+					jQuery(document).off('click','.select-for-allocation');
+					jQuery(document).on('click','.select-for-allocation', function() {
+
+						selectPOForAllocation(jQuery(this));
+
+					});
+				});
+
+
+
+			</script>
+			
+			<style>
+				#jsonTree a:hover {text-decoration:none; color:black; cursor:default;}
+				.jstree-grid-wrapper{border: 1px solid #D4DADC;}
+				.jstree-grid-header-regular{background: white url('/img/alohaSkin/grid_headerbg.gif') 0 bottom repeat-x; color:black;font-weight: bold;font-size: 11px;}
+				.jstree-grid-container {border-bottom: 1px solid #CCC;}
+				.jstree-grid-separator{padding-top: 7px;}
+				.jstree-kimble-invoice.jstree-focused{background: #FFF;}
+				.jstree-grid-cell {padding-left: 0px !important;}
+				.jstree-grid-cell span {min-height:1px;}
+
+			</style>
+				
+			</apex:outputPanel>
+			
+			<!-- INCLUDE INVOICE ADJUSTMENT -->
+			<apex:outputPanel layout="none" rendered="{!TheInvoiceCreationWizard.CurrentStep.StepName == 'IncludeInvoiceAdjustment'}">
+           	<apex:pageblockSection collapsible="false" showheader="true" title="{!$ObjectType.KimbleOne__InvoiceAdjustment__c.LabelPlural}" columns="3" >
+				<apex:pageBlockSectionItem dataStyle="width:15%">
+           			<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__BillingAccount__c.Label}" />
+           			<apex:outputField value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__Account__c}"/>
+           		</apex:pageBlockSectionItem>
+           		<apex:pageBlockSectionItem dataStyle="width:15%">
+           			<apex:outputText value="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__InvoiceDate__c.Label}" />
+           			<apex:outputField value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__InvoiceDate__c}"/>
+           		</apex:pageBlockSectionItem>
+           		<apex:pageBlockSectionItem dataStyle="width:15%">
+           			<apex:outputText value="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__NetAmount__c.Label} {!TheInvoiceCreationWizard.TheInvoice.CurrencyISOCode}" />
+           			<apex:outputField label="{!$Label.kimbleone__runningnettotallabel}" value="{!TheInvoiceCreationWizard.InvoiceRunningTotal.KimbleOne__InputCurrency__c}"/>
+           		</apex:pageBlockSectionItem>
+			</apex:pageblockSection>
+			
+			<apex:outputPanel id="AdjustmentsMainPanel">
+						
+			<apex:pageBlock id="AdjustmentsDetailPanel">
+
+						<apex:pageBlockButtons location="top">
+							<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__InvoiceAdjustment__c.createable}">
+								<input class="btn" type="button"
+										onclick="initialiseModalBoxy('#AdjustmentsPopup', '{!JSENCODE($Label.AddInvoiceAdjustmentHeading)}');addAdjustment()"
+										value="{!$Label.AddInvoiceAdjustmentHeading}" />
+							</apex:outputPanel>
+						</apex:pageBlockButtons>
+			
+						<apex:pageBlockTable value="{!TheInvoiceCreationWizard.TheInvoiceAdjustments}"
+							var="anAdjustment"  title="{!$Label.kimbleone__confirmdetailsheading}">
+							<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+								
+								<apex:commandLink action="{!TheInvoiceCreationWizard.RemoveInvoiceAdjustment}" 
+									reRender="AdjustmentsDetailPanel, AdjustmentsMainPanel">{!$Label.kimbleone__remove}
+									<apex:param name="aId" value="{!anAdjustment.TempId}" />
+								</apex:commandLink>
+							</apex:column>
+
+							<apex:column headerValue="{!$ObjectType.KimbleOne__InvoiceAdjustment__c.Fields.KimbleOne__InvoiceAdjustmentReason__c.Label}"
+								value="{!anAdjustment.ThisObject.KimbleOne__InvoiceAdjustmentReason__c}" />
+							<apex:column headerValue="{!$ObjectType.KimbleOne__InvoiceAdjustment__c.Fields.KimbleOne__DeliveryGroup__c.Label}"
+								value="{!anAdjustment.ThisObject.KimbleOne__DeliveryGroup__c}" />
+							<apex:column headerValue="{!$ObjectType.KimbleOne__InvoiceAdjustment__c.Fields.KimbleOne__DeliveryElement__c.Label}"
+								value="{!anAdjustment.ThisObject.KimbleOne__DeliveryElement__c}" />
+                            <apex:column headerValue="{!$ObjectType.KimbleOne__PurchaseOrder__c.Label}" 
+                                 value="{!anAdjustment.InvoiceAdjustmentPurchaseOrderName}" />
+                    		<apex:column headerValue="{!$ObjectType.KimbleOne__InvoiceAdjustment__c.Fields.KimbleOne__Description__c.Label}"
+								value="{!anAdjustment.ThisObject.KimbleOne__Description__c}" />
+							<apex:column headerClass="sortable">
+       	 		    			<apex:facet name="header">{!$ObjectType.KimbleOne__InvoiceAdjustment__c.Fields.KimbleOne__AdjustmentValue__c.Label}</apex:facet>
+       	 		    			<apex:outputText value="{0, number, {!TheInvoiceCreationWizard.TheInvoice.CurrencyISOCode} #,###.00}">
+									<apex:param value="{!anAdjustment.ThisObject.KimbleOne__AdjustmentValue__c}"></apex:param>
+								</apex:outputText>
+       	 		    		</apex:column>
+					
+						</apex:pageBlockTable>
+				</apex:pageBlock>		
+			</apex:outputPanel>
+			<!-- Adjustment Popup moved down to get dropdown reload to work -->
+			
+			<script type="text/javascript">
+				$(function () {
+					getReferenceData();
+				});
+			</script>
+			
+			</apex:outputPanel>		
+			
+			<!-- CONFIRM INVOICE DETAILS -->
+			<apex:outputPanel layout="none" rendered="{!TheInvoiceCreationWizard.CurrentStep.StepName == 'ConfirmInvoiceDetails'}">
+           	<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__confirmdetailsheading}" columns="2" >
+				
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__BillingAccount__c.Label}" />
+					<apex:outputField value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__Account__c}"/>
+				</apex:pageBlockSectionItem>
+				
+				<apex:outputField label="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__NetAmount__c.Label} {!TheInvoiceCreationWizard.TheInvoice.CurrencyISOCode}" value="{!TheInvoiceCreationWizard.InvoiceRunningTotal.KimbleOne__InputCurrency__c}"/>
+
+				<apex:pageBlockSectionItem >
+					<apex:outputText value="{!IF(IsNegativeInvoiceMode, $ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__CreditNoteDate__c.Label, $ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__InvoiceDate__c.Label)}"/>
+					<apex:inputField styleClass="kimbleDatePicker" value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__InvoiceDate__c}" />
+				</apex:pageBlockSectionItem>
+
+				<apex:inputField required="true" id="InvoicePaymentTermDays" value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__InvoicePaymentTermDays__c}" rendered="{!!IsNegativeInvoiceMode}"/>
+
+				<apex:pageBlockSectionItem rendered="{!IsNegativeInvoiceMode}">
+					<apex:outputLabel for="reasonCode" value="{!$ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__ReasonCode__c.Label}" />
+					<apex:selectList id="reasonCode" value="{!TheInvoiceCreationWizard.TheCreditNoteReasonCodeId}" size="1">
+						<apex:selectOptions value="{!TheCreditNoteReasonCodes}"/>
+					</apex:selectList>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem rendered="{!IsNegativeInvoiceMode}">
+					<apex:outputLabel for="reasonDescription" value="{!$ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__ReasonDescription__c.Label}" />
+					<apex:inputText id="reasonDescription" value="{!TheInvoiceCreationWizard.TheCreditNoteReasonDescription}" />
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem rendered="{!!IsInterCompanyInvoice}">
+						<apex:outputText value="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__BusinessUnitTradingEntity__c.Label}" />
+						<apex:actionRegion >
+							<apex:inputText id="businessUnitTradingEntitySelect" value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__BusinessUnitTradingEntity__c}" styleclass="kimblecustomlookup GetTradingEntityList null true false" required="true">
+								<apex:actionSupport event="onchange" action="{!TheInvoiceCreationWizard.BusinessUnitTradingEntityChange}" rerender="InvoicePaymentTermDays"/>
+							</apex:inputText>
+						</apex:actionRegion>
+				</apex:pageBlockSectionItem>
+				
+				<apex:outputField rendered="{!IsInterCompanyInvoice}" value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__BusinessUnitTradingEntity__c}"/>
+
+				<apex:pageBlockSectionItem rendered="{!!IsNegativeInvoiceMode}">
+						<apex:outputText value="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__ReceivableBankAccount__c.Label}" />
+						<apex:inputText id="receivableBankAccountSelect" value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__ReceivableBankAccount__c}" styleclass="kimblecustomlookup GetBankAccountList null true false" required="true"/> 
+				</apex:pageBlockSectionItem>
+				
+				<apex:inputText value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__Contact__c}" styleclass="kimblecustomlookup GetAllAccountContacts {!TheInvoiceCreationWizard.TheInvoice.KimbleOne__Account__c} false true" rendered="{!!ShowMultipleContacts && !UseEnhancedContactLookup}"/>
+
+				<apex:inputField id="enhanced-input-contact" value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__Contact__c}" styleclass="kimbleSearch " html-data-typename="AccountContact" rendered="{!!ShowMultipleContacts && UseEnhancedContactLookup}" html-data-filter="{!('Account__c:' + TheInvoiceCreationWizard.TheInvoice.KimbleOne__Account__c)}"/>
+				
+				<apex:pageBlockSectionItem rendered="{!ShowMultipleContacts}" >
+					<apex:outputLabel styleClass="billing-contacts-label" value="{!$ObjectType.KimbleOne__BillingContact__c.LabelPlural}"/>
+					<div class="invoice-contacts-container">
+						<div id="invoice-contacts">
+						</div>
+					</div>		 	
+				</apex:pageBlockSectionItem>
+				
+				<apex:inputField value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__Notes__c}"/>
+			</apex:pageblockSection>
+			
+			<apex:pageBlockSection columns="1" title="{!$Label.kimbleone__presentationdetailsheading}">
+				
+				<apex:pageBlockSectionItem rendered="{!!IsNegativeInvoiceMode}">
+					<apex:outputText value="{!$ObjectType.KimbleOne__Invoice__c.Fields.KimbleOne__InvoiceTemplate__c.Label}" />
+						<apex:inputText value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__InvoiceTemplate__c}" styleclass="kimblecustomlookup GetCommercialDocumentTemplateList Invoice true false" />
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem rendered="{!IsNegativeInvoiceMode}">
+					<apex:outputText value="{!$ObjectType.KimbleOne__CreditNote__c.Fields.KimbleOne__CreditNoteTemplate__c.Label}" />
+					<apex:outputPanel layout="none">
+						<apex:inputText value="{!TheInvoiceCreationWizard.TheCreditNoteTemplateId}" styleclass="kimblecustomlookup GetCommercialDocumentTemplateList CreditNote true false"/>
+					</apex:outputPanel>
+				</apex:pageBlockSectionItem>
+
+				<apex:inputField value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__InvoiceContextDescription__c}" style="width:400px" rendered="{!TheInvoiceCreationWizard.InvoiceFormat.KimbleOne__ShowContext__c}" />
+			
+			</apex:pageblockSection>
+			
+			<apex:pageBlockSection columns="2" title="{!$Label.kimbleone__customdetailsheading}" rendered="{!$ObjectType.KimbleOne__Invoice__c.FieldSets.KimbleOne__InvoiceDetails.size != 0}">
+				<apex:repeat value="{!$ObjectType.KimbleOne__Invoice__c.FieldSets.KimbleOne__InvoiceDetails}" var="i">
+					<apex:inputField rendered="{!!CONTAINS(i.FieldPath,'.')}" value="{!KimbleOne__Invoice__c[i]}" styleClass="{!IF(AND($ObjectType.KimbleOne__Invoice__c.Fields[i].type == 'date',$ObjectType.KimbleOne__Invoice__c.Fields[i].updateable),'kimbleDatePicker','')}"/>
+					<apex:outputField rendered="{!CONTAINS(i.FieldPath,'.')}" value="{!KimbleOne__Invoice__c[i]}"/>
+				</apex:repeat>
+   			</apex:pageBlockSection>
+
+			<apex:inputText styleClass="TheInvoiceContacts" style="display:none" value="{!TheInvoiceCreationWizard.TheInvoiceContactsJson}"/>
+			
+			<script type="text/javascript">
+				var invoiceContacts = (jQuery('.TheInvoiceContacts').val() == '' ? [] : jQuery.parseJSON(jQuery('.TheInvoiceContacts').val()));
+				var accountId = '<apex:outputText value="{!TheInvoiceCreationWizard.TheInvoice.KimbleOne__Account__c}"/>';
+			
+				$(function () {
+					getReferenceData();
+					if(jQuery('.invoice-contacts-container').length) drawInvoiceContacts();
+				});
+			</script>
+			
+			</apex:outputPanel>
+			
+			<apex:outputPanel rendered="{!TheInvoiceCreationWizard.HasFinished}">
+                 <script>
+		                safeNavigateToSForceURL('{!JSENCODE(RedirectToPreview)}');
+		          </script>
+	               	   
+           	</apex:outputPanel>
+					
+			</apex:pageBlock>
+	<apex:actionFunction action="{!TheInvoiceCreationWizard.AddInvoiceAdjustment}"
+						name="addAdjustment"
+						rerender="AdjustmentsPopupPanel"
+						oncomplete="showModalBoxy();" />
+		</apex:form>
+		
+		
+		
+		<div id="AdjustmentsPopup" style="display: none">
+				<apex:outputPanel id="AdjustmentsPopupPanel">
+			  <apex:form >
+					<apex:pageBlock >
+					
+						<div id="AdjustmentsPopupErrors">
+							<apex:pageMessages escape="false"/>
+						</div>
+						<apex:pageBlockButtons location="bottom">
+							<apex:commandButton action="{!TheInvoiceCreationWizard.SaveInvoiceAdjustment}"
+								value="{!$Label.kimbleone__add}"
+								oncomplete="hideModalBoxyWithErrorCheck('#AdjustmentsPopupErrors')"
+								styleclass="DisableButtonWhileBusy"
+								reRender="AdjustmentsPopupPanel, AdjustmentsMainPanel " />
+							<input class="btn" type="button" onclick="hideModalBoxy();"
+								value="{!$Label.kimbleone__cancel}" />
+						</apex:pageBlockButtons>
+					
+						<apex:pageBlockSection id="AdjustmentProperties" collapsible="false" columns="1" rendered="{!$ObjectType.KimbleOne__InvoiceAdjustment__c.createable}">
+							
+							<apex:pageBlockSectionItem >
+									<apex:outputText value="{!$ObjectType.KimbleOne__InvoiceAdjustment__c.Fields.KimbleOne__InvoiceAdjustmentReason__c.Label}" />
+										<apex:selectList id="invoiceAdjustmentReasonSelect" value="{!TheInvoiceCreationWizard.TheInvoiceAdjustment.ThisObject.KimbleOne__InvoiceAdjustmentReason__c}" size="1">
+											<apex:selectOptions value="{!TheInvoiceCreationWizard.TheInvoiceAdjustmentReasons}"/>
+									    		<apex:actionSupport event="onchange" action="{!TheInvoiceCreationWizard.InvoiceAdjustmentReasonChange}" rerender="AdjustmentProperties,AdjustmentsPopupPanel"/>			
+										</apex:selectList>
+							</apex:pageBlockSectionItem>
+
+                            <apex:pageBlockSectionItem id="invoiceAdjustmentPOAlloc" rendered="{!TheInvoiceCreationWizard.ShowInvoiceAdjustmentPOAllocationItemList}">
+                                <apex:outputText value="{!$ObjectType.KimbleOne__InvoiceAdjustment__c.Fields.KimbleOne__PurchaseOrderAllocationItem__c.Label}" />
+                                <apex:selectList value="{!TheInvoiceCreationWizard.TheInvoiceAdjustment.ThisObject.KimbleOne__PurchaseOrderAllocationItem__c}" size="1">
+                                    <apex:selectOptions value="{!TheInvoiceCreationWizard.TheInvoiceAdjustmentPurchaseOrderAllocationItems}"/>
+                                </apex:selectList>
+							</apex:pageBlockSectionItem>
+							
+						    <apex:pageBlockSectionItem rendered="{!!ISBLANK(TheInvoiceCreationWizard.DeliveryElementsThatCanBeAdjusted) && TheInvoiceCreationWizard.DeliveryElementsThatCanBeAdjusted.size > 0 && TheInvoiceCreationWizard.ShowDeliveryElementTypeList}">
+								<apex:outputText value="{!$Label.kimbleone__selectdeliveryelementforinvoiceadjustment}" />
+									<apex:selectList id="AdjustmentDeliveryElement" value="{!TheInvoiceCreationWizard.TheInvoiceAdjustment.ThisObject.KimbleOne__DeliveryElement__c}" size="1">
+										<apex:selectOptions value="{!TheInvoiceCreationWizard.DeliveryElementsThatCanBeAdjusted}"/>
+									</apex:selectList> 
+							</apex:pageBlockSectionItem>		
+							
+							 <apex:pageBlockSectionItem rendered="{!!ISBLANK(TheInvoiceCreationWizard.DeliveryGroupsThatCanBeAdjusted) && TheInvoiceCreationWizard.DeliveryGroupsThatCanBeAdjusted.size > 0 && TheInvoiceCreationWizard.ShowDeliveryGroupTypeList}">
+								<apex:outputText value="{!$Label.kimbleone__selectdeliveryelementforinvoiceadjustment}" />
+									<apex:selectList id="AdjustmentDeliveryGroup" value="{!TheInvoiceCreationWizard.TheInvoiceAdjustment.ThisObject.KimbleOne__DeliveryGroup__c}" size="1">
+										<apex:selectOptions value="{!TheInvoiceCreationWizard.DeliveryGroupsThatCanBeAdjusted}"/>
+									</apex:selectList> 
+							</apex:pageBlockSectionItem>				
+			
+							<apex:pageBlockSectionItem >
+									<apex:outputText value="{!$ObjectType.KimbleOne__InvoiceAdjustment__c.Label} {!TheInvoiceCreationWizard.TheInvoice.CurrencyISOCode}" />
+									<apex:inputField value="{!TheInvoiceCreationWizard.TheInvoiceAdjustment.ThisObject.KimbleOne__AdjustmentValue__c}" required="true" />
+							</apex:pageBlockSectionItem>
+							
+							<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$ObjectType.KimbleOne__InvoiceAdjustment__c.Fields.KimbleOne__Description__c.Label}" />
+								<apex:outputPanel >
+									<div class="requiredInput">
+										<div class="requiredBlock"></div>
+					 					<apex:inputField value="{!TheInvoiceCreationWizard.TheInvoiceAdjustment.ThisObject.KimbleOne__Description__c}"/>
+			  						</div>
+		  						</apex:outputPanel>
+							</apex:pageBlockSectionItem>
+						
+						</apex:pageblockSection>
+					</apex:pageBlock>
+					</apex:form>
+				</apex:outputPanel>
+			</div>
+		
+		<style>
+		.mainTitle {white-space:nowrap;}
+		.tableStyle {border-collapse: collapse; border-spacing: 0px 0px; }
+        .colStyle1 { width: 33%;text-align:right; padding-top:3px; padding-bottom:5px}
+        .colStyle2 { width: 33%; padding-left:20px; padding-top:5px; padding-bottom:5px}
+        .colStyle3 { width: 33%;text-align:right; padding-top:5px; padding-bottom:5px}
+        .rowstyle { border-bottom-style:solid; border-bottom-width:1px;border-bottom-color:#E8E8E8 }
+        span.filter-items{font-size: 18px; cursor: pointer;}
+		span.filter-items-off {color: #aaa;}
+		span.filter-items-on {color: #729bc7;}
+		/* SELECT 2 STYLING */
+		.select2-results li {margin-left:0px;}
+		.select2-container-multi .select2-choices
+		{
+			border: 2px solid rgb(224,224,224);
+			background-image:none;
+		}
+		.select2-container-multi .select2-choices .select2-search-choice {
+		    border: 1px solid #aaaaaa;
+		    border-radius: 4px;
+		    padding: 5px 20px 5px 5px;
+			background-image:none;
+		}
+		
+		.select2-container-multi .select2-search-choice-close {
+			background-image:  url({!URLFOR($Resource.AssignmentImages, 'assignmentSprite.png')});
+			background-position: -2px -29px;
+			background-repeat: no-repeat;
+			left:auto;
+		}
+		
+		.select2-container-multi .select2-choices .select2-search-choice .select2-search-choice-close:hover {
+			background-position: -2px -1px;
+		}
+		.allocation-info
+		{
+			font-size: 12px;
+		    color: #428BCA;
+		    margin-left: 2px;
+		    position: absolute;
+		}
+		
+		/* Invoice contacts */
+		div.select2-container.find-invoice-contact a.select2-choice {
+			height: 18px !important;
+			line-height: 18px !important;
+			background-image: none !important;
+			border-radius: 0px !important;
+			color: black !important;
+			padding-left: 4px !important;
+		}
+		div.select2-container.find-invoice-contact .select2-choice div {
+			border-left: none !important;
+		}
+		td.action-btn {
+		    font-size: 16px;
+		    text-align: center;
+		    cursor: pointer;
+		    width: 18px;
+		}
+		th.primary-cell {
+		    width: 100px;
+		}
+		td.primary-cell {
+		    text-align: center;
+		}
+		.select2-container.find-invoice-contact {
+		    width: 100% !important;
+		    padding-right: 2px;
+		}
+		</style>
+
+		<script>
+			function findInvoiceContacts(params)
+			{				
+				var existingInvoiceContactIds = [];
+				jQuery('.invoice-contact-row:not(.deleted)').each(function() {existingInvoiceContactIds.push(jQuery(this).attr('contactId'));});
+			
+				Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.InvoiceNewController.GetApplicableBillingContacts}',
+			      		accountId, existingInvoiceContactIds, params.term,
+			     			function(result, event){          
+			            		if (event.status) 
+				            {
+				             	var data = {};
+				             	data.results = result;
+				             	params.callback(data);
+				         	} 
+				         	else if (event.type === 'exception') 
+				         	{
+				             	alert(event.message);
+				         	} 
+				         	else 
+				         	{
+				             	alert(event.message);
+				         	}
+			        	}, 
+			        	{escape: false, timeout: 60000}
+			    	);
+			}
+			
+			function processInvoiceContacts()
+			{
+				if(jQuery('.invoice-contacts-container').length == 0) return;
+				
+				var theContacts = [];
+				
+				jQuery('.invoice-contact-row:not(.new-invoice-contact)').each(function() {
+					var theContact = {ContactId: jQuery(this).attr('contactId'), ContactName: jQuery(this).find('.invoice-contact-name').text(), IsPrimary: jQuery(this).find('input[name="primary-invoice-contacts"]:checked').length == 1};
+					theContacts.push(theContact);
+				});
+				
+				jQuery('.TheInvoiceContacts').val(JSON.stringify(theContacts));
+			}
+		</script>
+    </apex:define>
+</apex:composition>
+
+</apex:page>

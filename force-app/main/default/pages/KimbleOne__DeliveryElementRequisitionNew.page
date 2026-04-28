@@ -1,0 +1,395 @@
+<apex:page standardController="KimbleOne__SupplierRequisition__c" extensions="KimbleOne.DeliveryElementRequisitionNewController" showHeader="true" sidebar="false" standardStylesheets="true" tabStyle="KimbleOne__SupplierRequisition__c">
+
+<apex:composition template="KimbleOne__SiteMaster">
+    <apex:define name="Menu">
+     <c:Menu MenuContextType="DeliveryGroup" MenuContextId="{!TheGroup.Id}" MenuContextName="{!TheGroup.Name}" CurrentPage="{!$Page.KimbleOne__DeliveryElementSupplierRequisitions}"/> 
+    </apex:define>
+    
+    <apex:define name="Content">
+    	<apex:form id="TheForm">
+    	<div id="pageErrors">
+    		<apex:pageMessages escape="False" />
+		</div>
+		<apex:pageBlock title="{!$Label.kimbleone__createlabel} {!$ObjectType.KimbleOne__SupplierRequisition__c.Label}">
+           	<apex:pageBlockButtons location="bottom">
+           		<apex:commandButton action="{!Cancel}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__cancel}" rerender="TheForm" rendered="{!TheSupplierRequisitionCreationWizard.CanCancel}"/>
+           		<apex:commandButton action="{!TheSupplierRequisitionCreationWizard.GoPrevious}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__previous}" reRender="TheForm" rendered="{!TheSupplierRequisitionCreationWizard.CanGoPrevious}" onComplete="initialiseItems();"/>
+            	<apex:commandButton action="{!TheSupplierRequisitionCreationWizard.GoNext}" styleclass="DisableButtonWhileBusy" value="{!TheSupplierRequisitionCreationWizard.NextLabel}" reRender="TheForm" rendered="{!TheSupplierRequisitionCreationWizard.CanGoNext}" onComplete="initialiseItems();"/>
+            </apex:pageBlockButtons>
+            
+			<!-- SELECT ELEMENTS TO INCLUDE -->
+			<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__selectitemstoincludeheading}"  columns="1" rendered="{!TheSupplierRequisitionCreationWizard.CurrentStep.StepName == 'SelectDeliveryElementsToInclude'}">
+           		<apex:pageBlockTable value="{!TheSupplierRequisitionCreationWizard.TheElementsToSelect}" var="element">
+					<apex:column headerValue="{!$Label.kimbleone__selectlabel}">
+						<apex:inputField value="{!element.Selected.KimbleOne__InputCheckbox__c}"/>
+					</apex:column>
+					<apex:column value="{!element.DeliveryElement.Name}" headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Label}"/>
+					<apex:column value="{!element.DeliveryElement.KimbleOne__ServicesContractCost__c}" headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__ServicesContractCost__c.Label}"/>
+				</apex:pageBlockTable>
+		    </apex:pageBlockSection>
+		    
+		    <apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__selectitemstoincludeheading}"  columns="1" rendered="{!TheSupplierRequisitionCreationWizard.CurrentStep.StepName == 'SelectCosts'}">
+           		<!-- SELECT ANNUITIES TO INCLUDE -->
+		    	<apex:pageBlockTable value="{!TheSupplierRequisitionCreationWizard.TheAnnuitiesToSelect}" var="annuity" rendered="{!TheSupplierRequisitionCreationWizard.AnnuityCosts}">
+					<apex:column headerValue="{!$Label.kimbleone__selectlabel}">
+						<apex:inputField value="{!annuity.Selected.KimbleOne__InputCheckbox__c}"/>
+					</apex:column>
+					<apex:column value="{!annuity.Annuity.DeliveryElement__r.Name}" headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Label}"/>
+					<apex:column value="{!annuity.Annuity.Name}" headerValue="{!$ObjectType.KimbleOne__Annuity__c.Label}"/>
+					<apex:column value="{!annuity.Annuity.KimbleOne__StartDate__c}" headerValue="{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__StartDate__c.Label}"/>
+					<apex:column value="{!annuity.Annuity.KimbleOne__EndDate__c}" headerValue="{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__EndDate__c.Label}"/>
+					<apex:column value="{!annuity.Annuity.KimbleOne__UnitsUnitType__c}" headerValue="{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__UnitsUnitType__c.Label}"/>
+					<apex:column value="{!annuity.Annuity.KimbleOne__CostRate__c}" headerValue="{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__CostRate__c.Label}"/>
+					<apex:column value="{!annuity.Annuity.KimbleOne__ForecastCost__c}" headerValue="{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__ForecastCost__c.Label}"/>
+				</apex:pageBlockTable>
+				
+				<!-- SELECT PERIOD COSTS TO INCLUDE -->
+				<apex:pageBlockTable value="{!TheSupplierRequisitionCreationWizard.ThePeriodCostsToSelect}" var="cost" rendered="{!TheSupplierRequisitionCreationWizard.PeriodCosts}">
+					<apex:column headerValue="{!$Label.kimbleone__selectlabel}">
+						<apex:inputField value="{!cost.Selected.KimbleOne__InputCheckbox__c}"/>
+					</apex:column>
+					<apex:column value="{!cost.PeriodCost.DeliveryElement__r.Name}" headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Label}"/>
+					<apex:column value="{!cost.PeriodCost.TimePeriod__r.Name}" headerValue="{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__TimePeriod__c.Label}"/>
+					<apex:column value="{!cost.PeriodCost.KimbleOne__ForecastCost__c}" headerValue="{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__ForecastCost__c.Label}"/>
+				</apex:pageBlockTable>
+			    
+				<!-- SELECT MILESTONES TO INCLUDE -->
+				<apex:pageBlockTable value="{!TheSupplierRequisitionCreationWizard.TheMilestonesToSelect}" var="milestone" rendered="{!TheSupplierRequisitionCreationWizard.MilestoneCosts}">
+					<apex:column headerValue="{!$Label.kimbleone__selectlabel}">
+						<apex:inputField value="{!milestone.Selected.KimbleOne__InputCheckbox__c}"/>
+					</apex:column>
+					<apex:column value="{!milestone.Milestone.DeliveryElement__r.Name}" headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Label}"/>
+					<apex:column value="{!milestone.Milestone.Name}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.Name.Label}"/>
+					<apex:column value="{!milestone.Milestone.KimbleOne__MilestoneDate__c}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneDate__c.Label}"/>
+					<apex:column value="{!milestone.Milestone.KimbleOne__MilestoneUnits__c}" rendered="{!TheSupplierRequisitionCreationWizard.ShowMilestoneUnits}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneUnits__c.Label}"/>
+					<apex:column value="{!milestone.Milestone.KimbleOne__UnitValue__c}" rendered="{!TheSupplierRequisitionCreationWizard.ShowMilestoneUnits}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__UnitValue__c.Label}"/>
+					<apex:column value="{!milestone.Milestone.DeliveryElement__r.KimbleOne__CostUnitType__c}" rendered="{!TheSupplierRequisitionCreationWizard.ShowMilestoneUnits}" headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__CostUnitType__c.Label}"/>
+					<apex:column value="{!milestone.Milestone.KimbleOne__MilestoneValue__c}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneValue__c.Label}"/>
+				</apex:pageBlockTable>
+				
+				<!-- SELECT ACTIVITYASSIGNMENTS TO INCLUDE -->
+				<apex:pageBlockTable value="{!TheSupplierRequisitionCreationWizard.TheActivityAssignmentsToSelect}" var="activityAssignment" rendered="{!TheSupplierRequisitionCreationWizard.UsageCosts}">
+					<apex:column headerValue="{!$Label.kimbleone__selectlabel}">
+						<apex:inputField value="{!activityAssignment.Selected.KimbleOne__InputCheckbox__c}"/>
+					</apex:column>
+					<apex:column value="{!activityAssignment.ActivityAssignment.ResourcedActivity__r.DeliveryElement__r.Name}" headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Label}"/>
+					<apex:column value="{!activityAssignment.ActivityAssignment.KimbleOne__Resource__c}" headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__Resource__c.Label}"/>
+					<apex:column value="{!activityAssignment.ActivityAssignment.KimbleOne__ActivityRole__c}" headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ActivityRole__c.Label}"/>
+					<apex:column value="{!activityAssignment.ActivityAssignment.KimbleOne__SupplierInvoicingCurrencyISOCode__c}" headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__SupplierInvoicingCurrencyISOCode__c.Label}"/>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ForecastRemainingUsage__c.Label}">
+						<apex:outputField value="{!activityAssignment.ActivityAssignment.KimbleOne__ForecastRemainingUsage__c}"/>&nbsp;
+						<apex:outputField value="{!activityAssignment.ActivityAssignment.ResourcedActivity__r.ForecastUnitType__r.Name}"/>						
+					</apex:column>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__CostRate__c.Label}">
+						<apex:outputField value="{!activityAssignment.ActivityAssignment.KimbleOne__SupplierInvoicingCurrencyISOCode__c}"/>&nbsp;<apex:outputField value="{!activityAssignment.ActivityAssignment.KimbleOne__SupplierInvoicingCurrencyCostRate__c}"/>&nbsp;/&nbsp;
+						<apex:outputField value="{!activityAssignment.ActivityAssignment.ResourcedActivity__r.ForecastUnitType__r.Name}"/>
+					</apex:column>
+					<apex:column value="{!activityAssignment.ForecastSupplierInvoicingCurrencyCost.KimbleOne__InputCurrency__c}" headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ForecastCost__c.Label}"/>
+				</apex:pageBlockTable>
+		    </apex:pageblockSection>
+			
+			<!-- SELECT SUPPLIER DETAILS -->
+			<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__selectsupplierheading}"  columns="2" rendered="{!TheSupplierRequisitionCreationWizard.CurrentStep.StepName == 'SelectSupplierDetails'}">
+				<apex:pageBlockSectionItem >
+	           		<apex:outputLabel value="{!$ObjectType.KimbleOne__SupplierRequisition__c.Fields.KimbleOne__Resource__c.Label}"/>
+	           		<apex:inputField value="{!KimbleOne__SupplierRequisition__c.KimbleOne__Resource__c}" required="true"/>
+           		</apex:pageBlockSectionItem>
+           		
+           		<apex:inputField value="{!KimbleOne__SupplierRequisition__c.KimbleOne__SupplierAccount__c}" required="true">
+					<apex:actionSupport event="onchange" action="{!TheSupplierRequisitionCreationWizard.SupplierAccountChange}" rerender="SupplierContact, SupplierContactEnhanced, SupplierCurrency" oncomplete="RefreshModalBoxy()"/>
+				</apex:inputField>
+				
+				<apex:pageBlockSectionItem >
+	           		<apex:outputLabel value="{!$ObjectType.KimbleOne__SupplierRequisition__c.Fields.KimbleOne__RequisitionDate__c.Label}"/>
+	           		<apex:inputField value="{!KimbleOne__SupplierRequisition__c.KimbleOne__RequisitionDate__c}" required="true" styleClass="kimbleDatePicker"/>
+           		</apex:pageBlockSectionItem>
+				
+				<apex:pageBlockSectionItem >
+<!--
+					<apex:outputLabel value="{!$ObjectType.Account.Fields.CurrencyISOCode.Label}" />
+-->
+					<apex:outputLabel value="{!$Label.kimbleone__supplier} {!$Label.kimbleone__currency}" />
+					<apex:outputText id="SupplierCurrency" value="{!TheSupplierRequisitionCreationWizard.SupplierCurrencyCode}"/>
+				</apex:pageBlockSectionItem>
+				
+				&nbsp;
+				
+				<apex:inputText id="SupplierContact" value="{!KimbleOne__SupplierRequisition__c.KimbleOne__SupplierContact__c}" rendered="{!!UseEnhancedContactLookup}" required="false" styleclass="kimblecustomlookup GetAllAccountContacts {!IF(KimbleOne__SupplierRequisition__c.KimbleOne__SupplierAccount__c == NULL, 'null', KimbleOne__SupplierRequisition__c.KimbleOne__SupplierAccount__c)} false true"/>
+
+				<apex:inputField id="SupplierContactEnhanced" value="{!KimbleOne__SupplierRequisition__c.KimbleOne__SupplierContact__c}" styleclass="kimbleSearch " html-data-typename="AccountContact" rendered="{!UseEnhancedContactLookup}" html-data-filter="{!('Account__c:' + IF(KimbleOne__SupplierRequisition__c.KimbleOne__SupplierAccount__c == NULL, 'null', KimbleOne__SupplierRequisition__c.KimbleOne__SupplierAccount__c))}"/>
+
+				<script>
+				RefreshModalBoxy();
+			</script>
+			
+			</apex:pageblockSection>
+			
+			<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__confirmitemsheading}"  columns="1" rendered="{!TheSupplierRequisitionCreationWizard.CurrentStep.StepName == 'ConfirmCosts'}">
+           		<!-- CONFIRM ANNUITY COSTS -->
+           		<apex:pageBlockTable id="TheAnnuityCosts" value="{!TheSupplierRequisitionCreationWizard.TheSelectedAnnuities}" var="annuity" rendered="{!TheSupplierRequisitionCreationWizard.AnnuityCosts}">
+					<apex:column value="{!annuity.Annuity.DeliveryElement__r.Name}" headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Label}"/>
+					<apex:column value="{!annuity.Annuity.Name}" headerValue="{!$ObjectType.KimbleOne__Annuity__c.Label}"/>
+					<apex:column value="{!annuity.Annuity.KimbleOne__StartDate__c}" headerValue="{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__StartDate__c.Label}"/>
+					<apex:column value="{!annuity.Annuity.KimbleOne__EndDate__c}" headerValue="{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__EndDate__c.Label}"/>
+					<apex:column value="{!annuity.Annuity.KimbleOne__UnitsUnitType__c}" headerValue="{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__UnitsUnitType__c.Label}"/>
+					<apex:column value="{!annuity.Annuity.KimbleOne__CostRate__c}" headerValue="{!$ObjectType.KimbleOne__Annuity__c.Fields.KimbleOne__CostRate__c.Label}"/>
+				</apex:pageBlockTable>
+				
+				<!-- CONFIRM PERIOD COSTS -->
+           		<apex:pageBlockTable id="ThePeriodCosts" value="{!TheSupplierRequisitionCreationWizard.TheSelectedPeriodCosts}" var="cost" rendered="{!TheSupplierRequisitionCreationWizard.PeriodCosts}">
+					<apex:column value="{!cost.PeriodCost.DeliveryElement__r.Name}" headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Label}"/>
+					<apex:column value="{!cost.PeriodCost.TimePeriod__r.Name}" headerValue="{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__TimePeriod__c.Label}"/>
+					<apex:column value="{!cost.PeriodCost.KimbleOne__ForecastCost__c}" headerValue="{!$ObjectType.KimbleOne__PeriodCost__c.Fields.KimbleOne__ForecastCost__c.Label}"/>
+				</apex:pageBlockTable>
+				
+				<!-- CONFIRM Milestone -->
+				<apex:pageBlockTable id="TheMilestonesToConfirm" value="{!TheSupplierRequisitionCreationWizard.TheSelectedMilestones}" var="milestone" rendered="{!TheSupplierRequisitionCreationWizard.MilestoneCosts}">
+					<apex:column value="{!milestone.Milestone.DeliveryElement__r.Name}" headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Label}"/>
+					<apex:column value="{!milestone.Milestone.Name}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.Name.Label}"/>
+					<apex:column value="{!milestone.Milestone.KimbleOne__MilestoneDate__c}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneDate__c.Label}"/>
+					<apex:column value="{!milestone.Milestone.KimbleOne__MilestoneUnits__c}" rendered="{!TheSupplierRequisitionCreationWizard.ShowMilestoneUnits}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneUnits__c.Label}"/>
+					<apex:column value="{!milestone.Milestone.KimbleOne__UnitValue__c}" rendered="{!TheSupplierRequisitionCreationWizard.ShowMilestoneUnits}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__UnitValue__c.Label}"/>
+					<apex:column value="{!milestone.Milestone.DeliveryElement__r.KimbleOne__CostUnitType__c}" rendered="{!TheSupplierRequisitionCreationWizard.ShowMilestoneUnits}" headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__CostUnitType__c.Label}"/>
+					
+					<apex:column rendered="{!TheSupplierRequisitionCreationWizard.ShowMilestoneUnits}" headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__SupplierInvoicingCurrencyUnitValue__c.Label} ({!TheSupplierRequisitionCreationWizard.SupplierCurrencyCode})">
+						<apex:inputField value="{!milestone.Milestone.KimbleOne__SupplierInvoicingCurrencyUnitValue__c}" rendered="{!milestone.Milestone.DeliveryElement__r.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsUnitGenerated__c}">
+							<apex:actionSupport event="onchange" action="{!TheSupplierRequisitionCreationWizard.MilestoneChange}" rerender="TheMilestonesToConfirm"/>
+						</apex:inputField>
+					</apex:column>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__SupplierInvoicingCurrencyMilestoneValue__c.Label} ({!TheSupplierRequisitionCreationWizard.SupplierCurrencyCode})">
+						<apex:inputField value="{!milestone.Milestone.KimbleOne__SupplierInvoicingCurrencyMilestoneValue__c}" rendered="{!!milestone.Milestone.DeliveryElement__r.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsUnitGenerated__c}">
+							<apex:actionSupport event="onchange" action="{!TheSupplierRequisitionCreationWizard.MilestoneChange}" rerender="TheMilestonesToConfirm"/>
+						</apex:inputField>
+						<apex:outputField value="{!milestone.Milestone.KimbleOne__SupplierInvoicingCurrencyMilestoneValue__c}" rendered="{!milestone.Milestone.DeliveryElement__r.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsUnitGenerated__c}"/>
+						
+					</apex:column>
+				</apex:pageBlockTable>
+				
+				<!-- CONFIRM Activity Assignment -->
+				<apex:pageBlockTable id="TheActivityAssignmentsToConfirm" value="{!TheSupplierRequisitionCreationWizard.TheSelectedActivityAssignments}" var="activityAssignment" rendered="{!TheSupplierRequisitionCreationWizard.UsageCosts}">
+					<apex:column value="{!activityAssignment.ActivityAssignment.ResourcedActivity__r.DeliveryElement__r.Name}" headerValue="{!$ObjectType.KimbleOne__DeliveryElement__c.Label}"/>
+					<apex:column value="{!activityAssignment.ActivityAssignment.KimbleOne__Resource__c}" headerValue="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__Resource__c.Label}"/>
+					<apex:column headerValue="{!$Label.kimbleone__allocationlabel}">
+					
+						<table class="list" border="0" cellpadding="0" cellspacing="0">
+	            			<thead>
+								<tr class="headerRow">
+									<th class="headerRow" ><h2>{!$ObjectType.SupplierRequisitionLineAllocation__c.Fields.SupplierRequisitionLineAllocType__c.Label}</h2></th>
+									<th class="headerRow" ><h2><apex:outputText value="{!activityAssignment.ActivityAssignment.ResourcedActivityOperatedWith__r.UsageUnitType__r.Name}" /></h2></th>
+									<th class="headerRow" ><h2>{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__CostRate__c.Label}</h2></th>
+									<th class="headerRow" ><h2>{!$ObjectType.SupplierRequisitionLineAllocation__c.Fields.AllocatedAmount__c.Label}</h2></th>
+								</tr>
+							</thead>
+							
+							<tbody>
+								<apex:repeat value="{!activityAssignment.ActivityAssignmentAllocationItems}" var="allocItem">							
+									<tr class="dataRow">
+										<td class="dataCell">
+											<apex:outputText value="{!allocItem.AllocationType}" />
+										</td>
+										<td>
+											<apex:inputField value="{!allocItem.AllocationUnits.KimbleOne__InputDecimal__c}" rendered="{!allocItem.AllocationType=='Services' && activityAssignment.ActivityAssignment.KimbleOne__SupplierInvoicingCurrencyCostRate__c > 0 && allocItem.AllocationUnits.KimbleOne__InputDecimal__c > 0}">
+	     										<apex:actionSupport event="onchange" action="{!TheSupplierRequisitionCreationWizard.ActivityAssignmentChange}" rerender="TheActivityAssignmentsToConfirm"/>
+	     									</apex:inputField>
+											<apex:outputField value="{!allocItem.AllocationUnits.KimbleOne__InputDecimal__c}" rendered="{!allocItem.AllocationType=='Services' && (activityAssignment.ActivityAssignment.KimbleOne__SupplierInvoicingCurrencyCostRate__c == 0 || allocItem.AllocationUnits.KimbleOne__InputDecimal__c == 0)}"/>
+										</td>
+										<td>
+											<apex:outputLabel value="{!activityAssignment.ActivityAssignment.KimbleOne__SupplierInvoicingCurrencyISOCode__c}" styleclass="kimbleCurrencyCode" rendered="{!allocItem.AllocationType=='Services'}" />
+				     						<apex:outputField value="{!activityAssignment.ActivityAssignment.KimbleOne__SupplierInvoicingCurrencyCostRate__c}" rendered="{!allocItem.AllocationType=='Services'}"/>
+				     						<apex:outputText value=" / " rendered="{!allocItem.AllocationType=='Services'}"/>
+				     						<apex:outputField value="{!activityAssignment.ActivityAssignment.ResourcedActivity__r.ForecastUnitType__r.Name}" rendered="{!allocItem.AllocationType=='Services'}"/>
+										</td>
+										<td>
+											<apex:outputLabel value="{!activityAssignment.ActivityAssignment.KimbleOne__SupplierInvoicingCurrencyISOCode__c}" styleclass="kimbleCurrencyCode" rendered="{!allocItem.AllocationType!='Services'}" />
+				     						<apex:inputField value="{!allocItem.AllocationAmount.KimbleOne__InputCurrency__c}" rendered="{!allocItem.AllocationType!='Services'}">
+												<apex:actionSupport event="onchange" action="{!TheSupplierRequisitionCreationWizard.ActivityAssignmentChange}" rerender="TheActivityAssignmentsToConfirm"/>
+	     									</apex:inputField>
+	     									<apex:outputField value="{!allocItem.AllocationAmount.KimbleOne__InputCurrency__c}" rendered="{!allocItem.AllocationType=='Services'}"/>
+										</td>
+									</tr>
+								</apex:repeat>
+							</tbody>
+						</table>
+	   					
+					</apex:column>
+				</apex:pageBlockTable>	
+		    </apex:pageBlockSection>
+		   	
+			<!--  FINAL PAGE -->
+			<apex:outputPanel id="ConfirmSupplierRequisitionPanel" layout="none" rendered="{!TheSupplierRequisitionCreationWizard.CurrentStep.StepName == 'ConfirmSupplierRequisition'}">
+        	
+        	<apex:outputPanel style="display:none">
+			
+			<apex:outputText value="{!KimbleOne__SupplierRequisition__c.KimbleOne__ShippingAddress__c}"/>
+			<apex:outputText value="{!KimbleOne__SupplierRequisition__c.KimbleOne__ShippingCity__c}"/>
+			<apex:outputText value="{!KimbleOne__SupplierRequisition__c.KimbleOne__ShippingCountry__c}"/>
+			<apex:outputText value="{!KimbleOne__SupplierRequisition__c.KimbleOne__ShippingState__c}"/>
+			<apex:outputText value="{!KimbleOne__SupplierRequisition__c.KimbleOne__ShippingStreetName__c}"/>
+			<apex:outputText value="{!KimbleOne__SupplierRequisition__c.KimbleOne__ShippingPostalCode__c}"/>
+			
+			</apex:outputPanel>
+        	
+        	<apex:pageblockSection showHeader="true" collapsible="false" title="{!$Label.kimbleone__confirmdetailsheading}" columns="2" >		
+				<apex:outputField value="{!KimbleOne__SupplierRequisition__c.KimbleOne__SupplierAccount__c}"/>
+				
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.Account.Fields.CurrencyISOCode.Label}" />	
+					<apex:outputText id="SupplierCurrency" value="{!TheSupplierRequisitionCreationWizard.SupplierCurrencyCode}"/>
+				</apex:pageBlockSectionItem>
+				
+				<apex:outputField id="SupplierContact" value="{!KimbleOne__SupplierRequisition__c.KimbleOne__SupplierContact__c}" />
+				
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__SupplierRequisition__c.Fields.KimbleOne__SupplierRequisitionType__c.Label}" />	
+					<apex:selectList value="{!KimbleOne__SupplierRequisition__c.KimbleOne__SupplierRequisitionType__c}"  size="1" required="true">
+						<apex:selectOptions value="{!TheSupplierRequisitionCreationWizard.TheSupplierRequisitionTypes}" />
+					</apex:selectList>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__SupplierRequisition__c.Fields.KimbleOne__BusinessUnitTradingEntity__c.Label}" />
+					<apex:selectList value="{!KimbleOne__SupplierRequisition__c.KimbleOne__BusinessUnitTradingEntity__c}" size="1" required="true">
+						<apex:actionSupport event="onchange" action="{!TheSupplierRequisitionCreationWizard.UpdateAddress}" rerender="ConfirmSupplierRequisitionPanel" onComplete="handleShippingContactChange();" />
+						<apex:selectOptions value="{!TheSupplierRequisitionCreationWizard.TheTradingEntities}" />
+					</apex:selectList>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem rendered="{!EnableShippingContact}">
+						<apex:outputLabel value="{!$ObjectType.KimbleOne__SupplierRequisition__c.Fields.KimbleOne__ShippingContact__c.Label}"/>
+						<apex:actionRegion >
+							<apex:inputText id="SelectShippingContactId" value="{!TheSupplierRequisitionCreationWizard.ShippingContactName}" disabled="true">
+								<apex:actionSupport event="onchange" action="{!TheSupplierRequisitionCreationWizard.UpdateAddress}" reRender="ConfirmSupplierRequisitionPanel" onComplete="handleShippingContactChange();" />
+							</apex:inputText>
+							<apex:inputHidden id="SelectShippingContactId_lkid" value="{!KimbleOne__SupplierRequisition__c.KimbleOne__ShippingContact__c}" />
+							<a href="javascript:void(0);" class="kimbleSearch " onclick="openShippingContactPopup(); setLastMousePosition(event)" ><img src="/s.gif" class="lookupIcon" onblur="this.className = 'lookupIcon';" onfocus="this.className = 'lookupIconOn';" onmouseout="this.className = 'lookupIcon';this.className = 'lookupIcon';" onmouseover="this.className = 'lookupIconOn';this.className = 'lookupIconOn';" /></a>
+							<span id="clearLookup" class="hidden"><a href="javascript:void(0);" onclick="clearShippingContact();">{!$Label.Remove}</a></span>
+						</apex:actionRegion>
+				</apex:pageBlockSectionItem>
+
+				<apex:pageBlockSectionItem rendered="{!EnableShippingContact}">
+
+				</apex:pageBlockSectionItem>
+				
+				<apex:pageBlockSectionItem >
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__SupplierRequisition__c.Fields.KimbleOne__ShippingAddress__c.Label}"/>
+					<c:AddressDetailsField addressObject="{!KimbleOne__SupplierRequisition__c}" addressFieldPrefix="Shipping" />
+				</apex:pageBlockSectionItem>
+
+				<apex:inputField value="{!KimbleOne__SupplierRequisition__c.KimbleOne__SupplierNotes__c}" style="width: 300px;"/>
+				
+				<apex:inputField value="{!KimbleOne__SupplierRequisition__c.KimbleOne__Notes__c}" style="width: 300px;"/>
+				
+			</apex:pageBlockSection>
+			
+			<apex:pageBlockSection >
+	
+				<apex:repeat value="{!$ObjectType.KimbleOne__SupplierRequisition__c.FieldSets.KimbleOne__SupplierRequisitionDetails}" var="f" >
+	     			<apex:inputField rendered="{!!CONTAINS(f.FieldPath,'.')}" value="{!KimbleOne__SupplierRequisition__c[f]}" required="{!f.Required}" styleClass="{!IF(AND($ObjectType.KimbleOne__SupplierRequisition__c.Fields[f].type == 'date',$ObjectType.KimbleOne__SupplierRequisition__c.Fields[f].updateable),'kimbleDatePicker','')}"/>
+					<apex:outputField rendered="{!CONTAINS(f.FieldPath,'.')}" value="{!KimbleOne__SupplierRequisition__c[f]}"/>
+	   			</apex:repeat>
+
+			</apex:pageblockSection>
+			
+			<br/>
+			<apex:pageblockSection showHeader="false" collapsible="false" columns="1" >
+				<apex:pageBlockTable value="{!TheSupplierRequisitionCreationWizard.TheOrderedRequisitionLines}" var="line">
+					<apex:column value="{!TheSupplierRequisitionCreationWizard.TheRequisitionLines[line].LineNumber__c}" />
+					<apex:repeat value="{!$ObjectType.KimbleOne__SupplierRequisitionLine__c.FieldSets.KimbleOne__SupplierRequisitionLineDetails}" var="f">
+						<apex:column rendered="{!!CONTAINS(f.FieldPath,'.')}" headerValue="{!f.Label}">
+							<apex:inputField value="{!TheSupplierRequisitionCreationWizard.TheRequisitionLines[line][f]}" required="{!f.Required}" styleClass="{!IF(AND($ObjectType.KimbleOne__SupplierRequisitionLine__c.Fields[f].type == 'date',$ObjectType.KimbleOne__SupplierRequisitionLine__c.Fields[f].updateable),'kimbleDatePicker','')}"/>
+						</apex:column>
+					</apex:repeat>
+					<apex:column headerValue="{!$ObjectType.KimbleOne__SupplierRequisitionLine__c.Fields.Name.Label}" width="340px">
+						<apex:inputField style="width:320px" value="{!TheSupplierRequisitionCreationWizard.TheRequisitionLines[line].Name}" /> 
+					</apex:column>
+					<apex:column value="{!TheSupplierRequisitionCreationWizard.TheRequisitionLines[line].UnitAmount__c}" />
+					<apex:column value="{!TheSupplierRequisitionCreationWizard.TheRequisitionLines[line].UnitType__c}" />
+					<apex:column value="{!TheSupplierRequisitionCreationWizard.TheRequisitionLines[line].RequisitionedUnits__c}" />
+					<apex:column value="{!TheSupplierRequisitionCreationWizard.TheRequisitionLines[line].NetAmount__c}" />
+				</apex:pageBlockTable>
+			</apex:pageblockSection>
+			
+			</apex:outputPanel>
+			<apex:outputPanel rendered="{!TheSupplierRequisitionCreationWizard.HasFinished}">
+                 <script>
+		                safeNavigateToSForceURL('{!JSENCODE(RedirectRequisitions)}');
+		          </script>
+	               	   
+           	</apex:outputPanel>
+			</apex:pageBlock>
+	
+		</apex:form>
+		
+		<style>
+		.mainTitle {white-space:nowrap;}
+		</style>
+
+		<script>
+
+		jQuery(window).load(function()
+		{
+			initialiseItems();
+		});
+		function initialiseItems()
+		{
+		    SetupDatePicker();
+  		}
+		function SetupDatePicker()
+		{
+			//dateFormat: 'yy-mm-dd',
+			jQuery('.kimbleDatePicker').datepicker({
+					dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+					showOtherMonths: true,
+					selectOtherMonths: true,
+					changeMonth: true,
+					changeYear: true});
+		}
+
+		var kimblePopup;
+
+		function openShippingContactPopup()
+		{
+			kimblePopup = window.open(KimbleLookupPage + '?lknm=' +  jQuery('[id$=\'SelectShippingContactId\']').attr('id') + '&lktp=' + '{!$ObjectType.Contact.KeyPrefix}&typename=LookupContactsWithAccountTradingEntity' + '&lksrch=' + escape(jQuery('[id$=\'SelectShippingContactId\']').val()), "lookup", "width=670,height=480,toolbar=no,status=no,directories=no,menubar=no,resizable=yes,scrollable=no", false);
+  		}
+
+  		function kimblePickValue(targetInput, selectedItemId, selectedItemName)
+  		{
+  		    closeKimblePopup();
+
+			jQuery('[id$="SelectShippingContactId"]').val(selectedItemName);
+			jQuery('[id$="SelectShippingContactId_lkid"]').val(selectedItemId);
+
+			jQuery('[id$="SelectShippingContactId"]').trigger('onchange');
+    	}
+
+    	function closeKimblePopup()
+		{
+			if (kimblePopup != null) kimblePopup.close();
+		}
+
+		function clearShippingContact()
+		{
+			jQuery('[id$="SelectShippingContactId"]').val('');
+			jQuery('[id$="SelectShippingContactId_lkid"]').val('');
+
+			jQuery('[id$="SelectShippingContactId"]').trigger('onchange');
+  		}
+
+  		function handleShippingContactChange()
+  		{
+			if(jQuery('[id$="SelectShippingContactId"]').val().length == 0)
+			{
+			    jQuery('#clearLookup').addClass('hidden');
+   			}
+   			else
+   			{
+   			    jQuery('#clearLookup').removeClass('hidden');
+      		}
+    	}
+
+		</script>
+
+    </apex:define>
+</apex:composition>
+
+</apex:page>

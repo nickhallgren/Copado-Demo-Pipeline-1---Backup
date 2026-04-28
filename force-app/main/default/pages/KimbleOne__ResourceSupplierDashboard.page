@@ -1,0 +1,651 @@
+<apex:page controller="KimbleOne.ResourceSupplierDashboardController" sidebar="false">
+	<apex:composition template="KimbleOne__SiteMaster">
+		<apex:define name="Menu">
+			<c:Menu DefaultHelpPage="SupplierDashboard.html" MenuContextType="Resource"
+			        MenuContextId="{!theResource.Id}" MenuContextName="{!theResource.Name}"/>
+		</apex:define>
+		<apex:define name="Content">
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CharmStyle.css')}"/>
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'css/jquery.select2.css')}"/>
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__KimbleJS, 'Charm.js')}"/>
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQuerySelect2, 'js/jquery.select2.js')}"/>
+
+			<style>
+				.title-card-heading {
+					height: 28px;
+				}
+				
+				.full-width-dashboard-container {
+					display: table;
+					width: 100%;
+				  	margin-bottom: 5px;
+				}
+				
+				.cardContainer .card
+				{
+					display: block;
+				}
+				#summaryCardBody
+				{
+				  	height: 100px;
+		  			overflow-y: auto;
+				}
+				
+				#SupplierResourcePreferencesContainer {
+					overflow:hidden;
+					height: 150px;
+					display: table-cell;
+					width: 25%;
+				}
+				#SupplierProductContainer {
+					overflow:hidden;
+					height: 150px;
+					display: table-cell;
+					width: 25%;
+				}
+				#SupplierSequenceContainer {
+					display: table-cell;
+					height: 150px;
+					width: 50%;
+				}
+				
+				#data-loading {
+					text-align: center;
+					font-size: 200px;
+					color: #d3d3d3;
+					position: absolute;
+					filter: progid:DXImageTransform.Microsoft.Alpha(opacity=50);
+					-moz-opacity: 0.7;
+					-khtml-opacity: 0.7;
+					opacity: 0.7;
+					z-index: 1000;
+					background-color: #fff;
+					height: calc(100% - 160px);
+					width: calc(100% - 320px);
+					padding: 100px 50px 0px 50px;
+				}
+				
+				.hyperLink{
+				    border-bottom: 1px dotted rgb(0, 109, 204);
+				    color: rgb(0, 109, 204) !important;
+				    text-decoration: none;
+				}
+				
+				.save-btn {
+					margin-right: 11px;
+					margin-bottom: 2px;
+					font-size: 26px;
+				}
+				.action-btn {
+					color: #BBB;
+					cursor: pointer;
+				}
+				.toggle-medium {
+				    cursor: pointer;
+					font-size: 20px;
+					width: 25px;
+					text-align: right;
+				}
+				.table-preferences {
+				    width: 100%;
+				    padding: 6px;
+                }
+
+				/* Winter 18 Lightning Style Overrides - START */
+				/* Only required to format the pageBlock which is required to maintain fonts and styling in Lightning */
+				div[id$='sf-formatting-container'] .pbBody {
+					margin: 0px !important;
+					background-color: white;
+				}
+				div[id$='sf-formatting-container'].bPageBlock {
+					border: none !important;
+					overflow-x: hidden;
+				}
+				/* Winter 18 Lightning Style Overrides - END */
+
+            </style>
+
+
+			<apex:pageBlock id="sf-formatting-container">
+				<div id="resource-title">
+					<apex:outputPanel id="resourceCard" layout="none">
+						<div class="title-card-container">
+							<div class="title-card">
+								<div class="title-card-heading">
+									<div class="title-card-heading-text">
+										<apex:outputText value="{!theResource.Name}"/>
+									</div>
+								</div>
+							</div>
+						</div>
+					</apex:outputPanel>
+				</div>
+				<div id="Errors">
+					<apex:pageMessages escape="false"/>
+				</div>
+			</apex:pageBlock>
+			<apex:pageBlock id="SupplierInfoSection">
+				<div class="full-width-dashboard-container">
+					<div id="data-loading" class="hidden-item"><i class="fa fa-circle-o-notch fa-spin"></i></div>
+
+					<div id="SupplierResourcePreferencesContainer" class="cardContainer">
+						<apex:form id="TheSelfBillingForm">
+							<div class="card inverted variable-width min-horizontal-padding">
+								<div class="cardHeading inverted">
+									<h3 class="cardTitle">{!$Label.SelfBilling}</h3>
+								</div>
+
+								<div id="summaryCardBody" class="cardBody">
+									<div class="card inverted variable-width min-horizontal-padding">
+										<table class="table-preferences" border="0" cellpadding="3" cellspacing="0">
+											<tr>
+												<td>{!$ObjectType.Resource__c.Fields.SupplierInvoicingCurrencyIsoCode__c.Label}</td>
+												<td>
+													<apex:inputText value="{!theResource.KimbleOne__SupplierInvoicingCurrencyIsoCode__c}" rendered="{!SupplierMultiCurrencyEnabled}" onChange="updateSupplierInvoiceCurrency();" styleclass="kimblecustomlookup GetActiveCurrencyTypes null false false" />
+													<apex:outputField value="{!theResource.KimbleOne__SupplierInvoicingCurrencyIsoCode__c}" rendered="{!!SupplierMultiCurrencyEnabled}"/>
+												</td>
+											</tr>
+											<tr>
+												<td>{!$ObjectType.Resource__c.Fields.IsSelfBill__c.Label}</td>
+												<td>
+													<span id="is-self-bill" onclick="toggleSelfBillMode();" class="k-tgl fa toggle-medium"></span>
+												</td>
+											</tr>
+											<tr>
+												<td>{!$ObjectType.Contact.Fields.HasOptedOutSelfBilling__c.Label}</td>
+												<td>
+													<span id="self-bill-email" onclick="toggleSelfBillEmailMode()" class="k-tgl fa toggle-medium"></span>
+												</td>
+											</tr>
+										</table>
+
+										<apex:actionFunction name="updateSupplierInvoiceCurrency" action="{!updateSupplierInvoiceCurrency}" rendered="{!SupplierMultiCurrencyEnabled}"/>
+										<apex:actionFunction name="switchToSelfBillMode" action="{!SwitchToSelfBillMode}"/>
+										<apex:actionFunction name="switchToNonSelfBillMode" action="{!SwitchToNonSelfBillMode}"/>
+										<apex:actionFunction name="switchToHasNotOptedOutSelfBillEmailModeMode" action="{!SwitchToHasNotOptedOutSelfBillEmailMode}"/>
+										<apex:actionFunction name="switchToHasOptedOutSelfBillEmailModeMode" action="{!SwitchToHasOptedOutSelfBillEmailMode}"/>
+
+										<script>
+                                            var selfBillMode = {!IF(theResource.IsSelfBill__c,'true','false')};
+                                            var optedOutSelfBillEmailMode = {!IF(supplierContact.HasOptedOutSelfBilling__c,'true','false')};
+
+                                            jQuery(document).ready(function()
+                                            {
+                                                refreshSelfBillModes();
+                                            });
+
+                                            function refreshSelfBillModes()
+                                            {
+                                                if (selfBillMode)
+                                                {
+                                                    jQuery("#is-self-bill").removeClass('fa-toggle-off');
+                                                    jQuery("#is-self-bill").addClass('fa-toggle-on');
+                                                }
+                                                else
+                                                {
+                                                    jQuery("#is-self-bill").addClass('fa-toggle-off');
+                                                    jQuery("#is-self-bill").removeClass('fa-toggle-on');
+                                                }
+
+                                                if (optedOutSelfBillEmailMode)
+                                                {
+                                                    jQuery("#self-bill-email").removeClass('fa-toggle-off');
+                                                    jQuery("#self-bill-email").addClass('fa-toggle-on');
+                                                }
+                                                else
+                                                {
+                                                    jQuery("#self-bill-email").addClass('fa-toggle-off');
+                                                    jQuery("#self-bill-email").removeClass('fa-toggle-on');
+                                                }
+                                            }
+
+                                            function toggleSelfBillMode()
+                                            {
+                                                if (selfBillMode)
+                                                {
+                                                    switchToNonSelfBillMode();
+                                                    jQuery("#is-self-bill").addClass('fa-toggle-off');
+                                                    jQuery("#is-self-bill").removeClass('fa-toggle-on');
+                                                    jQuery("#self-bill-email").addClass('fa-toggle-off');
+                                                    jQuery("#self-bill-email").removeClass('fa-toggle-on');
+                                                }
+                                                else
+                                                {
+                                                    switchToSelfBillMode();
+                                                    jQuery("#is-self-bill").removeClass('fa-toggle-off');
+                                                    jQuery("#is-self-bill").addClass('fa-toggle-on');
+                                                }
+
+                                                selfBillMode = !selfBillMode;
+                                            }
+
+                                            function toggleSelfBillEmailMode()
+                                            {
+                                                if (selfBillMode)
+                                                {
+                                                    if (optedOutSelfBillEmailMode)
+	                                                {
+	                                                    switchToHasNotOptedOutSelfBillEmailModeMode();
+	                                                    jQuery("#self-bill-email").addClass('fa-toggle-off');
+	                                                    jQuery("#self-bill-email").removeClass('fa-toggle-on');
+	                                                }
+	                                                else
+	                                                {
+	                                                    switchToHasOptedOutSelfBillEmailModeMode();
+	                                                    jQuery("#self-bill-email").removeClass('fa-toggle-off');
+	                                                    jQuery("#self-bill-email").addClass('fa-toggle-on');
+	                                                }
+
+	                                                optedOutSelfBillEmailMode = !optedOutSelfBillEmailMode;
+                                                }
+                                            }
+                                        </script>
+									</div>
+								</div>
+							</div>
+						</apex:form>
+					</div>
+					<div id="SupplierProductContainer" class="cardContainer">
+						<div class="card inverted variable-width min-horizontal-padding">
+							<div class="cardHeading inverted">
+								<h3 class="cardTitle">{!$Label.Suppliers}</h3>
+							</div>
+							<div id="summaryCardBody" class="cardBody">
+								<div class="card inverted variable-width min-horizontal-padding">
+									<table class="list cardBodyTable" border="0" cellpadding="0" cellspacing="0">
+										<thead>
+										<tr class="headerRow">
+											<th class="headerRow" width="10%" colspan="1" style="font-size: 18px">
+												<a href="javascript:addSupplierAccount();"
+												   title="{!$Label.Add} {!$ObjectType.SupplierProduct__c.label}"><i
+															class="fa fa-plus-square"></i></a>
+											</th>
+											<th class="headerRow">
+												<h2>{!$ObjectType.SupplierProduct__c.Fields.SupplierAccount__c.label}</h2>
+											</th>
+										</tr>
+										</thead>
+										<tbody>
+										<apex:repeat value="{!theSupplierProducts}" var="supplierProd">
+											<tr class="dataRow primary-row">
+												<td class="dataCell row-label-cell" width="10%" colspan="1">
+													<apex:outputPanel layout="none"
+													                  rendered="{!$ObjectType.KimbleOne__SupplierProduct__c.updateable}">
+														<a class="action-btn" onclick="javascript:safeNavigateToSForceURL('{!$Page.AccountEdit}?id={!JSINHTMLENCODE(supplierProd.SupplierAccount__c)}&rId={!JSINHTMLENCODE(theResource.Id)}');"
+														   title="{!$Label.Edit} {!$ObjectType.Account.label}"><i
+																	class="fa fa-pencil-square-o"></i></a>
+													</apex:outputPanel>
+													<apex:outputPanel layout="none"
+													                  rendered="{!$ObjectType.KimbleOne__SupplierProduct__c.deletable}">
+														<a href="javascript:deleteSupplierProduct('{!JSINHTMLENCODE(supplierProd.Id)}');"
+														   title="{!$Label.Delete} {!$ObjectType.SupplierProduct__c.label}"><i
+																	class="fa fa-trash"></i></a>
+													</apex:outputPanel>
+												</td>
+												<td class="dataCell row-label-cell line-heading">
+													<apex:outputField value="{!supplierProd.KimbleOne__SupplierAccount__c}"/>
+												</td>
+											</tr>
+										</apex:repeat>
+										</tbody>
+									</table>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div id="SupplierSequenceContainer" class="cardContainer">
+						<div class="card inverted variable-width min-horizontal-padding">
+							<div class="cardHeading inverted">
+								<h3 class="cardTitle">{!$ObjectType.SupplierInvoice__c.label} {!$Label.References}</h3>
+							</div>
+							<div id="summaryCardBody" class="cardBody">
+								<div class="card inverted variable-width min-horizontal-padding">
+									<table class="list cardBodyTable" border="0" cellpadding="0" cellspacing="0">
+										<thead>
+										<tr class="headerRow">
+											<th class="headerRow" colspan="3" style="font-size: 18px">
+												<apex:outputPanel layout="inline"
+												                  rendered="{!AND(countEnum < 2, $ObjectType.KimbleOne__Sequence__c.createable)}">
+													<a href="javascript:CreateSequenceRecord();"
+													   title="{!$Label.Add} {!$ObjectType.Sequence__c.label}"><i
+																class="fa fa-plus-square"></i></a>
+												</apex:outputPanel>
+											</th>
+											<th class="headerRow"><h2>{!$Label.kimbleone__name}</h2></th>
+											<th class="headerRow">
+												<h2>{!$ObjectType.KimbleOne__Sequence__c.Fields.KimbleOne__CurrentValue__c.label}</h2>
+											</th>
+											<th class="headerRow">
+												<h2>{!$ObjectType.KimbleOne__Sequence__c.Fields.KimbleOne__Prefix__c.label}</h2></th>
+										</tr>
+										</thead>
+										<tbody>
+										<apex:repeat value="{!theSupplierSequences}" var="SSeq">
+											<tr class="dataRow primary-row">
+												<td class="dataCell row-label-cell" colspan="3">
+													<apex:outputPanel layout="none"
+													                  rendered="{!$ObjectType.KimbleOne__Sequence__c.updateable}">
+														<a href="javascript:editSupplierSequence('{!JSINHTMLENCODE(SSeq.Id)}');"
+														   title="{!$Label.Edit} {!$ObjectType.Sequence__c.label}"><i
+																	class="fa fa-pencil-square-o"></i></a>
+													</apex:outputPanel>
+													<apex:outputPanel layout="none"
+													                  rendered="{!$ObjectType.KimbleOne__Sequence__c.deletable}">
+														<a href="javascript:deleteSupplierSequence('{!JSINHTMLENCODE(SSeq.Id)}');"
+														   title="{!$Label.Delete} {!$ObjectType.Sequence__c.label}"><i
+																	class="fa fa-trash"></i></a>
+													</apex:outputPanel>
+												</td>
+												<td class="dataCell row-label-cell line-heading">{!LEFT(SSeq.KimbleOne__Enum__c, FIND(":",SSeq.KimbleOne__Enum__c)-1)}</td>
+												<td class="dataCell row-label-cell line-heading">
+													<apex:outputField value="{!SSeq.KimbleOne__CurrentValue__c}"/>
+												</td>
+												<td class="dataCell row-label-cell line-heading">
+													<apex:outputField value="{!SSeq.KimbleOne__Prefix__c}"/>
+												</td>
+											</tr>
+										</apex:repeat>
+										</tbody>
+									</table>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</apex:pageBlock>
+
+			<apex:form >
+				<apex:outputPanel id="supplierInvoicePBId">
+					<apex:pageBlock title="{!$Label.kimbleone__invoiceableheading} {!$Label.kimbleone__selfbilling} {!$ObjectType.KimbleOne__ActivityAssignment__c.labelPlural}"
+					                rendered="{!theActivityAssignments.size > 0 && $ObjectType.KimbleOne__SupplierInvoice__c.createable && theResource.KimbleOne__IsSelfBill__c}">
+						<apex:pageBlockButtons location="top">
+							<input id="generateSupplierInvoiceId" class="btn" type="button"
+							       onclick="generateSupplierInvoice();"
+							       value="{!$Label.GenerateLabel} {!$ObjectType.Invoice__c.label}"/>
+							<apex:actionFunction name="generateInvoice" action="{!generateInvoice}"
+							                     oncomplete="showModalBoxy();showWorking(); if($('#GenerateSupplierInvoiceErrors>span')[0].children.length == 0) loadJobsPopup(jQuery('[id$=\'GenerateSupplierInvoicePopupPanel\']'), '{!JSINHTMLENCODE(theResource.Id)}', runJobsComplete);"
+							                     reRender="GenerateSupplierInvoicePopupPanel, supplierInvoicePBId"/>
+						</apex:pageBlockButtons>
+						<apex:pageBlockTable value="{!theActivityAssignments}" var="activityAssignment">
+							<apex:column >
+								<apex:inputCheckbox value="{!activityAssignment.TheSelectedActivityAssignment}"
+								                    id="checkedone" styleClass="clsCheckbox"
+								                    onclick="activeAssignmentSelected();"/>
+							</apex:column>
+							<apex:column value="{!activityAssignment.TheActivityAssignment.Name}"/>
+							<apex:column value="{!activityAssignment.TheActivityAssignment.KimbleOne__DeliveryGroup__c}"/>
+							<apex:column value="{!activityAssignment.TheActivityAssignment.KimbleOne__ResourcedActivity__c}"/>
+						</apex:pageBlockTable>
+
+					</apex:pageBlock>
+				</apex:outputPanel>
+
+				<apex:actionFunction action="{!getSupplierProducts}" name="intialize" rerender="SupplierProductAdd" oncomplete="showModalBoxy()">
+					<apex:param name="supplierProductId" value=""/>
+				</apex:actionFunction>
+
+				<apex:actionFunction action="{!getSupplierProduct}" name="getSupplierProduct" rerender="SupplierAccountEdit" oncomplete="showModalBoxy();initialiseItems();">
+					<apex:param name="supplierAccountId" value=""/>
+				</apex:actionFunction>
+
+				<apex:actionFunction action="{!RemoveResourceFromSupplierProduct}" name="removeResourceFromSProduct" rerender="sf-formatting-container,SupplierInfoSection" oncomplete="showModalBoxy()">
+					<apex:param name="supplierProductId" value=""/>
+				</apex:actionFunction>
+
+				<apex:actionFunction action="{!DeleteSupplierSequenceRecord}" name="deleteSupplierSequenceRecord" rerender="sf-formatting-container,SupplierInfoSection" oncomplete="showModalBoxy()">
+					<apex:param name="sequenceId" value=""/>
+				</apex:actionFunction>
+
+				<apex:actionFunction action="{!ReloadAll}" name="rerenderMainDetails" rerender="sf-formatting-container,SupplierInfoSection" oncomplete="hideWorking();"/>
+
+				<apex:actionFunction name="CreateSequenceRecord" action="{!CreateSequenceRecord}" rerender="sf-formatting-container,SupplierInfoSection"/>
+
+				<apex:actionFunction name="getSupplierSequenceForEdit" action="{!getSupplierSequenceForEdit}" rerender="SequenceEditPopupPanel" oncomplete="showModalBoxy();">
+					<apex:param name="sequenceId" value=""/>
+				</apex:actionFunction>
+			</apex:form>
+
+			<apex:pageBlock title="{!$ObjectType.KimbleOne__SupplierInvoice__c.labelPlural}" rendered="{!theSupplierInvoices.size > 0}">
+
+				<apex:pageBlockTable value="{!theSupplierInvoices}" var="supplierInvo">
+					<apex:column value="{!supplierInvo.KimbleOne__InvoiceDate__c}"/>
+					<apex:column >
+						<apex:facet name="header">{!$ObjectType.KimbleOne__SupplierInvoice__c.Fields.Name.label}</apex:facet>
+						<apex:outputLink value="/{!supplierInvo.Id}"
+						                 styleClass="hyperLink">{!supplierInvo.Name}</apex:outputLink>
+					</apex:column>
+					<apex:column value="{!supplierInvo.KimbleOne__SupplierAccount__c}"/>
+					<apex:column value="{!supplierInvo.KimbleOne__Status__c}"/>
+					<apex:column value="{!supplierInvo.KimbleOne__NetAmount__c}"/>
+					<apex:column value="{!supplierInvo.KimbleOne__TaxAmount__c}"/>
+				</apex:pageBlockTable>
+
+			</apex:pageBlock>
+
+			<apex:pageBlock title="{!$ObjectType.KimbleOne__SupplierRequisitionLineAllocation__c.labelPlural}"
+			                rendered="{!theSupplierRequisitionLineAllocations.size > 0}">
+
+				<apex:pageBlockTable value="{!theSupplierRequisitionLineAllocations}" var="SRLA">
+					<apex:column value="{!SRLA.SupplierRequisitionLine__r.KimbleOne__SupplierRequisition__c}"/>
+					<apex:column value="{!SRLA.SupplierRequisitionLine__r.SupplierRequisition__r.KimbleOne__SupplierPurchaseOrder__c}"/>
+					<apex:column value="{!SRLA.SupplierRequisitionLine__r.SupplierRequisition__r.KimbleOne__Status__c}"/>
+					<apex:column value="{!SRLA.SupplierRequisitionLine__r.KimbleOne__LineNumber__c}"/>
+					<apex:column value="{!SRLA.KimbleOne__AllocatedAmount__c}"/>
+					<apex:column value="{!SRLA.SupplierRequisitionLine__r.KimbleOne__NetAmount__c}"/>
+					<apex:column value="{!SRLA.SupplierRequisitionLine__r.KimbleOne__InvoicedNetAmount__c}"/>
+				</apex:pageBlockTable>
+
+			</apex:pageBlock>
+
+			<apex:form id="SupplierProductAddForm">
+				<div id="SupplierProductAddPopup" style="display:none">
+					<apex:outputPanel id="SupplierProductAdd">
+						<div id="SupplierProductAddErrors">
+							<apex:pageMessages id="SupplierProductAddMessages" escape="false"/>
+						</div>
+
+						<apex:pageBlock >
+							<apex:pageBlockButtons location="bottom">
+								<apex:commandButton id="saveGroup" styleclass="DisableButtonWhileBusy"
+								                    action="{!CreateSupplierAccount}" value="{!$Label.kimbleone__save}"
+								                    oncomplete="hideModalBoxyWithErrorCheck('#SupplierProductAddErrors');"
+								                    rerender="SupplierProductAdd, sf-formatting-container,SupplierInfoSection"/>
+								<input id="cancelCreateSupplierAccount" class="btn" type="button"
+								       onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+							</apex:pageBlockButtons>
+
+							<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+								<apex:pageBlockSectionItem >
+									<apex:outputLabel styleClass="accountCls" value="{!$ObjectType.Account.Label}"/>
+									<apex:outputPanel layout="none">
+										<apex:outputPanel layout="block">
+											<apex:inputText id="AccountRecId" value="{!accountName}"
+											                styleclass="readonly"/>
+											<apex:inputHidden id="AccountRecId_lkid" value="{!accountId}"/>
+											<a href="javascript:openLookup(KimbleLookupPage + '?lkfm=' + jQuery('[id$=\'SupplierProductAddForm\']').attr('id') + '&lknm=' + jQuery('[id$=\'AccountRecId\']').attr('id') + '&lktp={!$ObjectType.Account.KeyPrefix}&ResourceId={!theResource.Id}&typename=LookupObjectSupplierAccountWithoutDuplicate',670,'1','&lksrch='+jQuery('[id$=\'AccountRecId\']').val())"
+											   class="kimbleSearch " onclick="setLastMousePosition(event)"><img
+														src="/s.gif" class="lookupIcon"
+														onblur="this.className = 'lookupIcon';"
+														onfocus="this.className = 'lookupIconOn';"
+														onmouseout="this.className = 'lookupIcon';this.className = 'lookupIcon';"
+														onmouseover="this.className = 'lookupIconOn';this.className = 'lookupIconOn';"/></a>
+										</apex:outputPanel>
+									</apex:outputPanel>
+								</apex:pageBlockSectionItem>
+							</apex:pageblockSection>
+						</apex:pageBlock>
+					</apex:outputPanel> <!-- end newDeliveryGroup -->
+				</div>
+			</apex:form>
+
+			<apex:form id="SupplierAccountEditForm">
+				<div id="SupplierAccountEditPopup" style="display:none">
+					<apex:outputPanel id="SupplierAccountEdit">
+						<div id="SupplierAccountEditErrors">
+							<apex:pageMessages id="SupplierAccountEditMessages" escape="false"/>
+						</div>
+
+						<apex:pageBlock >
+							<apex:pageBlockButtons location="bottom">
+								<apex:commandButton id="saveGroup" styleclass="DisableButtonWhileBusy"
+								                    action="{!updateSupplierAccount}" value="{!$Label.kimbleone__save}"
+								                    oncomplete="hideModalBoxyWithErrorCheck('#SupplierAccountEditErrors');initialiseItems();"
+								                    rerender="SupplierAccountEdit, sf-formatting-container,SupplierInfoSection"/>
+								<input id="cancelUpdateSupplierAccount" class="btn" type="button"
+								       onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+							</apex:pageBlockButtons>
+
+							<apex:pageBlockSection columns="1">
+								<apex:repeat value="{!$ObjectType.Account.FieldSets.KimbleOne__SupplierAccountEditFields}"
+								             var="field">
+									<apex:inputField value="{!editSupplierAccountDetails[field]}"
+									                 rendered="{!!CONTAINS(field.FieldPath,'.') && $ObjectType.Account.fields[field].Accessible}"
+									                 styleClass="{!IF(AND($ObjectType.Account.Fields[field].type == 'date',$ObjectType.Account.Fields[field].updateable),'kimbleDatePicker','')}"/>
+									<apex:outputField value="{!editSupplierAccountDetails[field]}"
+									                  rendered="{!CONTAINS(field.FieldPath,'.')}"/>
+								</apex:repeat>
+							</apex:pageBlockSection>
+						</apex:pageBlock>
+					</apex:outputPanel> <!-- end newDeliveryGroup -->
+				</div>
+			</apex:form>
+
+			<apex:form id="SequenceEditForm">
+				<div id="SequenceEditPopup" style="display: none">
+					<apex:outputPanel id="SequenceEditPopupPanel">
+						<apex:pageBlock >
+							<div id="SequenceEditPopupErrors">
+								<apex:pageMessages escape="false"/>
+							</div>
+							<apex:pageBlockButtons location="bottom">
+								<apex:commandButton action="{!updateSupplierSequence}"
+								                    value="{!$Label.kimbleone__save}"
+								                    styleclass="DisableButtonWhileBusy"
+								                    oncomplete="hideModalBoxyWithErrorCheck('#SequenceEditPopupErrors')"
+								                    reRender="SequenceEditPopupPanel, sf-formatting-container,SupplierInfoSection"/>
+								<input class="btn" type="button" onclick="hideModalBoxy();"
+								       value="{!$Label.Cancel}"/>
+							</apex:pageBlockButtons>
+
+							<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+								<apex:inputfield value="{!aSupplierSequence.Name}" required="true"/>
+								<apex:inputField value="{!aSupplierSequence.KimbleOne__Prefix__c}"/>
+								<apex:inputField value="{!aSupplierSequence.KimbleOne__CurrentValue__c}"/>
+								<apex:inputField value="{!aSupplierSequence.KimbleOne__DisplayFormat__c}"/>
+							</apex:pageblockSection>
+						</apex:pageBlock>
+					</apex:outputPanel>
+				</div>
+			</apex:form>
+
+			<apex:form id="GenerateSupplierInvoiceForm">
+				<div id="GenerateSupplierInvoicePopup" style="display:none">
+					<apex:outputPanel id="GenerateSupplierInvoicePopupPanel" style="min-height:80px;">
+						<div id="GenerateSupplierInvoiceErrors">
+							<apex:pageMessages id="GenerateSupplierInvoiceMessages" escape="false"/>
+						</div>
+					</apex:outputPanel>
+				</div>
+			</apex:form>
+
+
+			<script>
+				function showWorking()
+				{
+					jQuery('#data-loading').removeClass('hidden-item');
+				}
+
+				function hideWorking()
+				{
+					jQuery('#data-loading').addClass('hidden-item');
+				}
+
+				function editSupplierAccount(supplierAccountId)
+				{
+					initialiseModalBoxy('#SupplierAccountEditPopup', '{!JSENCODE($Label.Edit)} {!$ObjectType.Account.label}', jQuery('form[id$=\'SupplierAccountEditForm\']'));
+					getSupplierProduct(supplierAccountId);
+				}
+
+				function deleteSupplierProduct(supplierProductId)
+				{
+					if (confirm('{!JSENCODE($Label.AreYouSure)}'))
+					    removeResourceFromSProduct(supplierProductId);
+				}
+
+				function deleteSupplierSequence(sequenceId)
+				{
+					if (confirm('{!JSENCODE($Label.AreYouSure)}'))
+					    deleteSupplierSequenceRecord(sequenceId);
+				}
+
+				function addSupplierAccount()
+				{
+					initialiseModalBoxy('#SupplierProductAddPopup', '{!JSENCODE($Label.Edit)} {!$ObjectType.SupplierProduct__c.label}', jQuery('form[id$=\'SupplierProductAddForm\']'));
+					intialize();
+				}
+
+				function generateSupplierInvoice()
+				{
+					initialiseModalBoxy('#GenerateSupplierInvoicePopup', 'Generate Supplier Invoice', jQuery('form[id$=\'GenerateSupplierInvoiceForm\']'));
+					generateInvoice();
+				}
+
+				function editSupplierSequence(sequenceId)
+				{
+					initialiseModalBoxy('#SequenceEditPopup', '{!JSENCODE($Label.Edit)} {!$ObjectType.Sequence__c.label}', jQuery('form[id$=\'SequenceEditForm\']'));
+					getSupplierSequenceForEdit(sequenceId);
+				}
+				
+				function runJobsComplete()
+				{
+					hideModalBoxy();
+					rerenderMainDetails();
+					initialiseKimbleMenu();
+				}
+				
+				function activeAssignmentSelected()
+				{
+					var count = $('.clsCheckbox:checked').size();
+					
+					if(count > 0)
+					{
+						jQuery('[id$="generateSupplierInvoiceId"]').toggleClass('btnDisabled', false).attr('disabled', null);
+		    			jQuery('[id$="generateSupplierInvoiceId"]').toggleClass('btn', true);
+					}
+					else
+					{
+						jQuery('[id$="generateSupplierInvoiceId"]').toggleClass('btnDisabled', true).attr('disabled', 'disabled');
+						jQuery('[id$="generateSupplierInvoiceId"]').toggleClass('btn', false);
+					}
+				}
+				
+				jQuery(document).ready(function()
+				{
+					jQuery('[id$="generateSupplierInvoiceId"]').toggleClass('btnDisabled', true).attr('disabled', 'disabled');
+					jQuery('[id$="generateSupplierInvoiceId"]').toggleClass('btn', false);
+				});
+
+				function initialiseItems()
+				{
+				    SetupDatePicker();
+    			}
+
+				function SetupDatePicker()
+				{
+					//dateFormat: 'yy-mm-dd',
+					jQuery('.kimbleDatePicker').datepicker({
+							dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+							showOtherMonths: true,
+							selectOtherMonths: true,
+							changeMonth: true,
+							changeYear: true});
+				}
+
+            </script>
+
+		</apex:define>
+
+	</apex:composition>
+
+</apex:page>

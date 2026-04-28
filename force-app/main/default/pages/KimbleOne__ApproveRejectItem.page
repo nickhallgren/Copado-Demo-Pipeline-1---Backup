@@ -1,0 +1,94 @@
+<apex:page controller="KimbleOne.ApproveRejectItemController">
+
+    <style>
+    textarea.approve-reject-comments {
+        width: 300px;
+        height: 150px;
+    }
+    </style>
+    <div id="ApproveRejectPopup" style="display: none">
+        <apex:outputPanel id="ApproveRejectCommentsPopupPanel" styleClass="approveRejectCommentsPopup">
+            <apex:form >
+            <div id="ApproveRejectCommentsErrors">
+                <apex:pageMessages escape="false"/>
+            </div>
+            <apex:pageBlock mode="edit">
+                <apex:pageBlockSection collapsible="false" showheader="false" columns="1">
+                    <apex:inputTextArea label="{!$Label.kimbleone__comments}" styleClass="approve-reject-comments" value="{!Comments}"/>
+                </apex:pageBlockSection>
+                <apex:pageBlockButtons location="bottom">
+                    <input type="button" class="btn DisableButtonWhileBusy" value="{!$Label.Approve}" onclick="approveItem();"/>
+                    <input type="button" class="btn DisableButtonWhileBusy" value="{!$Label.RejectLabel}" onclick="rejectItem();"/>
+                    <input class="btn DisableButtonWhileBusy" type="button" onclick="cancelTheApprove();" value="{!$Label.Cancel}" />
+                </apex:pageBlockButtons>
+            </apex:pageBlock>
+
+            <apex:actionFunction action="{!ApprovePendingItem}" name="approveThePendingItem" oncomplete="closeApproveRejectPopup();" rerender="ApproveRejectCommentsPopupPanel">
+                <apex:param name="itemId" value="" />
+                <apex:param name="approvalComments" value="" />
+            </apex:actionFunction>
+            <apex:actionFunction action="{!RejectPendingItem}" name="rejectThePendingItem" oncomplete="closeApproveRejectPopup();" rerender="ApproveRejectCommentsPopupPanel">
+                <apex:param name="itemId" value="" />
+                <apex:param name="rejectionComments" value="" />
+            </apex:actionFunction>
+            <apex:actionFunction name="cancelTheApprove" oncomplete="cancelApprove();" rerender="ApproveRejectCommentsPopupPanel">
+            </apex:actionFunction>
+            </apex:form>
+        </apex:outputPanel>
+    </div>
+
+    <script>
+        function overrideSFApproveRejectLink(itemId)
+        {
+            if(jQuery('a.actionLink[href*="ProcessInstanceWorkitemWizardStageManager"]').length)
+            {
+                var newHref = '#';
+                var onclickHandler = "showApproveRejectPopup('" + itemId + "');";
+
+                var theOrigLink = jQuery('a.actionLink[href*="ProcessInstanceWorkitemWizardStageManager"]');
+                theOrigLink.prop('href', newHref);
+                theOrigLink.attr('onclick', onclickHandler);
+            }
+        }
+
+        function showApproveRejectPopup(itemId)
+        {
+            jQuery('.approveRejectCommentsPopup').attr('itemId', itemId);
+            initialiseModalBoxy('#ApproveRejectPopup', '{!JSENCODE($Label.ApproveRejectItem)}');
+            showModalBoxyWithFocus(jQuery('.approve-reject-comments'));
+        }
+
+        function closeApproveRejectPopup()
+        {
+            if(hideModalBoxyWithErrorCheck('#ApproveRejectCommentsErrors')) reloadVFPage();
+        }
+
+        function cancelApprove()
+        {
+            jQuery('.approve-reject-comments').val('');
+            hideModalBoxy();
+        }
+
+        function approveItem()
+        {
+            var itemId = jQuery('.approveRejectCommentsPopup').attr('itemId');
+            var comments = jQuery('.approve-reject-comments').val();
+
+            approveThePendingItem(itemId, comments);
+        }
+
+        function rejectItem()
+        {
+            var itemId = jQuery('.approveRejectCommentsPopup').attr('itemId');
+            var comments = jQuery('.approve-reject-comments').val();
+
+            if(!itemId && typeof reLoadItemId == 'function')
+            {
+                itemId = reLoadItemId();
+            }
+
+            rejectThePendingItem(itemId, comments);
+        }
+
+    </script>
+</apex:page>

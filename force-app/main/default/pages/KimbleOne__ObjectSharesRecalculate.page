@@ -1,0 +1,323 @@
+<apex:page standardController="KimbleOne__ShareReason__c" recordSetVar="ShareReasons" extensions="KimbleOne.ObjectSharesRecalculateController" showHeader="true" sidebar="false">
+	
+	<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu"></apex:define>  
+   
+<apex:define name="Content">
+	<apex:pageBlock title="Re-calculate All Sharing">
+		
+		<apex:pageBlockSection title="Job Context Id" columns="1">
+			<apex:pageBlockSectionItem >
+				<label>Job Context Id</label>
+				<input type="text" id="job-context-id" value="{!JobContextId}"/>
+			</apex:pageBlockSectionItem>
+		</apex:pageBlockSection>
+		
+		<apex:pageBlockSection title="Create jobs for Manual Shares to Keep" columns="1">
+			
+			<apex:pageBlockSectionItem >
+				<label>Reason Codes To Keep (comma separated list - no spaces)</label>
+			</apex:pageBlockSectionItem>
+			<apex:pageBlockSectionItem >
+				<input type="text" id="reason-codes" style="width:900px"/>
+			</apex:pageBlockSectionItem>
+			
+			<apex:pageBlockSectionItem >
+				<input id="reason-codes-button" type="button" class="btn" value="Go" onclick="reasonCodesToKeep()"/>
+				<span id="reason-codes-progress" class="progress"></span>
+			</apex:pageBlockSectionItem>
+		</apex:pageBlockSection>
+		
+		<apex:pageBlockSection title="Delete All Object Shares" columns="1">
+			<input id="delete-object-shares-button" type="button" class="btn" value="Go" onclick="deleteObjectShares();"/>
+			<span id="delete-object-share-progress" class="progress"></span>
+		</apex:pageBlockSection>
+		
+		<apex:pageBlockSection title="Delete All Instance Shares" columns="1">
+			<apex:pageBlockSectionItem >
+				<label>Instance Shares To Delete (comma separated list)</label>
+			</apex:pageBlockSectionItem>
+			<apex:pageBlockSectionItem >
+				<textarea id="instance-shares" style="width:900px;height:60px;">{!JSINHTMLENCODE(ShareInstances)}</textarea>
+			</apex:pageBlockSectionItem>
+			
+			<input id="delete-instance-share-button" type="button" class="btn" value="Go" onclick="deleteAllInstanceShares();"/>
+			<span id="delete-instance-share-progress" class="progress"></span>
+		</apex:pageBlockSection>
+		
+		<apex:pageBlockSection title="Re-calculate object ownership shares" columns="1">
+			<apex:pageBlockSectionItem >
+				<label>Batch Size</label>
+				<input type="text" id="ownership-batch-size" value="50"/>
+			</apex:pageBlockSectionItem>
+			<input id="ownership-button" type="button" class="btn" value="Go" onclick="recalculateOwnershipShares();"/>
+			<a href="/apexpages/setup/listAsyncApexJobs.apexp">Monitor Progress in Batch Apex</a>
+		</apex:pageBlockSection>
+		
+		<apex:pageBlockSection title="Run sharing re-calculation event classes" columns="1">
+			<apex:pageBlockSectionItem >
+				<label>Batch Size</label>
+				<input type="text" id="events-batch-size" value="20"/>
+			</apex:pageBlockSectionItem>
+			<apex:pageBlockSectionItem >
+				<label>Event Classes to re-calc (comma separated list)</label>
+			</apex:pageBlockSectionItem>
+			<apex:pageBlockSectionItem >
+				<textarea id="event-classes" style="width:900px;height:60px;">{!JSINHTMLENCODE(EventClasses)}</textarea>
+			</apex:pageBlockSectionItem>
+			
+			<input id="event-classes-button" type="button" class="btn" value="Go" onclick="recalculateEvents();"/>
+			<a href="/apexpages/setup/listAsyncApexJobs.apexp">Monitor Progress in Batch Apex</a>
+		</apex:pageBlockSection>
+		
+		<apex:pageBlockSection title="Run All Jobs" columns="1">
+			<input id="run-jobs-button" type="button" class="btn" value="Go" onclick="runAllJobs();"/>
+			<a href="/apexpages/setup/listAsyncApexJobs.apexp">Monitor Progress in Batch Apex</a>
+		</apex:pageBlockSection>
+		
+	</apex:pageBlock>
+	
+</apex:define>
+
+</apex:composition>
+	
+	<script>
+		
+		var reasonCodes;
+		
+		function reasonCodesToKeep()
+		{
+			reasonCodes = jQuery('#reason-codes').val().split(',');
+			jQuery('#reason-codes-button').hide();
+			jQuery('#reason-codes-progress').addClass('Processing');
+			jQuery('#reason-codes-progress').text('');
+			
+			processNextReasonCode();
+		}
+		
+		function processNextReasonCode()
+		{
+			if (reasonCodes.length == 0)
+			{
+				jQuery('#reason-codes-progress').removeClass('Processing');
+				jQuery('#reason-codes-button').show();
+				return;
+			}
+			
+			keepReasonCode(reasonCodes.pop());
+		}
+		
+		function keepReasonCode(code)
+		{
+			jQuery('#reason-codes-progress').text('Processing ' + code);
+			 		
+      		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ObjectSharesRecalculateController.KeepReasonCode}',
+       			code, jQuery('#job-context-id').val(),
+      			function(result, event){
+             		             		
+             		if (event.status) 
+		            {
+		             	processNextReasonCode();
+		         	} 
+		         	else if (event.type === 'exception') 
+		         	{
+		             	alert(event.message);
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		         	}			         	
+		         }, 
+		         {escape: true, timeout: 60000}
+		     );
+		}
+		
+		function deleteObjectShares()
+		{
+			jQuery('#delete-object-share-progress').addClass('Processing');
+			jQuery('#delete-object-shares-button').hide();
+			 		
+      		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ObjectSharesRecalculateController.DeleteObjectShares}',
+       			function(result, event){
+             		             		
+             		if (event.status) 
+		            {
+		             	if (result != 0) 
+		             		deleteObjectShares();
+		             	else
+		             	{
+		             		jQuery('#delete-object-share-progress').removeClass('Processing');
+		             		jQuery('#delete-object-shares-button').show(); 
+		             	}
+		         	} 
+		         	else if (event.type === 'exception') 
+		         	{
+		             	alert(event.message);
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		         	}			         	
+		         }, 
+		         {escape: true, timeout: 60000}
+		     );
+		}
+		
+		var instanceShares;
+		
+		function deleteAllInstanceShares()
+		{
+			instanceShares = jQuery('#instance-shares').val().split(',');
+			jQuery('#delete-instance-share-button').hide();
+			jQuery('#delete-instance-share-progress').addClass('Processing');
+			jQuery('#delete-instance-share-progress').text('');
+			
+			deleteNextInstanceShare();
+		}
+		
+		function deleteNextInstanceShare()
+		{
+			if (instanceShares.length == 0)
+			{
+				jQuery('#delete-instance-share-button').show();
+				jQuery('#delete-instance-share-progress').removeClass('Processing');
+				return;
+			}
+			
+			deleteInstanceShares(instanceShares.pop());
+		}
+		
+		function deleteInstanceShares(obj)
+		{
+			jQuery('#delete-instance-share-button').hide();
+			jQuery('#delete-instance-share-progress').text(obj);
+			 		
+      		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ObjectSharesRecalculateController.DeleteInstanceShares}',
+       			obj, function(result, event){
+             		             		
+             		if (event.status) 
+		            {
+		             	if (result != 0) 
+		             		deleteInstanceShares(obj);
+		             	else
+		             	{
+		             		deleteNextInstanceShare();
+		             	}
+		         	} 
+		         	else if (event.type === 'exception') 
+		         	{
+		             	alert(event.message);
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		         	}			         	
+		         }, 
+		         {escape: true, timeout: 60000}
+		     );
+		}
+		
+		function recalculateOwnershipShares()
+		{
+			jQuery('#ownership-button').hide();
+				
+      		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ObjectSharesRecalculateController.TriggerOwnershipRecalculation}',
+       			jQuery('#ownership-batch-size').val(), jQuery('#job-context-id').val(),  
+       			function(result, event){
+                       		
+             		if (event.status) 
+		            {
+		             	jQuery('#ownership-button').show();
+		         	} 
+		         	else if (event.type === 'exception') 
+		         	{
+		             	alert(event.message);
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		         	}			         	
+		         }, 
+		         {escape: true, timeout: 60000}
+		     );
+		
+		}
+		
+		function recalculateEvents()
+		{
+			jQuery('#event-classes-button').hide();
+				
+      		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ObjectSharesRecalculateController.TriggerEventRecalculation}',
+       			jQuery('#events-batch-size').val(), jQuery('#event-classes').val(), jQuery('#job-context-id').val(),  
+       			function(result, event){
+                       		
+             		if (event.status) 
+		            {
+		             	jQuery('#event-classes-button').show();
+		         	} 
+		         	else if (event.type === 'exception') 
+		         	{
+		             	alert(event.message);
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		         	}			         	
+		         }, 
+		         {escape: true, timeout: 60000}
+		     );
+		
+		}
+		
+		function runAllJobs()
+		{
+			jQuery('#run-jobs-button').hide();
+				
+      		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ObjectSharesRecalculateController.RunAllJobs}',
+       			jQuery('#job-context-id').val(),  
+       			function(result, event){
+                       		
+             		if (event.status) 
+		            {
+		             	jQuery('#run-jobs-button').show();
+		         	} 
+		         	else if (event.type === 'exception') 
+		         	{
+		             	alert(event.message);
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		         	}			         	
+		         }, 
+		         {escape: true, timeout: 60000}
+		     );
+		
+		}
+		
+	</script>
+	
+	<style>
+	.burger-menu {float:none;}
+	.progress
+	{
+		padding-left: 20px;
+		background-repeat: no-repeat;
+		padding-right: 12px;
+		height: 18px;
+		line-height: 18px;
+		display:none;
+	}
+	.Pending 
+	{
+		background-image: url('{!URLFOR($Resource.JobImages, 'pending16.gif')}');
+		display: block;
+	}
+	.Processing 
+	{
+		background-image: url('{!URLFOR($Resource.JobImages, 'running16.gif')}');
+		display: block;
+	}
+	</style>
+</apex:page>

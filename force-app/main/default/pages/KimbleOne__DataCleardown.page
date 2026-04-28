@@ -1,0 +1,374 @@
+<apex:page controller="KimbleOne.DataCleardownController" tabStyle="KimbleOne__ReferenceData__c">
+   <apex:composition template="KimbleOne__SiteMaster">
+	 
+<apex:define name="Menu">
+	<c:Menu HelpSource="CfgGuide" MenuContextName="Delete {!IF(MobileAutomationModeInd, 'Time and Expense ', '')}Transactional Data" />
+</apex:define>
+	
+<apex:define name="Content">
+<apex:form >
+	
+	<script>
+	
+		var inMobileAutomationMode = {!IF(MobileAutomationModeInd, 'true','false')};
+	
+		function updateJobTotals()
+		{
+			$("span[id='completed-job-count']").text($('.job.completed').length);
+			$("span[id='pending-job-count']").text($('.job.pending:not(.completed)').length);
+			$("span[id='failed-job-count']").text($('.job.failed:not(.pending)').length);
+		}
+		
+		function RunAll()
+	 	{
+	 		if ($('span[id$="orgName"]').text() != $('#verifyOrgName').val())
+	 		{
+	 			alert('{!JSENCODE($Label.ConfirmOrgNameMessage)}');
+	 			return;
+	 		}
+	 		
+	 		//run next 
+	 		var next = $('div.command[finished="false"]:first()');
+	 		
+	 		if (next.length == 0){
+		 		$('span[id$="cleardownStatus"]').show();
+		 		EnablePostCleardownOptions();
+		 		
+		 		if(inMobileAutomationMode)
+		 		{
+		 			GetAssignmentsToReset();
+	 			}
+		 		
+		 		return;
+	 		}
+	 		
+	 		next.find('.job').addClass('processing');
+	 		
+	 		var repeat = next.find('.repeat');
+	 		
+	 		if (repeat.text() == '')
+	 			repeat.text('1');
+	 		else
+	 		{
+	 			var repeatTimes = Number(repeat.text());
+	 			repeatTimes = repeatTimes + 1;
+	 			repeat.text(repeatTimes.toString());
+	 		}
+	 		
+	 		if(next.attr('item-counter') != null)
+	 		{
+		 		Visualforce.remoting.Manager.invokeAction(next.attr('operation'),
+		 			next.attr('mobile-mode'), next.attr('item-counter'), next.attr('record-limit'),
+		 			function(result, event){
+	                
+		                if (event.status) // finished
+		                {
+		                	var rerun = event.result;
+		                	
+							var context = $('div.command[finished="false"]:first()');
+							
+							if (!rerun)
+							{
+								context.attr('finished','true');
+								context.find('.job').addClass('completed');
+							}
+							
+							updateJobTotals();
+		                	
+		                	RunAll();              	          	
+		            	} 
+		            	else if (event.type === 'exception') 
+		            	{
+		                	var context = $('div.command[finished="false"]:first()');
+		                	context.find('.job').addClass('failed');
+		                	context.find('.job').find('.repeat').text(context.find('.job').find('.repeat').text() + ' - ' + event.message);
+		            	} 
+		            	else 
+		            	{
+		                	alert(event.message);
+		            	}
+		            }, 
+		            {escape: true, buffer: false, timeout: 120000}
+		        );
+	 		}
+	 		else
+	 		{
+		 		Visualforce.remoting.Manager.invokeAction(next.attr('operation'),
+		 			function(result, event){
+	                
+		                if (event.status) // finished
+		                {
+		                	var rerun = event.result;
+		                	
+							var context = $('div.command[finished="false"]:first()');
+							
+							if (!rerun)
+							{
+								context.attr('finished','true');
+								context.find('.job').addClass('completed');
+							}
+		                	
+		                	updateJobTotals();
+		                	
+		                	RunAll();              	          	
+		            	} 
+		            	else if (event.type === 'exception') 
+		            	{
+		                	var context = $('div.command[finished="false"]:first()');
+		                	context.find('.job').addClass('failed');
+		                	context.find('.job').find('.repeat').text(context.find('.job').find('.repeat').text() + ' - ' + event.message);
+		            	} 
+		            	else 
+		            	{
+		                	alert(event.message);
+		            	}
+		            }, 
+		            {escape: true, buffer: false, timeout: 120000}
+		        );
+	 		}
+	 		
+	 		
+	 	}
+	 	
+	 	function EnablePostCleardownOptions()
+	 	{
+	 		jQuery('input[id$="openOperationalTimePeriodsBtn"]').toggleClass( 'btnDisabled' );
+	 		jQuery('input[id$="openOperationalTimePeriodsBtn"]').toggleClass( 'btn' );
+
+	 		jQuery('input[id$="seedJobFindAssignmentUsageToRemoveBtn"]').toggleClass( 'btnDisabled' );
+	 		jQuery('input[id$="seedJobFindAssignmentUsageToRemoveBtn"]').toggleClass( 'btn' );
+	 	}
+	 	
+	 	var theAssignmentIds = [];
+	 	var assignmentCounter = 0;
+	 	var assignmentsToUpdate = 0;
+	 	
+		function GetAssignmentsToReset()
+		{
+			jQuery('.ResetAssignmentUsagePanel').css('display','none');
+			jQuery('.ResetAssignmentUsageLoading').css('display','');
+			
+			jQuery('.ResetAssignmentUsageStatus').html('Resetting Assignment Usage');
+			jQuery('.ResetAssignmentUsageResult').html('Working');
+						
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DataCleardownController.GetAssignmentsToReset}',
+				function(result, event){
+	 				if (event.status) // finished
+	                {
+	                	jQuery('.ResetAssignmentUsageStatus').html('Resetting Assignments');
+	                	theAssignmentIds = result;
+	                	assignmentCounter = 0;
+	                	assignmentsToUpdate = theAssignmentIds.length;
+	                	if(assignmentsToUpdate > 0)
+	                	{
+		                	jQuery('.ResetAssignmentUsageStatus').html('Assignments To Process: ' + assignmentsToUpdate);
+		                	ResetAssignmentUsageById(theAssignmentIds[assignmentCounter]);
+	                	}
+	                	else
+	                	{
+	                		jQuery('.ResetAssignmentUsageStatus').html('Stopped');
+	                		jQuery('.ResetAssignmentUsageResult').html('No Assignments to Process');
+	                		jQuery('.ResetAssignmentUsageLoading').find('.job').removeClass('processing').addClass('complete');
+	                	}
+	            	} 
+	            	else if (event.type === 'exception') 
+	            	{
+						jQuery('.ResetAssignmentUsageResult').html('Failed: ' + event.message);
+						jQuery('.ResetAssignmentUsageLoading').find('.job').removeClass('processing').addClass('failed');
+	            	} 
+	            	else 
+	            	{
+						jQuery('.ResetAssignmentUsageResult').html('Failed: ' + event.message);
+						jQuery('.ResetAssignmentUsageLoading').find('.job').removeClass('processing').addClass('failed');
+	            	}   	
+	            }, 
+	            {escape: true, buffer: false, timeout: 120000});
+		}
+		
+		function ResetAssignmentUsageById(theAssignmentId)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.DataCleardownController.ResetAssignmentUsage}', 
+				theAssignmentId, 
+				function(result, event){
+	 				if (event.status) // finished
+	                {
+	        			assignmentsToUpdate -= 1;
+	        			if(assignmentsToUpdate > 0)
+	        			{
+	        				assignmentCounter += 1;
+	        				jQuery('.ResetAssignmentUsageStatus').html('Assignments To Process: ' + assignmentsToUpdate);
+							ResetAssignmentUsageById(theAssignmentIds[assignmentCounter]);
+						}
+						else
+						{
+							//completed
+							jQuery('.ResetAssignmentUsageResult').text('Complete');
+							jQuery('.ResetAssignmentUsageStatus').html('');
+							jQuery('.ResetAssignmentUsagePanel').css('display','');
+							jQuery('.ResetAssignmentUsageLoading').css('display','none');
+							
+							jQuery('.mobileAutomationJobLink').show();
+							jQuery('.mobileAutomationJobLink')[0].click();
+						}
+	            	} 
+	            	else if (event.type === 'exception') 
+	            	{
+						jQuery('.ResetAssignmentUsageResult').text('Assignment Update Error: ' + event.message);
+						jQuery('.ResetAssignmentUsageLoading').find('.job').removeClass('processing').addClass('failed');
+	            	} 
+	            	else 
+	            	{
+						jQuery('.ResetAssignmentUsageResult').text('Assignment Update Error: ' + result);
+						jQuery('.ResetAssignmentUsageLoading').find('.job').removeClass('processing').addClass('failed');
+	            	}   	
+	            }, 
+	            {escape: true, buffer: false, timeout: 120000});
+		}
+	 	
+	 	$(document).ready(function(){
+			updateJobTotals();
+		});
+	
+	</script>
+	
+	<style>
+		.command {
+		    display: inline-block;
+		    width: 352px;
+		    padding-top: 6px;
+		    vertical-align: top;
+		    border-top: 1px solid #EAEAEA;
+		}
+		
+		.job
+		{
+			padding-left: 20px;
+			background-repeat: no-repeat;
+			padding-right: 12px;
+			display: block;
+			line-height: 18px;
+			font-weight:bold;
+		}
+		.repeat
+		{
+			padding-left: 4px;
+		}
+		.pending 
+		{
+			background-image: url('{!URLFOR($Resource.JobImages, 'pending16.gif')}');
+		}
+		.processing 
+		{
+			background-image: url('{!URLFOR($Resource.JobImages, 'running16.gif')}');
+		}
+		.completed 
+		{
+			background-image: url('{!URLFOR($Resource.JobImages, 'completed16.gif')}');
+		}
+		.failed 
+		{
+			background-image: url('{!URLFOR($Resource.JobImages, 'failed16.gif')}');
+		}
+		
+		.custom-object-link {
+			text-decoration: none;
+		}
+		
+		.progress-counter
+		{
+			float: right;
+			padding-top: 5px;
+		}
+		
+		/* override the standard trigger disabled banner to allow this screen to be usable */
+		#triggers-disabled-overlay {
+			top: 0 !important;
+			height: 16% !important;
+			background-color: #FF4242 !important;
+			position: fixed !important;
+		}
+		#triggers-disabled-message {
+			top: 0 !important;
+			color: #FFFFFF !important;
+			font-size: 28px !important;
+			margin-top: auto !important;
+			height: auto !important;
+		}
+		.mobileAutomationJobLink {
+			display: none;
+		}
+		
+	</style>
+
+     	<apex:pageMessages escape="false"/>
+     		
+	<apex:pageBlock >
+	
+    	 <apex:pageBlockButtons >
+    	 	<input id="runAll" class="btn" type="button" value="Run All" onclick="RunAll();"/>
+    	 	<span class="progress-counter">Pending:<span id="pending-job-count">0</span>&nbsp;Completed:<span id="completed-job-count">0</span>&nbsp;Failed:<span id="errored-job-count">0</span></span>
+    	 </apex:pageBlockButtons>
+    	 
+    	 <apex:pageblocksection collapsible="false" showheader="true" title="Confirm Org Name"  columns="2">
+    	 	<apex:pageBlockSectionItem >
+						<apex:outputText id="orgName" value="{!$Organization.Name}"/>
+			     		<input type="text" id="verifyOrgName"/>
+			</apex:pageBlockSectionItem>		
+			<apex:pageBlockSectionItem >
+						<apex:outputText id="orgType" value="{!OrgType}"/>
+						<apex:outputText id="cleardownStatus" value="Complete" style="display:none"/>
+			</apex:pageBlockSectionItem>
+    	 </apex:pageblocksection>
+    	 
+		 <apex:repeat value="{!ClearDownScopeItems}" var="deleteItem">
+	    	 <div class="command" finished="false" operation="{!$RemoteAction.DataCleardownController.DeleteSObjectData}" mobile-mode="{!MobileAutomationModeInd}" item-counter="{!deleteItem.Counter}" record-limit="{!deleteItem.recordLimit}">
+	    	 	<span class="job pending">{!$Label.DeleteButton}&nbsp;<apex:outputLink styleClass="custom-object-link" value="{!deleteItem.ListURL}">{!deleteItem.DisplayName}</apex:outputLink>:<span class="repeat"></span></span>
+	         </div>
+         </apex:repeat>
+ 
+ 		 <apex:outputPanel layout="none" rendered="{!!MobileAutomationModeInd}">
+			 <div class="command" finished="false" operation="{!$RemoteAction.DataCleardownController.ResetResourceGroupMemberAssignmentTemplate}">
+	    	 	<span class="job pending">Reset Resource Group Member Assignment Templates:<span class="repeat"></span></span>
+	         </div>
+         </apex:outputPanel>
+         
+      </apex:pageBlock>
+      
+      <apex:pageBlock title="Mobile Automation Post-Cleardown Steps" rendered="{!MobileAutomationModeInd}">
+       <apex:pageBlockSection title="Reset Assignment Usage">
+      			<div class="ResetAssignmentUsagePanel">
+         			<input type="button" class="btn" value="Run" onclick="GetAssignmentsToReset()"/>
+         		</div>
+         		<div class="ResetAssignmentUsageLoading" style="display:none">
+         			<span class="job processing"><span class="ResetAssignmentUsageStatus">Preparing</span></span>
+         		</div>
+         		<apex:outputText value="" styleclass="ResetAssignmentUsageResult"></apex:outputText>
+         		<apex:outputLink target="_blank" styleClass="mobileAutomationJobLink" value="{!$Page.KimbleOne__JobsPending}?alljobs=1">Run All Jobs</apex:outputLink>
+		 </apex:pageBlockSection>
+	 </apex:pageBlock>
+	 
+      <apex:pageBlock title="Post-Cleardown Steps" rendered="{!!MobileAutomationModeInd}">
+
+	  	<apex:pageBlockSection title="Reset Sequences" collapsible="false">
+      		<apex:commandButton id="resetSequences" action="{!ResetSequences}" value="Run"/>
+      		<apex:outputText value="{!ResetSequencesMessage}"></apex:outputText>
+      	</apex:pageBlockSection>
+
+	  	<apex:pageBlockSection title="Reset Resource Schedule Information" collapsible="false">
+      		<apex:commandButton id="createAllResourcePeriodsBtn" action="{!CreateAllResourcePeriods}" value="Run"/>
+        	<apex:outputLink value="{!ASyncJobMonitorLink}">{!CreateAllResourcePeriodsMessage}</apex:outputLink>
+      	</apex:pageBlockSection>
+	</apex:pageBlock>
+      
+      <apex:pageBlock title="Optional Steps" rendered="{!!MobileAutomationModeInd}">
+      	<apex:pageBlockSection title="Reset Sharing Config To Default" collapsible="false">
+      		<apex:commandButton id="resetSharingConfigToDefaultBtn" action="{!ResetSharingConfigToDefault}" value="Run"/>
+        	<apex:outputText value="{!ResetSharingConfigToDefaultMessage}"></apex:outputText>
+      	</apex:pageBlockSection>
+      </apex:pageBlock>
+      
+   </apex:form>
+   </apex:define>
+   </apex:composition>
+ 
+</apex:page>

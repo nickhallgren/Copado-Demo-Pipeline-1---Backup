@@ -1,0 +1,1179 @@
+<apex:page controller="KimbleOne.ActivityAssignmentCalendarController" extensions="KimbleOne.ActivityAssignmentRemoteActions" showHeader="false" sidebar="false">
+
+<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryCycle, 'jquery.cycle.all.js')}"/>
+<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryTimePicker, 'jquery.timepicker.min.js')}"/>
+<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__JQueryTimePicker, 'jquery.timepicker.css')}"/>
+
+<script>
+var theAssignmentCalendar = {};
+</script>
+
+<apex:form id="TheAssignmentCalendarForm">
+	<apex:actionRegion >
+	
+	<div id="assignmentCalendarPopup" style="display:none">
+		<apex:outputPanel id="PopupContent">
+			<div id="error-panel" style="display:none; width:390px;">
+			<apex:pageMessage summary="{!$Label.kimbleone__error}" severity="error" strength="2">
+				<ul style=" margin:0px ;padding:0"><li style="margin-left: 10px;padding-left: 0;list-style: none;" id="error-calendar"></li></ul>
+			</apex:pageMessage>
+			</div>
+			<div id="assignmentCalendarErrorPanel"><apex:pageMessages id="MessagesPanel" escape="false" /></div>
+			<apex:outputPanel rendered="{!!ISBLANK(TheCalendarAssignment)}" style="white-space: nowrap;">
+				<div id="left" style="display: inline-block;vertical-align: top; margin-bottom: 7px;" class="schedule-time-calendar">
+					<div id="scrollingMonths" style="width:490px;"></div>
+				</div>
+				<div id="right" style="margin-left: 4px;display: inline-block;vertical-align: top;width:530px">	
+					<apex:inputHidden id="theUsagePattern" value="{!TheCalendarAssignment.KimbleOne__UsagePattern__c}"/>
+					<apex:inputHidden id="theTimeSlotsJson" value="{!ScheduledTimeJson}"/>
+					<apex:pageBlock mode="edit">				
+						<apex:pageBlockButtons location="bottom">
+							<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.updateable && AllowSave}">
+								<input class="btn" id="btnSaveCalendar" onclick="saveCalendar()" type="button" value="{!$Label.Save}" style="width:60px;"/>								
+							</apex:outputPanel>
+							<input class="btn" id="btnCancelCalendar" onclick="cancelCalendar()" type="button" value="{!$Label.Cancel}" style="width:60px;"/>
+						</apex:pageBlockButtons>
+						<apex:pageblockSection collapsible="false" showheader="false" columns="2" >		
+			
+							<apex:outputField id="calendarResourceOutput" value="{!TheCalendarAssignment.KimbleOne__Resource__c}" />
+							<apex:pageBlockSectionItem ></apex:pageBlockSectionItem>
+							<apex:outputField id="calendarRoleOutput" value="{!TheCalendarAssignment.KimbleOne__ActivityRole__c}" />
+							<apex:pageBlockSectionItem ></apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem dataStyleClass="usage-behaviour-rule">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UsageBehaviourRule__c.Label}"/>
+							<apex:outputField id="calendarUBROutput" value="{!TheCalendarAssignment.KimbleOne__UsageBehaviourRule__c}"/>
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem ></apex:pageBlockSectionItem>
+							<apex:outputField id="calendarStartDateOutput" value="{!TheCalendarAssignment.KimbleOne__StartDate__c}" />
+							<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$Label.kimbleone__endingonlabel}" />
+								<span id="EndDate-calendar"></span>							
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UtilisationPercentage__c.Label}" />
+								<span id="Utilisation-calendar"></span>								
+							</apex:pageBlockSectionItem>
+		
+							<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$Label.kimbleone__assignmententryremainingeffort}" />
+								<div id="RemainingUsage-calendar" actual=""></div>							
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem ></apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem >
+								<apex:outputPanel ><span class="unforecast-usage-calendar"><apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UnforecastUsage__c.Label}" /></span></apex:outputPanel>
+								<div class="unforecast-usage-calendar" id="UnforecastUsage-calendar" actual=""></div>							
+							</apex:pageBlockSectionItem>
+						</apex:pageblockSection>
+						
+						<apex:pageblockSection id="scheduleDaysSection" collapsible="false" showheader="true" columns="1" title="{!$Label.kimbleone__scheduledayslabel}">
+						<div style="position:relative">
+						<div style="margin-bottom: 4px">
+							<span id="percent-block" class="percentage-day utilisation-block"></span>
+							<input type="radio" id="percentToggle" onclick="disableTimeFields();" name="daysToggle" /><label for="percentToggle">{!$Label.AtUtilisationLabel}</label>
+						</div>
+						
+						<div style="margin-bottom: 4px">
+							<span id="schedule-block" class="utilisation-block"></span>
+							<input type="radio" id="specificToggle" onclick="disableTimeFields();" name="daysToggle" checked="checked"/><label for="specificToggle">{!$Label.AtLabel}<select id="usageForecastFormat"></select><span id="usageUnits"></span></label>
+						</div>
+				
+						<div style="margin-bottom: 4px" class="schedule-with-time-radio">
+							<span id="time-block" class="utilisation-block fa fa-clock-o"></span>
+							<input type="radio" id="specificTimeToggle" onclick="enableTimeFields();" name="daysToggle"/><label for="specificTimeToggle">{!$Label.AtASpecificTimeLabel}: {!$ObjectType.ForecastTimeEntry__c.Fields.StartTime__c.Label}<input readonly="readonly" class="start-time inline-time-picker kimbleTimePicker" value=""/>{!$ObjectType.ForecastTimeEntry__c.Fields.EndTime__c.Label}<input readonly="readonly" class="end-time inline-time-picker kimbleTimePicker" value=""/><span id="calculatedUsageUnitsContainer"><span id="calculatedUsageUnits"></span><span id="timeUsageUnits"></span></span></label>
+ 							<div id="timeZoneBlock"><span class="time-zone-label">{!$ObjectType.ForecastTimeEntry__c.fields.TimeZoneSidKey__c.Label}:</span>
+ 							<select id="timeZone" disabled="disabled">
+ 							<apex:repeat value="{!TheTimeZones}" var="option">
+ 	 							<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheDefaultTimeZone) && option.Value == TheDefaultTimeZone}"> 
+ 								<option value="{!JSENCODE(option.Value)}" selected="selected">{!JSENCODE(option.Label)}</option>
+  								</apex:outputPanel> 
+  								<apex:outputPanel layout="none" rendered="{!ISBLANK(TheDefaultTimeZone) || option.Value != TheDefaultTimeZone}">
+ 								<option value="{!JSENCODE(option.Value)}">{!JSENCODE(option.Label)}</option>
+  								</apex:outputPanel>
+ 							</apex:repeat>
+ 							</select>
+ 							</div>
+						</div>
+				
+						<div>
+							<span class="utilisation-block assignment-off"></span>
+							<input type="radio" id="blankToggle" onclick="disableTimeFields();" name="daysToggle"/><label for="blankToggle">{!$Label.OffLabel}</label>
+						</div>
+						
+						<div style="position: absolute;top: 0px;right: 0px;">
+							<label for="showOtherAssignments">{!$Label.ShowOtherAssignmentsLabel}</label><input id="showOtherAssignments" type="checkbox" checked="checked"/>			
+						</div>
+						</div>
+					</apex:pageblockSection>
+						
+					<apex:pageblockSection id="EventsHeader" collapsible="false" showheader="true" columns="1" title="{!$Label.kimbleone__eventlabel}">
+						<div id="EventsTableBody" style="height:75px;overflow: auto;">
+						
+							<table id="EventsTable" class="list" border="0" cellpadding="0" cellspacing="0">
+								<colgroup>
+									<col style="width: 100px;"/><!-- date -->
+									<col style="width: 350px;"/><!-- subject -->
+								</colgroup>
+								<thead>
+									<tr class="headerRow">
+										<td>{!$Label.DateLabel}</td>
+										<td>{!$ObjectType.Event.Fields.Subject.label}</td>
+									</tr>
+								</thead>
+								<tbody>
+								
+								</tbody>
+							</table>
+						
+						</div>
+					</apex:pageblockSection>					
+					</apex:pageBlock>
+				</div>
+				<script>
+					theAssignmentCalendar = kimble.parseJSON("{!JSENCODE(TheAssignmentCalendarJson)}");
+				</script>
+				<apex:outputpanel layout="none" rendered="{!EditForecastTime}">
+				<style>
+					/* Only show this if trackingwith forecast time entries and at least one custom field defined*/	
+					li.scheduled-day .calendar-forecast-entry
+					{
+						display:block;
+					}
+				</style>
+				
+				</apex:outputpanel>
+				
+				<apex:outputPanel id="SelectedForecastTimeEntry">
+				<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheSelectedForecastEntry)}">
+					<div id="forecast-time-entry-popup" style="display:none">
+					<apex:pageBlock mode="edit">
+						<apex:pageBlockButtons location="bottom">
+							<input id="okForecastEntry" class="btn" onclick="updateForecastEntry()" type="button" value="{!$Label.Ok}" style="width:60px;"/>
+							<input id="cancelForecastEntry" class="btn" onclick="updateForecastEntryComplete()" type="button" value="{!$Label.Cancel}" style="width:60px;"/>
+						</apex:pageBlockButtons>
+						<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+							<apex:repeat var="f" value="{!$ObjectType.KimbleOne__ForecastTimeEntry__c.FieldSets.KimbleOne__ForecastTimeEntryDetails}">
+      							<apex:inputField value="{!TheSelectedForecastEntry[f]}" rendered="{!!CONTAINS(f.FieldPath,'.')}" required="{!f.Required}"  styleClass="{!IF(AND($ObjectType.KimbleOne__ForecastTimeEntry__c.Fields[f].type == 'date',$ObjectType.KimbleOne__ForecastTimeEntry__c.Fields[f].updateable),'kimbleDatePicker','')}"/>
+								<apex:outputField value="{!TheSelectedForecastEntry[f]}" rendered="{!CONTAINS(f.FieldPath,'.')}"/>
+							</apex:repeat>
+						</apex:pageblockSection>
+					</apex:pageBlock>
+					</div>
+				</apex:outputPanel>
+				
+				</apex:outputPanel>
+			</apex:outputPanel>
+		</apex:outputPanel>
+	</div>
+	
+	<apex:actionFunction action="{!LoadTheAssignmentCalendar}" name="loadTheAssignmentCalendar" rerender="PopupContent" oncomplete="initialiseAssignmentCalendar();">
+     	<apex:param name="activityAssignmentId" value="" />
+    </apex:actionFunction>
+    <apex:actionFunction action="{!SaveTheAssignmentCalendar}" name="saveTheAssignmentCalendar" rerender="PopupContent" oncomplete="saveCalendarComplete()"></apex:actionFunction>
+    
+    <apex:actionFunction action="{!SelectForecastEntry}" name="selectForecastEntry" rerender="SelectedForecastTimeEntry" oncomplete="showForecastEntry();SetupDatePicker();">
+     	<apex:param name="dte" value="" />
+    </apex:actionFunction>
+    
+    <apex:actionFunction action="{!UpdateForecastEntry}" name="updateForecastEntry" rerender="SelectedForecastTimeEntry" oncomplete="updateForecastEntryComplete();SetupDatePicker();"></apex:actionFunction>
+      
+	</apex:actionRegion>
+	
+</apex:form>		
+
+<script>	
+	function openAssignmentCalendar(assignmentId) 
+	{
+		initialiseModalBoxy('#assignmentCalendarPopup', '{!JSENCODE($Label.Edit)} {!$ObjectType.ActivityAssignment__c.label}', jQuery('form[id$=\'TheAssignmentCalendarForm\']'));
+		loadTheAssignmentCalendar(assignmentId);
+	}
+	
+	function initialiseAssignmentCalendar()
+	{
+		jQuery('#btnSaveCalendar').prop('disabled', !theAssignmentCalendar.HasEditAccess);
+		
+		var sel = jQuery('#usageForecastFormat').empty();
+		
+		var defaultSelectedVal;
+		
+		for (var i = 1; i <= theAssignmentCalendar.MaximumUsage / (theAssignmentCalendar.UsageForecastFormat * theAssignmentCalendar.UsageUnitToHourConversionFactor); i++)
+		{
+			var m = i * theAssignmentCalendar.UsageForecastFormat * theAssignmentCalendar.UsageUnitToHourConversionFactor;
+			var n = jQuery.formatNumber(m, {format: "0.00"});
+		
+			var key = HoursToKeyUsagePatternMap[n];
+			
+			if (theAssignmentCalendar.TheAssignment.HoursPerDay == m) defaultSelectedVal = key;
+			
+			sel.prepend('<option value="' + key  + '">' + jQuery.formatNumber((i * theAssignmentCalendar.UsageForecastFormat), {format: "0.##", locale:kimble.locale, isFullLocale:false}) + '</option>');
+		}
+		jQuery('#usageForecastFormat').val(defaultSelectedVal);
+		jQuery('#usageForecastFormat').change(setdayUsageKey);
+
+		jQuery("input[name='daysToggle']").change(setdayUsageKey);
+		
+		jQuery('#specificToggle').prop('checked', true);
+		
+		jQuery('#percent-block, #schedule-block').addClass(theAssignmentCalendar.TheAssignment.StyleClass);
+		
+		if (!theAssignmentCalendar.CanScheduleDay)
+		{
+			jQuery('#schedule-block').parent().hide();
+			jQuery('#time-block').parent().hide();
+			jQuery('#blankToggle').prop('checked', true);
+		}
+		
+		setdayUsageKey();
+		
+		jQuery('#usageUnits').text(theAssignmentCalendar.UsageUnitsSuffix);
+		jQuery('#timeUsageUnits').text(theAssignmentCalendar.UsageUnitsSuffix);
+		
+		calendarAssignmentUsage = new ActivityAssignmentUsagePattern(theAssignmentCalendar.TheAssignment.HoursPerDay, theAssignmentCalendar.TheAssignment.StartDate.toDate(), theAssignmentCalendar.TheAssignment.UsagePattern, theAssignmentCalendar.TheAssignment.Utilisation, theAssignmentCalendar.TheAssignment.BaselineUtilisation);
+		
+		refreshAssignmentFields(false);
+		
+		resourceAvailability = new ResourceAvailabilityUsagePattern(theAssignmentCalendar.ResourceAvailability, theAssignmentCalendar.IsUnavailableAssignment);
+		
+		otherAssignmentsDayMap = new Object();
+		
+		jQuery.each(theAssignmentCalendar.TheOtherAssignments, function (i, obj) {
+			
+			if (obj.UsagePattern == undefined) return true; //continue;
+			
+			var otherUsage = new ActivityAssignmentUsagePattern(theAssignmentCalendar.TheAssignment.HoursPerDay, obj.StartDate.toDate(), obj.UsagePattern, obj.Utilisation, obj.BaselineUtilisation);
+			
+			var contextDate = obj.StartDate.toDate();
+			
+			//populate date
+			while (contextDate.valueOf() <= obj.EndDate.toDate())
+			{
+				if (otherAssignmentsDayMap[contextDate.valueOf()] == null)
+					otherAssignmentsDayMap[contextDate.valueOf()] = '';
+				
+				if (otherUsage.getForecastUsageInHoursOnDate(contextDate, obj.FirmOnly) > 0)
+					otherAssignmentsDayMap[contextDate.valueOf()] += '<div class="other-assignment ' + obj.StyleClass + '">' + obj.ScopingActivityName + '</div>';
+				
+				contextDate = new Date(contextDate.getFullYear(), contextDate.getMonth(), contextDate.getDate() + 1, 0, 0, 0, 0);
+			}
+			
+		});
+		
+		jQuery('#showOtherAssignments').prop('checked', true);
+
+		refreshCalendar();	
+
+		if(theAssignmentCalendar.ScheduleWithTime)
+		{
+			if(theAssignmentCalendar.CanScheduleDay) jQuery('.schedule-with-time-radio').show();
+			
+			if(theAssignmentCalendar.TimeZoneEnabled && theAssignmentCalendar.CanScheduleDay) jQuery('#timeZoneBlock').show();
+			
+			drawScheduledTimeOverlay();
+		}
+		
+		jQuery('#showOtherAssignments').change(function() {
+			jQuery('.other-assignments').toggle();
+		});
+		
+		jQuery('.kimbleTimePicker').timepicker({ 'timeFormat': 'H:i', 'show2400': 'true'});
+		
+		showModalBoxyWithFocus(jQuery('#specificToggle'));
+		
+		if(typeof initialisePageTips === "function") initialisePageTips();
+	}
+	
+	function initialiseForecastTimePopup(obj)
+	{
+		var j = jQuery(obj);
+			
+		var tipHtml = '<div id="forecast-time-entry-tip"><div class="tip-loading"><span class="fa fa-circle-o-notch fa-spin"/></div></div>';
+		
+		//destroy all tooltips
+	    jQuery('.calendar-forecast-entry').qtip('destroy', true);
+			 
+	 	j.qtip({
+            overwrite: true,
+			show: {
+                solo:true,
+                event: 'click', // Use the same event type as above
+                ready: true // Show immediately - important!
+            },
+			hide: false,
+			style: {
+				classes: 'qtip-light qtip-shadow'
+	        },
+			content: { 
+				text: tipHtml,
+				title: ''
+			},
+	        position: {
+			   	my: 'top left',
+				at: 'bottom right',
+			   	target: jQuery(obj),
+			   	container: jQuery('form[id$=\'TheAssignmentCalendarForm\']')
+			}
+        });
+	        
+	    selectForecastEntry(new Date(new Number(j.closest('li').attr('dte'))).toKimbleUTC());    
+	}
+	
+	function updateForecastEntryComplete()
+	{
+		jQuery('.calendar-forecast-entry').qtip('destroy', true);
+	}
+	
+	function cancelCalendar()
+	{
+		hideModalBoxy();		
+	}
+
+	var calendarAssignmentUsage;
+	var resourceAvailability;
+	var otherAssignmentsDayMap;
+	
+	var dayUsageKey;
+	
+	//var scheduledForecastTimeEntries = {}
+
+	function enableTimeFields()
+	{
+		jQuery('.kimbleTimePicker').removeAttr('readonly');
+		jQuery('#timeZone').removeAttr('disabled');
+	}
+
+	jQuery(document).on('change', '.start-time.inline-time-picker', function ()
+	{
+		jQuery('.invalid-time-error').remove();
+
+		if(jQuery(this).val() > jQuery('.end-time.inline-time-picker').val() || jQuery('.end-time.inline-time-picker').val() == '')
+		{
+			jQuery('.end-time.inline-time-picker').val(jQuery(this).val());
+		}
+		
+		setUsageUnits(this);
+	});
+
+	jQuery(document).on('change', '.end-time.inline-time-picker', function ()
+	{
+		jQuery('.invalid-time-error').remove();
+		
+		if(jQuery(this).val() < jQuery('.start-time.inline-time-picker').val() || jQuery('.start-time.inline-time-picker').val() == '')
+		{
+			jQuery('.start-time.inline-time-picker').val(jQuery(this).val());
+		}
+		
+		setUsageUnits(this);
+	});
+	
+	function showForecastEntry()
+	{
+		jQuery('#forecast-time-entry-tip').empty().append(jQuery('#forecast-time-entry-popup').show());
+	}
+	
+	function setUsageUnits(field)
+	{
+		dayUsageKey = getDayUsageKeyFromTimes();
+
+		if(dayUsageKey == null)
+		{
+			jQuery(field).parent().parent().after(jQuery('<div class="invalid-time-error">' + '{!JSENCODE($Label.InvalidTimeInterval)}' + '</div>'));
+			jQuery('#calculatedUsageUnitsContainer').hide();
+		}
+		else
+		{
+			jQuery('#calculatedUsageUnits').text(KeyToHoursUsagePatternMap[dayUsageKey]);
+			jQuery('#calculatedUsageUnitsContainer').show();
+			jQuery('#specificTimeToggle').prop('checked', true);
+		}
+	}
+
+	function getDayUsageKeyFromTimes()
+	{
+		var newusage = null;
+		
+		if(jQuery('.start-time.inline-time-picker').val() != '' && jQuery('.end-time.inline-time-picker').val() != '')
+		{
+			newusage = HoursToKeyUsagePatternMap[timeDiff(jQuery('.start-time.inline-time-picker').val(), jQuery('.end-time.inline-time-picker').val()).toFixed(2)]
+		}
+		
+		if(newusage == null)
+		{
+			jQuery('.selectable').removeClass('selectable').addClass('invalid-usage');
+			jQuery('.invalid-usage').attr('title', '{!JSENCODE($Label.InvalidTimeInterval)}');
+		}
+		else
+		{
+			jQuery('.invalid-usage').addClass('selectable').removeClass('invalid-usage');
+			jQuery('.selectable').attr('title', '');
+		}
+			
+		return newusage;
+	}
+
+	function disableTimeFields()
+	{
+		jQuery('.kimbleTimePicker').attr('readonly', 'readonly');
+		jQuery('#timeZone').attr('disabled', 'disabled');
+	}
+	
+	// TODO : used in lots of places now so move central along with parseTime
+	function timeDiff(startTime, endTime)
+	{
+		// date is unimportant, using Date construct to do time maths
+		return (new Date(2000, 0, 1, parseTime(endTime).hh, parseTime(endTime).mm) - new Date(2000, 0, 1, parseTime(startTime).hh, parseTime(startTime).mm)) / 1000 / 60 / 60;
+	}
+	
+	function parseTime(s)
+	{
+		var part = s.match(/(\d+):(\d+)(?: )?(am|pm)?/i);
+		var hh = parseInt(part[1], 10);
+		var mm = parseInt(part[2], 10);
+		var ap = part[3] ? part[3].toUpperCase() : null;
+		if (ap === "AM") {
+			if (hh == 12) {
+				hh = 0;
+			}
+		}
+		if (ap === "PM") {
+			if (hh != 12) {
+				hh += 12;
+			}
+		}
+		return {
+			hh : hh,
+			mm : mm
+		};
+	}
+	
+	function saveCalendar()
+	{
+		jQuery('#btnSaveCalendar').prop('disabled', true);
+		
+		jQuery('[id$="theUsagePattern"]').val(theAssignmentCalendar.TheAssignment.UsagePattern);
+		
+		jQuery('[id$="theTimeSlotsJson"]').val(JSON.stringify(theAssignmentCalendar.TheDateTimeSlotMap));
+		
+		saveTheAssignmentCalendar();	
+	}
+	
+	function saveCalendarComplete()
+	{
+		jQuery('#btnSaveCalendar').prop('disabled', false);
+		
+		//Raise event to re-paint
+		
+		jQuery.publish('kimble.activityassignmentcalendarchange', {assignmentId:theAssignmentCalendar.TheAssignment.Id, resourceId:theAssignmentCalendar.TheResource.Id});
+		             	
+		cancelCalendar();
+	}
+	
+	function refreshAssignmentFields(trackChange)
+	{
+		jQuery('#Resource-calendar').text(unescapeHTML(theAssignmentCalendar.TheAssignment.ResourceName));
+		jQuery('#ActivityRole-calendar').text(theAssignmentCalendar.TheAssignment.Role);
+		
+		if (theAssignmentCalendar.TheAssignment.UsageBehaviourRule != null)
+			jQuery('#UsageBehaviourRule-calendar').text(theAssignmentCalendar.TheAssignment.UsageBehaviourRule.Name);
+		
+		jQuery('#StartDate-calendar').text(jQuery.datepicker.formatDate(kimble.regional.dateFormat, theAssignmentCalendar.TheAssignment.StartDate.toDate()));
+		
+		var remainingText = jQuery.formatNumber(theAssignmentCalendar.TheAssignment.RemainingUsage, {format: "#,###.00", locale:kimble.locale, isFullLocale:false});
+		
+		if (theAssignmentCalendar.TheAssignment.UnforecastUsage != null && theAssignmentCalendar.TheAssignment.UnforecastUsage != 0)
+		{
+			jQuery('.unforecast-usage-calendar').show();
+			jQuery('#UnforecastUsage-calendar').text(jQuery.formatNumber(theAssignmentCalendar.TheAssignment.UnforecastUsage, {format: "#,###.00", locale:kimble.locale, isFullLocale:false}));
+			
+			if (trackChange) 
+				jQuery('#UnforecastUsage-calendar').effect('highlight',1000);
+		}
+		else
+		{
+			jQuery('.unforecast-usage-calendar').hide();
+		}
+		
+		if (jQuery('#RemainingUsage-calendar').text() != remainingText)
+		{
+			jQuery('#RemainingUsage-calendar').text(remainingText)
+			
+			if (trackChange) 
+				jQuery('#RemainingUsage-calendar').effect('highlight',1000);
+		}
+			
+		var endDateText = jQuery.datepicker.formatDate(kimble.regional.dateFormat, theAssignmentCalendar.TheAssignment.EndDate.toDate());
+		if (jQuery('#EndDate-calendar').text() != endDateText)
+		{
+			jQuery('#EndDate-calendar').text(endDateText);
+			if (trackChange)
+			{
+				//Need to redraw assignment across all days
+				jQuery('#EndDate-calendar').effect('highlight',1000);
+				
+				refreshCalendar((jQuery('.calendarMonth:visible').attr('context') + '-1').toDate());
+			}
+		}
+		
+		var utilisationText = jQuery.formatNumber(theAssignmentCalendar.TheAssignment.Utilisation, {format: "#", locale:kimble.locale, isFullLocale:false}) + '%';
+		if (jQuery('#Utilisation-calendar').text() != utilisationText)
+		{
+			jQuery('#Utilisation-calendar').text(utilisationText)
+			if (trackChange)
+			{
+				jQuery('#Utilisation-calendar').effect('highlight',1000);
+				jQuery('.PCT.percentage-day').height(theAssignmentCalendar.TheAssignment.Utilisation + '%');
+			}
+		}
+		
+		if (calendarAssignmentUsage != null && calendarAssignmentUsage.isOverUtilised(theAssignmentCalendar.TheResource))
+		{
+			jQuery('#Utilisation-calendar').addClass('assignment-warning').attr('title',(kimble.labels['ResourceOverUtilisedWarning']));
+		}
+		else
+		{
+			jQuery('#Utilisation-calendar').removeClass('assignment-warning').attr('title','');
+		}
+		
+	}
+	
+	function setdayUsageKey()
+	{
+		jQuery('.invalid-usage').addClass('selectable').removeClass('invalid-usage');
+		jQuery('.selectable').attr('title', '');
+		
+		if (jQuery('input[name="daysToggle"]:checked').attr('id') == 'percentToggle')
+			dayUsageKey = theAssignmentCalendar.TheAssignment.Utilisation;
+		else if (jQuery('input[name="daysToggle"]:checked').attr('id') == 'blankToggle')
+			dayUsageKey = HoursToKeyUsagePatternMap['0.00'];
+		else if (jQuery('input[name="daysToggle"]:checked').attr('id') == 'specificTimeToggle')
+			dayUsageKey = getDayUsageKeyFromTimes();
+		else
+			dayUsageKey = jQuery('#usageForecastFormat').val();
+	}
+	
+	function refreshCalendar(currentDate)
+	{
+		jQuery('#scrollingMonths').empty();
+		jQuery('#scrollingMonths').cycle('destroy');
+		jQuery('#scrollingMonths>div').find('#selectable').selectable("destroy");
+		
+		if (currentDate == null) currentDate = new Date();
+		
+		var thisMonthIndex = paintMonths(theAssignmentCalendar.TheAssignment.StartDate.toDate(), theAssignmentCalendar.TheAssignment.EndDate.toDate(), currentDate);
+		
+		jQuery('#scrollingMonths>div').find('#selectable').selectable({
+            start: function(event, ui) {
+                
+                var d = event.originalEvent.target;
+                if (jQuery(d).hasClass('calendar-forecast-entry') && jQuery('#forecast-time-entry-tip').length == 0)
+                {
+                	initialiseForecastTimePopup(d);
+                	return false;
+                }
+                else if (!jQuery(d).hasClass('ui-selectee'))
+                	d = jQuery(d).parent();
+            },
+            stop: function (event, ui) {
+                //apply on or off to all selected
+                 var d = event.originalEvent.target;
+                 
+                 if (jQuery(d).hasClass('calendar-forecast-entry')) return;
+                 
+                jQuery('#btnSaveCalendar').prop('disabled', true);
+                jQuery('#error-panel').hide();
+                
+                jQuery('.ui-selected').find('div.PCT').show();
+               	jQuery('.ui-selected').addClass('click-selected');
+                   
+                jQuery.each(jQuery('.ui-selected'), function(i, obj){
+		                //only if we have  valid dayUsageKey to apply
+		                if(jQuery(this).parent().hasClass('invalid-usage')) return;
+
+                		var a = jQuery(obj).find('div.PCT');
+                		var d = new Date(new Number(a.closest('li').attr('dte')));
+						
+						a.closest('li').removeClass('scheduled-day');
+						
+                		calendarAssignmentUsage.addScheduledDay(d, dayUsageKey);
+                		if (dayUsageKey == HoursToKeyUsagePatternMap['0.00'])
+                		{
+                			a.height('100%');
+                			a.removeClass('percentage-day').addClass('assignment-off');
+                			
+            				// remove any possible scheduled time slots from day
+            				if(theAssignmentCalendar.TheDateTimeSlotMap != null)
+            				{
+            					delete theAssignmentCalendar.TheDateTimeSlotMap[d.toKimbleUTC()];
+           					}
+            					
+            				removeScheduledIndicator(d.toKimbleUTC());
+                		}
+                		else
+                		{
+                			var hrs = calendarAssignmentUsage.getForecastUsageInHoursOnDate(d);
+                			
+                			a.height((hrs / 12 * 100) + '%');
+                			a.removeClass('percentage-day').removeClass('assignment-off');
+                		
+                			if (calendarAssignmentUsage.isUtilisationDay(d))
+                				a.addClass('percentage-day');
+                			else
+                				a.closest('li').addClass('scheduled-day');
+                				
+                			//if we are tracking scheduled days or time
+           					if(theAssignmentCalendar.ScheduleWithTime)
+                			{
+	                			if(jQuery('input[name="daysToggle"]:checked').attr('id') == 'specificTimeToggle')
+	                			{
+	                				theAssignmentCalendar.TheDateTimeSlotMap[d.toKimbleUTC()] = {StartTime: jQuery('.start-time.inline-time-picker').val(), EndTime: jQuery('.end-time.inline-time-picker').val(), TimeZone: jQuery('#timeZone').val()};
+	               				}
+	               				else
+	               				{
+	               					// remove any possible scheduled time slots from day
+		            				if(theAssignmentCalendar.TheDateTimeSlotMap != null)
+		            				{
+		               					delete theAssignmentCalendar.TheDateTimeSlotMap[d.toKimbleUTC()];
+	               					}
+	               					
+	               					removeScheduledIndicator(d.toKimbleUTC());
+	               				}
+               				}
+                		}                 		                   	
+                });
+                
+                jQuery('.ui-selected').removeClass('ui-selected');
+                
+                theAssignmentCalendar.TheAssignment.UsagePattern = calendarAssignmentUsage.usagePattern;
+                
+                if (theAssignmentCalendar.TheAssignment.UsageBehaviourRule != null && theAssignmentCalendar.TheAssignment.UsageBehaviourRule.PreserveUsageOnScheduleChange)
+                {
+                	//recalculate enddate and utilisation or just utilisation
+                	try
+                	{
+                		calendarAssignmentUsage = recalculateAssignmentUsage(theAssignmentCalendar.TheAssignment, resourceAvailability, theAssignmentCalendar.TheAssignment.HoursPerDay);
+                	
+                		theAssignmentCalendar.TheAssignment.EndDate = calendarAssignmentUsage.endDate.toKimbleUTC();
+                		theAssignmentCalendar.TheAssignment.Utilisation = calendarAssignmentUsage.actualUtilisation;	
+                	}
+                	catch(e)
+					{
+						jQuery('#error-panel').show();
+						
+						var errorMessage = '';
+						if (kimble.labels[e] == null)
+							errorMessage = e;
+						else
+							errorMessage = kimble.labels[e];
+						
+						jQuery('#error-calendar').text(errorMessage);
+						
+						return;
+					}             	
+                }
+             	else //recalculate usage
+             	{
+             	 	//recalculateAssignmentUsage
+             	 	theAssignmentCalendar.TheAssignment.RemainingUsage = calendarAssignmentUsage.totalForecastUsageInHours / theAssignmentCalendar.TheAssignment.ForecastToHourConversionFactor;                	
+                }
+                
+                refreshAssignmentFields(true);
+                
+                if(theAssignmentCalendar.ScheduleWithTime)
+                {
+                	drawScheduledTimeOverlay();
+               	}
+                
+                jQuery('#btnSaveCalendar').prop('disabled', !theAssignmentCalendar.HasEditAccess);
+            },
+            selecting: function (event, ui) {
+            	var d = ui.selecting;
+            	jQuery(d).find('div.PCT').hide();
+            },
+            unselecting: function (event, ui) {
+            	var d = ui.unselecting;
+            	jQuery(d).find('div.PCT').show();
+            },
+            filter: 'li.selectable>div.bodyCal'
+        });
+        
+		if (jQuery('#scrollingMonths').children().length > 1)
+		{
+			jQuery('#scrollingMonths').cycle({ 
+	    		fx:     'scrollHorz', 
+	    		speed:  'slow', 
+	    		timeout: 0, 
+	    		next:   '.nextButton', 
+	    		prev:   '.previousButton' ,
+	    		startingSlide: thisMonthIndex,
+	    		after: function(currSlideElement, nextSlideElement, options, forwardFlag){
+	    			reloadEvents(jQuery(nextSlideElement).attr('context'));
+	    		}
+	    	});	
+	    }
+	    else
+	    {
+	    	reloadEvents(jQuery('.calendarMonth').attr('context'));
+	    }
+	}
+
+	function reloadEvents(ctx)
+	{
+		jQuery('[id$="EventsHeader"]').hide();
+		jQuery('#EventsTable>tbody').empty();
+		
+		if (theAssignmentCalendar.Events[ctx] == null) return;
+		
+		jQuery.each(theAssignmentCalendar.Events[ctx], function(i,ev){
+			
+			var trHtml = '<tr><td class="dataCell">' + jQuery.datepicker.formatDate(kimble.regional.dateFormat, new Date(ev.ActivityDate)) + '</td><td class="dataCell">' + ev.Subject + '</td></tr>';
+			jQuery(trHtml).appendTo(jQuery('#EventsTable>tbody'));
+		});
+		
+		jQuery('[id$="EventsHeader"]').show();
+		
+	}
+	
+	function drawScheduledTimeOverlay()
+	{
+		// overlay any existing scheduled time frames onto the relevant day
+		// get the keys to the scheduled days
+		var scheduledDays = [];
+		for (var key in theAssignmentCalendar.TheDateTimeSlotMap)
+		{
+			if (theAssignmentCalendar.TheDateTimeSlotMap.hasOwnProperty(key))
+			{
+		    	scheduledDays.push(key);
+			}
+		}
+		
+		jQuery(scheduledDays).each(function(key, value) 
+									{
+										appendScheduledIndicator(value);
+									});
+									
+		initialiseScheduledTimeQtips();
+	}	
+
+	function appendScheduledIndicator(dateVal)
+	{
+		// get the long version of this date
+		var dteLong = new Date(dateVal).setHours(0,0,0,0).valueOf();
+		
+		// find the div for this date and add the indicator if not already present
+		if(jQuery('li[dte="' + dteLong + '"]').find('.scheduled-time-ind').length == 0)
+		{
+			jQuery('li[dte="' + dteLong + '"]').prepend('<div class="fa fa-clock-o scheduled-time-ind"/>');
+		}
+	}
+
+	function removeScheduledIndicator(dateVal)
+	{
+		// get the long version of this date
+		var dteLong = new Date(dateVal).valueOf();
+		
+		// find the div for this date
+		jQuery('li[dte="' + dteLong + '"]').find('.scheduled-time-ind').remove();
+	}
+	
+	function initialiseScheduledTimeQtips()
+	{
+		jQuery('.scheduled-time-ind').qtip('destroy', true);
+		jQuery('.scheduled-time-ind').qtip({
+						            overwrite: true,
+									show: {
+								        event: 'mouseover'
+								    },
+								    hide: {
+								        event: 'mouseout'
+								    },
+									style: {
+										classes: 'qtip-light qtip-shadow qtip-rounded'
+							        },
+									content: {text: function(event, api) {							           
+					           			 return getTimePopupHtml(jQuery(this).parent().attr('dte'));
+					       			}},
+							        position: { adjust: { method: 'flip flip'
+										},
+										viewport: $(window)
+									}
+						        });
+	}
+	
+	function getTimePopupHtml(scheduleDate)
+	{
+		var popupHtml = '';
+		
+		var d = new Date(new Number(scheduleDate));
+		
+		var theSchedule = theAssignmentCalendar.TheDateTimeSlotMap[d.toKimbleUTC()];
+		popupHtml += '<div class="sched-time-qtip">';
+		popupHtml += '<div class="sched-time-row">';
+		popupHtml += '<div class="sched-time-label">{!$ObjectType.ForecastTimeEntry__c.Fields.StartTime__c.Label}:</div>';
+		popupHtml += '<div class="sched-start-time">' + theSchedule.StartTime + '</div>';
+		popupHtml += '</div>';
+		if (theSchedule.EndTime != null)
+		{
+			popupHtml += '<div class="sched-time-row">';
+			popupHtml += '<div class="sched-time-label">{!$ObjectType.ForecastTimeEntry__c.Fields.EndTime__c.Label}:</div>';
+			popupHtml += '<div class="sched-end-time">' + theSchedule.EndTime + '</div>';
+			popupHtml += '</div>';
+		}
+		if (theSchedule.TimeZone != null && theSchedule.TimeZone != '')
+		{
+			popupHtml += '<div class="sched-time-row">';
+			popupHtml += '<div class="sched-time-label">{!$ObjectType.ForecastTimeEntry__c.Fields.TimeZoneSidKey__c.Label}:</div>';
+			popupHtml += '<div class="sched-time-zone">' + theSchedule.TimeZone + '</div>';
+			popupHtml += '</div>';
+		}
+		popupHtml += '</div>';
+		return popupHtml;
+	}
+	
+	function paintMonths(startDate, endDate, currentDate)
+	{
+		var j = 0;
+		var thisMonthIndex;
+		for(var i = (startDate.getFullYear() * 12 + startDate.getMonth()); i <= (endDate.getFullYear() * 12 + endDate.getMonth());i++)
+		{
+			var contextDate = new Date(startDate.getFullYear(), startDate.getMonth() + j, 1);
+			
+			if (contextDate.getMonth() == currentDate.getMonth() && contextDate.getFullYear() == currentDate.getFullYear())
+				thisMonthIndex = j;
+			
+			j++;
+			
+			var divMonthHtml = '<div class="calendarMonth" context="' + startDate.getFullYear() + '-' + (startDate.getMonth() + j) + '"><div><div class="monthHeadCal"><div id="previousPeriodBtn" class="navigatePeriodButton previousButton"></div><div id="currentPeriodDisplayName">' + kimble.regional.monthNames[contextDate.getMonth()] + ' ' + contextDate.getFullYear() + '</div><div id="nextPeriodBtn" class="navigatePeriodButton nextButton"></div></div></div><div><table cellpadding="0" cellspacing="0" border="0">';
+			divMonthHtml += '<tr>';
+			for(var counter = kimble.firstDayIndex; counter < kimble.regional.dayNames.length + kimble.firstDayIndex; counter++)
+			{
+				var thisIdx = counter >= kimble.regional.dayNames.length ? counter - kimble.regional.dayNames.length : counter;
+				divMonthHtml += '<td><div class="dayHeadCal">' + kimble.regional.dayNames[thisIdx].substring(0,1) + '</div></td>';
+			}
+			divMonthHtml += '</tr></table></div></div>';
+        	var divMonth = jQuery(divMonthHtml);
+        	var daysInMonth = jQuery('<ol id="selectable"></ol>');
+        	
+        	var startDay = contextDate.getDay() - kimble.firstDayIndex;
+        	if(startDay < 0) startDay = 7 + startDay;
+    		//append days from last month
+    		for(var k=0;k<startDay;k++)
+    		{
+    			var dte = new Date(startDay);
+    			dte.setDate(dte.getDate() + k - startDay);
+    			dte = new Date(dte.toDateString());
+    			var dayLastMonth=jQuery('<li class="ui-state-default nonselectable" style="visibility: hidden;"><div>' + dte.getDate() + '</div><div class="bodyCal"></div></li>');
+    			dayLastMonth.appendTo(daysInMonth);
+    		}
+        	
+        	var numberOfDaysInMonth = getDaysInMonth(contextDate.getFullYear(), contextDate.getMonth());
+        	
+        	for (day = 0; day < numberOfDaysInMonth; day++)
+        	{
+        		var dte =  new Date(contextDate.getFullYear(), contextDate.getMonth(), contextDate.getDate() + day, 0,0,0,0);
+        		
+        		//if outside bounds of assignment or beforeequal to earliest time entry or is unavailable day then mark as unselectable else mark as selectable
+        		var selectable = " selectable";
+        		
+        		var isLockedDay = (dte.valueOf() < theAssignmentCalendar.TheAssignment.StartDate.toDate().valueOf() || dte.valueOf() > theAssignmentCalendar.TheAssignment.EndDate.toDate().valueOf());
+        		
+        		if (!isLockedDay && !theAssignmentCalendar.IsUnavailableAssignment && resourceAvailability.isUnavailableDate(dte)) isLockedDay = true; 
+        		
+        		if (!isLockedDay && dte.valueOf() < theAssignmentCalendar.EarliestOpenTrackingPeriod.toDate().valueOf()) isLockedDay = true;
+        		
+				if (!isLockedDay && calendarAssignmentUsage.getActualInHoursOnDate(dte) > 0) isLockedDay = true;
+        		
+        		if (isLockedDay)
+        			selectable = " nonselectable";
+        		
+        		var other = otherAssignmentsDayMap[dte.valueOf()];
+        		var otherAssStyle = '';
+        		
+        		if (!jQuery('#showOtherAssignments').prop('checked'))
+        		{
+        			otherAssStyle = 'display:none';
+        		}
+        		
+        		if (other == null) other = '';
+        		
+        		var dayHtml = jQuery('<li class="ui-state-default' + selectable + '" dte="' + dte.valueOf()  + '" style="border: 1px solid rgb(174, 208, 234);"><div class="fa fa-pencil calendar-forecast-entry"></div><div><a href="#">' + dte.getDate() + '</a></div><div class="other-assignments" style="' + otherAssStyle + '">' + other + '</div><div class="bodyCal"><div class="PCT ' + theAssignmentCalendar.TheAssignment.StyleClass + '"></div></div></li>');
+        		
+        		//if has forecast on day
+        		
+        		if (!isLockedDay)
+        		{
+        			var hrs = calendarAssignmentUsage.getForecastUsageInHoursOnDate(dte);
+                			
+                	dayUsagePct = hrs / 12 * 100;
+        			var isUtilisationDate = calendarAssignmentUsage.isUtilisationDay(dte);
+        			
+        			if (calendarAssignmentUsage.getUsagePatternOnDate(dte).split(':')[0] == HoursToKeyUsagePatternMap['0.00'])
+        			{
+        				dayHtml.find('.PCT').height('100%');
+        				dayHtml.find('.PCT').addClass('assignment-off');
+        			}
+        			else
+        			{
+        				if (isUtilisationDate)
+                			dayHtml.find('.PCT').addClass('percentage-day');
+        				else if (hrs > 0)
+        					dayHtml.addClass('scheduled-day');
+        					
+        				dayHtml.find('.PCT').height(dayUsagePct + '%');
+        			}
+        		}
+        		else
+        		{
+        			var actual = calendarAssignmentUsage.getActualInHoursOnDate(dte);
+        			
+        			if (actual > 0)
+        			{
+        				dayHtml.find('.PCT').addClass('assignment-time-entry');
+        				dayHtml.find('.PCT').height((actual / 12 * 100) + '%');
+        				dayHtml.find('.PCT').attr('title', (actual / theAssignmentCalendar.UsageUnitToHourConversionFactor) + ' ' + theAssignmentCalendar.UsageUnitsSuffix);
+        				
+        			}
+        		}
+        		
+        		dayHtml.appendTo(daysInMonth);
+        	}	
+        	
+        	daysInMonth.appendTo(divMonth);
+        	
+			divMonth.appendTo(jQuery('#scrollingMonths'));
+		}
+		
+		return thisMonthIndex;
+		
+	}
+	
+	
+	function getDaysInMonth(year, month) 
+	{
+    	return new Date(year, month + 1, 0).getDate();
+	}
+
+	function SetupDatePicker()
+	{
+		//dateFormat: 'yy-mm-dd',
+		jQuery('.kimbleDatePicker').datepicker({
+				dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+				showOtherMonths: true,
+				selectOtherMonths: true,
+				changeMonth: true,
+				changeYear: true});
+	}
+</script>
+
+<style>
+	.navigatePeriodButton
+	{
+		position: absolute;
+		top: 4px;
+		width: 30px;
+		height: 30px;
+		cursor: pointer;
+	}
+	.previousButton {background-image:url({!URLFOR($Resource.AssignmentImages, 'PreviousButtonSquare.png')});
+					 background-repeat:no-repeat;
+					 left:4px;
+					 }
+	.nextButton {background-image:url({!URLFOR($Resource.AssignmentImages, 'NextButtonSquare.png')});background-repeat:no-repeat;
+				right: 4px;
+				}
+	
+		#resizable h3 { text-align: center; margin: 0; }
+	.ui-resizable-ghost { border: 1px dotted gray; }
+	.ui-resizable-helper { border: 2px dotted #00F; }
+				
+				.PCT {max-height:42px; width: 60px; position: absolute; left: 0px;bottom:0}
+				#selectable .click-selected.calP1, .PCT.calP1 { background:#4CC417; color: white; }
+				#selectable .click-selected.calP2, .PCT.calP2 { background:#FFBF00; color: white; }
+				#selectable .PCT.calP3 { background:#FF00FF; color: white; }
+				
+			    #selectable .ui-selecting  { background: #2779AA !important; z-index:2;}
+				#selectable { list-style-type: none; margin: 0; padding: 0;}
+			    #selectable li { margin: 3px; padding: 1px; float: left; width: 60px; height: 60px; font-size: 14px; text-align: center; position:relative;}
+			    .monthHeadCal{
+			    border: 1px solid #AED0EA;
+			background: #D7EBF9 url(images/ui-bg_glass_80_d7ebf9_1x400.png) 50% 50% repeat-x;
+			font-weight: bold;
+			color: #2779AA;
+			font-size: 1.8em;
+			text-align: center;
+			margin: 3px;
+			padding: 1px;
+			width: 480px;
+			height: 35px;
+			line-height: 35px;
+			position:relative;
+			    }
+			    .dayHeadCal {
+			        border: 1px solid #AED0EA !important;
+			background: #EEE !important;
+			font-weight: bold !important;
+			color: #2779AA !important;
+			font-size: 1.5em !important;
+			text-align: center !important;
+			margin: 3px;
+			padding: 1px;
+			width: 60px;
+			height: 22px;
+			line-height: 22px;
+			    }
+			    .utilisation-block
+				{
+					display: inline-block;
+					width: 20px;
+					height: 20px;
+					vertical-align: top;
+				}
+			    .percentage-day
+			    {
+			    	opacity:0.5;
+			    	max-height: 100%;
+			    }
+			    .bodyCal
+			    {
+			        height:40px;
+			        padding-top: 2px;
+			        padding-left: 1px;padding-right: 1px;
+			        position:relative;
+			    }
+			    .bodyUtil
+			    {
+			    	padding-left: 1px;
+					padding-right: 1px;
+					position: absolute;
+					width: 58px;
+					top: 17px;
+			    }
+			    .nonselectable
+			    {
+			        background-color: #DDD !important;
+			        border: 1px solid #AED0EA !important;
+			        background-image: none !important;
+			    }
+    			.SFCalenderTask
+    			{
+    				background-color:#663399;
+    				background-image: none;
+    				color:#FFFFFF;
+    			}
+    			.TextAroundDay
+    			{
+    				color:#2779AA;
+    				font-weight: bold;
+    				font-family: Arial,Helvetica,sans-serif;
+    			}
+    			.WarningIcon{background-image:url({!URLFOR($Resource.WarningIcon)});background-repeat:no-repeat;}
+				
+				.other-assignments {position: absolute;z-index: 10;overflow: hidden;max-height: 33px;}
+				.other-assignment
+				{width: 60px; white-space: nowrap; overflow: hidden; margin-bottom: 1px; font-size: 8px; color: white;}
+
+	#specificTimeToggle {
+		margin-left: 3px;
+    	margin-top: 4px;
+   	}
+	#time-block {
+	    font-size: 20px;
+	    padding-left: 2px;
+	    color: #696969;
+	}
+	.kimbleTimePicker {
+	    width: 72px;
+	    margin-right: 5px;
+	    margin-bottom: 5px;
+	    margin-left: 8px;
+	}
+	.ui-timepicker-wrapper {
+	    z-index: 100000;  /* note high level required to render above existing modal popup*/
+	}
+	.invalid-usage {
+	    cursor: no-drop;
+	}
+	.invalid-time-error {
+	    color: #f00;
+	    font-weight: bold;
+	    text-align: right;
+	    margin-bottom: 5px;
+	}
+	span#calculatedUsageUnitsContainer {
+	    display: none;
+	}
+	span#calculatedUsageUnits {
+	    margin-right: 5px;
+	}
+	.schedule-with-time-radio,
+	#timeZoneBlock {
+		display:none;
+	}
+	.scheduled-time-ind {
+	    position: absolute;
+	    right: 3px;
+	    top: 2px;
+	    cursor: pointer;
+        color: #696969;
+	}
+	.sched-time-qtip {
+		display: table;
+		border: 8px solid #fff;
+	    background-color: #eee;	
+	}
+	.sched-time-row {
+		display: table-row;
+	}
+	.sched-time-label {
+		font-weight: bold;
+		padding-left: 5px;
+	    padding-top: 5px;
+	    padding-bottom: 5px;
+    }
+	.sched-start-time, .sched-end-time, .sched-time-zone {
+	    text-align: right;
+	    display: table-cell;
+	    padding-right: 5px;
+	}
+	.sched-time-zone {
+	    width: 150px;
+	    padding-bottom: 5px;
+	    line-height: 14px;
+        font-size: 10px;
+	}	
+	.calendar-forecast-entry
+	{
+		position: absolute;
+	    left: 3px;
+	    top: 2px;
+	    cursor: pointer;
+        color: #696969;
+        display:none;
+	}
+	.tip-loading {
+	    margin: 8px;
+	    font-size: 18px;
+	    width: 200px;
+	}
+	.unforecast-usage-calendar {
+    	display: none;
+	}
+	td.usage-behaviour-rule a {
+	    white-space: normal;
+	}
+	div#timeZoneBlock {
+		position: relative;
+	}
+	span.time-zone-label {
+		width: 106px;
+		display: block;
+		text-align: right;
+		padding-top: 3px;
+	}	
+	select#timeZone {
+		width: 381px;
+		position: absolute;
+		top: 0px;
+		right: 0px;
+	}	
+</style>
+	
+	
+</apex:page>

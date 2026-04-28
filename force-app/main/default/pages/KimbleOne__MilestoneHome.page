@@ -1,0 +1,457 @@
+<apex:page standardController="KimbleOne__Milestone__c" extensions="KimbleOne.MilestoneHomeController,KimbleOne.SecurityController,KimbleOne.FilesAndAttachmentsController" standardStylesheets="true" showHeader="true" sidebar="false" >
+	<apex:Composition template="KimbleOne__SiteMaster">
+		<apex:define name="Menu">
+			<c:Menu DefaultHelpPage="Milestones.html" MenuContextType="DeliveryGroup" MenuContextId="{!TheMilestone.DeliveryElement__r.KimbleOne__DeliveryGroup__c}" MenuContextName="{!TheMilestone.DeliveryElement__r.DeliveryGroup__r.Name}" CurrentPage="{!$Page.KimbleOne__DeliveryGroupMilestones}" ChildName="{!TheMilestone.Name}"/>
+		</apex:define>
+		<apex:define name="Content">
+
+			<apex:form id="TheForm">
+				<div style="display:none;">
+					<apex:outputText value="{!TheMilestone.KimbleOne__TemporalRevenueExchangeRate__c}"/>
+					<apex:outputText value="{!TheMilestone.KimbleOne__TemporalCostExchangeRate__c}"/>
+				</div>
+				<apex:pageMessages escape="false"/>
+				<style>
+						tr.assignment-row:hover {
+							background-color: #e3feff;
+						}
+						tr.assignment-row.other-milestone {
+							background-color: #eee;
+						}
+						div[id$="milestoneAssignments"] {
+							position: relative;
+						}
+						.assignment-search {
+							position: absolute;
+							top: 10px;
+							right: 16px;
+							font-size: 18px;
+							cursor: pointer;
+						}
+						.assignment-search:hover {
+							color: #015ba7;
+						}
+					</style>
+				<apex:pageBlock id="MilestoneDetails" title="{!$Label.kimbleone__milestoneheading} - {!TheMilestone.Name}">
+					<apex:pageBlockButtons location="top">
+						<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__Milestone__c.updateable && TheMilestone.MilestoneType__r.KimbleOne__Enum__c != 'Planning'}">
+							<apex:outputPanel layout="none" rendered="{!TheMilestone.MilestoneStatus__r.KimbleOne__Enum__c = 'Open' && !IsSupplierRequisitioned && AllowEdit}">
+								<input class="btn" type="button" value="{!$Label.Edit}" onclick="initialiseModalBoxy('#DeliveryElementManageMilestonesEditPopup', '{!JSENCODE($Label.Edit)} {!$ObjectType.Milestone__c.label}');showModalBoxy();"/>
+							</apex:outputPanel>
+							
+							<apex:outputPanel layout="none" rendered="{!TheMilestone.MilestoneType__r.KimbleOne__Enum__c == 'Revenue' || TheMilestone.MilestoneType__r.KimbleOne__Enum__c == 'Cost'}">
+								<input class="btn" type="button" value="{!$Label.kimbleone__clonelabel}" onclick="cloneMilestoneFunction();"/>
+							</apex:outputPanel>
+
+							<apex:outputPanel layout="none" rendered="{!ISBLANK(TheMilestone.KimbleOne__Event__c) && TheMilestone.DeliveryElement__r.KimbleOne__ProbabilityCodeEnum__c = 'P1' && TheMilestone.MilestoneStatus__r.KimbleOne__Enum__c = 'Open' && !RequiresSupplierRequisition && AllowEdit}">
+								<input class="btn" type="button" value="{!$Label.kimbleone__complete}" onclick="initialiseModalBoxy('#DeliveryElementManageMilestonesCompletePopup', '{!JSENCODE($Label.Complete)} {!$ObjectType.Milestone__c.label}');defaultCompletionDate();"/>
+							</apex:outputPanel>
+
+							<apex:outputPanel layout="none" rendered="{!TheMilestone.DeliveryElement__r.KimbleOne__ProbabilityCodeEnum__c = 'P1' && TheMilestone.MilestoneStatus__r.KimbleOne__Enum__c = 'Open' && RequiresSupplierRequisition && IsSupplierRequisitioned && IsSupplierRequisitionApproved}">
+								<apex:outputPanel layout="none" rendered="{!SupplierRequisitionType = 'Actualisation'}">
+									<input class="btn" type="button" value="{!$Label.kimbleone__complete}" onclick="initialiseModalBoxy('#DeliveryElementManageMilestonesCompletePopup', '{!JSENCODE($Label.Complete)} {!$ObjectType.Milestone__c.label}');showModalBoxy();"/>
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!SupplierRequisitionType = 'GoodsReceivedNote'}">
+									<input class="btn" type="button" value="{!$Label.ReceiveGoodsLabel}" onclick="safeNavigateToSForceURL('/{!$ObjectType.GoodsReceivedNote__c.KeyPrefix}');"/>
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!SupplierRequisitionType = 'SupplierInvoice'}">
+									<input class="btn" type="button" value="{!$Label.ReceiveSupplierInvoiceLabel}" onclick="safeNavigateToSForceURL('/{!$ObjectType.SupplierInvoice__c.KeyPrefix}');"/>
+								</apex:outputPanel>
+							</apex:outputPanel>
+
+
+							<apex:commandButton action="{!RevertMilestone}"  rerender="TheForm, MilestoneApprovalHistory" rendered="{!CanRevertMilestone && HasPermission['RevertCompletedMilestone']}" value="{!$Label.kimbleone__reverttodraft}"/>
+
+						</apex:outputPanel>
+					</apex:pageBlockButtons>
+
+					<apex:pageBlockSection columns="2">
+						<apex:outputField value="{!TheMilestone.Name}"/>
+
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneType__c.Label}"/>
+							<apex:outputField value="{!TheMilestone.MilestoneType__r.Name}"/>
+						</apex:pageBlockSectionItem>
+
+						<apex:outputField value="{!TheMilestone.KimbleOne__Event__c}" />
+
+						<apex:outputField value="{!TheMilestone.KimbleOne__MilestoneDate__c}"/>
+
+						<apex:outputField value="{!PlanMilestone.KimbleOne__TrackingPlan__c}" rendered="{!!ISBLANK(PlanMilestone)}"/>
+
+						<apex:outputField value="{!PlanMilestone.KimbleOne__BaselineDate__c}" rendered="{!!ISBLANK(PlanMilestone)}"/>
+
+						<!-- Preserve the layout of the page having removed Estimated Date -->
+						<apex:pageBlockSectionItem />
+
+						<apex:outputField value="{!PlanMilestone.KimbleOne__CompletionDate__c}" rendered="{!!ISBLANK(PlanMilestone)}"/>
+
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneValue__c.Label}"/>
+							<apex:outputPanel layout="none">
+								<apex:outputPanel layout="none" rendered="{!TheMilestone.MilestoneType__r.KimbleOne__Enum__c == 'Revenue'}">
+									<apex:outputField value="{!TheMilestone.KimbleOne__InvoicingCurrencyIsoCode__c}"/>&nbsp;
+									<apex:outputField value="{!TheMilestone.KimbleOne__InvoicingCurrencyMilestoneValue__c}"/>
+								</apex:outputPanel>
+								<apex:outputPanel layout="none" rendered="{!TheMilestone.MilestoneType__r.KimbleOne__Enum__c == 'Cost'}">
+									<apex:outputField value="{!TheMilestone.KimbleOne__MilestoneValue__c}"/>
+								</apex:outputPanel>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem rendered="{!TheMilestone.DeliveryElement__r.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUnitGenerated__c}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneUnits__c.Label}"/>
+							<apex:outputField value="{!TheMilestone.KimbleOne__MilestoneUnits__c}"/>
+						</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem rendered="{!TheMilestone.DeliveryElement__r.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUnitGenerated__c}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__RevenueUnitType__c.Label}"/>
+							<apex:outputField value="{!TheMilestone.DeliveryElement__r.RevenueUnitType__r.Name}"/>
+						</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem rendered="{!TheMilestone.DeliveryElement__r.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsUnitGenerated__c}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneUnits__c.Label}"/>
+							<apex:outputField value="{!TheMilestone.KimbleOne__MilestoneUnits__c}"/>
+						</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem rendered="{!TheMilestone.DeliveryElement__r.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsUnitGenerated__c}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__DeliveryElement__c.Fields.KimbleOne__CostUnitType__c.Label}"/>
+							<apex:outputField value="{!TheMilestone.DeliveryElement__r.CostUnitType__r.Name}"/>
+						</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem rendered="{!isElementInterCompanyInvoiceable}" />
+
+						<apex:pageBlockSectionItem rendered="{!isElementInterCompanyInvoiceable}">
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__InternalInvoicingCurrencyMilestoneValue__c.Label}"/>
+							<apex:outputPanel layout="none">
+								<apex:outputPanel layout="none" rendered="{!TheMilestone.MilestoneType__r.KimbleOne__Enum__c == 'Revenue'}">
+									<apex:outputField value="{!TheMilestone.KimbleOne__InternalInvoicingCurrencyIsoCode__c}"/>&nbsp;
+									<apex:outputField value="{!TheMilestone.KimbleOne__InternalInvoicingCurrencyMilestoneValue__c}"/>
+								</apex:outputPanel>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+
+						<apex:pageBlockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneStatus__c.Label}"/>
+							<apex:outputField value="{!TheMilestone.MilestoneStatus__r.Name}"/>
+						</apex:pageBlockSectionItem>
+
+						<apex:outputField value="{!TheMilestone.KimbleOne__Notes__c}"/>
+
+						<apex:repeat value="{!$ObjectType.KimbleOne__Milestone__c.FieldSets.KimbleOne__MilestoneDetails}" var="f">
+							<apex:outputField value="{!TheMilestone[f]}"/>
+						</apex:repeat>
+
+					</apex:pageBlockSection>
+				</apex:pageBlock>
+
+				<apex:pageBlock id="milestoneAssignments" title="{!$ObjectType.KimbleOne__ActivityAssignment__c.LabelPlural}" rendered="{!OrderedAssignmentIds.size > 0 && $ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__Milestone__c.updateable}">
+					<i class="fa fa-search assignment-search" title="{!$Label.SearchLabel}"></i>
+					<table border="0" cellpadding="0" cellspacing="0" class="list assignment-table kimble-enhanced-table">
+						<thead>
+						<tr class="headerRow">
+							<th class="headerRow"><h2>{!$Label.Actions}</h2></th>
+							<th class="headerRow sortable"><h2>{!$ObjectType.ActivityAssignment__c.Fields.StartDate__c.Label}</h2></th>
+							<th class="headerRow sortable"><h2>{!$ObjectType.ActivityAssignment__c.Fields.Resource__c.Label}</h2></th>
+							<th class="headerRow sortable"><h2>{!$ObjectType.ActivityAssignment__c.Fields.ActivityRole__c.Label}</h2></th>
+							<th class="headerRow sortable"><h2>{!$ObjectType.ActivityAssignment__c.Fields.Milestone__c.Label}</h2></th>
+						</tr>
+						</thead>
+						<tbody>
+						<apex:repeat value="{!OrderedAssignmentIds}" var="thisAssignmentId">
+							<apex:variable value="{!TheAssignmentsMap[thisAssignmentId]}" var="theAssignment"/>
+							<tr class="assignment-row {!IF(!ISBLANK(theAssignment.Milestone__c) && theAssignment.Milestone__c != TheMilestone.Id, 'other-milestone', '')}" assignment-id="{!theAssignment.Id}">
+								<td>
+									<apex:outputPanel layout="none" rendered="{!ISBLANK(theAssignment.Milestone__c) || theAssignment.Milestone__c = TheMilestone.Id}">
+										<apex:commandLink action="{!LinkMilestone}" styleClass="link-unlink-action" reRender="milestoneAssignments" onclick="showWorking('{!thisAssignmentId}');" oncomplete="reinitialiseAssignmentSearch();" rendered="{!ISBLANK(theAssignment.Milestone__c)}"><apex:outputText value="{!$Label.kimbleone__linklabel}"/>
+											<apex:param name="assignmentId" value="{!theAssignment.Id}" />
+										</apex:commandLink>
+										<apex:commandLink action="{!UnlinkMilestone}" styleClass="link-unlink-action" reRender="milestoneAssignments" onclick="showWorking('{!thisAssignmentId}');" oncomplete="reinitialiseAssignmentSearch();" rendered="{!!ISBLANK(theAssignment.Milestone__c)}"><apex:outputText value="{!$Label.kimbleone__unlinklabel}"/>
+											<apex:param name="assignmentId" value="{!theAssignment.Id}" />
+										</apex:commandLink>
+									</apex:outputPanel>
+									<i class="fa fa-circle-o-notch fa-spin link-working hidden-item"></i>
+								</td>
+								<td>
+									<apex:outputField value="{!theAssignment.StartDate__c}" />
+								</td>
+								<td>
+									<apex:outputField value="{!theAssignment.Resource__c}" />
+								</td>
+								<td>
+									<apex:outputField value="{!theAssignment.ActivityRole__c}" />
+								</td>
+								<td>
+									<apex:outputField value="{!theAssignment.Milestone__c}" />
+								</td>
+							</tr>
+						</apex:repeat>
+						</tbody>
+					</table>
+				</apex:pageBlock>
+
+				<apex:actionFunction action="{!DefaultCompletionDate}" name="defaultCompletionDate" rerender="CompleteMilestone" oncomplete="showModalBoxy(); initialiseItems();">
+				</apex:actionFunction>
+
+			</apex:form>
+
+			<div id="DeliveryElementManageMilestonesEditPopup" style="display:none">
+				<apex:outputPanel id="EditMilestone">
+					<apex:form >
+						<div id="EditMilestoneErrors">
+							<apex:pageMessages escape="false"/>
+						</div>
+						<apex:pageBlock >
+							<apex:pageBlockButtons location="bottom">
+								<apex:commandButton styleclass="DisableButtonWhileBusy" action="{!SaveMilestone}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#EditMilestoneErrors'); initialiseItems();" reRender="EditMilestone, TheForm"/>
+								<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+							</apex:pageBlockButtons>
+							<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+								<apex:inputfield value="{!TheMilestone.Name}" required="true" />
+
+								<apex:pageBlockSectionItem rendered="{!ISBLANK(PlanMilestone) && TheMilestone.DeliveryElement__r.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUnitGenerated__c == false && TheMilestone.MilestoneType__r.KimbleOne__Enum__c == 'Revenue'}">
+									<apex:outputLabel >{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneValue__c.Label} {!JSINHTMLENCODE(TheMilestone.KimbleOne__InvoicingCurrencyIsoCode__c)}</apex:outputLabel>
+									<apex:inputField id="milestoneValue" styleclass="MilestoneValueTextEdit" value="{!TheMilestone.KimbleOne__InvoicingCurrencyMilestoneValue__c}" required="true">
+										<apex:actionSupport event="onchange" status="milestoneValueCalcStatus" action="{!CalculateInternalValues}" reRender="internalInvCcyMilestoneValueField" rendered="{!isElementInterCompanyInvoiceable}"/>
+									</apex:inputField>
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem rendered="{!AllowEdit && TheMilestone.MilestoneType__r.KimbleOne__Enum__c == 'Revenue' && !TheMilestone.DeliveryElement__r.InternalRevenueBehaviourRule__r.RevenueGenerationModel__r.KimbleOne__IsUnitGenerated__c && TheMilestone.MilestoneType__r.KimbleOne__Enum__c == 'Revenue' && isElementInterCompanyInvoiceable}" >
+									<apex:outputLabel >{!$Label.kimbleone__intercompany} {!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneValue__c.Label} {!JSINHTMLENCODE(TheMilestone.KimbleOne__InternalInvoicingCurrencyIsoCode__c)}</apex:outputLabel>
+									<apex:outputPanel layout="none">
+										<div class="requiredInput">
+											<apex:outputPanel layout="none" rendered="{!TheMilestone.DeliveryElement__r.InternalRevenueBehaviourRule__r.KimbleOne__CanEditInternalRevenue__c && HasPermission['OverrideInternalRevenue']}"><div class="requiredBlock"></div></apex:outputPanel>
+												<apex:actionStatus id="milestoneValueCalcStatus">
+													<apex:facet name="start">
+														<span style="font-weight: bold;color: #4A4A56;font-size: 91%;"><img src="{!URLFOR($Resource.LoadingImage)}" />{!$Label.Loading}</span>
+													</apex:facet>
+													<apex:facet name="stop">
+														<apex:outputPanel id="internalInvCcyMilestoneValueField" layout="none">
+															<apex:inputField value="{!TheMilestone.KimbleOne__InternalInvoicingCurrencyMilestoneValue__c}" rendered="{!TheMilestone.DeliveryElement__r.InternalRevenueBehaviourRule__r.KimbleOne__CanEditInternalRevenue__c && HasPermission['OverrideInternalRevenue']}"/>
+															<apex:outputField value="{!TheMilestone.KimbleOne__InternalInvoicingCurrencyMilestoneValue__c}" rendered="{!!TheMilestone.DeliveryElement__r.InternalRevenueBehaviourRule__r.KimbleOne__CanEditInternalRevenue__c || !HasPermission['OverrideInternalRevenue']}"/>
+														</apex:outputPanel>
+													</apex:facet>
+												</apex:actionStatus>
+										</div>
+									</apex:outputPanel>
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem rendered="{!TheMilestone.DeliveryElement__r.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsUnitGenerated__c == false && TheMilestone.MilestoneType__r.KimbleOne__Enum__c == 'Cost'}">
+									<apex:outputLabel >{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneValue__c.Label} {!JSINHTMLENCODE(TheMilestone.KimbleOne__SupplierInvoicingCurrencyIsoCode__c)}</apex:outputLabel>
+									<apex:inputField styleclass="MilestoneValueTextEdit" value="{!TheMilestone.KimbleOne__SupplierInvoicingCurrencyMilestoneValue__c}" required="true"/>
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem rendered="{!ISBLANK(PlanMilestone) && TheMilestone.DeliveryElement__r.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUnitGenerated__c == true && TheMilestone.MilestoneType__r.KimbleOne__Enum__c == 'Revenue'}">
+									<apex:outputLabel >{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__UnitValue__c.Label} {!JSINHTMLENCODE(TheMilestone.KimbleOne__InvoicingCurrencyIsoCode__c)}</apex:outputLabel>
+                                    <apex:inputField id="unitValue" styleclass="MilestoneValueTextEdit"  value="{!TheMilestone.KimbleOne__InvoicingCurrencyUnitValue__c}" required="true">
+                                        <apex:actionSupport event="onchange" status="unitCalcStatus" action="{!CalculateInternalValues}" reRender="internalInvCcyUnitValueField" rendered="{!isElementInterCompanyInvoiceable}"/>
+                                    </apex:inputField>
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem rendered="{!AllowEdit && TheMilestone.MilestoneType__r.KimbleOne__Enum__c == 'Revenue' && TheMilestone.DeliveryElement__r.InternalRevenueBehaviourRule__r.RevenueGenerationModel__r.KimbleOne__IsUnitGenerated__c && isElementInterCompanyInvoiceable}" >
+									<apex:outputLabel >{!$Label.kimbleone__intercompany} {!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__InvoicingCurrencyUnitValue__c.Label} {!JSINHTMLENCODE(TheMilestone.KimbleOne__InternalInvoicingCurrencyIsoCode__c)}</apex:outputLabel>
+									<apex:outputPanel layout="none">
+										<div class="requiredInput">
+											<apex:outputPanel layout="none" rendered="{!TheMilestone.DeliveryElement__r.InternalRevenueBehaviourRule__r.KimbleOne__CanEditInternalRevenue__c && HasPermission['OverrideInternalRevenue']}"><div class="requiredBlock"></div></apex:outputPanel>
+											<apex:actionStatus id="unitCalcStatus">
+												<apex:facet name="start">
+													<span style="font-weight: bold;color: #4A4A56;font-size: 91%;"><img src="{!URLFOR($Resource.LoadingImage)}" />{!$Label.Loading}</span>
+												</apex:facet>
+												<apex:facet name="stop">
+													<apex:outputPanel id="internalInvCcyUnitValueField" layout="none">
+														<apex:inputField value="{!TheMilestone.KimbleOne__InternalInvoicingCurrencyUnitValue__c}" rendered="{!TheMilestone.DeliveryElement__r.InternalRevenueBehaviourRule__r.KimbleOne__CanEditInternalRevenue__c && HasPermission['OverrideInternalRevenue']}"/>
+														<apex:outputField value="{!TheMilestone.KimbleOne__InternalInvoicingCurrencyUnitValue__c}" rendered="{!!TheMilestone.DeliveryElement__r.InternalRevenueBehaviourRule__r.KimbleOne__CanEditInternalRevenue__c || !HasPermission['OverrideInternalRevenue']}"/>
+													</apex:outputPanel>
+												</apex:facet>
+											</apex:actionStatus>
+										</div>
+									</apex:outputPanel>
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem rendered="{!TheMilestone.DeliveryElement__r.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsUnitGenerated__c == true && TheMilestone.MilestoneType__r.KimbleOne__Enum__c == 'Cost'}">
+									<apex:outputLabel >{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__UnitValue__c.Label} {!JSINHTMLENCODE(TheMilestone.KimbleOne__SupplierInvoicingCurrencyIsoCode__c)}</apex:outputLabel>
+									<apex:inputField styleclass="MilestoneValueTextEdit" value="{!TheMilestone.KimbleOne__SupplierInvoicingCurrencyUnitValue__c}" required="true"/>
+								</apex:pageBlockSectionItem>
+
+								<apex:inputfield styleclass="kimbleDatePicker" value="{!TheMilestone.KimbleOne__MilestoneDate__c}" required="true"/>
+
+								<apex:pageBlockSectionItem rendered="{!TheMilestone.DeliveryElement__r.Product__r.ProductDomain__r.RevenueGenerationModel__r.KimbleOne__IsUnitGenerated__c}">
+									<apex:outputLabel value="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneUnits__c.Label}"/>
+									<apex:inputField value="{!TheMilestone.KimbleOne__MilestoneUnits__c}" required="true"/>
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem rendered="{!TheMilestone.DeliveryElement__r.Product__r.ProductDomain__r.CostGenerationModel__r.KimbleOne__IsUnitGenerated__c}">
+									<apex:outputLabel value="{!$ObjectType.KimbleOne__Milestone__c.Fields.KimbleOne__MilestoneUnits__c.Label}"/>
+									<apex:inputField value="{!TheMilestone.KimbleOne__MilestoneUnits__c}" required="true"/>
+								</apex:pageBlockSectionItem>
+
+								<apex:inputField value="{!TheMilestone.KimbleOne__Notes__c}"/>
+
+							</apex:pageBlockSection>
+						</apex:pageBlock>
+					</apex:form>
+				</apex:outputPanel>
+			</div>
+
+			<div id="DeliveryElementManageMilestonesCompletePopup" style="display:none">
+				<apex:outputPanel id="CompleteMilestone">
+					<apex:form >
+						<div id="CompleteMilestoneErrors">
+							<apex:pageMessages escape="false"/>
+						</div>
+						<apex:pageBlock >
+							<apex:pageBlockButtons location="bottom">
+								<apex:commandButton styleclass="DisableButtonWhileBusy" action="{!CompleteCostMilestone}" value="{!$Label.kimbleone__complete}" oncomplete="hideModalBoxyWithErrorCheck('#CompleteMilestoneErrors'); initialiseItems();" rendered="{!TheMilestone.MilestoneType__r.KimbleOne__Enum__c = 'Cost'}" reRender="CompleteMilestone, TheForm" />
+								<apex:commandButton styleclass="DisableButtonWhileBusy" action="{!CompleteRevenueMilestone}" value="{!$Label.kimbleone__complete}" oncomplete="hideModalBoxyWithErrorCheck('#CompleteMilestoneErrors'); initialiseItems();" rendered="{!TheMilestone.MilestoneType__r.KimbleOne__Enum__c = 'Revenue'}" reRender="CompleteMilestone, TheForm" />
+
+								<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+							</apex:pageBlockButtons>
+							<apex:pageblockSection collapsible="false" showheader="false" columns="1">
+
+								<apex:inputField styleclass="kimbleDatePicker" value="{!TheMilestone.KimbleOne__MilestoneDate__c}" required="true" />
+
+								<apex:inputField value="{!TheMilestone.KimbleOne__Notes__c}" style="width:200px" />
+
+							</apex:pageBlockSection>
+						</apex:pageBlock>
+					</apex:form>
+				</apex:outputPanel>
+			</div>
+
+			<div id="DeliveryElementCloneMilestonePopup" style="display:none">
+				
+				<apex:outputPanel id="CloneMilestonePanel">
+					<apex:form >
+	
+						<div id="cloneMilestoneErrors">
+							<apex:pageMessages escape="false"/>
+						</div>
+
+						<apex:pageBlock id="clonePageBlock" mode="edit" rendered="{!$ObjectType.KimbleOne__Milestone__c.updateable}">
+							<apex:pageBlockSection id="cloneSection" collapsible="false" showheader="false" columns="1">
+								<apex:pageBlockSectionItem >
+									<apex:outputText id="milestoneToCloneLabel" value="{!$ObjectType.KimbleOne__Milestone__c.fields.Name.label}" />
+									<apex:inputField id="cloneName" required="true" value="{!theCloneFields.Name}"/>
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem rendered="{!theCloneFields.KimbleOne__InputInteger__c == null}">
+									<apex:outputText id="milestoneToCloneLabel" value="{!$ObjectType.KimbleOne__Milestone__c.fields.KimbleOne__MilestoneValue__c.label}" />
+									<apex:inputField id="cloneDecimal" required="true" value="{!theCloneFields.KimbleOne__InputDecimal__c}"/>
+								</apex:pageBlockSectionItem>
+
+								<apex:pageBlockSectionItem rendered="{!theCloneFields.KimbleOne__InputInteger__c != null}">
+									<apex:outputText id="milestoneToCloneLabel" value="{!$ObjectType.KimbleOne__Milestone__c.fields.KimbleOne__MilestonePercentage__c.label}" />
+									<apex:inputField id="clonePct" required="true" value="{!theCloneFields.KimbleOne__InputInteger__c}"/>
+								</apex:pageBlockSectionItem>
+	
+								<apex:pageBlockSectionItem >
+									<apex:outputText id="milestoneToCloneLabel" value="{!$ObjectType.KimbleOne__Milestone__c.fields.KimbleOne__MilestoneDate__c.label}" />
+									<apex:inputField id="cloneDate" required="true" value="{!theCloneFields.KimbleOne__InputDate__c}" styleClass="kimbleDatePicker"/>
+								</apex:pageBlockSectionItem>
+							</apex:pageBlockSection>
+
+							<apex:pageBlockButtons location="bottom">
+								<apex:outputPanel id="cloneButtons">
+									<apex:commandButton styleclass="DisableButtonWhileBusy" action="{!CloneMilestone}" value="{!$Label.kimbleone__clonelabel}" rerender="CloneMilestonePanel" oncomplete="hideModalBoxyWithErrorCheck('#cloneMilestoneErrors'); initialiseItems();"/>
+									<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+								</apex:outputPanel>
+							</apex:pageBlockButtons>
+						</apex:pageBlock>
+						
+						<style>
+							#DeliveryElementCloneMilestonePopup th { 
+							  min-width: 92px;
+							}
+						</style>
+
+					</apex:form>
+				</apex:outputPanel>
+			</div>
+			
+			<apex:form >
+				<apex:actionFunction action="{!InitialiseCloneMilestone}" name="cloneMilestoneFunction" rerender="CloneMilestone,clonePageBlock" oncomplete="initialiseModalBoxy('#DeliveryElementCloneMilestonePopup', '{!JSENCODE($Label.kimbleone__clonelabel)} {!$ObjectType.KimbleOne__Milestone__c.label}');showModalBoxy();initialiseItems();">
+				</apex:actionFunction>
+			</apex:form>
+			
+			<apex:relatedList list="CombinedAttachments" rendered="{!AttachmentsEnabled && TheMilestone.MilestoneType__r.KimbleOne__Enum__c != 'Planning'}"/>
+			<apex:relatedList subject="{!KimbleOne__Milestone__c}" list="AttachedContentDocuments" rendered="{!FilesEnabled && TheMilestone.MilestoneType__r.KimbleOne__Enum__c != 'Planning'}"/>
+
+			<!-- Approval History -->
+			<apex:include pageName="{!$Page.ApproveRejectItem}" rendered="{!InPageApproveRejectEnabled}"/>
+			<apex:relatedList list="ProcessSteps" id="MilestoneApprovalHistory" rendered="{!!RequiresSupplierRequisition}"/>
+			<apex:outputPanel layout="none" rendered="{!InPageApproveRejectEnabled}">
+			<script>
+				jQuery(window).load(function()
+				{
+					var approvalItemId = '<apex:outputText value="{!KimbleOne__Milestone__c.Id}"/>';
+
+					overrideSFApproveRejectLink(approvalItemId);
+				});
+			</script>
+			</apex:outputPanel>
+
+			<script>
+						var searchInitialised = false;
+
+						$(document).ready(function(){
+    						$(function() {
+    							hideSalesForceApprovalProcessButtons();
+   								jQuery(document).off('click', '.assignment-search').on('click', '.assignment-search', initialiseAssignmentSearch);
+    						})
+    					});
+    					function hideSalesForceApprovalProcessButtons()
+    					{
+    							$('input[name="piSubmit"]').remove();
+    							$('input[name="piRemove"]').remove();
+    					}
+    					
+    					function showWorking(assignmentId)
+    					{
+    						var theRow = jQuery('tr.assignment-row[assignment-id="' + assignmentId + '"]');
+    						
+    						theRow.find('.link-working').removeClass('hidden-item');
+    						theRow.find('.link-unlink-action').addClass('hidden-item');
+    					}
+    					
+    					function initialiseAssignmentSearch()
+    					{
+	    					if(jQuery('.table-filter').size() < 1)
+	    					{
+								jQuery('.kimble-enhanced-table').enhancedTable();
+								searchInitialised = true;
+	    					}
+    					}
+    					
+    					function reinitialiseAssignmentSearch()
+    					{
+							if(searchInitialised) initialiseAssignmentSearch();
+    					}
+    					
+						jQuery(document).ready(function() {
+							if(isSFLightning()) jQuery('input[name="newNote"],input[name="attachFile"]').hide();
+						});
+
+						jQuery(window).load(function()
+						{
+						initialiseItems();
+						});
+						function initialiseItems()
+						{
+							SetupDatePicker();
+						}
+						function SetupDatePicker()
+						{
+							//dateFormat: 'yy-mm-dd',
+							jQuery('.kimbleDatePicker').datepicker({
+									dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+									showOtherMonths: true,
+									selectOtherMonths: true,
+									changeMonth: true,
+									changeYear: true});
+						}
+				</script>
+		</apex:define>
+	</apex:Composition>
+</apex:page>

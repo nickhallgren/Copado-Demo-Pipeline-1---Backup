@@ -1,0 +1,202 @@
+<apex:page standardController="KimbleOne__Resource__c" extensions="KimbleOne.ResourceGroupMemberTemplatesController" sidebar="false" >
+	
+<apex:composition template="KimbleOne__SiteMaster">
+
+	<apex:define name="Menu">
+		<c:Menu DefaultHelpPage="ManagingGroupAssignmentTemplates.html" MenuContextType="Resource" MenuContextId="{!KimbleOne__Resource__c.Id}" MenuContextName="{!KimbleOne__Resource__c.Name}"/>
+	</apex:define>
+
+	<apex:define name="Content">
+	
+		<apex:outputPanel id="AssignmentTemplates" layout="block">
+			
+			<div id="DeleteErrors">
+				<apex:pageMessages escape="false"/>
+			</div>
+			
+			<apex:form >
+			
+				<apex:pageBlock >
+
+					<apex:pageBlockButtons >
+						<input type="button" class="btn" value="{!$Label.Add}" 
+							onclick="initialiseModalBoxy('#AssignmentTemplatePopup', 'Add');newAssignmentTemplate();"></input>
+					</apex:pageBlockButtons>
+						
+					<apex:pageBlockTable value="{!AssignmentTemplates}" var="template" >
+					
+						<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+							<apex:outputPanel rendered="true">
+					     		<apex:outputLink value="#" onclick="initialiseModalBoxy('#AssignmentTemplatePopup', '{!JSENCODE($Label.kimbleone__view)} {!$ObjectType.KimbleOne__ResourceGroupMemberAssignmentTemplate__c.label}');editAssignmentTemplate('{!JSINHTMLENCODE(template.Id)}','')">
+           							{!$Label.kimbleone__view}
+           						</apex:outputLink>
+	       					</apex:outputPanel>
+       						<apex:outputPanel rendered="{!template.Status__r.KimbleOne__Enum__c == ResourceGrpMemAssTempStatusDraft}">
+								&nbsp;|&nbsp;
+	       						<apex:outputLink value="#" onclick="delAssignmentTemplate('{!JSINHTMLENCODE(template.Id)}','')" >{!$Label.kimbleone__delete}
+           						</apex:outputLink>
+           					</apex:outputPanel>
+	       				</apex:column>
+
+						<apex:column value="{!template.Name}"  headerValue="{!$ObjectType.KimbleOne__ResourceGroupMemberAssignmentTemplate__c.Fields.Name.Label}"/>
+						<apex:column value="{!template.KimbleOne__ResourcedActivity__c}"  headerValue="{!$ObjectType.KimbleOne__ResourceGroupMemberAssignmentTemplate__c.Fields.KimbleOne__ResourcedActivity__c.Label}"/>
+						<apex:column value="{!template.KimbleOne__StartDate__c}"  headerValue="{!$ObjectType.KimbleOne__ResourceGroupMemberAssignmentTemplate__c.Fields.KimbleOne__StartDate__c.Label}"/>
+						<apex:column value="{!template.KimbleOne__EndDate__c}"  headerValue="{!$ObjectType.KimbleOne__ResourceGroupMemberAssignmentTemplate__c.Fields.KimbleOne__EndDate__c.Label}"/>
+						<apex:column value="{!template.KimbleOne__EntryUnits__c}"  headerValue="{!$ObjectType.KimbleOne__ResourceGroupMemberAssignmentTemplate__c.Fields.KimbleOne__EntryUnits__c.Label}"/>
+						<apex:column value="{!template.KimbleOne__UtilisationPercentage__c}"  headerValue="{!$ObjectType.KimbleOne__ResourceGroupMemberAssignmentTemplate__c.Fields.KimbleOne__UtilisationPercentage__c.Label}"/>
+						<apex:column value="{!template.Status__r.Name}"  headerValue="{!$ObjectType.KimbleOne__ResourceGroupMemberAssignmentTemplate__c.Fields.KimbleOne__Status__c.Label}"/>
+							
+					</apex:pageBlockTable>
+
+					<apex:actionFunction action="{!newAssignmentTemplate}" name="newAssignmentTemplate" rerender="AssignmentTemplate" oncomplete="showModalBoxy(); initialiseItems();">
+					</apex:actionFunction>
+					
+					<apex:actionFunction action="{!getAssignmentTemplate}" name="editAssignmentTemplate" rerender="AssignmentTemplate,AssignmentTemplateView" oncomplete="showModalBoxy()">
+			  			<apex:param name="tId" value="" />
+					</apex:actionFunction>
+					<apex:actionFunction action="{!deleteAssignmentTemplate}" name="delAssignmentTemplate" rerender="AssignmentTemplates">
+			  			<apex:param name="tId" value="" />
+					</apex:actionFunction>
+						
+				</apex:pageBlock>
+					
+			</apex:form>
+					
+		</apex:outputPanel>
+
+		<div id="AssignmentTemplatePopup" style="display: none">
+	
+			<apex:outputPanel id="AssignmentTemplate">
+
+				<apex:form >
+
+					<apex:pageBlock >
+
+						<div id="EditAssignmentTemplateErrors">
+							<apex:pageMessages escape="false"/>
+						</div>
+
+						<apex:pageBlockButtons location="bottom">
+						<apex:outputPanel layout="none" rendered="true">
+								<apex:commandButton action="{!saveAssignmentTemplate}" value="{!$Label.kimbleone__save}" oncomplete="hideModalBoxyWithErrorCheck('#EditAssignmentTemplateErrors'); initialiseItems();" rendered="{!AssignmentTemplate.Status__r.KimbleOne__Enum__c != ResourceGrpMemAssTempStatusActive && AssignmentTemplate.Status__r.KimbleOne__Enum__c != ResourceGrpMemAssTempStatusClosed}" reRender="AssignmentTemplates,AssignmentTemplate" />
+								<apex:commandButton id="activateTemplate" styleclass="DisableButtonWhileBusy" action="{!activateAssignmentTemplate}" value="{!$Label.kimbleone__activatelink}" rendered="{!AssignmentTemplate.Status__r.KimbleOne__Enum__c = ResourceGrpMemAssTempStatusDraft}" oncomplete="hideModalBoxyWithErrorCheck('#EditAssignmentTemplateErrors')" reRender="AssignmentTemplates,AssignmentTemplate" />
+								<apex:commandButton id="revertBtn" styleclass="DisableButtonWhileBusy" action="{!RevertTemplate}" value="{!$Label.kimbleone__reverttodraft}" rendered="{!AssignmentTemplate.Status__r.KimbleOne__Enum__c = ResourceGrpMemAssTempStatusActive && AssignmentsWithActuals.size = 0}" oncomplete="hideModalBoxyWithErrorCheck('#EditAssignmentTemplateErrors')" rerender="AssignmentTemplates,AssignmentTemplate"/>
+								<apex:commandButton id="reopenBtn" styleclass="DisableButtonWhileBusy" action="{!ReOpenTemplate}" value="{!$Label.kimbleone__reopenbutton}" rendered="{!AssignmentTemplate.Status__r.KimbleOne__Enum__c = ResourceGrpMemAssTempStatusClosed}" oncomplete="hideModalBoxyWithErrorCheck('#EditAssignmentTemplateErrors')" reRender="AssignmentTemplates,AssignmentTemplate"/>
+								<apex:commandButton id="closeBtn" styleclass="DisableButtonWhileBusy" action="{!CloseAssignmentTemplate}" value="{!$Label.kimbleone__close}" rendered="{!AssignmentTemplate.Status__r.KimbleOne__Enum__c = ResourceGrpMemAssTempStatusActive}" oncomplete="hideModalBoxyWithErrorCheck('#EditAssignmentTemplateErrors')" rerender="AssignmentTemplates,AssignmentTemplate"/>
+						</apex:outputPanel>
+						<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}" />
+						</apex:pageBlockButtons>
+
+						<apex:pageblockSection collapsible="false" showheader="false" columns="1" rendered="{!AssignmentTemplate.Status__r.KimbleOne__Enum__c != ResourceGrpMemAssTempStatusActive && AssignmentTemplate.Status__r.KimbleOne__Enum__c != ResourceGrpMemAssTempStatusClosed}" >
+
+							<apex:inputField value="{!AssignmentTemplate.Name}" />
+							
+							<apex:pageBlockSectionItem rendered="{!ISBLANK(AssignmentTemplate.Id)}" >
+								<apex:outputText value="{!$ObjectType.KimbleOne__ResourceGroupMemberAssignmentTemplate__c.Fields.KimbleOne__ResourcedActivity__c.Label}"></apex:outputText>
+								<apex:selectList value="{!AssignmentTemplate.KimbleOne__ResourcedActivity__c}" required="true" size="1">
+						        	<apex:selectOptions value="{!ResourcedActivities}"/>
+						        </apex:selectList>
+							</apex:pageBlockSectionItem>
+							<apex:pageBlockSectionItem rendered="{!!ISBLANK(AssignmentTemplate.Id)}" >
+								<apex:outputText value="{!$ObjectType.KimbleOne__ResourceGroupMemberAssignmentTemplate__c.Fields.KimbleOne__ResourcedActivity__c.Label}"></apex:outputText>
+								<apex:outputField value="{!AssignmentTemplate.KimbleOne__ResourcedActivity__c}" />
+							</apex:pageBlockSectionItem>
+							
+							<apex:inputField value="{!AssignmentTemplate.KimbleOne__StartDate__c}" styleClass="kimbleDatePicker" />
+							
+							<apex:pageBlockSectionItem >
+								<apex:outputText value="{!$ObjectType.KimbleOne__ResourceGroupMemberAssignmentTemplate__c.Fields.KimbleOne__UsageBehaviourRule__c.Label}"></apex:outputText>
+								<apex:actionRegion >
+									<apex:selectList id="assignmentUsageBehaviourRuleSelect" value="{!AssignmentTemplate.KimbleOne__UsageBehaviourRule__c}" required="true" size="1">
+							        	<apex:selectOptions value="{!TheUsageRuleOptions}"/>
+							        	<apex:actionSupport event="onchange" action="{!RefreshEntryCriteria}" oncomplete="initialiseItems();" rerender="EntryCriteria"  />
+							        </apex:selectList>
+							    </apex:actionRegion>
+							</apex:pageBlockSectionItem>
+
+							<apex:pageblockSection collapsible="false" showheader="false" columns="1" id="EntryCriteria"  rendered="{!!ISBLANK(AssignmentTemplate)}"> 
+								<apex:inputField id="entryUnits" value="{!AssignmentTemplate.KimbleOne__EntryUnits__c}" required="true" rendered="{!UsageBehaviourRulesMap[AssignmentTemplate.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'DerivedUsage'}"/>
+								<apex:inputField id="utilisationPercentage" value="{!AssignmentTemplate.KimbleOne__UtilisationPercentage__c}" required="true" rendered="{!UsageBehaviourRulesMap[AssignmentTemplate.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'DerivedUtilisation'}"/>
+								<apex:inputField id="endDate"  value="{!AssignmentTemplate.KimbleOne__EndDate__c}" styleClass="kimbleDatePicker" rendered="{!UsageBehaviourRulesMap[AssignmentTemplate.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'DerivedEndDate'}"/>
+							</apex:pageblockSection>
+                            
+							<apex:pageBlockSectionItem >							
+                                <apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.LabelPlural}"/>
+								<apex:outputText value="{!NumberOfAssignmentsToCreate}"/>	
+                            </apex:pageBlockSectionItem>
+						</apex:pageblockSection>
+						
+						<apex:pageblockSection collapsible="false" showheader="false" columns="1" rendered="{!AssignmentTemplate.Status__r.KimbleOne__Enum__c = ResourceGrpMemAssTempStatusActive || AssignmentTemplate.Status__r.KimbleOne__Enum__c = ResourceGrpMemAssTempStatusClosed}">
+							<apex:outputField value="{!AssignmentTemplate.Name}" />
+							<apex:outputField value="{!AssignmentTemplate.KimbleOne__ResourcedActivity__c}" />
+							<apex:outputField value="{!AssignmentTemplate.KimbleOne__StartDate__c}" />
+							<apex:outputField value="{!AssignmentTemplate.KimbleOne__UsageBehaviourRule__c}" />
+							
+							<apex:pageBlockSectionItem rendered="{!UsageBehaviourRulesMap[AssignmentTemplate.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'DerivedUsage'}">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourceGroupMemberAssignmentTemplate__c.Fields.KimbleOne__EntryUnits__c.Label}"/>
+								<apex:outputField value="{!AssignmentTemplate.KimbleOne__EntryUnits__c}" />
+							</apex:pageBlockSectionItem>
+							
+							<apex:outputField value="{!AssignmentTemplate.KimbleOne__EndDate__c}" />
+							
+							<apex:pageBlockSectionItem rendered="{!UsageBehaviourRulesMap[AssignmentTemplate.KimbleOne__UsageBehaviourRule__c].EntrySpecification__r.Enum__c != 'DerivedUtilisation'}">
+								<apex:outputLabel value="{!$ObjectType.KimbleOne__ResourceGroupMemberAssignmentTemplate__c.Fields.KimbleOne__UtilisationPercentage__c.Label}"/>
+								<apex:outputField value="{!AssignmentTemplate.KimbleOne__UtilisationPercentage__c}" />
+							</apex:pageBlockSectionItem>
+                            
+							<apex:pageBlockSectionItem >							
+                                <apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.LabelPlural}"/>
+								<apex:outputText value="{!NumberOfAssignmentsToCreate}"/>	
+                            </apex:pageBlockSectionItem>
+						</apex:pageblockSection>
+						
+						<div style="max-height: 180px; overflow-y: auto;">
+							<apex:pageblockTable value="{!AssignmentsWithActuals}" var="assignment" rendered="{!AssignmentsWithActuals.size > 0}">
+								<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}" rendered="{!AssignmentTemplate.Status__r.KimbleOne__Enum__c = ResourceGrpMemAssTempStatusClosed}">
+									<apex:outputLink style="display: block;height: 17px;" value="#" onclick="convertAssignment(this, '{!JSENCODE(assignment.Id)}');" ><apex:outputText value="{!$Label.kimbleone__converttospecific}"/></apex:outputLink>
+								</apex:column>
+								<apex:column value="{!assignment.KimbleOne__Resource__c}"/>
+								<apex:column value="{!assignment.KimbleOne__LatestTimeEntryDate__c}"/>
+								<apex:column value="{!assignment.KimbleOne__LatestExpenseItemDate__c}"/>
+							</apex:pageblockTable>
+						</div>	
+						
+					</apex:pageBlock>
+
+					<apex:actionFunction action="{!ConvertAssignmentToResourcedSpecific}" name="convertAssignmentToResourcedSpecific" rerender="AssignmentTemplate, ActivateAssignmentTemplate">
+			  			<apex:param name="assignmentId" value="" />
+					</apex:actionFunction>
+					
+				</apex:form>
+
+			</apex:outputPanel>
+			
+		</div>
+		
+		<script>
+			function convertAssignment(obj, assignmentId)
+			{
+				jQuery(obj).addClass('Loading').text('');
+				convertAssignmentToResourcedSpecific(assignmentId);
+			}
+			function initialiseItems()
+			{
+				SetupDatePicker();
+			}
+			function SetupDatePicker()
+			{
+				//dateFormat: 'yy-mm-dd',
+				jQuery('.kimbleDatePicker').datepicker({
+						dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+						showOtherMonths: true,
+						selectOtherMonths: true,
+						changeMonth: true,
+						changeYear: true});
+			}
+		</script>
+        
+	</apex:define>
+		
+</apex:composition>
+	
+</apex:page>

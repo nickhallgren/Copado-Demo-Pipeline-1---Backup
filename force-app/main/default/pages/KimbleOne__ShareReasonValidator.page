@@ -1,0 +1,132 @@
+<apex:page standardController="KimbleOne__ShareReason__c" recordSetVar="ShareReasons" extensions="KimbleOne.ShareReasonValidatorController" showHeader="true" sidebar="false">
+
+	<!-- Page used to configure / re-calculate sharing rules -->
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu"></apex:define>  
+   
+<apex:define name="Content">
+	<apex:pageBlock title="Share Reason Validation">
+            <apex:pageBlockButtons location="top">
+				<input id="validateAll" type="button" class="btn" value="Validate All" onclick="validateAll();"></input>
+            </apex:pageBlockButtons>
+			
+			<apex:pageBlockTable value="{!TheShareReasons}" var="reason">
+              <apex:column headerValue="{!$Label.kimbleone__actions}" width="20px">
+              	<div id="reason-menu" data-floating-dropdown="#{!reason.Id}-menu-data" class="fa fa-bars burger-menu"></div>
+              	<div id="{!reason.Id}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-left" style="margin-top:1px">
+		   			 <ul class="floating-dropdown-menu">				       
+				        <li><a href="/{!reason.Id}/e"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.Edit}</a></li>
+				        		     
+				       <li><a href="javascript:validateReason('{!reason.Id}');"><i class="fa fa-check-square dropdown-icon"></i>{!$Label.Validate}</a></li>		 
+				    </ul>
+				</div>
+              </apex:column>
+			
+			 <apex:column headerValue="{!$ObjectType.KimbleOne__ShareReason__c.Label}">
+			 	<a href="/{!reason.Id}"><apex:outputText value="{!reason.Name}"/></a> 
+			 </apex:column>
+			 
+			 <apex:column Value="{!reason.KimbleOne__Code__c}"/>
+			 <apex:column Value="{!reason.KimbleOne__ContextObject__c}"/>
+			 <apex:column Value="{!reason.KimbleOne__IsOwner__c}"/>
+			 <apex:column Value="{!reason.KimbleOne__IsActive__c}"/>
+			 <apex:column HeaderValue="Validation" width="500px">
+			 	<div class="validation-progress" id="{!reason.Id}"></div>
+			 	<div class="validation-message"></div>
+			 </apex:column>	
+			 
+			</apex:pageBlockTable>
+	</apex:pageBlock>
+	
+	<script>
+	
+	function validateAll()
+	{
+		jQuery('.validation-progress').addClass('Pending');
+		
+		validateNextReason();
+	}
+	
+	function validateNextReason()
+	{
+		var nextReason = jQuery('.validation-progress.Pending');
+		
+		if (nextReason.length == 0) return;
+		
+		validateReason(nextReason[0].id);
+	}
+	
+	function validateReason(reasonId)
+    {
+      	jQuery('#' + reasonId).removeClass('Pending').addClass('Processing');
+      	jQuery('#' + reasonId).next().empty();
+             		
+      		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ShareReasonValidatorController.ValidateShareReason}',
+       			reasonId,
+      			function(result, event){
+             		jQuery('#' + reasonId).removeClass('Processing');
+             		
+             		if (event.status) 
+		            {
+		             	//result is a list of string messages
+		             	if (result != null && result.length > 0)
+		             	{
+		             		for(var i=0;i<result.length;i++)
+		             		{
+		             			var html = '<div><a href="/' + result[i].Id + '">' + result[i].Name + '</a>';
+		             			
+		             			for (var j=0;j<result[i].Errors.length;j++)
+		             			{
+		             				html += '<div>' + result[i].Errors[j] + '</div>';
+		             			}
+		             			
+		             			jQuery('#' + reasonId).next().append(jQuery(html));
+		             		}
+		             	}
+		             	
+		             	validateNextReason();
+		         	} 
+		         	else if (event.type === 'exception') 
+		         	{
+		             	alert(event.message);
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		         	}			         	
+         }, 
+         {escape: true, timeout: 60000}
+     );
+   }
+	
+	</script>
+	
+	<style>
+	.burger-menu {float:none;}
+	.validation-progress
+	{
+		padding-left: 20px;
+		background-repeat: no-repeat;
+		padding-right: 12px;
+		height: 18px;
+		line-height: 18px;
+		display:none;
+	}
+	.Pending 
+	{
+		background-image: url('{!URLFOR($Resource.JobImages, 'pending16.gif')}');
+		display: block;
+	}
+	.Processing 
+	{
+		background-image: url('{!URLFOR($Resource.JobImages, 'running16.gif')}');
+		display: block;
+	}
+	</style>
+	
+</apex:define>
+
+</apex:composition>
+	
+</apex:page>

@@ -1,0 +1,1867 @@
+<apex:page Controller="KimbleOne.ActivityAssignmentsNewEditController" extensions="KimbleOne.ActivityAssignmentRemoteActions" showHeader="false" sidebar="false">
+<apex:includeScript value="{!URLFOR($Resource.KimbleOne__ActivityAssignmentUsagePattern)}" />
+<div id="assignments-container">
+	<div id="assignments-edit-grid">
+		<table class="list" border="0" cellpadding="0" cellspacing="0" id="assignments-table">
+			<!--a comment -->
+		</table>
+		
+		<div id="EditAssignmentContainer" style="display:none">
+			<div id="assignment-edit-details">
+							
+			</div>
+			<div style="text-align:center;">
+				<input id="AssignmentOkButton" class="btn" type="button" value="{!$Label.Ok}" />
+				<input class="btn" type="button" value="{!$Label.Cancel}" onclick="hideModalBoxy();"/>
+			</div>
+		</div>
+	</div>
+</div>
+<script>
+	var assignmentToEdit;
+	var activityToEdit;
+	
+	var useResourceEnhancedLookup = {!IF(UseResourceEnhancedLookup, 'true','false')};
+	var useLocationEnhancedLookup = {!IF(UseLocationEnhancedLookup, 'true','false')};
+	
+	var enableTrackingPlanUsageWarnings = <apex:outputText value="{!EnableTrackingPlanUsageWarnings}"/>;
+	
+	var resourceKeyPrefix = '<apex:outputText value="{!$ObjectType.KimbleOne__Resource__c.KeyPrefix}"/>';
+	var locationKeyPrefix = '<apex:outputText value="{!$ObjectType.KimbleOne__Location__c.KeyPrefix}"/>';
+	
+	var classificationStyleMap = kimble.parseJSON("{!JSENCODE(TheJsonClassificationsMap)}");
+	
+	var assignmentsToDelete;
+	
+	var locationOptions;
+	
+	var usageLabel = '<apex:outputText value="{!$ObjectType.KimbleOne__PlanTask__c.Fields.KimbleOne__Effort__c.Label}"/>';
+	
+	var costRateLabel = '<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__CostRate__c.Label}"/>';
+	var revenueRateLabel = '<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__RevenueRate__c.Label}"/>';
+	var resourceLabel = '<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__Resource__c.Label}"/>';
+	var startDateLabel = '<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__StartDate__c.Label}"/>';
+	var endDateLabel = '<apex:outputText value="{!$Label.kimbleone__enddatelabel}"/>';
+	var usageBehaviourRuleLabel = '<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UsageBehaviourRule__c.Label}"/>';
+	var utilisationLabel = '<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UtilisationPercentage__c.Label}"/>';
+	var resourceInitialsLabel = '<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ResourceInitials__c.Label}"/>';
+	var unforecastUsageLabel = '<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__UnforecastUsage__c.Label}"/>';
+	var totalCostLabel = 'Total Cost';
+	var totalRevenueLabel = 'Total Revenue';
+	
+	var showCosts = false;
+	
+	<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__TemporalForecastCostRate__c.Accessible}">
+		showCosts = true;
+	</apex:outputPanel>
+	
+	<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheLocationOptionsJson)}">
+	
+		locationOptions = kimble.parseJSON("{!JSENCODE(TheLocationOptionsJson)}");
+	
+	</apex:outputPanel>
+	
+	var scopingActivities = {};
+	var theTaskAssignments;
+	
+	function clearAll()
+	{
+		jQuery('#assignments-edit-grid>table>tbody').empty();
+	}
+	
+	function initialiseForActivity(resourcedActivityId, taskAssignments)
+	{
+		theTaskAssignments = taskAssignments;
+		//build grid based on operating activity
+		getAssignmentsToEdit(resourcedActivityId);
+	}
+	
+	function getAssignmentsToEdit (activityId)
+	{	
+		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.GetActivityAssignmentsToEdit}',
+			activityId,
+			function(result, event){          
+				if (event.status) {
+					// initialise grid
+					scopingActivities[result.Id] = result;
+					assignmentsToDelete = new Array();
+					
+					refreshAssignmentEditGrid();
+				} 
+				else if (event.type === 'exception') 
+				{
+					alert(event.message);
+				} 
+				else 
+				{
+					alert(event.message);
+				}
+			}, 
+			{escape: false, timeout: 60000});
+	}
+	
+	function verifyResource(activity, assignment, context)
+	{				
+		if (assignment.ResourceId == null) return;
+		
+		if (activity.IsRoleMandatory && (assignment.ActivityRoleId == null || assignment.ActivityRoleId == '')) return;
+		
+		if (activity.IsLocationMandatory && (assignment.LocationId == null || assignment.LocationId == '')) return;
+		
+		if (assignment.StartDate == null) return;
+		
+		if(assignment.UpdateCostOnResourceChange && context == 'resource')
+			assignment.ForecastCostRate = null;
+
+		if(assignment.UpdateCostOnRoleChange && context == 'role')
+			assignment.ForecastCostRate = null;
+			
+		if(assignment.UpdateCostOnLocationChange && context == 'location')
+			assignment.ForecastCostRate = null;
+			
+		if(assignment.UpdateRevenueOnResourceChange && context == 'resource')
+			assignment.InvoicingCurrencyForecastRevenueRate = null;
+			
+		if(assignment.UpdateRevenueOnRoleChange && context == 'role')
+			assignment.InvoicingCurrencyForecastRevenueRate = null;
+			
+		if(assignment.UpdateRevenueOnLocationChange && context == 'location')
+			assignment.InvoicingCurrencyForecastRevenueRate = null;
+		
+		var oldId;
+		if (assignment.Id.substr(0,1) == '_')
+		{
+			oldId = assignment.Id;
+			assignment.Id = null;
+		}
+		
+		jQuery('#loadingIndicatorOuterContainer').show();
+		
+		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.GetAssignmentDefaults}',
+       		assignment,
+      			function(result, event){
+             		 if (event.status) 
+		             {
+		            	assignmentToEdit = result.TheActivityAssignment;
+		            	
+		            	if (oldId != null) assignmentToEdit.Id = oldId;
+		            	
+		            	if (activity.TheResources[assignmentToEdit.ResourceId] == null) activity.TheResources[assignmentToEdit.ResourceId] = result.TheSelectedResource;
+		            			            	
+		            	var assignmentTrHtml = getAssignmentEditHtml(assignmentToEdit);
+	
+						jQuery('#assignment-edit-details').empty().append(jQuery(assignmentTrHtml));
+		         	} 
+		         	else if (event.type === 'exception') 
+		         	{
+		             	alert(event.message);
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		         	}
+		         	
+		         	jQuery('#loadingIndicatorOuterContainer').hide();
+         }, 
+         {escape: false, timeout: 60000}
+     );
+	}
+	
+	function deleteAssignments(onError)
+	{
+		if (assignmentsToDelete.length > 0)
+		{
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.DeleteActivityAssignments}',
+				assignmentsToDelete,
+				function(result, event){          
+					if (event.status) {
+						assignmentsToDelete = new Array();
+					} 
+					else if (event.type === 'exception') 
+					{
+						if (onError != null)
+							onError(event.message);
+						else
+							alert(event.message);					
+					} 
+					else 
+					{
+						if (onError != null)
+							onError(event.message);
+						else
+							alert(event.message);
+					}
+					hideWorking();						
+				}, 
+				{escape: false, timeout: 60000});
+		}
+		else
+			hideWorking();
+	}
+	
+	function saveAllAssignments(onError)	
+	{
+		var theAssignmentsToSave = new Array();
+		
+		jQuery.each(Object.keys(scopingActivities), function (i, key) {
+			
+			var activity = scopingActivities[key];
+			
+			jQuery.each(Object.keys(activity.TheAssignments), function (j, assignmentId) {
+			
+			var assignment = activity.TheAssignments[assignmentId];
+			
+			if (assignment.HasChanges)
+			{
+				delete assignment.HasChanges
+				
+				var clone = jQuery.extend(true, {}, assignment);
+				
+				if (clone.Id.substr(0,1) == '_')
+				{
+					clone.LocalId = clone.Id;
+					clone.Id = null;
+				}
+				
+				theAssignmentsToSave.push(clone);	
+			}
+			});
+		});
+		
+		if (theAssignmentsToSave.length > 0)
+		{
+			//jQuery('#assignment-error').hide();
+			
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.SaveActivityAssignments}',
+				theAssignmentsToSave,
+				function(result, event){          
+					if (event.status) {
+						
+						jQuery.each(Object.keys(result), function (i, localId) {
+							jQuery.each(Object.keys(scopingActivities), function (i, key) {
+			
+								var activity = scopingActivities[key];
+							
+								jQuery.each(Object.keys(activity.TheAssignments), function (j, assignmentId) {
+									if(assignmentId == localId)
+									{
+										var matchingAssignment = activity.TheAssignments[assignmentId];
+										
+										delete activity.TheAssignments[assignmentId];
+										
+										matchingAssignment.Id = result[localId];
+										
+										activity.TheAssignments[matchingAssignment.Id] = matchingAssignment;
+										
+										result[localId] = matchingAssignment;
+									}
+								});
+							});
+						});
+						
+						//TODO - Should this call getAssignmentsToEdit
+						refreshAssignmentEditGrid();
+						
+						jQuery.publish('kimble.saveAssignmentsComplete', result);
+					} 
+					else if (event.type === 'exception') 
+					{
+						if (onError != null)
+							onError(event.message);
+						else
+							alert(event.message);					
+					} 
+					else 
+					{
+						if (onError != null)
+							onError(event.message);
+						else
+							alert(event.message);
+					}							
+				}, 
+				{escape: false, timeout: 60000});
+		}
+		else
+		{
+			jQuery.publish('kimble.saveAssignmentsComplete', {});
+		}
+	}
+
+	function verifyLookup(obj, typ)
+	{				
+		jQuery('#loadingIndicatorOuterContainer').show();
+		
+		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentsNewEditController.VerifyLookup}',
+       		obj.val(), typ,
+      			function(result, event){
+             		 if (event.status) 
+		             {
+		            	if (result == null)
+		            		kimbleOpenLookup(obj.next(), typ);
+		            	else
+		            		kimblePickValue(obj.attr('id'), result.id, result.text);
+		         	} 
+		         	else if (event.type === 'exception') 
+		         	{
+		             	alert(event.message);
+		         	} 
+		         	else 
+		         	{
+		             	alert(event.message);
+		         	}
+		         	
+		         	jQuery('#loadingIndicatorOuterContainer').hide();
+         }, 
+         {escape: false, timeout: 60000}
+     );
+	}
+	
+	var showRevenue = false;
+
+function calculateActivityRollups(activityId)
+{
+	var activity = scopingActivities[activityId];
+	
+	var expendedUsage = 0;
+	var totalUsage = 0;
+	var baselineUsage = 0;
+	var remainingUsage = 0;
+	var taskUsage = 0;
+	
+	var startDate = null;
+	var endDate = null;
+	
+	var theScopingId;
+	
+	jQuery.each(Object.keys(activity.TheAssignments), function(i, assId) {
+		var assignment = activity.TheAssignments[assId];
+		
+		expendedUsage += assignment.ActualUsage;
+		remainingUsage += assignment.RemainingUsage;
+		baselineUsage += assignment.BaselineUsage;
+		
+		if (theTaskAssignments[assId] != null)
+		{
+			jQuery.each(Object.keys(theTaskAssignments[assId]), function (j, taskId){
+				taskUsage += theTaskAssignments[assId][taskId].RemainingEffort * assignment.UsageToHourConversionFactor / assignment.ForecastToHourConversionFactor;
+			});
+		}
+		
+		if (startDate == null || assignment.StartDate.toDate() < startDate) startDate = assignment.StartDate.toDate();
+		
+		if (endDate == null || assignment.EndDate.toDate() > endDate) endDate = assignment.EndDate.toDate();
+		
+		theScopingId = assignment.TheScopingElementId;
+	});
+	
+	var activityRow = jQuery('[activity-id="' + activityId + '"].activity-row');
+	activityRow.find('.total-expended').text(kimble.formatNumber(expendedUsage, '0.##'));
+	activityRow.find('.total-remaining').text(kimble.formatNumber(remainingUsage, '0.##'));
+	activityRow.find('.total-planned').removeClass('task-tolerance-warning').removeClass('task-tolerance-error').text(kimble.formatNumber(taskUsage, '0.##'));
+	activityRow.find('.total-total').text(kimble.formatNumber(expendedUsage + remainingUsage, '0.##'));
+	activityRow.find('.total-baseline').text(kimble.formatNumber(baselineUsage, '0.##'));
+	
+	var taskTolerance = 1.05;
+	
+	if (taskUsage * taskTolerance < remainingUsage)
+		activityRow.find('.total-planned').addClass('task-tolerance-warning');
+	
+	if (taskUsage > remainingUsage * taskTolerance)
+		activityRow.find('.ttotal-planned').addClass('task-tolerance-error');
+				
+	
+	
+	//if different
+	var oldStart = kimble.parseDate(activityRow.find('.min-start-date').val());
+	var oldEnd = kimble.parseDate(activityRow.find('.max-end-date').val());
+	
+	if (startDate != null) activityRow.find('.min-start-date').val(kimble.formatDate(startDate.toKimbleUTC()));
+	if (endDate != null) activityRow.find('.max-end-date').val(kimble.formatDate(endDate.toKimbleUTC()));
+	
+	if (endDate != null && oldEnd != endDate.toKimbleUTC())
+		jQuery.publish('kimble.latestEndDateChanged', {dte:endDate.toKimbleUTC(), scopingId:theScopingId});
+	
+	if (startDate != null && oldStart != startDate.toKimbleUTC())
+		jQuery.publish('kimble.earliestStartDateChanged', {dte:startDate.toKimbleUTC(), scopingId:theScopingId});
+}
+
+var kimblePopup;
+var startDateChange;
+var endDateChange;
+var baseCurrency;
+var invoicingCurrency;
+var invoicingUnits;
+var usageHeaderLabel;
+
+var defaultIncludeInAggregate = false;
+var assignmentUsagePatternMap = {};
+
+function refreshAssignmentEditGrid()
+{
+	//TODO: What about simple drop down?
+	useResourceEnhancedLookup = true;
+	
+	//clear all
+	jQuery('#assignments-edit-grid>table').empty();
+	
+	//setup column headers - is revenue rate col applicable
+	jQuery.each(Object.keys(scopingActivities), function (i, key) {
+		
+		usageHeaderLabel = usageLabel + ' (' + scopingActivities[key].ForecastingUnits + ')';
+		
+		baseCurrency = scopingActivities[key].BaseCurrency;
+		invoicingCurrency = scopingActivities[key].InvoicingCurrency;
+		invoicingUnits = scopingActivities[key].InvoicingUnits;
+		revenueUnits = scopingActivities[key].RevenueEntryUnits;
+
+		if (scopingActivities[key].HasRevenue)
+			showRevenue = true;
+		
+		jQuery.each(Object.keys(scopingActivities[key].TheResources), function (j, resourceId) {
+			var resource = scopingActivities[key].TheResources[resourceId].Resource;
+			
+			jQuery.each(Object.keys(resource.AggregatePattern), function (k, key) {
+				var usage = resource.AggregatePattern[key];
+				usage.agg = 0;
+				
+				jQuery.each(Object.keys(usage.p), function(l, p){
+					if (classificationStyleMap[p] != undefined && classificationStyleMap[p].IsUtilPct) usage.agg += usage.p[p];
+				});
+			});
+			
+		});
+		
+		jQuery.each(Object.keys(scopingActivities[key].TheAssignments), function (j, assignmentId) {
+			
+			var assignment = scopingActivities[key].TheAssignments[assignmentId];
+			
+			if (assignment.IncludeInAggUtilisation == true) defaultIncludeInAggregate = true;
+			
+			var resource = scopingActivities[key].TheResources[assignment.ResourceId].Resource;
+			
+			var assignmentUsage = new ActivityAssignmentUsagePattern(assignment.HoursPerDay, assignment.StartDate.toDate(), assignment.UsagePattern, assignment.Utilisation, assignment.Utilisation);
+			
+			assignmentUsagePatternMap[assignment.Id] = assignmentUsage;
+			
+			var counter = 0;
+			
+			jQuery.each(assignment.UsagePattern.split(USAGEDAYDELIMITER), function (x, s){
+				if (s == '') return false;
+			
+				var dte = new Date(assignment.StartDate.toDate().getFullYear(), assignment.StartDate.toDate().getMonth(), assignment.StartDate.toDate().getDate() + counter, 0, 0, 0, 0);
+				counter++;
+				
+				if (resource.AggregatePattern[dte.toKimbleUTC()] != null && resource.AggregatePattern[dte.toKimbleUTC()].agg != null && assignment.IncludeInAggUtilisation)
+				{
+					resource.AggregatePattern[dte.toKimbleUTC()].agg -= (assignmentUsage.getForecastUsage(s, false, assignment.HoursPerDay) / assignment.HoursPerDay) * 100;
+				}
+			});
+		});	
+		
+	});
+	
+	//Build table headers
+	var tableHeaderHtml = '<thead><tr class="headerRow">';
+	
+	tableHeaderHtml += '<th></th>';
+	tableHeaderHtml += '<th></th>';
+	tableHeaderHtml += '<th id="usage-header" colspan="5" style="text-align:center">' + usageHeaderLabel + '</th>';
+	tableHeaderHtml += '<th></th>';
+	tableHeaderHtml += '<th></th>';
+	tableHeaderHtml += '<th></th>';
+	
+	if (showCosts) tableHeaderHtml += '<th></th>';
+	
+	if (showRevenue) tableHeaderHtml += '<th></th>';
+	
+	//if (showCosts) tableHeaderHtml += '<th></th>';
+	
+	//if (showRevenue) tableHeaderHtml += '<th></th>';
+	
+	tableHeaderHtml += '</tr>';
+	
+	tableHeaderHtml += '<tr class="headerRow">';
+	
+	tableHeaderHtml += '<th id="action-header" class="headerRow"></th>';
+	
+	tableHeaderHtml += '<th id="resource-header" class="headerRow">' + resourceLabel + '</th>';
+	tableHeaderHtml += '<th id="expended-header" style="text-align:center" class="headerRow">{!$Label.ExpendedEffort}</th>';
+	tableHeaderHtml += '<th id="remaining-header" style="text-align:center" class="headerRow">{!$Label.RemainingEffort}</th>';
+	tableHeaderHtml += '<th id="planned-remaining-header" style="text-align:center" class="headerRow">{!$Label.PlannedResourceAssignmentUsage}</th>';
+	tableHeaderHtml += '<th id="total-effort-header" style="text-align:center" class="headerRow">{!$Label.TotalEffort}</th>';
+	tableHeaderHtml += '<th id="baseline-effort-header" style="text-align:center" class="headerRow">{!$Label.BaselineLabel}</th>';
+	tableHeaderHtml += '<th id="start-date-header" class="headerRow">' + startDateLabel + '</th>';
+	tableHeaderHtml += '<th id="end-date-header" class="headerRow">' + endDateLabel + '</th>';
+	tableHeaderHtml += '<th id="utilisation-percentage-header" class="headerRow">' + utilisationLabel + '</th>';
+	
+	if (showCosts) tableHeaderHtml += '<th id="cost-rate-header" class="headerRow">' + '<span>' + costRateLabel + '<br/>(' + baseCurrency + ' ' + invoicingUnits + ')</span></th>';
+	if (showRevenue) tableHeaderHtml += '<th id="revenue-rate-header" class="headerRow">' + '<span>' + revenueRateLabel + '<br/>(' + invoicingCurrency + ' ' + revenueUnits + ')</span></th>';
+	
+	//if (showCosts) tableHeaderHtml += '<th id="total-cost-header" class="headerRow">' + '<span>' + totalCostLabel + ' (' + baseCurrency + ')</span></th>';
+	//if (showRevenue) tableHeaderHtml += '<th id="total-cost-header" class="headerRow">' + '<span>' + totalRevenueLabel + ' (' + baseCurrency + ')</span></th>';
+	
+	tableHeaderHtml += '</tr></thead><tbody></tbody>';
+	
+	jQuery('#assignments-edit-grid>table').append(jQuery(tableHeaderHtml));
+	
+	if (showRevenue)
+	{
+		jQuery('#revenue-rate-header').show();
+		jQuery('#total-revenue-header').show();
+	}
+	
+	var numScopingActivities = (scopingActivities != undefined ? Object.keys(scopingActivities).length : 0);
+	
+	jQuery.each(Object.keys(scopingActivities), function (i, key) {
+		//draw scoping activity line
+		var activity = scopingActivities[key];
+		
+		var scopingTrHtml = '<tr activity-id="' + key + '" class="activity-row summary-cell summary-row dataRow">';
+		
+		scopingTrHtml += '<td colspan="2"><span class="fa fa-plus-square" style="color: #888; font-size: 15px;"></span><a href="javascript:void(0);" class="add-link-assignment undecorated-link" style="padding-left: 4px;">{!$Label.AddAssigmentLabel}' + (numScopingActivities > 1 ? ' - ' + activity.Name : '') + '</a></td>';
+		
+		scopingTrHtml += '<td class="total-expended"></td>';
+		scopingTrHtml += '<td class="total-remaining"></td>';
+		scopingTrHtml += '<td class="total-planned"></td>';
+		scopingTrHtml += '<td class="total-total"></td>';
+		scopingTrHtml += '<td class="total-baseline"></td>';
+		
+		scopingTrHtml += '<td activity-id="' + key + '" id="minStartDateCell"><input id="minStartDate" type="text" class="min-start-date kimbleDatePicker input-date" style="width:65px" /></td>';
+		scopingTrHtml += '<td activity-id="' + key + '" id="maxEndDateCell"><input id="maxEndDate" type="text" class="max-end-date kimbleDatePicker input-date" style="width:65px" /></td>';
+		
+		scopingTrHtml += '<td></td>';
+		
+		if (showCosts) scopingTrHtml += '<td></td>';
+		
+		if (showRevenue) scopingTrHtml += '<td></td>';
+		
+		//if (showCosts) scopingTrHtml += '<td>TOT COST</td>';
+		
+		//if (showRevenue) scopingTrHtml += '<td>TOT REV</td>';
+		
+		scopingTrHtml += '</tr>';
+		
+		jQuery('#assignments-edit-grid>table>tbody').append(jQuery(scopingTrHtml));
+		
+		jQuery.each(Object.keys(activity.TheAssignments), function (j, assignmentId) {
+			
+			var assignment = activity.TheAssignments[assignmentId];
+			
+			if (assignment.EarliestTimeEntryDate != null) 
+			{
+				jQuery('[activity-id="' + assignment.TheScopingActivityId + '"] .min-start-date').prop('readonly', true);
+				jQuery('[activity-id="' + assignment.TheScopingActivityId + '"] .max-end-date').prop('readonly', true);
+			}
+			
+			var assignmentTrHtml = getAssignmentHtml(assignment);
+			
+			jQuery('#assignments-edit-grid>table>tbody').append(jQuery(assignmentTrHtml));
+			
+		});
+		
+		calculateActivityRollups(activity.Id);
+	});
+	
+	calculateAssignmentWarnings();
+	
+	//Behaviour
+	jQuery(document).off('change', '.min-start-date');
+	jQuery(document).on('change', '.min-start-date', function() {
+		//push change down to all assignments
+		var activityId = jQuery(this).closest('tr').attr('activity-id');
+		var activity = scopingActivities[activityId];
+		startDateChange = true;
+		
+		var newDate = kimble.parseDate(jQuery(this).val());
+		
+		jQuery.each(Object.keys(activity.TheAssignments), function(i, key) {
+			
+			var assignment = activity.TheAssignments[key];
+			
+			assignment.StartDate = newDate;
+			
+			recalculateUsage(assignment, true);
+		});
+		
+		startDateChange = false;
+	});
+	
+	jQuery(document).off('click', '.add-link-assignment');
+	jQuery(document).on('click', '.add-link-assignment', function () {
+		
+		var activityId = jQuery(this).closest('tr').attr('activity-id');
+		addAssignment(activityId);
+	});
+	
+	jQuery(document).off('click', '.resource-cell');
+	jQuery(document).on('click', '.resource-cell', function () {
+		assignmentToEdit = getAssignmentForEvent(this);
+		activityToEdit = scopingActivities[jQuery(this).closest('tr').attr('activity-id')];
+		
+		showAssignmentEditPopup(assignmentToEdit);
+	});
+	
+	jQuery(document).off('change', '.resource-input');
+	jQuery(document).on('change', '.resource-input', function () {
+		
+		var text = jQuery(this).val();
+		
+		if (text == '' || text == null) return;
+		
+		//verify lookup
+		verifyLookup(jQuery(this), resourceKeyPrefix);
+	});
+	
+	jQuery(document).off('change', '.resource-select');
+	jQuery(document).on('change', '.resource-select', function () {
+		
+		var resourceVal = jQuery(this).val();
+		if (resourceVal != '')
+			assignmentToEdit.ResourceId = resourceVal;
+		else
+			assignmentToEdit.ResourceId = null;
+		
+		verifyResource(activityToEdit, assignmentToEdit, 'resource');
+	});
+	
+	jQuery(document).off('change', '.role-select');
+	jQuery(document).on('change', '.role-select', function () {
+		var roleVal = jQuery(this).val();
+		if (roleVal != '')
+			assignmentToEdit.ActivityRoleId = roleVal;
+		else
+			assignmentToEdit.ActivityRoleId = null;
+		
+		if (activityToEdit.IsRoleMandatory)
+			verifyResource(activityToEdit, assignmentToEdit, 'role');
+	});
+	
+	jQuery(document).off('change', '.location-select');
+	jQuery(document).on('change', '.location-select', function () {
+		var locVal = jQuery(this).val();
+		if (locVal != '')
+			assignmentToEdit.LocationId = locVal;
+		
+		if (activityToEdit.IsLocationMandatory)
+			verifyResource(activityToEdit, assignmentToEdit, 'location');
+	});
+	
+	jQuery(document).off('change', '.usage-input');
+	jQuery(document).on('change', '.usage-input', function () {
+		var assignment = getAssignmentForEvent(this);
+		
+		assignment.RemainingUsage = kimble.parseNumber(jQuery(this).val());
+		
+		recalculateUsage(assignment, true);
+	});
+	
+	jQuery(document).off('change', '.start-date-input');
+	jQuery(document).on('change', '.start-date-input', function () {
+		var assignment = getAssignmentForEvent(this);
+		
+		assignment.StartDate = kimble.parseDate(jQuery(this).val());
+		
+		recalculateUsage(assignment, true);
+	});
+	
+	jQuery(document).off('change', '.end-date-input');
+	jQuery(document).on('change', '.end-date-input', function () {
+		var assignment = getAssignmentForEvent(this);
+		
+		assignment.EndDate = kimble.parseDate(jQuery(this).val());
+		
+		recalculateUsage(assignment, true);
+	});
+	
+	jQuery(document).off('change', '.utilisation-input');
+	jQuery(document).on('change', '.utilisation-input', function () {
+		var assignment = getAssignmentForEvent(this);
+		
+		assignment.Utilisation = kimble.parseNumber(jQuery(this).val());
+		
+		recalculateUsage(assignment, true);
+	});
+	
+	jQuery(document).off('change', '.assignment-popup-content input, .assignment-popup-content select');
+	jQuery(document).on('change', '.assignment-popup-content input, .assignment-popup-content select', function() {
+		
+		var popup = jQuery('.assignment-popup-content');
+		
+		var assignmentId = popup.attr('assignment-id');
+		
+		var assignment = findAssignment(assignmentId);
+		
+		var oldAssignment =  popup.data('oldAssignment');
+		
+		if (oldAssignment == null) oldAssignment = jQuery.extend(true, {}, assignment);
+		
+		assignment.Initials = popup.find('.popup-initials').val();
+		assignment.UsageBehaviourRuleId = popup.find('.popup-usage-behaviour-rule').val();
+		assignment.StartDate = kimble.parseDate(popup.find('.popup-start-date').val());
+		assignment.EndDate = kimble.parseDate(popup.find('.popup-end-date').val());
+		assignment.Utilisation = kimble.parseNumber(popup.find('.popup-utilisation').val());
+		assignment.RemainingUsage = kimble.parseNumber(popup.find('.popup-usage').val());
+		
+		recalculateUsage(assignment, true);
+		
+		//redraw popup
+		jQuery('.assignment-popup-content').replaceWith(jQuery(getAssignmentPopupHtml(assignment.Id, null, null, oldAssignment)));
+		jQuery('.assignment-popup-content').data('oldAssignment', oldAssignment);
+		
+		jQuery('#' + assignment.Id).replaceWith(jQuery(getAssignmentHtml(assignment)));
+		
+	});
+	
+	jQuery(document).off('change', '.edit-usage-behaviour-rule, .edit-start-date, .edit-usage, .edit-end-date, .edit-utilisation, .edit-initials');
+	jQuery(document).on('change', '.edit-usage-behaviour-rule, .edit-start-date, .edit-usage, .edit-end-date, .edit-utilisation, .edit-initials', function() {
+		
+		assignmentToEdit.UsageBehaviourRuleId = jQuery('.edit-usage-behaviour-rule').val();
+		assignmentToEdit.StartDate = kimble.parseDate(jQuery('.edit-start-date').val());
+		assignmentToEdit.EndDate = kimble.parseDate(jQuery('.edit-end-date').val());
+		assignmentToEdit.Utilisation = kimble.parseNumber(jQuery('.edit-utilisation').val());
+		assignmentToEdit.RemainingUsage = kimble.parseNumber(jQuery('.edit-usage').val());
+		assignmentToEdit.Initials = jQuery('.edit-initials').val();
+		
+		recalculateUsage(assignmentToEdit, false);
+		
+		//redraw
+		jQuery('.assignment-edit-content').empty().append(jQuery(getAssignmentEditHtml(assignmentToEdit)));
+	});
+	
+	jQuery(document).off('click', '#AssignmentOkButton');
+	jQuery(document).on('click', '#AssignmentOkButton', function() {
+		
+		if (assignmentToEdit.RemainingUsage == null) {alert(kimble.labels['RequiredValue'].format(usageLabel)); return;}
+		if (assignmentToEdit.StartDate == null) {alert(kimble.labels['RequiredValue'].format(startDateLabel)); return;}
+		if (assignmentToEdit.EndDate == null) {alert(kimble.labels['RequiredValue'].format(endDateLabel)); return;}
+		if (assignmentToEdit.Utilisation == null) {alert(kimble.labels['RequiredValue'].format(utilisationLabel)); return;}
+		
+		recalculateUsage(assignmentToEdit, true);
+		assignmentToEdit = null;
+		actiivtyToEdit = null;
+		hideModalBoxy();
+		
+	});
+	
+	jQuery(document).off('change', '.cost-rate-input');
+	jQuery(document).on('change', '.cost-rate-input', function () {
+				
+		var costRate = kimble.parseNumber(jQuery(this).val(),'#,##0.00');
+		assignmentToEdit.ForecastCostRate = costRate / assignmentToEdit.ForecastToInvoiceConversionFactor;
+		assignmentToEdit.CostRateSummary = '[{"D":"' + assignmentToEdit.StartDate + '","R":' + (assignmentToEdit.ForecastCostRate) + '}]';
+	    
+	    jQuery(this).closest('td').find('.future-cost-change').remove();
+	});
+	
+	jQuery(document).off('change', '.revenue-rate-input');
+	jQuery(document).on('change', '.revenue-rate-input', function () {
+		var invRevRate = kimble.parseNumber(jQuery(this).val(),'#,##0.00'); 
+		
+		assignmentToEdit.InvoicingCurrencyForecastRevenueRate = invRevRate / assignmentToEdit.ForecastToRevenueConversionFactor;
+				
+		assignmentToEdit.RevenueRateSummary = '[{"D":"' + assignmentToEdit.StartDate + '","R":' + (assignmentToEdit.InvoicingCurrencyForecastRevenueRate) + '}]';
+	});
+	
+	jQuery(document).off('focus', '.kimbleDatePicker');
+	jQuery(document).on('focus', '.kimbleDatePicker', function () {
+		
+		if (jQuery(this).prop('readonly')) return;
+		
+		jQuery(this).datepicker({
+			dateFormat: kimble.regional.dateFormat,firstDay: kimble.firstDayIndex,
+			showOtherMonths: true,
+			selectOtherMonths: true,
+			beforeShowDay: resourceAvailabilityOverlay
+		});		
+	});
+	
+	jQuery(document).off('click', '.delete-assignment');
+	jQuery(document).on('click', '.delete-assignment', function () {
+		var assignment = getAssignmentForEvent(this);
+		
+		delete scopingActivities[assignment.TheScopingActivityId].TheAssignments[assignment.Id];
+		
+		jQuery('#' + assignment.Id).remove();
+		
+		if (assignment.Id.substr(0,1) != '_')
+			assignmentsToDelete.push(assignment.Id);
+		
+		jQuery.publish('kimble.assignmentDeleted', assignment);
+	});
+	
+	jQuery(document).off('click', '.balance-assignment');
+	jQuery(document).on('click', '.balance-assignment', function () {
+		
+		var popup = jQuery('.assignment-popup-content');
+		
+		var assignment = findAssignment(popup.attr('assignment-id'));
+		
+		var oldAssignment = jQuery.extend(true, {}, assignment);
+		
+		balanceAssignment(assignment, jQuery(this).attr('start-date'),jQuery(this).attr('end-date'));
+		
+		//redraw popup
+		jQuery('.assignment-popup-content').replaceWith(jQuery(getAssignmentPopupHtml(assignment.Id, jQuery(this).attr('start-date').toDate(), jQuery(this).attr('end-date').toDate(),oldAssignment)));
+		
+		//Flash what has changed
+		if (oldAssignment.StartDate != assignment.StartDate)
+			jQuery('.popup-start-date').effect('highlight',2000);
+		
+		if (oldAssignment.EndDate != assignment.EndDate)
+			jQuery('.popup-end-date').effect('highlight',2000);
+		
+		if (oldAssignment.RemainingUsage != assignment.RemainingUsage)
+			jQuery('.popup-usage').effect('highlight',2000);
+		
+	});
+	
+	jQuery.unsubscribe('kimble.planChanged');
+	jQuery.subscribe('kimble.planChanged', function(event, data) {
+		//traceAction('PlanChanged Caught');
+		var refreshWarnings = false;
+		theTaskAssignments = {};
+		
+		if (data.taskAssignments != null)
+		{
+			data.taskAssignments.forEach(function(ta){
+				if (theTaskAssignments[ta.ActivityAssignmentId] == null)
+					theTaskAssignments[ta.ActivityAssignmentId] = {};
+				
+				theTaskAssignments[ta.ActivityAssignmentId][ta.TaskId] = ta;
+			});
+		}
+		
+		Object.keys(theTaskAssignments).forEach(function(assId){
+			refreshWarnings = true;
+			var assignment = findAssignment(assId);
+			assignment.CanDelete = false;
+			
+			var entrySpecification = findUsageBehaviourRule(scopingActivities[assignment.TheScopingActivityId], assignment.UsageBehaviourRuleId).EntrySpecification;
+			
+			if (entrySpecification == "TaskUsage") {
+				//traceAction('Recalculating Assignment for TaskUsage');
+				recalculateUsage(assignment, true, true);
+			}
+		});
+		
+		if(refreshWarnings)
+		{
+			calculateAssignmentWarnings();
+		}
+	});
+	
+	jQuery.publish('kimble.assignmentGridRefreshComplete');
+}
+
+function showAssignmentEditPopup(assignment)
+{
+	jQuery('#assignment-edit-details').empty();
+	
+	initialiseModalBoxy('#EditAssignmentContainer','Edit Assignment');
+	
+	jQuery('#assignment-edit-details').append(jQuery(getAssignmentEditHtml(assignment)));
+	
+	showModalBoxy();
+}
+
+function addAssignment(scopingActivityId)
+{
+	activityToEdit = scopingActivities[scopingActivityId];
+	
+	assignmentToEdit = {Id:getUniqueId(), ActualUsage:0, RemainingUsage:0, TheScopingActivityId:scopingActivityId, CanChangeResource:true, HasChanges:true, StartDate:new Date().toKimbleUTC(), UsageBehaviourRuleId: activityToEdit.TheUsageBehaviourRules[0].Id};
+	
+	showAssignmentEditPopup(assignmentToEdit);
+}
+
+function balanceAssignment(assignment, newStartDate, newEndDate)
+{
+	var assignmentUsage = new ActivityAssignmentUsagePattern(assignment.HoursPerDay, assignment.StartDate.toDate(), assignment.UsagePattern, assignment.Utilisation, assignment.Utilisation);
+	
+	var earliestFirmDate = assignmentUsage.earliestFirmDate;
+	var latestFirmDate = assignmentUsage.latestFirmDate
+	
+	if (earliestFirmDate != undefined && newStartDate.toDate() > earliestFirmDate) newStartDate = earliestFirmDate.toKimbleUTC();
+	
+	if (latestFirmDate != undefined && newEndDate.toDate() < latestFirmDate) newEndDate = latestFirmDate.toKimbleUTC();
+	
+	if (assignment.LatestStartDate != null && newStartDate.toDate() > assignment.LatestStartDate.toDate()) newStartDate = assignment.LatestStartDate;
+	
+	if (assignment.EarliestEndDate != null && newEndDate.toDate() < assignment.EarliestEndDate.toDate()) newEndDate = assignment.EarliestEndDate;
+	
+	assignment.StartDate = newStartDate;
+	
+	assignment.EndDate = newEndDate;
+	
+	recalculateUsage(assignment, true);
+}
+
+function findAssignment(id)
+{
+	var assignmentRow = jQuery('#assignments-edit-grid #' + id);
+	var assignmentId = assignmentRow.attr('id');
+	var activityId = assignmentRow.closest('tr').attr('activity-id');
+	var activity = scopingActivities[activityId];
+	
+	return activity.TheAssignments[assignmentId];
+}
+
+function getAssignmentForEvent(obj)
+{
+	var assignmentRow = jQuery(obj).closest('tr');
+	var assignmentId = assignmentRow.attr('id');
+	var activityId = assignmentRow.closest('tr').attr('activity-id');
+	var activity = scopingActivities[activityId];
+	
+	return activity.TheAssignments[assignmentId];
+}
+
+function parseCostSummaryJson (j)
+{
+	return kimble.parseJSON(j.replace(/"CostRate"/g, '"R"').replace(/"FromDate"/g, '"D"'));
+}
+
+function getAssignmentEditHtml(assignment)
+{
+	var activity =  scopingActivities[assignment.TheScopingActivityId];
+	
+	var popupHtml = '<table activity-id="' + activity.Id + '" assignment-id="' + assignment.Id + '" cellpadding="3" cellspacing="3" border="0" class="assignment-edit-content">';
+	
+	popupHtml += '<tr><td>' + resourceLabel + '</td><td>';
+	
+	if (assignment.CanChangeResource)
+	{
+		if (useResourceEnhancedLookup)
+		{
+			var resourceName = '';
+			
+			if (assignment.ResourceId != null) resourceName = activity.TheResources[assignment.ResourceId].Resource.Name;
+			
+			var inputId = 'SelectResourceId' + assignment.Id;
+			
+			popupHtml += '<input type="text" id="' + inputId + '" class="resource-input " value="' + resourceName + '">';
+			
+			popupHtml += '<a href="javascript:void(0);" class="kimbleSearch " onclick="setLastMousePosition(event);kimbleOpenLookup(this,\'' + resourceKeyPrefix + '\');" ><img src="/s.gif" class="lookupIcon" style="margin-bottom: -5px;" onblur="this.className = \'lookupIcon\';" onfocus="this.className = \'lookupIconOn\';" onmouseout="this.className = \'lookupIcon\';this.className = \'lookupIcon\';" onmouseover="this.className = \'lookupIconOn\';this.className = \'lookupIconOn\';" /></a>';
+		}
+		else //dropdown
+		{
+			popupHtml += '<select class="resource-select">';
+			
+			jQuery.each(activity.TheResources, function(i, resource) {			
+				var selected = '';
+				if (resource.Id == assignment.ResourceId) selected = ' selected';
+				popupHtml += '<option value="' + resource.Id + '">' + resource.Name + '</option>';		
+			});
+			
+			popupHtml += '</select>';
+		}
+	}
+	else
+	{
+		popupHtml += '<span>' + activity.TheResources[assignment.ResourceId].Resource.Name + '</span>';
+	}
+	
+	popupHtml += '</td></tr>';
+	
+	if (assignment.Initials == null) assignment.Initials = '';
+	
+	popupHtml += '<tr><td>' + resourceInitialsLabel + '</td><td><input class="edit-initials" type="text" value="' + assignment.Initials + '"/></td></tr>';
+	
+	popupHtml += '<tr><td><apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__ActivityRole__c.Label}"/></td><td>';
+	
+	popupHtml += '<select class="role-select">';
+		
+	jQuery.each(activity.TheActivityRoles, function(i, role) {			
+		var selected = '';
+		if (role.id == assignment.ActivityRoleId) selected = ' selected';
+		
+		popupHtml += '<option' + selected + ' value="' + role.id + '">' + role.text + '</option>';		
+	});
+		
+	popupHtml += '</select></td></tr>';
+	
+	if (locationOptions != null && locationOptions.length > 0)
+	{
+		popupHtml += '<tr><td><apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Fields.KimbleOne__Location__c.Label}"/></td>';
+	
+		popupHtml += '<td class="location-cell">';
+			
+		if(useLocationEnhancedLookup)
+		{
+			var locationName = '';
+		
+			if (assignment.LocationId != null) locationName = findLocation(assignment.LocationId);
+		
+			var inputId = 'SelectLocationId' + assignment.Id;
+		
+			popupHtml += '<input type="text" id="' + inputId + '" class="location-input readonly" value="' + locationName + '">';
+			popupHtml += '<a href="javascript:void(0);" class="kimbleSearch " onclick="setLastMousePosition(event);kimbleOpenLookup(this,\'' + locationKeyPrefix + '\');" ><img src="/s.gif" class="lookupIcon" onblur="this.className = \'lookupIcon\';" onfocus="this.className = \'lookupIconOn\';" onmouseout="this.className = \'lookupIcon\';this.className = \'lookupIcon\';" onmouseover="this.className = \'lookupIconOn\';this.className = \'lookupIconOn\';" /></a>';
+		}
+		else
+		{
+			popupHtml += '<select class="location-select">';
+			jQuery.each(locationOptions, function(i, location) {			
+				var selected = '';
+				if (location.id == assignment.LocationId) selected = ' selected';
+				
+				popupHtml += '<option' + selected + ' value="' + location.id + '">' + location.text + '</option>';		
+			});	
+		}
+		
+		popupHtml += '</td></tr>';
+	}
+	
+	//Cost RATE
+	if (showCosts)
+	{
+		popupHtml += '<tr><td>' + costRateLabel + ' (' + activity.BaseCurrency + '/' + activity.InvoicingUnits + ')</td><td>';
+		
+		var costRateReadOnly = '';
+		
+		if (!activity.CanEditCostRate) costRateReadOnly = ' readonly ';
+		
+		var costRateValue = '';
+		var costRateInfo = '';
+		
+		if (assignment.CostRateSummary != null)
+		{
+			var costRateSummary = parseCostSummaryJson(assignment.CostRateSummary);
+			if (costRateSummary.length > 0)
+			{
+				var costRate = costRateSummary[0].R * assignment.ForecastToInvoiceConversionFactor;
+				costRateValue = jQuery.formatNumber(costRate, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false});
+				
+				if (costRateSummary.length > 1)
+				{
+					costRateInfo = '<span class="fa fa-info-circle future-cost-change"/>';
+				}
+			}
+		}
+		
+		popupHtml += '<input ' + costRateReadOnly + '  type="text" class="cost-rate-input" value="' + costRateValue + '"></input>' + costRateInfo;
+		popupHtml += '</td></tr>';
+	}
+	
+	//Revenue RATE
+	if (activity.HasRevenue)
+	{
+		popupHtml += '<tr><td>' + revenueRateLabel + ' (' + activity.InvoicingCurrency + '/' + activity.RevenueEntryUnits + ')</td><td>';
+		
+		var revRateValue = '';
+					
+		if (assignment.InvoicingCurrencyForecastRevenueRate != null)
+		{
+			revRateValue = jQuery.formatNumber(assignment.InvoicingCurrencyForecastRevenueRate * assignment.ForecastToRevenueConversionFactor, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false});
+		}
+			
+		popupHtml += '<input type="text" class="revenue-rate-input" value="' + revRateValue + '"></input>';
+		
+		popupHtml += '</td></tr>';
+	}
+		
+	popupHtml += '<tr><td>' + usageBehaviourRuleLabel + '</td>';
+	
+	popupHtml += '<td class="usage-behaviour-cell"><select  class="edit-usage-behaviour-rule">';
+	
+	var usageBehaviourRule;
+	
+	jQuery.each(activity.TheUsageBehaviourRules, function(i, rule) {			
+		var selected = '';
+		if (rule.Id == assignment.UsageBehaviourRuleId)
+		{
+			usageBehaviourRule = rule;
+			selected = ' selected';
+		}
+		
+		popupHtml += '<option' + selected + ' value="' + rule.Id + '">' + rule.Name + '</option>';		
+	});
+		
+	popupHtml += '</select></td>';
+	
+	//++USAGE
+	var usageReadOnly = '';
+	
+	if ((assignment.UnforecastUsage != null && assignment.UnforecastUsage != 0) || usageBehaviourRule.EntrySpecification == 'DerivedUsage'|| usageBehaviourRule.EntrySpecification == 'TaskUsage' || (usageBehaviourRule.FixedUsage && assignment.Id.substr(0,1) != '_')) usageReadOnly = ' readonly ';
+	var usageVal = '';
+	if (assignment.RemainingUsage != null) usageVal = kimble.formatNumber(assignment.RemainingUsage, '0.##');
+	
+	popupHtml += '<tr><td>' + usageLabel + ' (' + activity.ForecastingUnits + ')</td><td><input class="edit-usage"' + usageReadOnly + 'type="text" value="' + usageVal + '"></input></td></tr>';
+	
+	if (assignment.UnforecastUsage != null && assignment.UnforecastUsage != 0)
+		popupHtml += '<tr><td>' + unforecastUsageLabel + ' (' + activity.ForecastingUnits + ')</td><td><input class="edit-unforecast-usage" readonly type="text" value="' + kimble.formatNumber(assignment.UnforecastUsage, '#.##') + '"></input></td></tr>';
+	
+	//++START DATE
+	popupHtml += '<tr><td>' + startDateLabel + '</td><td><input ' + (usageBehaviourRule.EntrySpecification == 'TaskUsage'?'disabled':'')+ ' start-date="true" class="edit-start-date kimbleDatePicker" activity-id="' + assignment.TheScopingActivityId + '" assignment-id="' + assignment.Id + '" type="text" class="kimbleDatePicker" value="' + kimble.formatDate(assignment.StartDate) + '"></input></td></tr>';
+	
+	//++END DATE
+	if (usageBehaviourRule.EntrySpecification == 'DerivedEndDate' || usageBehaviourRule.EntrySpecification == 'TaskUsage') 
+		popupHtml += '<tr><td>' + endDateLabel + '</td><td><input end-date="true" class="edit-end-date" activity-id="' + assignment.TheScopingActivityId + '" assignment-id="' + assignment.Id + '"  readonly type="text" value="' + kimble.formatDate(assignment.EndDate) + '"></input></td></tr>';
+	else
+		popupHtml += '<tr><td>' + endDateLabel + '</td><td><input end-date="true" class="edit-end-date kimbleDatePicker" activity-id="' + assignment.TheScopingActivityId + '" assignment-id="' + assignment.Id + '"  type="text" class="kimbleDatePicker" value="' + kimble.formatDate(assignment.EndDate) + '"></input></td></tr>';
+	
+	//++UTILISATION
+	var utilisationReadOnly = '';
+	var utilisationVal = '';
+	if (assignment.Utilisation != null) utilisationVal = kimble.formatNumber(assignment.Utilisation, '0');
+	if (usageBehaviourRule.EntrySpecification == 'DerivedUtilisation'|| usageBehaviourRule.EntrySpecification == 'TaskUsage') utilisationReadOnly = ' readonly ';
+	popupHtml += '<tr><td>' + utilisationLabel + '</td><td><input class="edit-utilisation" ' + utilisationReadOnly + '  type="text" class="utilisation-input" value="' + utilisationVal + '"></input></td></tr>';
+	
+	popupHtml += '</table>';
+	
+	return popupHtml;
+}
+
+function getAssignmentPopupHtml(assignmentId, earliestStartDate, latestEndDate, oldAssignment)
+{
+	var assignment = findAssignment(assignmentId);
+	
+	//if (oldAssignment == null) oldAssignment = assignment;
+	
+	var activity =  scopingActivities[assignment.TheScopingActivityId];
+	
+	var popupHtml = '<table assignment-id="' + assignmentId + '" cellpadding="3" cellspacing="3" border="0" class="assignment-popup-content">';
+	
+	popupHtml += '<tr><td>' + resourceLabel + '</td><td>' + scopingActivities[assignment.TheScopingActivityId].TheResources[assignment.ResourceId].Resource.Name + '</td></tr>';
+	
+	popupHtml += '<tr><td>' + resourceInitialsLabel + '</td><td><input class="popup-initials" type="text" value="' + assignment.Initials + '"/></td></tr>';
+	
+	popupHtml += '<tr><td>' + usageBehaviourRuleLabel + '</td>';
+	
+	popupHtml += '<td class="usage-behaviour-cell"><select  class="popup-usage-behaviour-rule">';
+	
+	var usageBehaviourRule;
+	
+	jQuery.each(activity.TheUsageBehaviourRules, function(i, rule) {			
+		var selected = '';
+		if (rule.Id == assignment.UsageBehaviourRuleId)
+		{
+			usageBehaviourRule = rule;
+			selected = ' selected';
+		}
+		
+		popupHtml += '<option' + selected + ' value="' + rule.Id + '">' + rule.Name + '</option>';		
+	});
+		
+	popupHtml += '</select></td>';
+	
+	//++USAGE
+	var usageReadOnly = '';
+	
+	if ((assignment.UnforecastUsage != null && assignment.UnforecastUsage != 0) || usageBehaviourRule.EntrySpecification == 'DerivedUsage'|| usageBehaviourRule.EntrySpecification == 'TaskUsage' || (usageBehaviourRule.FixedUsage && assignment.Id.substr(0,1) != '_')) usageReadOnly = ' readonly ';
+	var usageVal = '';
+	if (assignment.RemainingUsage != null) usageVal = kimble.formatNumber(assignment.RemainingUsage, '#.##');
+	
+	popupHtml += '<tr><td>' + usageLabel + ' (' + activity.ForecastingUnits + ')</td><td><input class="popup-usage"' + usageReadOnly + 'type="text" value="' + usageVal + '"></input>';
+	
+	if (assignment.UnforecastUsage != null && assignment.UnforecastUsage != 0)
+		popupHtml += '<tr><td>' + unforecastUsageLabel + ' (' + activity.ForecastingUnits + ')</td><td><input class="edit-unforecast-usage" readonly type="text" value="' + kimble.formatNumber(assignment.UnforecastUsage, '#.##') + '"></input></td></tr>';
+	
+	if(oldAssignment != null) popupHtml += '<span class="previous-value">[' + kimble.formatNumber(oldAssignment.RemainingUsage, '#.##') + ']</span>';
+	
+	popupHtml += '</td></tr>';
+	
+	//++START DATE
+	popupHtml += '<tr><td>' + startDateLabel + '</td><td><input ' + (usageBehaviourRule.EntrySpecification == 'TaskUsage'?'disabled':'') + ' start-date="true" class="popup-start-date kimbleDatePicker" activity-id="' + assignment.TheScopingActivityId + '" assignment-id="' + assignment.Id + '" type="text" class="kimbleDatePicker" value="' + kimble.formatDate(assignment.StartDate) + '"></input>';
+	
+	if (oldAssignment != null)
+		popupHtml += '<span class="previous-value">[' + kimble.formatDate(oldAssignment.StartDate) + ']</span>';
+	
+	popupHtml += '</td></tr>';
+	
+	//++END DATE
+	if (usageBehaviourRule.EntrySpecification == 'DerivedEndDate'|| usageBehaviourRule.EntrySpecification == 'TaskUsage' ) 
+		popupHtml += '<tr><td>' + endDateLabel + '</td><td><input end-date="true" class="popup-end-date" activity-id="' + assignment.TheScopingActivityId + '" assignment-id="' + assignment.Id + '"  readonly type="text" value="' + kimble.formatDate(assignment.EndDate) + '"></input>';
+	else
+		popupHtml += '<tr><td>' + endDateLabel + '</td><td><input end-date="true" class="popup-end-date kimbleDatePicker" activity-id="' + assignment.TheScopingActivityId + '" assignment-id="' + assignment.Id + '"  type="text" class="kimbleDatePicker" value="' + kimble.formatDate(assignment.EndDate) + '"></input>';
+	
+	if (oldAssignment != null)
+		popupHtml += '<span class="previous-value">[' + kimble.formatDate(oldAssignment.EndDate) + ']</span>';
+	
+	popupHtml += '</td></tr>';
+	
+	//++UTILISATION
+	var utilisationReadOnly = '';
+	var utilisationVal = '';
+	if (assignment.Utilisation != null) utilisationVal = kimble.formatNumber(assignment.Utilisation, '#');
+	if (usageBehaviourRule.EntrySpecification == 'DerivedUtilisation' || usageBehaviourRule.EntrySpecification == 'TaskUsage') utilisationReadOnly = ' readonly ';
+	
+	popupHtml += '<tr><td>' + utilisationLabel + '</td><td><input class="popup-utilisation" ' + utilisationReadOnly + '  type="text" class="utilisation-input" value="' + utilisationVal + '"></input>';
+	
+	if (oldAssignment != null)
+		popupHtml += '<span class="previous-value">[' + kimble.formatNumber(oldAssignment.Utilisation, '#') + ']</span>';
+	
+	popupHtml += '</td></tr>';
+		
+	if (earliestStartDate != null && latestEndDate != null)
+		popupHtml += '<tr><td colspan="2"><input start-date="' + earliestStartDate.toKimbleUTC() + '" end-date="' + latestEndDate.toKimbleUTC() + '" class="balance-assignment" type="button" value="Balance"/></td></tr>';
+		
+	popupHtml += '</table>';
+	
+	return popupHtml;
+}
+
+function getAssignmentHtml(assignment)
+{
+	var tr = '<tr activity-id="' + assignment.TheScopingActivityId + '" id="' + assignment.Id + '">';
+			
+	tr += '<td>';
+	
+	if (assignment.CanDelete) tr += '<span class="delete-assignment fa fa-trash-o" style="color: #888; font-size: 15px;"></span>';
+	
+	tr += '</td>';
+	
+	var activity = scopingActivities[assignment.TheScopingActivityId];
+	
+	//++RESOURCE
+	tr += '<td class="resource-cell undecorated-link"><div>';
+	tr += activity.TheResources[assignment.ResourceId].Resource.Name;
+	tr += '</div></td>';
+		
+	var usageBehaviourRule;
+	
+	//++USAGE BEHAVIOUR RULE
+		
+	jQuery.each(activity.TheUsageBehaviourRules, function(i, rule) {			
+		if (rule.Id == assignment.UsageBehaviourRuleId)
+		{
+			usageBehaviourRule = rule;
+		}
+	});
+		
+	if (assignment.ActualUsage == null) assignment.ActualUsage = 0;
+	
+	tr += '<td class="actual-usage-cell">' + kimble.formatNumber(assignment.ActualUsage, '0.##') + '</td>';
+	
+	var usageReadOnly = '';
+	
+	if (usageBehaviourRule != undefined && (usageBehaviourRule.EntrySpecification == 'DerivedUsage' || usageBehaviourRule.EntrySpecification == 'TaskUsage' || (usageBehaviourRule.FixedUsage && assignment.Id.substr(0,1) != '_'))) usageReadOnly = ' readonly ';
+	var usageVal = '';
+	if (assignment.RemainingUsage != null) usageVal = kimble.formatNumber(assignment.RemainingUsage, '#.##');
+	
+	tr += '<td class="usage-cell"><input ' + usageReadOnly + 'type="text" class="usage-input" value="' + usageVal + '"></input></td>';
+	
+	var taskUsage = 0;
+	
+	if (theTaskAssignments != null && theTaskAssignments[assignment.Id] != null)
+	{
+		jQuery.each(Object.keys(theTaskAssignments[assignment.Id]), function (i, key) {
+			taskUsage += theTaskAssignments[assignment.Id][key].RemainingEffort * assignment.UsageToHourConversionFactor / assignment.ForecastToHourConversionFactor;
+		});
+	}
+	
+	var taskTolerance = 1.05;
+	
+	var taskToleranceClass = '';
+	var taskTitle = '';
+	if (taskUsage * taskTolerance < assignment.RemainingUsage)
+	{
+		taskToleranceClass = 'task-tolerance-warning';
+		taskTitle = '{!JSENCODE($Label.UsageExceedsPlannedEffortLabel)}';
+	}
+	
+	if (taskUsage > assignment.RemainingUsage * taskTolerance)
+	{
+		taskToleranceClass = 'task-tolerance-error';
+		taskTitle = '{!JSENCODE($Label.PlannedEffortExceedsUsageLabel)}';
+	}
+		
+	tr += '<td class="task-usage-cell ' + taskToleranceClass + '" title="' + taskTitle + '">' + kimble.formatNumber(taskUsage, '0.##') + '</td>';
+	
+	tr += '<td class="total-usage-cell">' + kimble.formatNumber(assignment.ActualUsage + assignment.RemainingUsage, '0.##') + '</td>';
+	
+	tr += '<td class="baseline-usage-cell">' + (assignment.BaselineUsage != null ? kimble.formatNumber(assignment.BaselineUsage, '0.##') : '') + '</td>';
+	
+	
+	//++START DATE
+	tr += '<td class="start-date-cell"><input ' + (usageBehaviourRule != undefined && usageBehaviourRule.EntrySpecification == 'TaskUsage'?'disabled':'') + ' start-date="true" activity-id="' + assignment.TheScopingActivityId + '" assignment-id="' + assignment.Id + '" type="text" class="start-date-input kimbleDatePicker input-date" value="' + kimble.formatDate(assignment.StartDate) + '"></input></td>';
+	
+	var endDateDisabled = '';
+	
+	//++END DATE
+	if (usageBehaviourRule != undefined && (usageBehaviourRule.EntrySpecification == 'DerivedEndDate' || usageBehaviourRule.EntrySpecification == 'TaskUsage')) 
+		endDateDisabled = 'disabled';
+	
+	tr += '<td class="end-date-cell"><input ' + endDateDisabled + ' end-date="true" activity-id="' + assignment.TheScopingActivityId + '" assignment-id="' + assignment.Id + '"  type="text" class="end-date-input kimbleDatePicker input-date" value="' + kimble.formatDate(assignment.EndDate) + '"></input></td>';
+	
+	//++UTILISATION
+	var utilisationReadOnly = '';
+	var utilisationVal = '';
+	if (assignment.Utilisation != null) utilisationVal = kimble.formatNumber(assignment.Utilisation, '#');
+	if (usageBehaviourRule != undefined && (usageBehaviourRule.EntrySpecification == 'DerivedUtilisation' || usageBehaviourRule.EntrySpecification == 'TaskUsage')) utilisationReadOnly = ' readonly ';
+	tr += '<td class="utilisation-cell"><input ' + utilisationReadOnly + '  type="text" class="utilisation-input" value="' + utilisationVal + '"></input></td>';
+	
+	//++COST RATE SUMMARY
+	if (jQuery('#cost-rate-header').length > 0) //show costs
+	{
+		var costRateReadOnly = '';
+		
+		if (!activity.CanEditCostRate) costRateReadOnly = ' readonly ';
+		
+		var costRateValue = '';
+		var costRateInfo = '';
+		
+		if (assignment.CostRateSummary != null)
+		{
+			var costRateSummary = parseCostSummaryJson(assignment.CostRateSummary);
+			if (costRateSummary.length > 0)
+			{
+				var costRate = costRateSummary[0].R * assignment.ForecastToInvoiceConversionFactor;
+				costRateValue = jQuery.formatNumber(costRate, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false});
+				
+				if (costRateSummary.length > 1)
+				{
+					costRateInfo = '<span class="fa fa-info-circle future-cost-change"/>';
+				}
+			}
+		}
+		
+		tr += '<td class="cost-rate-cell">' + costRateValue + ' ' + costRateInfo + '</td>'
+	}
+	
+	//++REVENUE RATE SUMMARY
+	if (showRevenue)
+	{
+		tr += '<td class="revenue-rate-cell">';
+		
+		if (activity.HasRevenue)
+		{
+			var revRateValue = '';
+					
+			if (assignment.InvoicingCurrencyForecastRevenueRate != null)
+			{
+				revRateValue = jQuery.formatNumber(assignment.InvoicingCurrencyForecastRevenueRate * assignment.ForecastToRevenueConversionFactor, {format: "#,##0.00", locale:kimble.locale, isFullLocale:false});
+			}
+			
+			tr += revRateValue;
+
+		}
+		
+		tr += '</td>';
+	}
+	
+	//Total cost
+	//tr += '<td>33</td>';
+	
+	
+	//Total revenue
+	//tr += '<td>99</td>';
+	
+	tr += '</tr>';
+	
+	return tr;
+}
+
+function findUsageBehaviourRule(activity, id)
+{
+	var match;
+	jQuery.each(activity.TheUsageBehaviourRules, function(i, rule) {
+	
+		if (rule.Id == id) match = rule;
+	
+	});
+	
+	return match;
+}
+
+function findLocation(id)
+{
+	var match;
+	jQuery.each(locationOptions, function(i, location) {
+	
+		if (location.id == id) match = location.text;
+	
+	});
+	
+	return match;
+}
+
+function recalculateUsage(assignment, andSave, supressRecalculateWarnings)
+{
+	if (assignment.ResourceId == null) return;
+	
+	var resource = scopingActivities[assignment.TheScopingActivityId].TheResources[assignment.ResourceId];
+	
+	var availability = new ResourceAvailabilityUsagePattern(resource.AvailabilityPattern);
+	
+	var assignmentUsage;
+	
+	if (assignmentUsagePatternMap[assignment.Id] == null)
+	{
+		assignmentUsage = new ActivityAssignmentUsagePattern(assignment.HoursPerDay, assignment.StartDate.toDate(), assignment.UsagePattern, assignment.Utilisation, assignment.Utilisation);
+	}
+	else
+	{
+		assignmentUsage = assignmentUsagePatternMap[assignment.Id];
+	} 
+	
+	var entrySpecification = findUsageBehaviourRule(scopingActivities[assignment.TheScopingActivityId], assignment.UsageBehaviourRuleId).EntrySpecification;
+	
+	try
+	{
+		if (entrySpecification == "DerivedUsage" || assignment.IsUsageProfiled)
+		{
+			if (assignment.Utilisation == null) return;
+
+			if (assignment.EndDate == null) return;
+
+			assignmentUsage = assignmentUsage.createForDerivedUsage(assignment.StartDate.toDate(), assignment.EndDate.toDate(), assignment.Utilisation ,availability, assignment.IsUsageProfiled ? findUsageBehaviourRule(scopingActivities[assignment.TheScopingActivityId], assignment.UsageBehaviourRuleId).StartDateRule : null, assignment.HoursPerDay);
+
+			var newUsageInHours = assignmentUsage.totalForecastUsageInHours;
+			var newUsageInForecastUnits = newUsageInHours / assignment.ForecastToHourConversionFactor;
+
+			assignment.RemainingUsage = newUsageInForecastUnits;
+			assignment.UnforecastUsage = 0;
+		}
+		else if (entrySpecification == "DerivedEndDate")
+		{
+			if (assignment.RemainingUsage == null) return;
+		
+			if (assignment.Utilisation == null || assignment.Utilisation <= 0) return;
+			
+			var usageInHours = assignment.RemainingUsage * assignment.ForecastToHourConversionFactor;
+			
+			if (assignment.UnforecastUsage != null && assignment.UnforecastUsage != 0) usageInHours += assignment.UnforecastUsage * assignment.ForecastToHourConversionFactor;
+				
+			assignmentUsage = assignmentUsage.createForDerivedEndDate(assignment.StartDate.toDate(), usageInHours, assignment.Utilisation, availability, assignment.HoursPerDay);
+			
+			assignment.EndDate = assignmentUsage.endDate.toKimbleUTC();
+			
+			assignment.RemainingUsage = assignmentUsage.totalForecastUsageInHours / assignment.ForecastToHourConversionFactor;
+				
+			assignment.UnforecastUsage = 0;
+			
+		}
+		else if (entrySpecification == "DerivedUtilisation")
+		{
+			if (assignment.RemainingUsage == null) return;
+			
+			if (assignment.EndDate == null) return;
+			
+			var remainingUsageInHours = assignment.RemainingUsage * assignment.ForecastToHourConversionFactor;
+			
+			if (assignment.UnforecastUsage != null && assignment.UnforecastUsage != 0) remainingUsageInHours += assignment.UnforecastUsage * assignment.ForecastToHourConversionFactor;
+			
+			assignmentUsage = assignmentUsage.createForDerivedUtilisation(assignment.StartDate.toDate(), assignment.EndDate.toDate(), remainingUsageInHours, availability, assignment.HoursPerDay);
+			
+			assignment.RemainingUsage = assignmentUsage.totalForecastUsageInHours / assignment.ForecastToHourConversionFactor;
+			assignment.UnforecastUsage = (remainingUsageInHours - assignmentUsage.totalForecastUsageInHours) / assignment.ForecastToHourConversionFactor;
+			assignment.Utilisation = assignmentUsage.targetUtilisation;
+			
+		}
+		else if (entrySpecification == "TaskUsage")
+		{
+			//build task usage map based on theTaskAssignments;
+			//theTaskAssignments
+			var tasks = theTaskAssignments[assignment.Id];
+			var taskUsage = [];
+			
+			var totalRemainingUsageInHours = 0;
+			
+			if(tasks != undefined)
+			{
+				Object.keys(tasks).forEach(function(taskId){
+					var remainingInHours = tasks[taskId].RemainingEffort * assignment.UsageToHourConversionFactor;
+					
+					// dates on tasks are actually optional through config - defensive condition for this scenario
+					if(tasks[taskId].StartDate != null && tasks[taskId].EndDate != null)
+						taskUsage.push({StartDate:tasks[taskId].StartDate.toDate(),EndDate:tasks[taskId].EndDate.toDate(), RemainingUsageInHours:remainingInHours});
+					
+					totalRemainingUsageInHours += remainingInHours;
+				});
+			}
+			
+			assignmentUsage = assignmentUsage.createFromDateRangeForecast(assignment.EarliestTimeEntryDate == null?null:assignment.EarliestTimeEntryDate.toDate(), assignment.LatestTimeEntryDate == null?null:assignment.LatestTimeEntryDate.toDate(), taskUsage, availability, assignment.HoursPerDay);
+				
+			assignment.StartDate = assignmentUsage.startDate.toKimbleUTC();
+			assignment.EndDate = assignmentUsage.endDate.toKimbleUTC();
+			assignment.RemainingUsage = assignmentUsage.totalForecastUsageInHours / assignment.ForecastToHourConversionFactor;
+			assignment.Utilisation = assignmentUsage.targetUtilisation; 
+			
+			assignment.UnforecastUsage = (roundTo2dp(totalRemainingUsageInHours) - roundTo2dp(assignmentUsage.totalForecastUsageInHours)) / assignment.ForecastToHourConversionFactor;			
+		}
+		
+		if (assignmentUsage == null) return;
+		
+		assignment.UsagePattern = assignmentUsage.usagePattern;
+		
+		assignmentUsagePatternMap[assignment.Id] = assignmentUsage;
+		
+		if (!andSave) return;
+		
+		assignment.HasChanges = true;
+		
+		scopingActivities[assignment.TheScopingActivityId].TheAssignments[assignment.Id] = assignment;
+		
+		var assignmentTrHtml = getAssignmentHtml(assignment);
+		
+		if (jQuery('#' + assignment.Id).length == 1)
+			jQuery('#' + assignment.Id).replaceWith(jQuery(assignmentTrHtml));
+		else
+			jQuery('#assignments-edit-grid>table>tbody').append(jQuery(assignmentTrHtml));
+		
+		if (!startDateChange && !endDateChange)
+			calculateActivityRollups(assignment.TheScopingActivityId);
+
+		jQuery.publish('kimble.assignmentChanged', {assignment:assignment, activity:scopingActivities[assignment.TheScopingActivityId]});
+		
+		if(!supressRecalculateWarnings) calculateAssignmentWarnings(assignment.Id);
+		
+		jQuery('#remote-action-error-text').text('');
+		jQuery('#remote-action-error').hide();
+	}
+	catch(e)
+	{
+		//console.trace();
+		
+		if (kimble.labels[e] == null)
+		{
+			jQuery('#remote-action-error-text').text(e);
+		}
+		else
+		{
+			jQuery('#remote-action-error-text').text(kimble.labels[e]);
+		}
+		
+		jQuery('#remote-action-error').show();
+		
+		//jQuery('#' + assignment.Id).find('.usage-cell').append(jQuery(errorHtml));     		
+	}
+}
+
+var assignmentWarnings = {};
+
+function calculateAssignmentWarnings(assignmentId)
+{
+	// assignment warnings off by default in upgrading orgs
+	if(enableTrackingPlanUsageWarnings)
+	{
+		// if(assignmentId == null) traceAction('Calculate All Assignment Warnings');
+
+		jQuery.each(Object.keys(scopingActivities), function(k, key) {
+			
+			var activity = scopingActivities[key];
+			
+			jQuery.each(Object.keys(scopingActivities[key].TheAssignments), function (j, assId) {
+				
+				if (assId == assignmentId || assignmentId == null)
+				{
+					//do calculation
+					var assignment = scopingActivities[key].TheAssignments[assId];
+					var resource = scopingActivities[key].TheResources[assignment.ResourceId].Resource;
+					var availability = new ResourceAvailabilityUsagePattern(scopingActivities[key].TheResources[assignment.ResourceId].AvailabilityPattern);
+					
+					if (resource.MaximumUtilisation != null)
+					{
+						//if(assignmentId != null) traceAction('Calculate Assignment Warnings for assignment ' + assignmentId);
+						
+						assignmentWarnings[assId] = {resourceId: assignment.ResourceId,dates:{}, assignedBeforeStart:resource.StartDate != null && resource.StartDate.toDate() > assignment.StartDate.toDate(), assignedAfterEnd:resource.EndDate != null && resource.EndDate.toDate() < assignment.EndDate.toDate()};
+					
+						jQuery.each(assignment.UsagePattern.split(','), function (i, dayUsage) 
+				  		{  			
+				 			if (dayUsage == '') return true;
+				 			
+				 			var contextDay = new Date(assignment.StartDate.toDate().getFullYear(), assignment.StartDate.toDate().getMonth(), assignment.StartDate.toDate().getDate() + i, 0, 0, 0, 0);
+				 			
+				 			if (availability.isUnavailableDate(contextDay))
+				 			{
+				 				assignmentWarnings[assId].dates[contextDay.toKimbleUTC()] = {isUnavailable:true};
+				 			}
+				 			else
+				 			{
+					 			var usage = dayUsage.split(':')[0]; 
+					 			var actual = dayUsage.split(':')[1];
+					 				
+					 			if (usage != undefined )
+					 			{ 				
+					      			var usageAsPercent = 0;
+					      			
+					      			if (usage == NONFORECASTDAY || usage == CLOSEDDAY)
+					      			{
+					      				usageAsPercent = 0;
+					      			}
+					      			else
+					      			{
+										var dayUsage = KeyToHoursUsagePatternMap[usage];
+								
+										if (dayUsage == null) // percentage usage
+											usageAsPercent = new Number(usage);
+										else
+											usageAsPercent = new Number(dayUsage) / assignment.HoursPerDay * 100;
+					      			}
+					      			
+					      			if (usageAsPercent > 0)
+					      			{
+					      				var isOverUtilisedOnAssignment = (usageAsPercent > resource.MaximumUtilisation);
+					      				
+					      				var isOverUtilisedAllAssignments = false;
+					      				var hasImportantEvent = false;
+					      				var requiredUsage = usageAsPercent * assignment.HoursPerDay / 100;
+					      				
+					      				if (resource != null)
+					      				{
+					      					var aggregate = resource.AggregatePattern[contextDay.toKimbleUTC()];
+											
+											if (aggregate != null)
+											{
+												var aggregateBeforeAdditionOfThisAssignment = aggregate.agg;
+												var totalAggregate = aggregate.agg;
+												
+												if(assignment.IncludeInAggUtilisation == null)  assignment.IncludeInAggUtilisation = defaultIncludeInAggregate;
+												
+												if (assignment.IncludeInAggUtilisation) totalAggregate += usageAsPercent;
+												
+												if (aggregateBeforeAdditionOfThisAssignment > 0 && totalAggregate > resource.MaximumUtilisation)
+													isOverUtilisedAllAssignments = true;
+											}
+											
+											if (resource.UserId != null && activity.ResourceEvents[resource.UserId] && activity.ResourceEvents[resource.UserId][contextDay.toKimbleUTC()] != null)
+												hasImportantEvent = true;
+					      				}
+					      				
+					      				if (isOverUtilisedOnAssignment || isOverUtilisedAllAssignments || hasImportantEvent)
+					      				{
+					      					assignmentWarnings[assId].dates[contextDay.toKimbleUTC()] = {requiredUsage:requiredUsage, isOverUtilisedOnAssignment:isOverUtilisedOnAssignment,isOverUtilisedAllAssignments:isOverUtilisedAllAssignments,hasImportantEvent:hasImportantEvent};
+					      				}
+					      			}
+					      		}
+					      	}
+						});
+					}
+					
+					// we can exit the each as we've processed the assignment
+					if(assignmentId != null && assId == assignmentId) return false;
+				}
+			});	
+			
+		});
+		
+		jQuery.publish('kimble.assignmentWarning', assignmentWarnings);
+	}
+}
+
+function resourceAvailabilityOverlay(date) 
+{
+	var assignmentId = jQuery(this).attr('assignment-id');
+	
+	if (assignmentId == null) return [true, null];
+	
+	var activityId = jQuery(this).attr('activity-id');
+	
+	var activity = scopingActivities[activityId];
+	var assignment = activity.TheAssignments[assignmentId];
+	
+	if (assignment == null) assignment = assignmentToEdit;
+	
+	var resource = activity.TheResources[assignment.ResourceId];
+	
+	var earliestOpenDate = activity.EarliestAssignableDate.toDate();
+	
+	var availabilityStartDate = resource.AvailabilityPattern.StartDate.toDate();
+	
+	var earliestOffsetInDays = Math.round((date.getTime() - earliestOpenDate.getTime()) / (1000*60*60*24));
+	
+	var availabilityOffsetInDays = Math.round((date.getTime() - availabilityStartDate.getTime()) / (1000*60*60*24));
+	
+	if (earliestOffsetInDays < 0)
+		return [false,"closedperiod","Closed Period"];
+		
+	if (availabilityOffsetInDays < 0)
+		return [true,"closedperiod","Closed Period"];
+	
+	//Start date cannot be after earliest time entry
+	if (jQuery(this).attr('start-date') == 'true' && assignment.EarliestTimeEntryDate != null && date > assignment.EarliestTimeEntryDate.toDate())
+		return [false, "closedperiod", "Time Entry Exists"];
+	
+	//End date cannot be before latest time entry
+	if (jQuery(this).attr('end-date') == 'true' && assignment.LatestTimeEntryDate != null && date < assignment.LatestTimeEntryDate.toDate())
+		return [false, "closedperiod", "Time Entry Exists"];
+	
+	var availabilityChar = resource.AvailabilityPattern.UsagePattern.substring(availabilityOffsetInDays,availabilityOffsetInDays + 1);
+	
+	if (availabilityChar == '|')
+		return [false,"closedperiod","Closed Period"];
+	
+	if (availabilityChar == '!')
+		return [false,"Unavailable","Unavailable"];
+	
+	if (availabilityChar == '-')
+		return [false,"NonBusDay","Non business day"];
+	
+	var dayUsage = resource.Resource.AggregatePattern[date.toKimbleUTC()];
+	
+	if (dayUsage == null) return [true, null];
+	
+	var prob = dayUsage.p;
+	
+	if (prob == null) return [true, null];
+	
+	return [true, classificationStyleMap[Object.keys(prob)[0].Cls] + ' no-background'];
+	
+}
+
+function kimbleOpenLookup(obj, typ)
+{
+	var inp = jQuery(obj).prev();
+	//openLookup(KimbleLookupPage + '?lknm=' + inp.attr('id') + '&lktp=' + typ,670,'1','&lksrch=' + escape(inp.val()));
+	kimblePopup = window.open(KimbleLookupPage + '?lknm=' + inp.attr('id') + '&lktp=' + typ + '&lksrch=' + escape(inp.val()), "lookup", "width=670,height=480,toolbar=no,status=no,directories=no,menubar=no,resizable=yes,scrollable=no", false);
+}
+
+function closeKimblePopup()
+{
+	if (kimblePopup != null) kimblePopup.close();
+}
+
+//Generic response
+function kimblePickValue(objId, resultId, resultName)
+{
+	closeKimblePopup();
+	
+	var obj = jQuery('#' + objId);
+	obj.attr('data-id', resultId).val(resultName);
+	
+	if (jQuery('#' + objId).hasClass('resource-input'))
+	{
+		assignmentToEdit.ResourceId = resultId;
+		verifyResource(activityToEdit, assignmentToEdit, 'resource');
+	}
+	else		
+	{
+		assignmentToEdit.LocationId = resultId;
+		
+		if(activityToEdit.IsLocationMandatory)
+			verifyResource(activityToEdit, assignmentToEdit, 'location');
+	}	
+}
+
+function getUniqueId()
+{
+	  // Math.random should be unique because of its seeding algorithm.
+	  // Convert it to base 36 (numbers + letters), and grab the first 9 characters
+	  // after the decimal.
+	  return '__' + Math.random().toString(36).substr(2, 9);
+}
+
+	
+	
+</script>
+
+<style>
+select.usage-behaviour-select {
+    width: 180px;
+}
+
+input.usage-input {
+    width: 30px;
+}
+
+input.utilisation-input {
+    width: 30px;
+}
+
+input.cost-rate-input {
+    width: 60px;
+}
+
+input.revenue-rate-input {
+    width: 60px;
+}
+
+input.start-date-input {
+    width: 80px;
+}
+
+input.end-date-input {
+    width: 80px;
+}
+
+input.resource-input {
+    width: 220px;
+}
+
+table.assignment-popup-content td:nth-child(1), table.assignment-edit-content td:nth-child(1){
+    font-weight: bold;
+    text-align: right;
+	font-size:11px;
+}
+
+table#assignments-table {
+    border-collapse: collapse;
+    padding: 0;
+}
+
+#action-header {
+    width: 20px;
+}
+
+#remaining-header, #expended-header, #total-effort-header,  #planned-remaining-header, #baseline-effort-header{
+    width: 62px;
+}
+.total-expended, .total-remaining, .total-planned, .total-total, .total-baseline {
+    text-align: center;
+}
+#start-date-header, #end-date-header
+{
+	width: 72px;
+	text-align: center;
+}
+#utilisation-percentage-header {
+    width: 62px;
+}
+
+#cost-rate-header,  #revenue-rate-header{
+    width: 70px;
+	 text-align: center;
+}
+.resource-cell
+{
+	cursor:pointer;
+}
+.usage-cell, .actual-usage-cell, .task-usage-cell, .total-usage-cell, .baseline-usage-cell, .min-start-date, .max-end-date, .start-date-cell, .end-date-cell {
+    text-align: center;
+}
+input.usage-input, input.utilisation-input {
+    width: 46px;
+    text-align: center;
+    background-color: rgba(0, 0, 0, 0) !important;
+    border: 0 !important;
+    cursor: text;
+    height: 100%;
+}
+
+.utilisation-cell {
+    text-align: center;
+}
+
+.error-message {
+    margin: 0px 0px 0px 0px;
+    font-size: 11px;
+    background-color: #f00;
+    font-weight: bold;
+    height: 18px;
+    width: 6px;
+    display: inline-block;
+    vertical-align: top;
+}
+
+.task-tolerance-error
+{
+    background-color: #B42E34 !important;
+    border-radius: 2px;
+    color: #fff !important;
+    font-weight: bold;
+}
+
+.task-tolerance-warning
+{
+    background-color: #ffc107;
+    border-radius: 2px;
+    color: #fff !important;
+    font-weight: bold;
+}
+span.previous-value {
+    font-size: 12px;
+    padding-left: 4px;
+    color: #aaa;
+}
+</style>
+
+</apex:page>

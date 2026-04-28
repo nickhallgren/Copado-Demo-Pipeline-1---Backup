@@ -1,0 +1,1016 @@
+<apex:page standardController="KimbleOne__EventClass__c" extensions="KimbleOne.EventClassEditController" sidebar="false">
+	<head>
+		<script>
+		var sObjectWalker = new SObjectWalker(100, function(){
+				console.log('!! Meta complete !!');
+	    });
+		</script>
+	</head>	
+	<apex:composition template="KimbleOne__SiteMaster">
+        <apex:define name="Menu">
+            <c:Menu MenuContextName="{!KimbleOne__EventClass__c.Name}"/>
+        </apex:define>
+
+		<apex:define name="Content">
+			<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+			<style type="text/css">
+				.hiddenHeader {
+					display : none;
+				}
+				.criterion-group-lists {
+					margin : 8px 21px 13px 8px;
+				}
+				.criterion-groups {
+					
+				}
+				.criterions {
+					
+				}
+				.criterion {
+					min-width : 50px;
+					min-height : 50px;
+				}
+				.criterion-description {
+					font-size: 13px;
+				}
+				.criterion-description-list {
+				    list-style-type: none;
+				    padding: 0px;
+				    margin: 0px;		
+				}
+				.criterion-description-list li{
+				    padding-left: 0px;
+				}
+		 		.group-name-input { 
+		 			width : 180px; 
+		 			height : 25px; 
+		 		}
+		 		.group-title {
+		 			font-family : Arial, Helvetica, sans-serif;
+		 		}
+		 		.AndOrCard {
+					min-width : 35px;
+					min-height : 35px;
+					max-height : 35px;
+					height : 35px;
+		  			vertical-align: middle; 
+		 		}
+		 		.GroupOrCard {
+		 			min-width : 35px;
+					min-height : 35px;
+					max-height : 35px;
+					height : 35px;
+		  			vertical-align: middle; 
+		  			margin: 10px 10px 0px 10px;
+		 		}
+		 		.AndOr {
+					font-size: 25px;
+					font-weight: bold;
+					margin: 10px 10px 10px 10px;
+		 		}
+		 		.operator {
+                    border: 1px solid rgba(0, 0, 0, 0);
+                    border-radius: 4px;
+                    -webkit-box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+                    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+                    display: inline-block;
+                    border-color: #DDD;
+                    padding: 2px 3px 2px 3px;
+                    margin: 2px;
+                    margin-right: 7px !important;
+                    background-color: #F5F5F5;
+ 					min-width : 10px;
+					min-height : 10px;
+					max-height : 20px;
+					height : 15px;
+		  			vertical-align: middle; 
+					font-weight: bold;
+ 					margin: 3px 3px 3px 3px;
+                	text-align: center;
+		 		}
+		 		.edit-icon {
+		 			margin-left : 5px;
+		 		}
+		
+				a.event-mode {
+				    color: #555;
+				    text-decoration: none;
+				    line-height: 18px;
+				    padding: 3px 15px;
+				    white-space: nowrap;
+				    list-style: outside none none;
+				    font-size: 12px;
+				    cursor:pointer;
+				}
+	
+			</style>
+
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__JQueryExtensions)}"/>
+			<apex:includeScript value="{!URLFOR($Resource.KimbleOne__CustomObjects)}"/>
+<!-- 			<apex:stylesheet value="{!URLFOR($Resource.JsonEditor, 'style.css')}"/> -->
+				
+			<apex:form id="EventClassEditForm">
+				<div style='{!htmlencode(HiddenElementStyle)}'>
+					{!text(now())}
+				</div>
+				<apex:pageBlock title="{!$Label.kimbleone__eventclassedit}" mode="edit">
+					<apex:pageMessages />
+					<apex:pageBlockButtons location="top">
+						<input type="button" class="btn" value="{!$Label.Save}" onclick="ECEPage.saveAll();" />
+						<input type="button" class="btn" value="{!$Label.Cancel}" onclick="cancel();" />
+						<input type="button" class="btn" value="{!$Label.ExportLabel}" onclick="window.open('{!$Page.EventClassExport}?id={!EventClass__c.Id}','_export')" />
+						<apex:commandButton onclick="return confirmRecalculate()" action="{!RecalculateAllCompletionActions}" value="Recalculate Completion Actions" rendered="{!!ISBLANK(KimbleOne__EventClass__c.Id)}"/>
+					</apex:pageBlockButtons>
+					<apex:pageBlockSection title="{!$Label.kimbleone__eventclassdetail}" columns="2" collapsible="false">
+
+						<!-- Event Class Name -->
+						<apex:pageBlockSectionItem >
+							<apex:outputText value="{!$ObjectType.KimbleOne__EventClass__c.Fields.Name.Label}" />
+							<apex:outputPanel layout="none">
+								<apex:inputField value="{!KimbleOne__EventClass__c.Name}" required="true" />
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+						
+						<apex:pageBlockSectionItem >
+							<!-- No Suffix -->
+						</apex:pageBlockSectionItem>
+						
+						<!-- Event Name -->
+						<apex:pageBlockSectionItem >
+							<apex:outputText value="{!$ObjectType.KimbleOne__EventClass__c.Fields.KimbleOne__EventName__c.Label}" />
+							<apex:outputPanel layout="none">
+								<div class="requiredInput">
+									<div class="requiredBlock"></div>
+									<apex:inputField value="{!KimbleOne__EventClass__c.KimbleOne__EventName__c}" />
+								</div>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+						
+						<!-- Object Type -->
+						<apex:pageBlockSectionItem >
+							<apex:outputText id="ObjectTypeLabel" value="{!$ObjectType.KimbleOne__EventClass__c.Fields.KimbleOne__ObjectType__c.Label}" />
+							<apex:inputField id="ObjectTypeField" value="{!KimbleOne__EventClass__c.KimbleOne__ObjectType__c}" required="true"/>							
+						</apex:pageBlockSectionItem>
+						
+						<!-- Event Narrative -->
+						<apex:pageBlockSectionItem >
+							<apex:outputText value="{!$ObjectType.KimbleOne__EventClass__c.Fields.KimbleOne__EventNarrative__c.Label}" />
+							<apex:outputPanel layout="none">
+								<apex:inputTextarea styleClass="NarrativeTextArea" value="{!KimbleOne__EventClass__c.KimbleOne__EventNarrative__c}" style="width:258px; height:63px" />								
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+												
+						<!-- Event Data -->
+						<apex:pageBlockSectionItem >
+							<apex:outputText id="EventDataLabel" value="{!$ObjectType.KimbleOne__EventClass__c.Fields.KimbleOne__EventData__c.Label}" />
+							<apex:inputTextarea styleClass="NarrativeTextArea" value="{!KimbleOne__EventClass__c.KimbleOne__EventData__c}" style="width:258px; height:63px" />
+						</apex:pageBlockSectionItem>
+												
+						<!-- Scoped With Path -->
+						<apex:pageBlockSectionItem >
+							<apex:outputText id="ScopedWithPathLabel" value="{!$ObjectType.KimbleOne__EventClass__c.Fields.KimbleOne__ScopedWithPath__c.Label}" />
+							<apex:outputPanel layout="none">
+								<apex:inputField value="{!KimbleOne__EventClass__c.KimbleOne__ScopedWithPath__c}" id="ScopedWithPathField" html-disabled="true"/>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+						
+						<!-- Date Binding -->
+						<apex:pageBlockSectionItem >
+							<apex:outputText id="EventDateFieldNameLabel" value="{!$ObjectType.KimbleOne__EventClass__c.Fields.KimbleOne__EventDateFieldName__c.Label}" />
+							<apex:outputPanel layout="none">
+								<apex:inputField value="{!KimbleOne__EventClass__c.KimbleOne__EventDateFieldName__c}" id="DateBindingField" html-disabled="true"/>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+						
+						<!-- Reported Through Path -->
+						<apex:pageBlockSectionItem >
+							<apex:outputText id="ReportedThroughLabel" value="{!$ObjectType.KimbleOne__EventClass__c.Fields.KimbleOne__ReportedThroughPath__c.Label}" />
+							<apex:outputPanel layout="none">
+								<apex:inputField value="{!KimbleOne__EventClass__c.KimbleOne__ReportedThroughPath__c}" id="ReportedThroughPathField" html-disabled="true"/>
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+						
+						<!-- Date Binding Offset -->
+						<apex:pageBlockSectionItem >
+							<apex:outputText id="EventDateOffsetLabel" value="{!$ObjectType.KimbleOne__EventClass__c.Fields.KimbleOne__EventDateOffset__c.Label}" />
+							<apex:outputPanel layout="none">
+								<apex:inputField value="{!KimbleOne__EventClass__c.KimbleOne__EventDateOffset__c}" />
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+						
+						<!-- Active -->
+						<apex:pageBlockSectionItem >
+							<apex:outputText value="{!$ObjectType.KimbleOne__EventClass__c.Fields.KimbleOne__IsActive__c.Label}" />
+							<apex:outputPanel layout="none">
+								<apex:inputField value="{!KimbleOne__EventClass__c.KimbleOne__IsActive__c}" />
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+
+						<!-- Is Event Date Bound -->
+						<apex:pageBlockSectionItem >
+							<apex:outputText id="IsEventDateBoundLabel" value="{!$ObjectType.KimbleOne__EventClass__c.Fields.KimbleOne__IsEventDateBound__c.Label}" />
+							<apex:outputPanel layout="none">
+								<apex:inputField value="{!KimbleOne__EventClass__c.KimbleOne__IsEventDateBound__c}" />
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+
+						<!-- Show On Timeline -->
+						<apex:pageBlockSectionItem >
+							<apex:outputText id="ShowOnTimelineLabel" value="{!$ObjectType.KimbleOne__EventClass__c.Fields.KimbleOne__ShowOnTimeline__c.Label}" />
+							<apex:outputPanel layout="none">
+								<apex:inputField value="{!KimbleOne__EventClass__c.KimbleOne__ShowOnTimeline__c}" />
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+						
+						<!-- Evaluate Asynchronously -->
+						<apex:pageBlockSectionItem >
+							<apex:outputText id="EvaluateAsynchronouslyLabel" value="{!$ObjectType.KimbleOne__EventClass__c.Fields.KimbleOne__EvaluateAsynchronously__c.Label}" />
+							<apex:outputPanel layout="none">
+								<apex:inputField value="{!KimbleOne__EventClass__c.KimbleOne__EvaluateAsynchronously__c}" />
+							</apex:outputPanel>
+						</apex:pageBlockSectionItem>
+
+					</apex:pageBlockSection>
+						
+					<!-- Don't validate fields above when editing criteria -->
+					<apex:actionRegion >
+						<apex:outputPanel style="{!htmlencode(HiddenElementStyle)}">
+							
+							<!-- Completion Actions Json-->
+							<apex:inputTextArea value="{!KimbleOne__EventClass__c.KimbleOne__CompletionActions__c}" styleClass="CompletionActionsField"/>
+					
+							<!-- Creation Mode -->
+							<apex:outputText value="{!$ObjectType.KimbleOne__EventClass__c.Fields.KimbleOne__CreationMode__c.Label}"/>
+							<apex:outputPanel layout="none"  style="{!htmlencode(HiddenElementStyle)}">
+								<apex:selectList value="{!KimbleOne__EventClass__c.KimbleOne__CreationMode__c}"
+									size="1" styleClass="creationModeField">
+									<apex:selectOptions value="{!TheCreationModes}" />
+								</apex:selectList>
+							</apex:outputPanel>
+							
+							<!-- Completion Mode -->
+							<apex:outputText value="{!$ObjectType.KimbleOne__EventClass__c.Fields.KimbleOne__CompletionMode__c.Label}"/>
+							<apex:outputPanel layout="none" style="{!htmlencode(HiddenElementStyle)};">
+								<apex:selectList value="{!KimbleOne__EventClass__c.KimbleOne__CompletionMode__c}"
+									size="1" styleClass="completionModeField">
+									<apex:selectOptions value="{!TheCompletionModes}" />
+								</apex:selectList>
+							</apex:outputPanel>
+						
+						</apex:outputPanel>
+						
+						<apex:outputPanel id="TheEventClassCriteriaCards">
+							<div style='{!HTMLENCODE(HiddenElementStyle)}'>
+								{!text(now())}
+							</div>
+							<script>
+								var groupListIndex = 0;
+								var groupListIds = [];
+							</script>
+							<div class='cardContainer criterion-group-lists'>
+								<apex:repeat var="GroupList" value="{!TheGroupLists}">
+									<script>
+										 groupListIds[groupListIndex] = '{!JSENCODE(TEXT(GroupList.contextId))}';
+										 groupListIndex += 1;
+									</script>
+									<div class='card GroupList-{!HTMLENCODE(TEXT(GroupList.contextId))}'>
+										<div class="cardHeading">
+											<div class="card-heading-icon fa fa-{!HTMLENCODE(GroupList.IconName)}" ></div>
+											<div class="card-title-container">
+												<h3 class="cardTitle"><apex:outputText value="{!GroupList.TheCriterionType.name}"/></h3>
+												<a onclick='ECEPage.editEventMode(this, {!JSINHTMLENCODE(TEXT(GroupList.contextId))});' class='event-mode'>
+													<apex:outputText value="{!TheCreationMode.name}" rendered="{!GroupList.isCreate}"/>
+													<apex:outputText value="{!TheCompletionMode.name}" rendered="{!!GroupList.isCreate}"/>
+												</a>
+											</div>
+											<div data-floating-dropdown="#{!GroupList.TheCriterionType.id}-menu-data" class="fa fa-bars burger-menu"></div>
+											<div class="deleting Loading" style="display:none"></div>
+											<div id="{!HTMLENCODE(GroupList.TheCriterionType.id)}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+									   			 <ul class="floating-dropdown-menu">
+											        <li><a href="javascript:newGroup('{!GroupList.TheCriterionType.id}');"><i class="fa fa-plus-square dropdown-icon"></i>{!$Label.New} {!$Label.CriterionGroup}</a></li>
+											     </ul>
+											</div>
+										</div>
+										<div class="cardBody">
+											<div class='inner-cards-container criterion-groups'>
+												<div class='inner-card-container'>
+													<apex:repeat var="Group" value="{!GroupList.TheCriterionGroups}">
+														<apex:outputPanel layout="none" rendered="{!Group.HasPrevious}">
+															<div class='card GroupOrCard'>
+																<h1 class='AndOr'>{!$Label.Or}</h1>
+															</div>
+														</apex:outputPanel>
+														<div class='inner-card'>
+															<div class='inner-card-header'>
+																<div class="inner-card-title">
+																	<h3 class='cardTitle {!HTMLENCODE(TEXT(Group.contextId))}-groupView'><apex:outputText value="{!HTMLENCODE(Group.TheCriterionGroup.name)}"/></h3><a class='fa fa-pencil undecorated-link {!HTMLENCODE(TEXT(Group.contextId))}-groupEditIcon edit-icon' href="javascript:ECEPage.startGroupNameEdit('{!JSINHTMLENCODE(TEXT(Group.contextId))}');" ></a>
+																	<apex:inputTextArea styleClass="group-name-input {!Group.contextId}-groupEdit" value="{!Group.TheCriterionGroup.name}" style="display:none"/>
+																	<a href="javascript:ECEPage.endGroupNameEdit('{!JSINHTMLENCODE(TEXT(Group.contextId))}');" class='{!HTMLENCODE(TEXT(Group.contextId))}-groupEdit cardTitle undecorated-link ' style="display:none"><i class='fa fa-check-square edit-icon'></i></a>
+																	<a href="javascript:ECEPage.cancelGroupNameEdit('{!JSINHTMLENCODE(TEXT(Group.contextId))}');" class='{!HTMLENCODE(TEXT(Group.contextId))}-groupEdit cardTitle undecorated-link edit-icon' style="display:none"><i class='fa fa-undo edit-icon'></i></a>
+																</div>
+																<div data-floating-dropdown="#{!HTMLENCODE(TEXT(Group.contextId))}-menu-data" class="fa fa-bars burger-menu"></div>
+																<div class="deleting Loading" style="display:none"></div>
+																<div id="{!HTMLENCODE(TEXT(Group.contextId))}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+														   			 <ul class="floating-dropdown-menu">
+																        <li><a href="javascript:newCriterion('{!JSINHTMLENCODE(GroupList.TheCriterionType.id)}', '{!JSINHTMLENCODE(TEXT(Group.contextId))}');"><i class="fa fa-plus-square-o dropdown-icon"></i>{!$Label.New} {!$Label.Criterion}</a></li>
+																        <li><a href="javascript:deleteGroup('{!JSINHTMLENCODE(GroupList.TheCriterionType.id)}', '{!JSINHTMLENCODE(TEXT(Group.contextId))}');"><i class="fa fa-trash dropdown-icon"></i>{!$Label.DeleteButton}</a></li>
+																     </ul>
+																</div>
+															</div>
+															<div class="inner-card-body">
+																<div class='cardContainer criterions'>
+																	<apex:repeat var="CriterionWrap" value="{!Group.TheCriteria}">
+																		<apex:outputPanel layout="none" rendered="{!CriterionWrap.HasPrevious}">
+																			<div class='card AndOrCard'>
+																				<h1 class='AndOr'>{!$Label.And}</h1>
+																			</div>
+																		</apex:outputPanel>
+																		<div class='card criterion'>
+																			<div class='cardHeading'>
+																				<div class="card-title-container criterion-description">
+																					<ul class="criterion-description-list">
+                                                                                        <li>
+                                                                                            <apex:outputText value="{!CriterionWrap.FieldDescription} "/>
+                                                                                            <span class='operator'><apex:outputText value="{!CriterionWrap.OperatorDescription} "/></span>
+                                                                                        	<apex:outputText value="{!CriterionWrap.ValueDescription}"/>
+                                                                                        </li>
+ 																				</ul>
+																				</div>
+																				<div data-floating-dropdown="#{!HTMLENCODE(TEXT(CriterionWrap.contextId))}-menu-data" class="fa fa-bars burger-menu"></div>
+																				<div class="deleting Loading" style="display:none"></div>
+																				<div id="{!HTMLENCODE(TEXT(CriterionWrap.contextId))}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-right" style="margin-top:1px">
+																		   			 <ul class="floating-dropdown-menu">
+																				        <li><a href="javascript:ECEPage.startCriterionEdit('.{!JSINHTMLENCODE(TEXT(CriterionWrap.contextId))}-popup', '{!JSENCODE($Label.EditCriterion)}');"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.Edit}</a></li>
+																				        <li><a href="javascript:deleteCriterion('{!JSINHTMLENCODE(GroupList.TheCriterionType.id)}', '{!JSINHTMLENCODE(TEXT(Group.contextId))}', '{!JSINHTMLENCODE(TEXT(CriterionWrap.contextId))}');"><i class="fa fa-trash dropdown-icon"></i>{!$Label.DeleteButton}</a></li>
+																				     </ul>
+																				</div>
+																			</div>
+																		</div>
+																	</apex:repeat>
+																</div>
+															</div>
+														</div>
+													</apex:repeat>
+												</div>
+											</div>
+										</div>
+										<div class="card-footer">
+											<div class="card-footer-body completion-actions"></div>
+										</div>
+									</div>
+								</apex:repeat>
+							</div>
+						</apex:outputPanel>
+
+						<!-- Save -->
+						<apex:actionFunction action="{!save}" name="_saveAll">
+						</apex:actionFunction>
+		
+						<!-- Cancel -->
+						<apex:actionFunction action="{!cancel}" name="cancel">
+						</apex:actionFunction>
+		
+						<!-- New Criterion Group -->
+						<apex:actionFunction action="{!TheGroupList.newGroup}" name="newGroup" rerender="TheEventClassCriteriaCards, TheEventClassCriteria" oncomplete="ECEPage.refreshDynamicAreaPostHook();">
+							<apex:param name="CriterionTypeId" value=""/>
+						</apex:actionFunction>
+						
+						<!-- New Criterion -->
+						<apex:actionFunction action="{!TheGroupList.TheCriterionGroup.newCriterion}" name="newCriterion" rerender="TheEventClassCriteriaCards, TheEventClassCriteria" oncomplete="ECEPage.refreshDynamicAreaPostHook(function(){ECEPage.startCriterionEdit('.' + newCriterionContexId + '-popup', '{!JSENCODE($Label.kimbleone__editnewcriterion)}');});">
+							<apex:param name="CriterionTypeId" value=""/> 
+							<apex:param name="CriterionGroupId" value=""/>
+						</apex:actionFunction>
+		
+						<!-- Criterion Group Delete -->
+						<apex:actionFunction action="{!TheGroupList.removeGroup}" name="deleteGroup" rerender="TheEventClassCriteriaCards, TheEventClassCriteria" oncomplete="ECEPage.refreshDynamicAreaPostHook();">
+							<apex:param name="CriterionTypeId" value=""/>
+							<apex:param name="CriterionGroupId" value=""/>
+						</apex:actionFunction>
+		
+						<!-- Criterion Delete -->
+						<apex:actionFunction action="{!TheGroupList.TheCriterionGroup.removeCriterion}" name="deleteCriterion" rerender="TheEventClassCriteriaCards, TheEventClassCriteria" oncomplete="ECEPage.refreshDynamicAreaPostHook();">
+							<apex:param name="CriterionTypeId" value=""/>
+							<apex:param name="CriterionGroupId" value=""/>
+							<apex:param name="CriterionId" value=""/>
+						</apex:actionFunction>
+		
+						<!-- Refresh Dynamic Area -->
+						<apex:actionFunction name="refreshDynamicArea" rerender="TheEventClassCriteriaCards, TheEventClassCriteria" oncomplete="ECEPage.refreshDynamicAreaPostHook();">
+						</apex:actionFunction>
+	
+	
+					<apex:outputPanel id="TheEventClassCriteria">
+						<div id='criterion-popups'>
+							<script>
+								// RETURN VALUES AFTER DYNAMIC AREA RERENDER
+								var newCriterionContexId = '{!JSENCODE(TEXT(CriterionContextId))}';
+								var criteriaCount = '{!JSENCODE(TEXT(TheCriteriaCount))}';
+							</script>
+							<apex:repeat var="GroupList" value="{!TheGroupLists}">
+								<apex:repeat var="Group" value="{!GroupList.TheCriterionGroups}">
+									<apex:repeat var="CriterionWrap" value="{!Group.TheCriteria}" >
+										<div class='{!HTMLENCODE(TEXT(CriterionWrap.contextId))}-popup' style='{!HTMLENCODE(HiddenElementStyle)}'>
+											<apex:pageBlock mode="edit">
+												<apex:pageBlockButtons location="bottom">
+													<input type='button' class='btn' value='{!JSENCODE($Label.Ok)}' onClick="ECEPage.endCriterionEdit('.{!JSINHTMLENCODE(TEXT(CriterionWrap.contextId))}-popup');"/>
+<!-- 													<input type='button' class='btn' value='{!JSENCODE($Label.Close)}' onClick="ECEPage.cancelCriterionEdit('.{!JSINHTMLENCODE(TEXT(CriterionWrap.contextId))}-popup');"/> -->
+												</apex:pageBlockButtons>
+												<apex:pageBlockSection columns="3" collapsible="false">
+							
+													<apex:pageBlockSectionItem >
+														<apex:outputText value="{!$Label.kimbleone__fieldheading}: " />
+														<apex:outputPanel layout="none">
+															<apex:selectList value="{!CriterionWrap.TheCriterion.KimbleOne__ObjectState__c}"
+																size="1" style="width:140px">
+																<apex:selectOptions value="{!TheObjectStates}" />
+															</apex:selectList>
+														</apex:outputPanel>
+													</apex:pageBlockSectionItem>
+													
+													<!-- Field Name -->
+													<apex:pageBlockSectionItem >
+														<apex:outputPanel layout="none">
+															<apex:inputText value="{!CriterionWrap.TheCriterion.KimbleOne__FieldName__c}" id="EventClassFieldSelector" />
+														</apex:outputPanel>
+													</apex:pageBlockSectionItem>
+				
+													<apex:pageBlockSectionItem >
+														<!-- Empty -->
+													</apex:pageBlockSectionItem>
+													
+													<!-- Operator -->
+													<apex:pageBlockSectionItem >
+														<apex:outputText value="{!$Label.kimbleone__operator}: " />
+														<apex:outputPanel layout="none">
+<!-- 															<apex:selectList styleClass="operatorField{!HTMLENCODE(TEXT(CriterionWrap.contextId))}" value="{!CriterionWrap.TheCriterion.KimbleOne__Operator__c}" size="1" style="width:140px"> -->
+															<apex:selectList styleClass="operatorField" value="{!CriterionWrap.TheCriterion.KimbleOne__Operator__c}" size="1" style="width:140px">
+																<apex:selectOptions value="{!TheOperators}" />
+															</apex:selectList>
+														</apex:outputPanel>
+													</apex:pageBlockSectionItem>
+			
+													<apex:pageBlockSectionItem >
+														<!-- Empty -->
+													</apex:pageBlockSectionItem>
+													
+													<apex:pageBlockSectionItem >
+														<!-- Empty -->
+													</apex:pageBlockSectionItem>
+													
+													<!-- Value Type -->
+													<apex:pageBlockSectionItem >
+														<apex:outputText value="{!$Label.kimbleone__valuelabel}: " />
+														<apex:outputPanel layout="none">
+															<apex:selectList value="{!CriterionWrap.TheCriterion.KimbleOne__ValueType__c}" size="1" style="width:140px" styleClass="valueTypeInput">
+																<apex:selectOptions value="{!TheValueTypes}" />
+															</apex:selectList>
+														</apex:outputPanel>
+													</apex:pageBlockSectionItem>
+				
+													<!-- Value Object State -->
+													<apex:pageBlockSectionItem >
+														<apex:outputPanel layout="none">
+															<apex:selectList value="{!CriterionWrap.TheCriterion.KimbleOne__ValueObjectState__c}" size="1" style="width:140px" styleClass="valueObjectStateInput">
+																<apex:selectOptions value="{!TheObjectStates}" />
+															</apex:selectList>
+														</apex:outputPanel>
+													</apex:pageBlockSectionItem>
+													
+													<!-- Value -->
+													<apex:pageBlockSectionItem >
+														<apex:outputPanel layout="none" style="display:none">
+<!-- 															<apex:inputTextArea value="{!CriterionWrap.TheCriterion.KimbleOne__Value__c}" id="StringOrJsonArrayInput" styleClass="valueInput" onclick="ECEPage.editCriterionLiteral('{!$ObjectType.EventClassCriterion__c.Fields.Value__c.Label}', '{!JSINHTMLENCODE(TEXT(CriterionWrap.contextId))}', this);" /> -->
+															<apex:inputTextArea value="{!CriterionWrap.TheCriterion.KimbleOne__Value__c}" id="StringOrJsonArrayInput" styleClass="valueInput" style="{!htmlencode(HiddenElementStyle)}" />
+															<div class="value-editor-target" style='min-width:230px;'/>
+														</apex:outputPanel>
+													</apex:pageBlockSectionItem> 
+													
+												</apex:pageBlockSection>
+											</apex:pageBlock>
+										</div>
+									</apex:repeat>
+								</apex:repeat>
+							</apex:repeat>
+						</div>
+					</apex:outputPanel>	
+					</apex:actionRegion>
+				
+				</apex:pageBlock>
+			</apex:form>
+
+			<!-- Dialogs -->
+
+			<!-- Ractive templates -->
+			<c:JsonEditingTemplates />
+			
+			<!-- Json Array Editing -->
+			<c:JsonArrayEditor />
+			
+			<div id="popup-frame" style="{!htmlencode(HiddenElementStyle)}">
+ 		        <apex:outputPanel id="DeliveryElementPanel">
+		          <apex:pageBlock >
+		            <apex:pageBlockButtons location="bottom" styleClass="popup-frame-buttons">
+		            </apex:pageBlockButtons>
+		            <apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+		            <div class='popup-frame-body'></div>
+		            </apex:pageBlockSection>
+		          </apex:pageBlock>
+		       </apex:outputPanel>
+		    </div>
+			
+			<div id="completion-actions-template" style="{!htmlencode(HiddenElementStyle)}">
+		    	<apex:outputPanel >
+	            	<label style="margin-left: 0.5rem;color: rgb(74, 74, 86);font-family: Arial, Helvetica, sans-serif;font-size: 10.92px;font-weight: bold;">{!$Label.Actions}<a class='fa fa-plus' on-click="add" style="margin-left: 0.5rem;"/></label>
+		            <ol>
+		            {{#actions}}
+		            	<li>
+		            		<label>{{TypeName}}<a class="fa fa-pencil-square-o" style='margin-left:0.5em' on-click='edit'/><a class="fa fa-trash-o" style='margin-left:0.5em' on-click='del'/></label>
+		            	</li>
+		            {{/actions}}
+		            </ol>
+		    	</apex:outputPanel>
+			</div>
+
+			<div class="completion-action-add" ></div>
+
+			<div id="add-completion-action-template" style="{!htmlencode(HiddenElementStyle)}">
+		        <apex:outputPanel >
+		          <apex:pageBlock >
+		            <apex:pageBlockButtons location="bottom">
+		            	<input type="button" class='btn' value="{!$Label.Ok}" on-click="ok"/>
+		            	<input type="button" class='btn' value="{!$Label.Cancel}" on-click="cancel"/>
+		            </apex:pageBlockButtons>
+		            <apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+		            <apex:pageblocksectionitem >
+		            	<apex:outputLabel value="{!$Label.kimbleone__actionlinksheader}"/>
+		            	<select value="{{selectedAction}}">
+		            		{{#choices}}
+		            		<option value="{{@index}}">{{TypeName}}</option>
+		            		{{/choices}}
+		            	</select>
+		            </apex:pageblocksectionitem>
+		            </apex:pageBlockSection>
+		          </apex:pageBlock>
+		       </apex:outputPanel>
+			</div>
+			
+			<div class="completion-action-edit" ></div>
+
+			<div id="edit-completion-action-template" style="{!htmlencode(HiddenElementStyle)}">
+		        <apex:outputPanel >
+		          <apex:pageBlock >
+		            <apex:pageBlockButtons location="bottom">
+		            	<input type="button" class='btn' value="{!$Label.Ok}" on-click="ok"/>
+		            </apex:pageBlockButtons>
+		            <apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+		           		{{] fieldsEditorTmpl}}
+		            </apex:pageBlockSection>
+		          </apex:pageBlock>
+		       </apex:outputPanel>
+			</div>
+
+			<script>
+				function confirmRecalculate()
+				{
+					return confirm('Are you sure? Completion Actions will be fired for ALL ' + jQuery('[id$="ObjectTypeField"]').val() + ' Objects and may result in DUPLICATE data.');
+				}
+			
+				// POPULATE THE OBJECTTYPE AND DATEBINDING FIELDS WITH THE JQUERY FIELDSELECTOR PLUGIN
+				jQuery.fn.extend({
+				    setEnabled: function(state) {
+				        return this.each(function() {
+				            this.disabled = state;
+				        });
+				    },
+				    validate: function(validator, validCB, invalidCB) {
+				        this.filter(':input').each(function(i, input){
+				            $input = jQuery(input);
+				
+				            if(validCB == undefined)
+				                validCB = function(val, input) {
+				                    $(input).css('background-color', 'white');
+				                };
+				            if(invalidCB == undefined)
+				                invalidCB = function(val, input) {
+				                    $(input).css('background-color', '#c00');
+				                };
+				
+				            var validate = function(){
+				                if(validator($input.val()))
+				                    validCB($input.val(), input);
+				                else
+				                    invalidCB($input.val(), input);
+				            };
+				            $input.change(validate).keyup(validate).click(validate);
+				        });
+				    },
+				});
+								    
+				var ECEPage = new STDPage();
+				jQuery.extend(ECEPage, {
+					setOperators: kimble.parseJSON("{!JSENCODE(TheSetOperators)}"),
+					completionActionEditor: null,
+					criterionEditorContents: null,
+					criterionFormContents: null,
+					criterionEditorBoxy: null,
+					oldCriterionLiteralValue: null,
+					oldCriterionFieldValue: null,
+					narrativeTemplate: new Template(),
+					sObjectTree: null,
+					flags: {
+						fieldSelectorsRefreshing : false,
+						criterionFieldSelectorsRefreshing : false,
+						editorsRefreshing : false,
+					},
+					init: function() {
+						
+						if(ECEPage.flags.fieldSelectorsRefreshing) return;
+						
+						ECEPage.flags.fieldSelectorsRefreshing = true;
+						
+						try {
+							var objField = jQuery('[id$="ObjectTypeField"]');
+							var bindingField = jQuery('[id$="DateBindingField"]');
+							var scopedWithPathField = jQuery('[id$="ScopedWithPathField"]');
+							var reportedThroughPathField = jQuery('[id$="ReportedThroughPathField"]');
+							
+							var bindingFilter = {
+							 	keep : function(field) {
+									return field.type === 'date';
+								}
+							};
+		
+							var scopedFilter = {
+							 	keep : function(field) {
+									return field.name.toLowerCase() === 'id' || field.type === 'reference'; 
+								}
+							};
+		
+							var reportedFilter = {
+							 	keep : function(field, object, path) {
+									var objName = object.name.toLowerCase();
+									if(field.name === 'Id' && (objName === 'deliveryelement__c' || objName == 'deliverygroup__c' || objName == 'proposal__c'))
+										return true;
+									if(field.type === 'reference') {
+										var refTo = field.referenceTo;
+										if(jQuery.isArray(refTo)) {
+											for(var i = 0; i < refTo.length; i++) {
+												var objName = refTo[i].toLowerCase();
+												if(objName === 'deliveryelement__c' || objName == 'deliverygroup__c' || objName == 'proposal__c')
+													return true;
+											}
+										}
+										else {
+											refTo = refTo.toLowerCase();
+											if(refTo == 'deliveryelement__c' || refTo == 'deliverygroup__c' || refTo == 'proposal__c')
+												return true;
+										}
+									} 
+									return false;
+								}
+							};
+		
+							objField.change(function() {
+								var rootItem = jQuery(this).val();
+								bindingField.val("");
+								if (rootItem != "")
+								{
+									bindingField.fieldSelector({
+										rootObject : rootItem,
+										filter : bindingFilter,
+										initWithFirstInList : false,
+										showLabel:true
+									});
+								
+									scopedWithPathField.fieldSelector({
+										rootObject : rootItem,
+										filter : scopedFilter,
+										showLabel:true
+									});
+								
+									reportedThroughPathField.fieldSelector({
+										rootObject : rootItem,
+										filter : reportedFilter,
+										deepWalk : true,
+										initWithFirstInList : false,
+										showLabel:true
+									});
+								}
+								
+								jQuery('.NarrativeTextArea').change();
+							});
+		
+							var rootItem = objField.val();
+							if (rootItem != "")
+							{
+								bindingField.fieldSelector({
+									rootObject : rootItem,
+									filter : bindingFilter,
+									initWithFirstInList : false,
+									showLabel:true
+								}, function() { bindingField.prop('disabled', false); });
+								
+								scopedWithPathField.fieldSelector({
+									rootObject : rootItem,
+									filter : scopedFilter,
+									showLabel:true
+								}, function() { scopedWithPathField.prop('disabled', false); });
+								
+								reportedThroughPathField.fieldSelector({
+									rootObject : rootItem,
+									filter : reportedFilter,
+									deepWalk : true,
+									initWithFirstInList : false,
+									showLabel:true
+								}, function() { reportedThroughPathField.prop('disabled', false); });
+							}
+							
+							objField.prop('disabled', criteriaCount > 0);
+							
+							var roots = [];
+							roots.push(objField.val());
+							
+							/*
+								objField.find('option').each(function(i, opt) {
+									roots.push(jQuery(opt).val());
+								});	
+							*/
+							
+							ECEPage.sObjectTree = new Tree(roots, ECEPage.sObjectChildResolver, true, true);
+							ECEPage.narrativeTemplate.addTag('kimble', '{' + '!', '[a-zA-Z0-9._]*', '}', function(val){
+								return ECEPage.sObjectTree.isValidPath(val.replace(/\b(new|old)/i, objField.val()));
+							});
+							jQuery('.NarrativeTextArea').validate(function(val){
+								return ECEPage.narrativeTemplate.isValid(val, true);
+							});
+							ECEPage.refreshDynamicAreaPostHook();						
+							jQuery('.NarrativeTextArea').change();
+						}
+						catch(e) {
+							console.log(e.message);
+							console.log(e);
+							ECEPage.flags.fieldSelectorsRefreshing = false;
+						}
+						finally {
+							ECEPage.flags.fieldSelectorsRefreshing = false;
+						}
+					},
+					sObjectChildResolver: function(parent) {
+						var children = [];
+						try {
+							var objectDescription = sforce.connection.describeSObject(parent);
+							for(var i = 0; i < objectDescription.fields.length; i++) {
+								children.push(objectDescription.fields[i].name); 
+							}
+						} catch(e) {
+							console.log(e.message);
+							console.log(e);
+						}
+						return children;
+					},
+					saveAll: function() {
+						jQuery('[id$="ObjectTypeField"]').prop('disabled', false);
+						_saveAll();
+					},
+					startGroupNameEdit: function(idPrefix) {
+						var view = jQuery('.' + idPrefix + '-groupView').hide();
+						var icon = jQuery('.' + idPrefix + '-groupEditIcon').hide();
+						var editor = jQuery('.' + idPrefix + '-groupEdit').fadeIn(100);
+					},
+					switchToGroupNameView: function(idPrefix) {
+						var view = jQuery('.' + idPrefix + '-groupView');
+						var icon = jQuery('.' + idPrefix + '-groupEditIcon');
+						var editor = jQuery('.' + idPrefix + '-groupEdit');
+						editor.hide();
+						view.fadeIn(100);
+						icon.fadeIn(100);
+						return {editor : editor, view : view};
+					},
+					endGroupNameEdit: function(idPrefix) {
+						var els = ECEPage.switchToGroupNameView(idPrefix)
+						els.view.text(els.editor.val());
+					},
+					cancelGroupNameEdit: function(idPrefix) {
+						var els = ECEPage.switchToGroupNameView(idPrefix)
+						els.editor.val(els.view.text());
+					},
+					criterionEditorCotroller : null,
+					CriterionEditorController : function(selector, title) {
+						var ctx = this;
+						sObjectWalker.pushCallbacks(function() {
+							var formContents = jQuery(selector);
+							var editorBoxy = new Boxy(formContents, {draggable:true, title:title, modal: true, closeable: false, clone: false, appendToElement: '#criterion-popups'});
+							var rootObject = sObjectWalker.sobjectsComplete[jQuery('[id$="ObjectTypeField"]').val()];
+							var fieldInput = formContents.find('[id$="EventClassFieldSelector"]');
+							var operatorField = formContents.find('.operatorField');
+							var valueTypeInput = formContents.find('.valueTypeInput');
+							var valueInput = formContents.find('.valueInput');
+							var editorTarget = formContents.find('.value-editor-target');
+							var valueStateInput = formContents.find('.valueObjectStateInput');
+							var floatingDropdownButton = formContents.find("[id$='button-floating-dropdown']");
+	
+							fieldInput.fieldSelector({ rootObject : rootObject.name });
+
+							fieldInput.change(function() { valueInput.jaeSetField(rootObject.name + '.' + fieldInput.val()); });
+							operatorField.change(function() { valueInput.jaeSetIsArray(operatorField.val() in ECEPage.setOperators); });
+							
+							var oldField = null;
+							var oldLiteral = null
+							objectTypeChanged = function(dontUpdateValue) {
+								if(valueTypeInput.prop('selectedIndex') == 0) {
+									//valueInput.val(null);
+									valueStateInput.css('display', 'none');
+									oldField = valueInput.val();
+									if(oldLiteral) valueInput.val(oldLiteral);
+									valueInput.removeFieldSelector();
+									valueInput.jsonArrayEditor({
+										rootObject : rootObject,
+										fieldPath : rootObject.name + '.' + fieldInput.val(),
+										isArray : (operatorField.val() in ECEPage.setOperators),
+									});
+								}
+								else {
+									valueStateInput.css('display', 'block');
+									oldLiteral = valueInput.val();
+									if(oldField) valueInput.val(oldField);
+									valueInput.removeJsonArrayEditor();
+									valueInput.fieldSelector({ rootObject : rootObject.name });
+								}
+							}
+							objectTypeChanged(true);
+							valueTypeInput.change(function() { objectTypeChanged(); });
+							
+							ctx.done = function() { editorBoxy.hide(); }
+							editorBoxy.show();
+						});
+					},
+					startCriterionEdit: function(selector, title) {
+						ECEPage.criterionEditorCotroller = new ECEPage.CriterionEditorController(selector, title);
+					},
+					endCriterionEdit: function(selector) {
+						ECEPage.criterionEditorCotroller.done();
+						ECEPage.criterionEditorCotroller = null;
+						refreshDynamicArea();
+					},
+					editEventMode: function(source, groupListId) {
+						var title = '{!JSENCODE($Label.EditEventCreationMode)}';
+						if(groupListIds[1] == groupListId)
+							title = '{!JSENCODE($Label.EditEventCompletionMode)}';
+						var boxy = new Boxy(jQuery('#popup-frame').clone(), {
+							title: title,
+							clone: false, 
+							afterHide: function(){boxy.unload();},
+							closeable: false,
+							modal: true,
+						});
+						
+						var select = null;					
+						if(groupListIds[0] == groupListId)
+							select = jQuery('.creationModeField')
+						else if(groupListIds[1] == groupListId)
+							select = jQuery('.completionModeField')
+						else
+							return;
+							
+						var contents = boxy.getContent().find('.popup-frame-body');
+						select.find('option').each(function(i, opt){
+							var $opt = $(opt);
+							var id = 'radio-' + $opt.val();
+							var gid = 'grp-lst-mode';
+							var item = $('<div/>');
+							var label = $('<label/>').
+								attr('for', id).
+								text($opt.text());
+							var radio = $('<input/>').
+								attr('id', id).
+								attr('type', 'radio').
+								attr('name', gid).
+								attr('value', $opt.val()).
+								text($opt.text()).
+								change($opt.val(), function(){
+									if($(this).is(':checked'))
+										select.val($opt.val()).change();
+										$(source).text($opt.text());
+								}).
+								prop('checked', $opt.prop('selected'));
+							item.append(radio);
+							item.append(label);
+							contents.append(item);
+						});
+						
+						var buttons = boxy.getContent().find('.popup-frame-buttons');
+						buttons.append(jQuery('<input/>').
+							attr('class', 'btn').
+							attr('type', 'button').
+							attr('value', '{!JSENCODE($Label.Ok)}')
+							.click(function(){
+								boxy.hide();
+							}));
+					},
+					refreshDynamicAreaPostHook: function(callback) {
+						ECEPage.refreshObjectTypeField();
+						ECEPage.setCompletionActionsEditor();
+// 						ECEPage.refreshObjectTypeField();
+						if(callback != undefined) 
+	 						callback();
+					},
+					refreshObjectTypeField: function() {
+						jQuery('[id$="ObjectTypeField"]').prop('disabled', criteriaCount > 0);
+					},
+					setCompletionActionsEditor : function() {
+						var existingValueString = jQuery('.CompletionActionsField').val().trim();
+						ECEPage.completionActions = (existingValueString.length > 0 ? kimble.parseJSON(existingValueString) : []);
+						//ECEPage.writeActionsToField();
+						ECEPage.completionActionsController = new ECEPage.CompletionActionsController(ECEPage.completionActions, ECEPage.eventClassBaseJs, '#completion-actions-template', jQuery('.GroupList-' + groupListIds[1]).find('.completion-actions'));
+					},
+					eventClassBaseJs : kimble.parseJSON("{!JSENCODE(eventClassBaseJs)}"),
+					completionActions : null,
+					writeActionsToField : function() {
+						jQuery('.CompletionActionsField').val(JSON.stringify(ECEPage.completionActions));
+					},
+					completionActionsController : null,
+					CompletionActionsController : function(actions, choices, template, target) {
+						var ctx = this;
+
+						ctx.model = {
+							actions : actions,
+						};
+						ctx.ractive = new Ractive({
+						    el: target,
+						    template: jQuery(template).html(),
+						    data: ctx.model,
+						});
+						ctx.ractive.on({
+							edit : function(evt) {
+								var action = ctx.ractive.get(evt.keypath);
+								ECEPage.editCompletionActionController = new ECEPage.EditCompletionActionController(action);
+								initialiseModalBoxy('.completion-action-edit', '{!JSENCODE($Label.Edit)} ' + action.TypeName);
+								showModalBoxy();
+							},
+							add : function() {
+								if(ECEPage.addCompletionActionController == null)
+									ECEPage.addCompletionActionController = new ECEPage.AddCompletionActionController(actions, choices);
+								initialiseModalBoxy('.completion-action-add', '{!JSENCODE($Label.AddCompletionAction)}');
+								showModalBoxy();
+							},
+							del : function(evt) {
+								var action = ctx.ractive.get(evt.keypath);
+								var index = ctx.model.actions.indexOf(action);
+								ctx.ractive.splice('actions', index, 1);
+								ECEPage.writeActionsToField();
+							},
+						});
+					},
+					addCompletionActionController : null,
+					AddCompletionActionController : function(actions, choices, template, target) {
+						var ctx = this;
+						ctx.model = {
+							actions : actions,
+							selectedAction : 0,
+							choices : choices,
+						};
+						ctx.ractive = new Ractive({
+						    el: '.completion-action-add',
+						    template: jQuery('#add-completion-action-template').html(),
+						    data: ctx.model,
+						});
+						ctx.ractive.on({
+							ok : function(evt) {
+								var action = jQuery.extend({}, choices[ctx.model.selectedAction]);
+								ctx.ractive.push('actions', action);
+								hideModalBoxy();
+								ECEPage.completionActionsController.ractive.update();
+								ECEPage.writeActionsToField();
+								ECEPage.editCompletionActionController = new ECEPage.EditCompletionActionController(action);
+									initialiseModalBoxy('.completion-action-edit', '{!JSENCODE($Label.Edit)} ' + action.TypeName);
+									showModalBoxy();
+							},
+							cancel : function(evt) { hideModalBoxy(); },
+						});
+					},
+					editCompletionActionController : null,
+					EditCompletionActionController : function(action) {
+						var ctx = this;
+						ctx.model = action;
+						ctx.ractive = new Ractive({
+						    el: '.completion-action-edit',
+						    template: $('#edit-completion-action-template').html().replace(/\{\{\]/gim, '{{>'),
+						    data: ctx.model,
+						    partials : editorTemplates.getEditorPartials(),
+						    onchange : ECEPage.writeActionsToField,
+						});
+						ctx.ractive.on({
+							ok : function(evt) {
+								hideModalBoxy();
+								ECEPage.completionActionsController.ractive.update();
+							},
+							cancel : function(evt) { hideModalBoxy(); },
+						});
+					},
+				});
+
+				jQuery(ECEPage.init);
+			</script>
+		</apex:define>
+	</apex:composition>
+</apex:page>

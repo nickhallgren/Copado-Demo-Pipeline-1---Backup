@@ -1,0 +1,1159 @@
+<apex:page standardController="KimbleOne__TravelRequisition__c" sidebar="false" extensions="KimbleOne.TravelRequisitionHomeController" >
+
+	<apex:composition template="KimbleOne__SiteMaster">
+
+		<apex:define name="Menu">
+			<c:Menu MenuContextName="{!KimbleOne__TravelRequisition__c.Name}"/>
+		</apex:define>
+
+		<apex:define name="Content">
+			<div id="left" style="float:left;width:75%" >
+				<apex:form id="TheForm">
+					<div id="pageErrors">
+						<apex:pageMessages escape="False" />
+					</div>
+					<apex:outputPanel layout="none" rendered="{!ISBLANK(TheRequisitionVersion)}">
+
+						<apex:outputText value="{!KimbleOne__TravelRequisition__c.KimbleOne__TravelFromDate__c}" style="display:none"/>
+						<apex:outputText value="{!KimbleOne__TravelRequisition__c.KimbleOne__Status__c}" style="display:none"/>
+						<apex:pageBlock mode="edit">
+							<div class="pbHeader">
+								<table border="0" cellpadding="0" cellspacing="0">
+									<tbody>
+									<tr>
+										<td class="pbTitle"><h2 class="mainTitle">{!$Label.kimbleone__travelrequestheading}</h2></td>
+										<td class="pbButton ">
+											<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__TravelRequisition__c.updateable}">
+												<apex:commandButton action="{!AmendBooking}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__amendbookingbutton}" reRender="TheForm" rendered="{!CanAmendBooking}"/>
+												<apex:commandButton action="{!CancelRequisition}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__cancel}" reRender="TheForm" rendered="{!CanCancelRequisition}"/>
+												<apex:commandButton action="{!SubmitForItinerary}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__requestitinerarybutton}" reRender="TheForm" rendered="{!CanSubmitForItinerary}"/>
+												<apex:commandButton action="{!UpdateItinerary}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__updateitineraryoptionsbutton}" reRender="TheForm" rendered="{!CanUpdateItinerary}"/>
+												<apex:commandButton action="{!SubmitForItineraryApproval}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__submitforitineraryapprovalbutton}" reRender="TheForm" rendered="{!CanSubmitForItineraryApproval}"/>
+												<apex:commandButton action="{!SubmitForApproval}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__submitforapprovalbutton}" reRender="TheForm" rendered="{!CanSubmitForApproval}"/>
+												<apex:commandButton action="{!CompleteRequisition}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__complete}" reRender="TheForm" rendered="{!CanCompleteRequisition}" />
+												<apex:commandButton action="{!CloneRequisition}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__clonelabel}" reRender="TheForm" rendered="{!CanCloneRequisition}" />
+											</apex:outputPanel>
+										</td>
+										<td class="pbTitle" style="text-align: right;"><h3 class="mainTitle"><apex:outputField value="{!KimbleOne__TravelRequisition__c.Status__r.Name}" /></h3></td>
+									</tr>
+									</tbody>
+								</table>
+
+							</div>
+							<table border="0" cellspacing="4" cellpadding="0" style="width:100%">
+								<tr>
+									<td style="vertical-align: top;width:65%">
+										<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+
+											<apex:pageBlockSectionItem >
+												<apex:outputPanel >
+													<apex:outputLabel value="{!$ObjectType.KimbleOne__TravelRequisition__c.Fields.KimbleOne__Resource__c.Label}"/>
+													<p><apex:outputLabel value="{!$ObjectType.KimbleOne__TravelRequisition__c.Fields.KimbleOne__ResourcedActivity__c.Label}"/></p>
+												</apex:outputPanel>
+												<apex:outputPanel >
+													<apex:outputField value="{!KimbleOne__TravelRequisition__c.KimbleOne__Resource__c}" />
+													<p><apex:outputText value="{!KimbleOne__TravelRequisition__c.ResourcedActivity__r.KimbleOne__FullName__c}"/></p>
+												</apex:outputPanel>
+											</apex:pageBlockSectionItem>
+											<apex:pageBlockSectionItem >
+												<apex:outputLabel value="{!$ObjectType.KimbleOne__TravelRequisition__c.Fields.KimbleOne__TravelReason__c.Label}"/>
+												<apex:outputField value="{!KimbleOne__TravelRequisition__c.KimbleOne__TravelReason__c}"/>
+											</apex:pageBlockSectionItem>
+
+										</apex:pageblockSection>
+
+										<apex:pageBlockSection >
+											<apex:repeat value="{!$ObjectType.KimbleOne__TravelRequisition__c.FieldSets.KimbleOne__TravelRequisitionDetails}" var="f" >
+												<apex:outputField value="{!KimbleOne__TravelRequisition__c[f]}" />
+											</apex:repeat>
+										</apex:pageBlockSection>
+
+									</td>
+									<td style="vertical-align: top;width:35%">
+										<div style="border: 1px solid #E0E3E5;margin-right: 7px;background-color: #FFFFFE;">
+											<apex:pageblockSection collapsible="false" showheader="false" columns="1" rendered="{!WithItinerary}">
+												<apex:pageBlockSectionItem labelStyle="white-space:nowrap;" rendered="{!WithItinerary}">
+													<apex:outputPanel >
+														<apex:outputLabel value="{!$Label.kimbleone__selectednetamountlabel}"/>
+														<p><apex:outputLabel value="{!$Label.kimbleone__lowestlogicalfarelabel}"/></p>
+													</apex:outputPanel>
+													<apex:outputPanel >
+														<apex:outputPanel rendered="{!KimbleOne__TravelRequisition__c.KimbleOne__NetAmount__c <= CheapestItineraryCost.KimbleOne__InputCurrency__c}">
+															<span style="color:#89B22B;font-weight:bold;"><apex:outputField value="{!KimbleOne__TravelRequisition__c.KimbleOne__NetAmount__c}"/></span>
+															<p><apex:outputField value="{!CheapestItineraryCost.KimbleOne__InputCurrency__c}"/></p>
+														</apex:outputPanel>
+														<apex:outputPanel rendered="{!KimbleOne__TravelRequisition__c.KimbleOne__NetAmount__c > CheapestItineraryCost.KimbleOne__InputCurrency__c}">
+															<span style="color:red;font-weight:bold;"><apex:outputField value="{!KimbleOne__TravelRequisition__c.KimbleOne__NetAmount__c}"/></span>
+															<p><apex:outputField value="{!CheapestItineraryCost.KimbleOne__InputCurrency__c}"/></p>
+														</apex:outputPanel>
+													</apex:outputPanel>
+												</apex:pageBlockSectionItem>
+											</apex:pageblockSection>
+										</div>
+									</td>
+								</tr>
+							</table>
+
+
+
+							<apex:outputPanel id="TravelCategories">
+								<!-- FLIGHT -->
+								<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['Flight'] != 0}">
+									<div class="travelCategoryHeading flight"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__flightsheading}</h2></div>
+									<div class="travelCategoryContent">
+
+										<apex:variable value="{!0}" var="rowNum"/>
+										<apex:pageBlockTable value="{!TheRequisitionItems['Flight']}" var="itm">
+											<apex:column headervalue="{!$Label.kimbleone__detailsheading}" style="width:150px" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+													(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+												</apex:outputPanel>
+												<apex:outputText escape="false" value="{!itm.Description__c}"/><br/>
+												<b><apex:outputText value="{!$ObjectType.KimbleOne__TravelRequisition__c.Fields.KimbleOne__Reference__c.Label}"/></b>:<apex:outputText value="{!KimbleOne__TravelRequisition__c.KimbleOne__Reference__c}"/>/<apex:outputText value="{!itm.Reference__c}"/>
+												<apex:outputPanel layout="block" rendered="{!!ISBLANK(itm.NetAmount__c)}">
+													<b><apex:outputText value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__NetAmount__c.Label}"/></b>:<apex:outputField value="{!itm.NetAmount__c}"/>
+												</apex:outputPanel>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.RequisitionNotes__c}" />
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}" rendered="{!WithItinerary}">
+												<apex:inputText value="{!itm.SelectedTravelItineraryItem__c}" style="display:none" styleclass="item{!itm.Id}"/>
+												<table class="travelBasis" border="0" cellpadding="0" cellspacing="0">
+													<apex:repeat value="{!itm.TravelItineraryItems__r}" var="itinerary">
+														<tr>
+															<td rowspan="4" class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																<apex:outputPanel layout="none" rendered="{!CanSelectItineraryOptions}">
+																	<apex:outputPanel layout="none" rendered="{!!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id}">
+																		<input type="radio" name="selectFlightItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')" checked="checked"/>
+																	</apex:outputPanel>
+																	<apex:outputPanel layout="none" rendered="{!!(itm.SelectedTravelItineraryItem__c == itinerary.Id)}">
+																		<input type="radio" name="selectFlightItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')"/>
+																	</apex:outputPanel>
+																</apex:outputPanel>
+															</td>
+															<td rowspan="4" class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																&nbsp;
+															</td>
+															<td rowspan="4" style="background:transparent;">
+																<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="30" rows="6" readonly="true"/>
+															</td>
+															<td style="background:transparent;">
+																<apex:outputField value="{!itinerary.NetAmount__c}"/>
+															</td>
+														</tr>
+														<tr>
+															<td class="label">{!$ObjectType.KimbleOne__TravelItineraryItem__c.Fields.KimbleOne__FlightDepartureAirline__c.Label}</td>
+															<td><apex:outputField value="{!itinerary.FlightDepartureAirline__c}"/></td>
+														</tr>
+														<tr>
+															<td class="label">{!$ObjectType.KimbleOne__TravelItineraryItem__c.Fields.KimbleOne__FlightReturnAirline__c.Label}</td>
+															<td><apex:outputField value="{!itinerary.FlightReturnAirline__c}"/></td>
+														</tr>
+														<tr>
+															<td class="label">{!$ObjectType.KimbleOne__TravelItineraryItem__c.Fields.KimbleOne__RequiresApproval__c.Label}</td>
+															<td><apex:outputField value="{!itinerary.RequiresApproval__c}"/></td>
+														</tr>
+													</apex:repeat>
+												</table>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" style="width:120px" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.SupplierAccount__c}"/>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__BookingReference__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','actionColumn')}">
+												<apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#BookingReferencePopup', '{!JSENCODE($Label.kimbleone__booknowheading)}'); bookRequisitionItem('{!JSINHTMLENCODE(itm.Id)}')" rendered="{!CanBookNow && TheRequisitionItemsMap[itm.Id].Status__c != BookedId}">{!$Label.kimbleone__booknowlink}</apex:outputLink>
+												<apex:outputField value="{!TheRequisitionItemsMap[itm.Id].BookingReference__c}" rendered="{!!ISBLANK(TheRequisitionItemsMap[itm.Id].BookingReference__c)}"/>
+
+												<div><apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#UpdateBookingPopup', '{!JSENCODE($Label.kimbleone__updatebutton)}'); updateRequisitionItem('{!JSINHTMLENCODE(itm.Id)}')" rendered="{!CanUpdateBooking && TheRequisitionItemsMap[itm.Id].Status__c = BookedId}">{!$Label.kimbleone__updatebookinglabel}</apex:outputLink></div>
+
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__travelrequisitionothers}" rendered="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemFlight.size > 0}">
+												<apex:repeat value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemFlight}" var="f" >
+													<b><apex:outputLabel value="{!f.Label}"></apex:outputLabel> : </b><apex:outputField value="{!itm[f]}"  /> <br/>
+												</apex:repeat>
+											</apex:column>
+
+										</apex:pageBlockTable>
+									</div>
+								</apex:outputPanel>
+
+								<!-- HOTEL -->
+								<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['Hotel'] != 0}">
+									<div class="travelCategoryHeading hotel"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__hotelsheading}</h2></div>
+									<div class="travelCategoryContent">
+
+										<apex:variable value="{!0}" var="rowNum"/>
+										<apex:pageBlockTable value="{!TheRequisitionItems['Hotel']}" var="itm" >
+											<apex:column headervalue="{!$Label.kimbleone__detailsheading}" style="width:150px" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+													(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+												</apex:outputPanel>
+												<apex:outputText escape="false" value="{!itm.Description__c}"/><br/>
+												<b><apex:outputText value="{!$ObjectType.KimbleOne__TravelRequisition__c.Fields.KimbleOne__Reference__c.Label}"/></b>:<apex:outputText value="{!KimbleOne__TravelRequisition__c.KimbleOne__Reference__c}"/>/<apex:outputText value="{!itm.Reference__c}"/>
+												<apex:outputPanel layout="block" rendered="{!!ISBLANK(itm.NetAmount__c)}">
+													<b><apex:outputText value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__NetAmount__c.Label}"/></b>:<apex:outputField value="{!itm.NetAmount__c}"/>
+												</apex:outputPanel>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.RequisitionNotes__c}" />
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:inputText value="{!itm.SelectedTravelItineraryItem__c}" style="display:none" styleclass="item{!itm.Id}"/>
+												<table class="travelBasis" border="0" cellpadding="0" cellspacing="0">
+													<apex:repeat value="{!itm.TravelItineraryItems__r}" var="itinerary">
+														<tr>
+															<td rowspan="2" class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																<apex:outputPanel layout="none" rendered="{!CanSelectItineraryOptions}">
+																	<apex:outputPanel layout="none" rendered="{!!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id}">
+																		<input type="radio" name="selectHotelItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')" checked="checked"/>
+																	</apex:outputPanel>
+																	<apex:outputPanel layout="none" rendered="{!!(itm.SelectedTravelItineraryItem__c == itinerary.Id)}">
+																		<input type="radio" name="selectHotelItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')"/>
+																	</apex:outputPanel>
+																</apex:outputPanel>
+															</td>
+															<td rowspan="2" class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																&nbsp;
+															</td>
+															<td rowspan="2" style="background:transparent;">
+																<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="30" rows="6" readonly="true"/>
+															</td>
+															<td style="background:transparent;">
+																<apex:outputField value="{!itinerary.NetAmount__c}"/>
+															</td>
+														</tr>
+														<tr>
+															<td class="label">{!$ObjectType.KimbleOne__TravelItineraryItem__c.Fields.KimbleOne__RequiresApproval__c.Label}</td>
+															<td><apex:outputField value="{!itinerary.RequiresApproval__c}"/></td>
+														</tr>
+													</apex:repeat>
+												</table>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" style="width:120px" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.SupplierAccount__c}"/>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__BookingReference__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','actionColumn')}">
+												<apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#BookingReferencePopup', '{!JSENCODE($Label.kimbleone__booknowheading)}'); bookRequisitionItem('{!JSINHTMLENCODE(itm.Id)}')" rendered="{!CanBookNow && TheRequisitionItemsMap[itm.Id].Status__c != BookedId}">{!$Label.kimbleone__booknowlink}</apex:outputLink>
+												<apex:outputField value="{!TheRequisitionItemsMap[itm.Id].BookingReference__c}" rendered="{!!ISBLANK(TheRequisitionItemsMap[itm.Id].BookingReference__c)}"/>
+
+												<div><apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#UpdateBookingPopup', '{!JSENCODE($Label.kimbleone__updatebutton)}'); updateRequisitionItem('{!JSINHTMLENCODE(itm.Id)}')" rendered="{!CanUpdateBooking && TheRequisitionItemsMap[itm.Id].Status__c = BookedId}">{!$Label.kimbleone__updatebookinglabel}</apex:outputLink></div>
+
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__travelrequisitionothers}" rendered="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemHotel.size > 0}">
+												<apex:repeat value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemHotel}" var="f" >
+													<b><apex:outputLabel value="{!f.Label}"></apex:outputLabel> : </b><apex:outputField value="{!itm[f]}"  /> <br/>
+												</apex:repeat>
+											</apex:column>
+
+										</apex:pageBlockTable>
+									</div>
+								</apex:outputPanel>
+
+								<!-- TRAIN -->
+								<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['Train'] != 0}">
+									<div class="travelCategoryHeading train"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__trainsheading}</h2></div>
+									<div class="travelCategoryContent">
+
+										<apex:variable value="{!0}" var="rowNum"/>
+										<apex:pageBlockTable value="{!TheRequisitionItems['Train']}" var="itm" >
+											<apex:column headervalue="{!$Label.kimbleone__detailsheading}" style="width:150px" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+													(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+												</apex:outputPanel>
+												<apex:outputText escape="false" value="{!itm.Description__c}"/><br/>
+												<b><apex:outputText value="{!$ObjectType.KimbleOne__TravelRequisition__c.Fields.KimbleOne__Reference__c.Label}"/></b>:<apex:outputText value="{!KimbleOne__TravelRequisition__c.KimbleOne__Reference__c}"/>/<apex:outputText value="{!itm.Reference__c}"/>
+												<apex:outputPanel layout="block" rendered="{!!ISBLANK(itm.NetAmount__c)}">
+													<b><apex:outputText value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__NetAmount__c.Label}"/></b>:<apex:outputField value="{!itm.NetAmount__c}"/>
+												</apex:outputPanel>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.RequisitionNotes__c}" />
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}"  styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:inputText value="{!itm.SelectedTravelItineraryItem__c}" style="display:none" styleclass="item{!itm.Id}"/>
+												<table class="travelBasis" border="0" cellpadding="0" cellspacing="0">
+													<apex:repeat value="{!itm.TravelItineraryItems__r}" var="itinerary">
+														<tr>
+															<td rowspan="2" class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																<apex:outputPanel layout="none" rendered="{!CanSelectItineraryOptions}">
+																	<apex:outputPanel layout="none" rendered="{!!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id}">
+																		<input type="radio" name="selectTrainItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')" checked="checked"/>
+																	</apex:outputPanel>
+																	<apex:outputPanel layout="none" rendered="{!!(itm.SelectedTravelItineraryItem__c == itinerary.Id)}">
+																		<input type="radio" name="selectTrainItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')"/>
+																	</apex:outputPanel>
+																</apex:outputPanel>
+															</td>
+															<td rowspan="2" class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																&nbsp;
+															</td>
+															<td rowspan="2" style="background:transparent;">
+																<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="30" rows="6" readonly="true"/>
+															</td>
+															<td style="background:transparent;">
+																<apex:outputField value="{!itinerary.NetAmount__c}"/>
+															</td>
+														</tr>
+														<tr>
+															<td class="label">{!$ObjectType.KimbleOne__TravelItineraryItem__c.Fields.KimbleOne__RequiresApproval__c.Label}</td>
+															<td><apex:outputField value="{!itinerary.RequiresApproval__c}"/></td>
+														</tr>
+													</apex:repeat>
+												</table>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" style="width:120px"  styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.SupplierAccount__c}"/>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__BookingReference__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','actionColumn')}">
+												<apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#BookingReferencePopup', '{!JSENCODE($Label.kimbleone__booknowheading)}'); bookRequisitionItem('{!JSINHTMLENCODE(itm.Id)}')" rendered="{!CanBookNow && TheRequisitionItemsMap[itm.Id].Status__c != BookedId}">{!$Label.kimbleone__booknowlink}</apex:outputLink>
+												<apex:outputField value="{!TheRequisitionItemsMap[itm.Id].BookingReference__c}" rendered="{!!ISBLANK(TheRequisitionItemsMap[itm.Id].BookingReference__c)}"/>
+
+												<div><apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#UpdateBookingPopup', '{!JSENCODE($Label.kimbleone__updatebutton)}'); updateRequisitionItem('{!JSINHTMLENCODE(itm.Id)}')" rendered="{!CanUpdateBooking && TheRequisitionItemsMap[itm.Id].Status__c = BookedId}">{!$Label.kimbleone__updatebookinglabel}</apex:outputLink></div>
+
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__travelrequisitionothers}" rendered="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemTrain.size > 0}">
+												<apex:repeat value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemTrain}" var="f" >
+													<b><apex:outputLabel value="{!f.Label}"></apex:outputLabel> : </b><apex:outputField value="{!itm[f]}"  /> <br/>
+												</apex:repeat>
+											</apex:column>
+
+										</apex:pageBlockTable>
+									</div>
+								</apex:outputPanel>
+
+								<!-- TAXI -->
+								<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['Taxi'] != 0}">
+									<div class="travelCategoryHeading taxi"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__taxiheading}</h2></div>
+									<div class="travelCategoryContent">
+
+										<apex:variable value="{!0}" var="rowNum"/>
+										<apex:pageBlockTable value="{!TheRequisitionItems['Taxi']}" var="itm" >
+											<apex:column headervalue="{!$Label.kimbleone__detailsheading}" style="width:150px" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+													(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+												</apex:outputPanel>
+												<apex:outputText escape="false" value="{!itm.Description__c}"/><br/>
+												<b><apex:outputText value="{!$ObjectType.KimbleOne__TravelRequisition__c.Fields.KimbleOne__Reference__c.Label}"/></b>:<apex:outputText value="{!KimbleOne__TravelRequisition__c.KimbleOne__Reference__c}"/>/<apex:outputText value="{!itm.Reference__c}"/>
+												<apex:outputPanel layout="block" rendered="{!!ISBLANK(itm.NetAmount__c)}">
+													<b><apex:outputText value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__NetAmount__c.Label}"/></b>:<apex:outputField value="{!itm.NetAmount__c}"/>
+												</apex:outputPanel>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.RequisitionNotes__c}" />
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:inputText value="{!itm.SelectedTravelItineraryItem__c}" style="display:none" styleclass="item{!itm.Id}"/>
+												<table class="travelBasis" border="0" cellpadding="0" cellspacing="0">
+													<apex:repeat value="{!itm.TravelItineraryItems__r}" var="itinerary">
+														<tr>
+															<td rowspan="2" class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																<apex:outputPanel layout="none" rendered="{!CanSelectItineraryOptions}">
+																	<apex:outputPanel layout="none" rendered="{!!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id}">
+																		<input type="radio" name="selectFlightItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')" checked="checked"/>
+																	</apex:outputPanel>
+																	<apex:outputPanel layout="none" rendered="{!!(itm.SelectedTravelItineraryItem__c == itinerary.Id)}">
+																		<input type="radio" name="selectFlightItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')"/>
+																	</apex:outputPanel>
+																</apex:outputPanel>
+															</td>
+															<td rowspan="2" class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																&nbsp;
+															</td>
+															<td rowspan="2" style="background:transparent;">
+																<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="30" rows="6" readonly="true"/>
+															</td>
+															<td style="background:transparent;">
+																<apex:outputField value="{!itinerary.NetAmount__c}"/>
+															</td>
+														</tr>
+														<tr>
+															<td class="label">{!$ObjectType.KimbleOne__TravelItineraryItem__c.Fields.KimbleOne__RequiresApproval__c.Label}</td>
+															<td><apex:outputField value="{!itinerary.RequiresApproval__c}"/></td>
+														</tr>
+													</apex:repeat>
+												</table>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" style="width:120px"  styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.SupplierAccount__c}"/>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__BookingReference__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','actionColumn')}">
+												<apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#BookingReferencePopup', '{!JSENCODE($Label.kimbleone__booknowheading)}'); bookRequisitionItem('{!JSINHTMLENCODE(itm.Id)}')" rendered="{!CanBookNow && TheRequisitionItemsMap[itm.Id].Status__c != BookedId}">{!$Label.kimbleone__booknowlink}</apex:outputLink>
+												<apex:outputField value="{!TheRequisitionItemsMap[itm.Id].BookingReference__c}" rendered="{!!ISBLANK(TheRequisitionItemsMap[itm.Id].BookingReference__c)}"/>
+
+												<div><apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#UpdateBookingPopup', '{!JSENCODE($Label.kimbleone__updatebutton)}'); updateRequisitionItem('{!JSINHTMLENCODE(itm.Id)}')" rendered="{!CanUpdateBooking && TheRequisitionItemsMap[itm.Id].Status__c = BookedId}">{!$Label.kimbleone__updatebookinglabel}</apex:outputLink></div>
+
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__travelrequisitionothers}" rendered="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemTaxi.size > 0}">
+												<apex:repeat value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemTaxi}" var="f" >
+													<b><apex:outputLabel value="{!f.Label}"></apex:outputLabel> : </b><apex:outputField value="{!itm[f]}"  /> <br/>
+												</apex:repeat>
+											</apex:column>
+
+										</apex:pageBlockTable>
+									</div>
+								</apex:outputPanel>
+
+								<!-- CAR HIRE -->
+								<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['CarHire'] != 0}">
+									<div class="travelCategoryHeading carHire"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__carhirelabel}</h2></div>
+									<div class="travelCategoryContent">
+
+										<apex:variable value="{!0}" var="rowNum"/>
+										<apex:pageBlockTable value="{!TheRequisitionItems['CarHire']}" var="itm" >
+											<apex:column headervalue="{!$Label.kimbleone__detailsheading}" style="width:180px" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+													(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+												</apex:outputPanel>
+												<apex:outputText escape="false" value="{!itm.Description__c}"/><br/>
+												<b><apex:outputText value="{!$ObjectType.KimbleOne__TravelRequisition__c.Fields.KimbleOne__Reference__c.Label}"/></b>:<apex:outputText value="{!KimbleOne__TravelRequisition__c.KimbleOne__Reference__c}"/>/<apex:outputText value="{!itm.Reference__c}"/>
+												<apex:outputPanel layout="block" rendered="{!!ISBLANK(itm.NetAmount__c)}">
+													<b><apex:outputText value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__NetAmount__c.Label}"/></b>:<apex:outputField value="{!itm.NetAmount__c}"/>
+												</apex:outputPanel>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.RequisitionNotes__c}" />
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:inputText value="{!itm.SelectedTravelItineraryItem__c}" style="display:none" styleclass="item{!itm.Id}"/>
+												<table class="travelBasis" border="0" cellpadding="0" cellspacing="0">
+													<apex:repeat value="{!itm.TravelItineraryItems__r}" var="itinerary">
+														<tr>
+															<td rowspan="2" class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																<apex:outputPanel layout="none" rendered="{!CanSelectItineraryOptions}">
+																	<apex:outputPanel layout="none" rendered="{!!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id}">
+																		<input type="radio" name="selectCarHireItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')" checked="checked"/>
+																	</apex:outputPanel>
+																	<apex:outputPanel layout="none" rendered="{!!(itm.SelectedTravelItineraryItem__c == itinerary.Id)}">
+																		<input type="radio" name="selectCarHireItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')"/>
+																	</apex:outputPanel>
+																</apex:outputPanel>
+															</td>
+															<td rowspan="2" class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																&nbsp;
+															</td>
+															<td rowspan="2" style="background:transparent;">
+																<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="30" rows="6" readonly="true"/>
+															</td>
+															<td style="background:transparent;">
+																<apex:outputField value="{!itinerary.NetAmount__c}"/>
+															</td>
+														</tr>
+														<tr>
+															<td class="label">{!$ObjectType.KimbleOne__TravelItineraryItem__c.Fields.KimbleOne__RequiresApproval__c.Label}</td>
+															<td><apex:outputField value="{!itinerary.RequiresApproval__c}"/></td>
+														</tr>
+													</apex:repeat>
+												</table>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" style="width:120px"  styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.SupplierAccount__c}"/>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__BookingReference__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','actionColumn')}">
+												<apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#BookingReferencePopup', '{!JSENCODE($Label.kimbleone__booknowheading)}'); bookRequisitionItem('{!JSINHTMLENCODE(itm.Id)}')" rendered="{!CanBookNow && TheRequisitionItemsMap[itm.Id].Status__c != BookedId}">{!$Label.kimbleone__booknowlink}</apex:outputLink>
+												<apex:outputField value="{!TheRequisitionItemsMap[itm.Id].BookingReference__c}" rendered="{!!ISBLANK(TheRequisitionItemsMap[itm.Id].BookingReference__c)}"/>
+
+												<div><apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#UpdateBookingPopup', '{!JSENCODE($Label.kimbleone__updatebutton)}'); updateRequisitionItem('{!JSINHTMLENCODE(itm.Id)}')" rendered="{!CanUpdateBooking && TheRequisitionItemsMap[itm.Id].Status__c = BookedId}">{!$Label.kimbleone__updatebookinglabel}</apex:outputLink></div>
+
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__travelrequisitionothers}" rendered="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemCarHire.size > 0}">
+												<apex:repeat value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemCarHire}" var="f" >
+													<b><apex:outputLabel value="{!f.Label}"></apex:outputLabel> : </b><apex:outputField value="{!itm[f]}"  /> <br/>
+												</apex:repeat>
+											</apex:column>
+
+										</apex:pageBlockTable>
+									</div>
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheTravellers.Size != 0}">
+									<div class="travelCategoryHeading other"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$ObjectType.KimbleOne__Traveller__c.LabelPlural}</h2></div>
+									<div class="travelCategoryContent">
+										<apex:pageBlockTable value="{!TheTravellers}" var="traveller" rendered="{!TheTravellers.size != 0}">
+
+											<apex:column headervalue="{!$ObjectType.KimbleOne__Traveller__c.Fields.KimbleOne__Contact__c.Label}" width="400px">
+												<apex:outputField value="{!traveller.KimbleOne__Contact__c}"/>
+											</apex:column>
+
+											<apex:repeat var="f" value="{!$ObjectType.Contact.FieldSets.KimbleOne__TravellerDetails}">
+												<apex:column headerValue="{!f.label}">
+													<apex:outputField value="{!TheContactTravellerDetails[traveller.KimbleOne__Contact__c][f]}" />
+												</apex:column>
+											</apex:repeat>
+										</apex:pageBlockTable>
+									</div>
+									<br/>
+								</apex:outputPanel>
+
+							</apex:outputPanel>
+						</apex:pageBlock>
+
+						<apex:actionFunction action="{!UpdateSelectedItineraryItem}" name="updateSelectedItineraryItem" rerender="TheForm, requisitionChatter">
+							<apex:param name="itemId" value=""/>
+							<apex:param name="itineraryId" value=""/>
+						</apex:actionFunction>
+
+						<apex:actionFunction action="{!LoadRequisitionItemToBook}" name="bookRequisitionItem" rerender="SelectedRequisitionItem" oncomplete="showModalBoxy()">
+							<apex:param name="itemId" value=""/>
+						</apex:actionFunction>
+
+						<apex:actionFunction action="{!LoadRequisitionItemToUpdate}" name="updateRequisitionItem" rerender="UpdateRequisitionItem" oncomplete="showModalBoxy()">
+							<apex:param name="itemId" value=""/>
+						</apex:actionFunction>
+
+					</apex:outputPanel>
+					<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheRequisitionVersion)}">
+						<apex:pageBlock mode="edit">
+							<div class="pbHeader">
+								<table border="0" cellpadding="0" cellspacing="0">
+									<tbody>
+									<tr>
+										<td class="pbTitle"><h2 class="mainTitle">{!$Label.kimbleone__travelrequestheading}</h2></td>
+										<td class="pbButton ">
+											<apex:outputPanel layout="none" rendered="{!$ObjectType.KimbleOne__TravelRequisition__c.updateable}">
+												<apex:commandButton action="{!AmendBooking}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__amendbookingbutton}" reRender="TheForm" rendered="{!CanAmendBooking}"/>
+												<apex:commandButton action="{!SubmitForItinerary}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__requestitinerarybutton}" reRender="TheForm" rendered="{!CanSubmitForItinerary}"/>
+												<apex:commandButton action="{!UpdateItinerary}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__updateitineraryoptionsbutton}" reRender="TheForm" rendered="{!CanUpdateItinerary}"/>
+												<apex:commandButton action="{!SubmitForItineraryApproval}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__submitforitineraryapprovalbutton}" reRender="TheForm" rendered="{!CanSubmitForItineraryApproval}"/>
+												<apex:commandButton action="{!SubmitForApproval}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__submitforapprovalbutton}" reRender="TheForm" rendered="{!CanSubmitForApproval && KimbleOne__TravelRequisition__c.KimbleOne__NetAmount__c == CheapestItineraryCost.KimbleOne__InputCurrency__c}"/>
+												<apex:commandButton action="{!CloneRequisition}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__clonelabel}" reRender="TheForm" rendered="{!CanCloneRequisition}" />
+												<apex:outputPanel layout="none" rendered="{!CanSubmitForApproval && KimbleOne__TravelRequisition__c.KimbleOne__NetAmount__c != CheapestItineraryCost.KimbleOne__InputCurrency__c}">
+													<input type="button" class="btn" onclick="initialiseModalBoxy('#FareReasonPopup', '{!JSENCODE($Label.EnterFareSelectionReasonHeading)}');showModalBoxy();" value="{!$Label.kimbleone__submitforapprovalbutton}" />
+												</apex:outputPanel>
+											</apex:outputPanel>
+										</td>
+										<td class="pbTitle" style="text-align: right;"><h3 class="mainTitle"><apex:outputField value="{!KimbleOne__TravelRequisition__c.Status__r.Name}" /></h3></td>
+									</tr>
+									</tbody>
+								</table>
+
+							</div>
+							<table border="0" cellspacing="4" cellpadding="0" style="width:100%">
+								<tr>
+									<td style="vertical-align: top;width:65%">
+										<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+
+											<apex:pageBlockSectionItem >
+												<apex:outputPanel >
+													<apex:outputLabel value="{!$ObjectType.KimbleOne__TravelRequisition__c.Fields.KimbleOne__Resource__c.Label}"/>
+													<p><apex:outputLabel value="{!$ObjectType.KimbleOne__TravelRequisition__c.Fields.KimbleOne__ResourcedActivity__c.Label}"/></p>
+												</apex:outputPanel>
+												<apex:outputPanel >
+													<apex:outputField value="{!KimbleOne__TravelRequisition__c.KimbleOne__Resource__c}" />
+													<p><apex:outputText value="{!KimbleOne__TravelRequisition__c.ResourcedActivity__r.KimbleOne__FullName__c}"/></p>
+												</apex:outputPanel>
+											</apex:pageBlockSectionItem>
+											<apex:pageBlockSectionItem >
+												<apex:outputLabel value="{!$ObjectType.KimbleOne__TravelRequisition__c.Fields.KimbleOne__TravelReason__c.Label}"/>
+												<apex:outputField value="{!KimbleOne__TravelRequisition__c.KimbleOne__TravelReason__c}"/>
+											</apex:pageBlockSectionItem>
+
+										</apex:pageblockSection>
+
+										<apex:pageBlockSection >
+											<apex:repeat value="{!$ObjectType.KimbleOne__TravelRequisition__c.FieldSets.KimbleOne__TravelRequisitionDetails}" var="f" >
+												<apex:outputField value="{!KimbleOne__TravelRequisition__c[f]}" />
+											</apex:repeat>
+										</apex:pageBlockSection>
+
+									</td>
+									<td style="vertical-align: top;width:35%">
+										<div style="border: 1px solid #E0E3E5;margin-right: 7px;background-color: #FFFFFE;">
+											<apex:pageblockSection collapsible="false" showheader="false" columns="1" >
+												<apex:pageBlockSectionItem labelStyle="white-space:nowrap;">
+													<apex:outputPanel >
+														<apex:outputLabel value="{!$Label.kimbleone__selectednetamountlabel}"/>
+														<p><apex:outputLabel value="{!$Label.kimbleone__lowestlogicalfarelabel}"/></p>
+													</apex:outputPanel>
+													<apex:outputPanel >
+														<apex:outputPanel rendered="{!KimbleOne__TravelRequisition__c.KimbleOne__NetAmount__c <= CheapestItineraryCost.KimbleOne__InputCurrency__c}">
+															<span style="color:#89B22B;font-weight:bold;"><apex:outputField value="{!KimbleOne__TravelRequisition__c.KimbleOne__NetAmount__c}"/></span>
+															<p><apex:outputField value="{!CheapestItineraryCost.KimbleOne__InputCurrency__c}"/></p>
+														</apex:outputPanel>
+														<apex:outputPanel rendered="{!KimbleOne__TravelRequisition__c.KimbleOne__NetAmount__c > CheapestItineraryCost.KimbleOne__InputCurrency__c}">
+															<span style="color:red;font-weight:bold;"><apex:outputField value="{!KimbleOne__TravelRequisition__c.KimbleOne__NetAmount__c}"/></span>
+															<p><apex:outputField value="{!CheapestItineraryCost.KimbleOne__InputCurrency__c}"/></p>
+														</apex:outputPanel>
+													</apex:outputPanel>
+												</apex:pageBlockSectionItem>
+												<apex:pageBlockSectionItem rendered="{!KimbleOne__TravelRequisition__c.KimbleOne__NetAmount__c != CheapestItineraryCost.KimbleOne__InputCurrency__c}">
+													<apex:outputLabel value="{!$ObjectType.KimbleOne__TravelRequisition__c.Fields.KimbleOne__ItinerarySelectionReason__c.Label}"/>
+													<apex:outputField value="{!KimbleOne__TravelRequisition__c.KimbleOne__ItinerarySelectionReason__c}"/>
+												</apex:pageBlockSectionItem>
+											</apex:pageblockSection>
+										</div>
+									</td>
+								</tr>
+							</table>
+
+							<apex:outputPanel id="TravelCategories">
+
+								<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['Flight'] != 0}">
+									<div class="travelCategoryHeading flight"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__flightsheading}</h2></div>
+									<div class="travelCategoryContent">
+
+										<apex:variable value="{!0}" var="rowNum"/>
+										<apex:pageBlockTable value="{!TheRequisitionItems['Flight']}" var="itm">
+											<apex:column headervalue="{!$Label.kimbleone__detailsheading}" style="width:150px" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+													(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+												</apex:outputPanel>
+												<apex:outputText escape="false" value="{!itm.Description__c}"/>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.RequisitionNotes__c}" />
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:inputText value="{!itm.SelectedTravelItineraryItem__c}" style="display:none" styleclass="item{!itm.Id}"/>
+												<table class="travelBasis" border="0" cellpadding="0" cellspacing="0">
+													<apex:repeat value="{!itm.TravelItineraryItems__r}" var="itinerary">
+														<tr>
+															<td class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																<apex:outputPanel layout="none" rendered="{!CanSelectItineraryOptions}">
+																	<apex:outputPanel layout="none" rendered="{!!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id}">
+																		<input type="radio" name="selectFlightItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')" checked="checked"/>
+																	</apex:outputPanel>
+																	<apex:outputPanel layout="none" rendered="{!!(itm.SelectedTravelItineraryItem__c == itinerary.Id)}">
+																		<input type="radio" name="selectFlightItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')"/>
+																	</apex:outputPanel>
+																</apex:outputPanel>
+															</td>
+															<td class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																&nbsp;
+															</td>
+															<td style="background:transparent;">
+																<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="48" rows="6" readonly="true"/>
+															</td>
+															<td style="background:transparent;">
+																<apex:outputField value="{!itinerary.NetAmount__c}"/>
+															</td>
+														</tr>
+													</apex:repeat>
+												</table>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" style="width:120px" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.SupplierAccount__c}"/>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__BookingReference__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','actionColumn')}">
+												<apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#BookingReferencePopup', '{!JSENCODE($Label.kimbleone__booknowheading)}'); bookRequisitionItem('{!JSINHTMLENCODE(itm.Id)}')" rendered="{!CanBookNow && TheRequisitionItemsMap[itm.Id].Status__c != BookedId}">{!$Label.kimbleone__booknowlink}</apex:outputLink>
+												<apex:outputField value="{!TheRequisitionItemsMap[itm.Id].BookingReference__c}" rendered="{!TheRequisitionItemsMap[itm.Id].Status__c = BookedId}"/>
+
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__SupplierRequisition__c.Fields.KimbleOne__SupplierPurchaseOrder__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputLink value="/{!itm.SupplierRequisition__c}"><apex:outputText value="{!itm.SupplierRequisition__r.SupplierPurchaseOrder__r.Name}"/></apex:outputLink>
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__travelrequisitionothers}" rendered="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemFlight.size > 0}">
+												<apex:repeat value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemFlight}" var="f" >
+													<b><apex:outputLabel value="{!f.Label}"></apex:outputLabel> : </b><apex:outputField value="{!itm[f]}"  /> <br/>
+												</apex:repeat>
+											</apex:column>
+										</apex:pageBlockTable>
+									</div>
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['Hotel'] != 0}">
+									<div class="travelCategoryHeading hotel"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__hotelsheading}</h2></div>
+									<div class="travelCategoryContent">
+
+										<apex:variable value="{!0}" var="rowNum"/>
+										<apex:pageBlockTable value="{!TheRequisitionItems['Hotel']}" var="itm" >
+											<apex:column headervalue="{!$Label.kimbleone__detailsheading}" style="width:150px" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+													(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+												</apex:outputPanel>
+												<apex:outputText escape="false" value="{!itm.Description__c}"/>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.RequisitionNotes__c}" />
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:inputText value="{!itm.SelectedTravelItineraryItem__c}" style="display:none" styleclass="item{!itm.Id}"/>
+												<table class="travelBasis" border="0" cellpadding="0" cellspacing="0">
+													<apex:repeat value="{!itm.TravelItineraryItems__r}" var="itinerary">
+														<tr>
+															<td class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																<apex:outputPanel layout="none" rendered="{!CanSelectItineraryOptions}">
+																	<apex:outputPanel layout="none" rendered="{!!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id}">
+																		<input type="radio" name="selectHotelItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')" checked="checked"/>
+																	</apex:outputPanel>
+																	<apex:outputPanel layout="none" rendered="{!!(itm.SelectedTravelItineraryItem__c == itinerary.Id)}">
+																		<input type="radio" name="selectHotelItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')"/>
+																	</apex:outputPanel>
+																</apex:outputPanel>
+															</td>
+															<td class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																&nbsp;
+															</td>
+															<td style="background:transparent;">
+																<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="48" rows="6" readonly="true"/>
+															</td>
+															<td style="background:transparent;">
+																<apex:outputField value="{!itinerary.NetAmount__c}"/>
+															</td>
+														</tr>
+													</apex:repeat>
+												</table>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" style="width:120px" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.SupplierAccount__c}"/>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__BookingReference__c.Label}"  styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','actionColumn')}">
+												<apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#BookingReferencePopup', '{!JSENCODE($Label.kimbleone__booknowheading)}'); bookRequisitionItem('{!JSINHTMLENCODE(itm.Id)}')" rendered="{!CanBookNow && TheRequisitionItemsMap[itm.Id].Status__c != BookedId}">{!$Label.kimbleone__booknowlink}</apex:outputLink>
+												<apex:outputField value="{!TheRequisitionItemsMap[itm.Id].BookingReference__c}" rendered="{!TheRequisitionItemsMap[itm.Id].Status__c = BookedId}"/>
+
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__SupplierRequisition__c.Fields.KimbleOne__SupplierPurchaseOrder__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputLink value="/{!itm.SupplierRequisition__c}"><apex:outputText value="{!itm.SupplierRequisition__r.SupplierPurchaseOrder__r.Name}"/></apex:outputLink>
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__travelrequisitionothers}" rendered="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemHotel.size > 0}">
+												<apex:repeat value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemHotel}" var="f" >
+													<b><apex:outputLabel value="{!f.Label}"></apex:outputLabel> : </b><apex:outputField value="{!itm[f]}"  /> <br/>
+												</apex:repeat>
+											</apex:column>
+										</apex:pageBlockTable>
+									</div>
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['Train'] != 0}">
+									<div class="travelCategoryHeading train"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__trainsheading}</h2></div>
+									<div class="travelCategoryContent">
+
+										<apex:variable value="{!0}" var="rowNum"/>
+										<apex:pageBlockTable value="{!TheRequisitionItems['Train']}" var="itm" >
+											<apex:column headervalue="{!$Label.kimbleone__detailsheading}" style="width:150px" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+													(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+												</apex:outputPanel>
+												<apex:outputText escape="false" value="{!itm.Description__c}"/>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.RequisitionNotes__c}" />
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}"  styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:inputText value="{!itm.SelectedTravelItineraryItem__c}" style="display:none" styleclass="item{!itm.Id}"/>
+												<table class="travelBasis" border="0" cellpadding="0" cellspacing="0">
+													<apex:repeat value="{!itm.TravelItineraryItems__r}" var="itinerary">
+														<tr>
+															<td class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																<apex:outputPanel layout="none" rendered="{!CanSelectItineraryOptions}">
+																	<apex:outputPanel layout="none" rendered="{!!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id}">
+																		<input type="radio" name="selectTrainItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')" checked="checked"/>
+																	</apex:outputPanel>
+																	<apex:outputPanel layout="none" rendered="{!!(itm.SelectedTravelItineraryItem__c == itinerary.Id)}">
+																		<input type="radio" name="selectTrainItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')"/>
+																	</apex:outputPanel>
+																</apex:outputPanel>
+															</td>
+															<td class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																&nbsp;
+															</td>
+															<td style="background:transparent;">
+																<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="48" rows="6" readonly="true"/>
+															</td>
+															<td style="background:transparent;">
+																<apex:outputField value="{!itinerary.NetAmount__c}"/>
+															</td>
+														</tr>
+													</apex:repeat>
+												</table>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" style="width:120px"  styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.SupplierAccount__c}"/>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__BookingReference__c.Label}"  styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','actionColumn')}">
+												<apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#BookingReferencePopup', '{!JSENCODE($Label.kimbleone__booknowheading)}'); bookRequisitionItem('{!JSINHTMLENCODE(itm.Id)}')" rendered="{!CanBookNow && TheRequisitionItemsMap[itm.Id].Status__c != BookedId}">{!$Label.kimbleone__booknowlink}</apex:outputLink>
+												<apex:outputField value="{!TheRequisitionItemsMap[itm.Id].BookingReference__c}" rendered="{!TheRequisitionItemsMap[itm.Id].Status__c = BookedId}"/>
+
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__SupplierRequisition__c.Fields.KimbleOne__SupplierPurchaseOrder__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputLink value="/{!itm.SupplierRequisition__c}"><apex:outputText value="{!itm.SupplierRequisition__r.SupplierPurchaseOrder__r.Name}"/></apex:outputLink>
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__travelrequisitionothers}" rendered="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemTrain.size > 0}">
+												<apex:repeat value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemTrain}" var="f" >
+													<b><apex:outputLabel value="{!f.Label}"></apex:outputLabel> : </b><apex:outputField value="{!itm[f]}"  /> <br/>
+												</apex:repeat>
+											</apex:column>
+										</apex:pageBlockTable>
+									</div>
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['Taxi'] != 0}">
+									<div class="travelCategoryHeading taxi"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__taxiheading}</h2></div>
+									<div class="travelCategoryContent">
+
+										<apex:variable value="{!0}" var="rowNum"/>
+										<apex:pageBlockTable value="{!TheRequisitionItems['Taxi']}" var="itm" >
+											<apex:column headervalue="{!$Label.kimbleone__detailsheading}" style="width:150px" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputPanel rendered="{!itm.ActionRequest__c != ActionRequestMap['None']}" style="color:red;">
+													(<apex:outputText value="{!itm.ActionRequest__r.Name}"/>)<br/>
+												</apex:outputPanel>
+												<apex:outputText escape="false" value="{!itm.Description__c}"/>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.RequisitionNotes__c}" />
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:inputText value="{!itm.SelectedTravelItineraryItem__c}" style="display:none" styleclass="item{!itm.Id}"/>
+												<table class="travelBasis" border="0" cellpadding="0" cellspacing="0">
+													<apex:repeat value="{!itm.TravelItineraryItems__r}" var="itinerary">
+														<tr>
+															<td class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																<apex:outputPanel layout="none" rendered="{!CanSelectItineraryOptions}">
+																	<apex:outputPanel layout="none" rendered="{!!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id}">
+																		<input type="radio" name="selectFlightItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')" checked="checked"/>
+																	</apex:outputPanel>
+																	<apex:outputPanel layout="none" rendered="{!!(itm.SelectedTravelItineraryItem__c == itinerary.Id)}">
+																		<input type="radio" name="selectFlightItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')"/>
+																	</apex:outputPanel>
+																</apex:outputPanel>
+															</td>
+															<td class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																&nbsp;
+															</td>
+															<td style="background:transparent;">
+																<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="48" rows="6" readonly="true"/>
+															</td>
+															<td style="background:transparent;">
+																<apex:outputField value="{!itinerary.NetAmount__c}"/>
+															</td>
+														</tr>
+													</apex:repeat>
+												</table>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" style="width:120px"  styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.SupplierAccount__c}"/>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__BookingReference__c.Label}"  styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','actionColumn')}">
+												<apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#BookingReferencePopup', '{!JSENCODE($Label.kimbleone__booknowheading)}'); bookRequisitionItem('{!JSINHTMLENCODE(itm.Id)}')" rendered="{!CanBookNow && TheRequisitionItemsMap[itm.Id].Status__c != BookedId}">{!$Label.kimbleone__booknowlink}</apex:outputLink>
+												<apex:outputField value="{!TheRequisitionItemsMap[itm.Id].BookingReference__c}" rendered="{!TheRequisitionItemsMap[itm.Id].Status__c = BookedId}"/>
+
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__SupplierRequisition__c.Fields.KimbleOne__SupplierPurchaseOrder__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputLink value="/{!itm.SupplierRequisition__c}"><apex:outputText value="{!itm.SupplierRequisition__r.SupplierPurchaseOrder__r.Name}"/></apex:outputLink>
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__travelrequisitionothers}" rendered="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemTaxi.size > 0}">
+												<apex:repeat value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemTaxi}" var="f" >
+													<b><apex:outputLabel value="{!f.Label}"></apex:outputLabel> : </b><apex:outputField value="{!itm[f]}"  /> <br/>
+												</apex:repeat>
+											</apex:column>
+										</apex:pageBlockTable>
+									</div>
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheRequisitionItemsSize['CarHire'] != 0}">
+									<div class="travelCategoryHeading carHire"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$Label.kimbleone__carhirelabel}</h2></div>
+									<div class="travelCategoryContent">
+
+										<apex:variable value="{!0}" var="rowNum"/>
+										<apex:pageBlockTable value="{!TheRequisitionItems['CarHire']}" var="itm" >
+											<apex:column headervalue="{!$Label.kimbleone__detailsheading}" width="150px" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputText escape="false" value="{!itm.Description__c}"/>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__RequisitionNotes__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.RequisitionNotes__c}" />
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__itineraryoptionsandcostsheading}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:inputText value="{!itm.SelectedTravelItineraryItem__c}" style="display:none" styleclass="item{!itm.Id}"/>
+												<table class="travelBasis" border="0" cellpadding="0" cellspacing="0">
+													<apex:repeat value="{!itm.TravelItineraryItems__r}" var="itinerary">
+														<tr>
+															<td class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																<apex:outputPanel layout="none" rendered="{!CanSelectItineraryOptions}">
+																	<apex:outputPanel layout="none" rendered="{!!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id}">
+																		<input type="radio" name="selectCarHireItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')" checked="checked"/>
+																	</apex:outputPanel>
+																	<apex:outputPanel layout="none" rendered="{!!(itm.SelectedTravelItineraryItem__c == itinerary.Id)}">
+																		<input type="radio" name="selectCarHireItineraryItem{!itm.Id}" onclick="selectTravelItinerary('{!JSINHTMLENCODE(itm.Id)}','{!JSINHTMLENCODE(itinerary.Id)}')"/>
+																	</apex:outputPanel>
+																</apex:outputPanel>
+															</td>
+															<td class="{!IF(!ISBLANK(itm.SelectedTravelItineraryItem__c) && itm.SelectedTravelItineraryItem__c == itinerary.Id,'selectedOption','unselectedOption')}">
+																&nbsp;
+															</td>
+															<td style="background:transparent;">
+																<apex:inputTextArea value="{!itinerary.ItineraryNotes__c}" cols="48" rows="6" readonly="true"/>
+															</td>
+															<td style="background:transparent;">
+																<apex:outputField value="{!itinerary.NetAmount__c}"/>
+															</td>
+														</tr>
+													</apex:repeat>
+												</table>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" style="width:120px"  styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputField value="{!itm.SupplierAccount__c}"/>
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__BookingReference__c.Label}"  styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','actionColumn')}">
+												<apex:outputLink styleclass="actionLink" value="javascript:void(0)" onclick="initialiseModalBoxy('#BookingReferencePopup', '{!JSENCODE($Label.kimbleone__booknowheading)}'); bookRequisitionItem('{!JSINHTMLENCODE(itm.Id)}')" rendered="{!CanBookNow && TheRequisitionItemsMap[itm.Id].Status__c != BookedId}">{!$Label.kimbleone__booknowlink}</apex:outputLink>
+												<apex:outputField value="{!TheRequisitionItemsMap[itm.Id].BookingReference__c}" rendered="{!TheRequisitionItemsMap[itm.Id].Status__c = BookedId}"/>
+
+											</apex:column>
+											<apex:column headervalue="{!$ObjectType.KimbleOne__SupplierRequisition__c.Fields.KimbleOne__SupplierPurchaseOrder__c.Label}" styleclass="{!IF(itm.IsCancelled__c, 'lineCancelled','')}">
+												<apex:outputLink value="/{!itm.SupplierRequisition__c}"><apex:outputText value="{!itm.SupplierRequisition__r.SupplierPurchaseOrder__r.Name}"/></apex:outputLink>
+											</apex:column>
+											<apex:column headervalue="{!$Label.kimbleone__travelrequisitionothers}" rendered="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemCarHire.size > 0}">
+												<apex:repeat value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemCarHire}" var="f" >
+													<b><apex:outputLabel value="{!f.Label}"></apex:outputLabel> : </b><apex:outputField value="{!itm[f]}"  /> <br/>
+												</apex:repeat>
+											</apex:column>
+										</apex:pageBlockTable>
+									</div>
+								</apex:outputPanel>
+
+								<apex:outputPanel layout="none" rendered="{!TheTravellers.Size != 0}">
+									<div class="travelCategoryHeading other"><h2 style="margin-left: 32px;font-size: 1.2em;">{!$ObjectType.KimbleOne__Traveller__c.LabelPlural}</h2></div>
+									<div class="travelCategoryContent">
+										<apex:pageBlockTable value="{!TheTravellers}" var="traveller" rendered="{!TheTravellers.size != 0}">
+
+											<apex:column headervalue="{!$ObjectType.KimbleOne__Traveller__c.Fields.KimbleOne__Contact__c.Label}" width="400px">
+												<apex:outputField value="{!traveller.KimbleOne__Contact__c}"/>
+											</apex:column>
+
+											<apex:repeat var="f" value="{!$ObjectType.Contact.FieldSets.KimbleOne__TravellerDetails}">
+												<apex:column headerValue="{!f.label}">
+													<apex:outputField value="{!TheContactTravellerDetails[traveller.KimbleOne__Contact__c][f]}" />
+												</apex:column>
+											</apex:repeat>
+										</apex:pageBlockTable>
+									</div>
+									<br/>
+								</apex:outputPanel>
+
+							</apex:outputPanel>
+						</apex:pageBlock>
+
+						<apex:actionFunction action="{!UpdateSelectedItineraryItem}" name="updateSelectedItineraryItem" rerender="TheForm, requisitionChatter">
+							<apex:param name="itemId" value=""/>
+							<apex:param name="itineraryId" value=""/>
+						</apex:actionFunction>
+
+						<apex:actionFunction action="{!LoadRequisitionItemToBook}" name="bookRequisitionItem" rerender="SelectedRequisitionItemOld" oncomplete="showModalBoxy()">
+							<apex:param name="itemId" value=""/>
+						</apex:actionFunction>
+					</apex:outputPanel>
+
+					<script>
+        	function selectTravelItinerary(itemId, itineraryId)
+        	{
+        		$('.item' + itemId).val(itineraryId);
+        		updateSelectedItineraryItem(itemId, itineraryId);
+        	}
+        	
+        </script>
+				</apex:form>
+
+				<apex:outputPanel layout="none" rendered="{!ISBLANK(TheRequisitionVersion)}">
+					<div id="BookingReferencePopup" style="display:none">
+
+						<apex:form id="SelectedRequisitionItem">
+							<div id="BookingReferencePopupErrors">
+								<apex:pageMessages escape="false"/>
+							</div>
+							<apex:pageBlock rendered="{!!ISBLANK(TheRequisitionItemToBook)}">
+								<apex:pageBlockButtons location="bottom">
+									<apex:commandButton action="{!BookRequisitionItem}" styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__bookbutton}" reRender="TheForm, SelectedRequisitionItem" oncomplete="hideModalBoxyWithErrorCheck('#BookingReferencePopupErrors');"/>
+									<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.kimbleone__cancel}"/>
+								</apex:pageBlockButtons>
+								<apex:variable var="cat" value="{!TheRequisitionItemToBook.TravelCategory__r.KimbleOne__Enum__c}"/>
+								<apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+									<apex:outputField value="{!TheRequisitionItemToBook.Name}"/>
+									<apex:pageBlockSectionItem >
+										<apex:outputLabel value="{!$ObjectType.KimbleOne__TravelRequisition__c.Fields.KimbleOne__Reference__c.Label}"/>
+										<apex:outputPanel layout="none">
+											<apex:outputText value="{!KimbleOne__TravelRequisition__c.KimbleOne__Reference__c}"/>/<apex:outputField value="{!TheRequisitionItemToBook.KimbleOne__Reference__c}"/>
+										</apex:outputPanel>
+									</apex:pageBlockSectionItem>
+
+									<apex:pageBlockSectionItem >
+										<apex:outputLabel value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" />
+										<apex:outputPanel layout="none">
+											<div class="requiredInput" id="supplieraccount-reqd">
+												<div class="requiredBlock"></div>
+												<apex:selectList value="{!TheRequisitionItemToBook.KimbleOne__SupplierAccount__c}" size="1" required="true">
+													<apex:selectOptions value="{!theTravelCategorySuppliers[cat]}" />
+												</apex:selectList>
+											</div>
+										</apex:outputPanel>
+									</apex:pageBlockSectionItem>
+
+									<apex:outputField value="{!TheRequisitionItemToBook.SelectedTravelItineraryItem__r.KimbleOne__ItineraryNotes__c}"/>
+									<apex:inputField value="{!TheRequisitionItemToBook.CurrencyIsoCode}"/>
+									<apex:inputField value="{!TheRequisitionItemToBook.KimbleOne__NetAmount__c}"/>
+									<apex:inputField value="{!TheRequisitionItemToBook.KimbleOne__BookingReference__c}" required="true"/>
+									<apex:inputField value="{!TheRequisitionItemToBook.KimbleOne__BookingNotes__c}"/>
+
+									<apex:repeat value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemDetails}" var="f" rendered="{!ISBLANK(TheRequisitionVersion)}">
+										<apex:inputField value="{!TheRequisitionItemToBook[f]}" required="{!f.Required}" />
+									</apex:repeat>
+
+								</apex:pageblockSection>
+							</apex:pageBlock>
+						</apex:form>
+
+					</div>
+
+					<div id="UpdateBookingPopup" style="display:none">
+
+						<apex:form id="UpdateRequisitionItem">
+							<div id="UpdateBookingPopupErrors">
+								<apex:pageMessages escape="false"/>
+							</div>
+							<apex:pageBlock rendered="{!!ISBLANK(TheRequisitionItemToUpdate)}">
+								<apex:pageBlockButtons location="bottom">
+									<apex:commandButton action="{!UpdateBooking}"  styleclass="DisableButtonWhileBusy" value="{!$Label.kimbleone__updatebookinglabel}" reRender="TheForm, UpdateRequisitionItem" oncomplete="hideModalBoxyWithErrorCheck('UpdateBookingPopupErrors');"/>
+									<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.kimbleone__cancel}"/>
+								</apex:pageBlockButtons>
+								<apex:variable var="cat" value="{!TheRequisitionItemToUpdate.TravelCategory__r.KimbleOne__Enum__c}"/>
+								<apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+									<apex:outputField value="{!TheRequisitionItemToUpdate.Name}"/>
+									<apex:pageBlockSectionItem >
+										<apex:outputLabel value="{!$ObjectType.KimbleOne__TravelRequisition__c.Fields.KimbleOne__Reference__c.Label}"/>
+										<apex:outputPanel layout="none">
+											<apex:outputText value="{!KimbleOne__TravelRequisition__c.KimbleOne__Reference__c}"/>/<apex:outputText value="{!TheRequisitionItemToUpdate.KimbleOne__Reference__c}"/>
+										</apex:outputPanel>
+									</apex:pageBlockSectionItem>
+									<apex:outputField value="{!TheRequisitionItemToUpdate.SelectedTravelItineraryItem__r.KimbleOne__ItineraryNotes__c}"/>
+									<apex:outputField value="{!TheRequisitionItemToUpdate.KimbleOne__BookingReference__c}" />
+
+									<apex:pageBlockSectionItem >
+										<apex:outputLabel value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.Fields.KimbleOne__SupplierAccount__c.Label}" />
+										<apex:outputPanel layout="none">
+											<div class="requiredInput" id="supplieraccount-reqd">
+												<div class="requiredBlock"></div>
+												<apex:selectList value="{!TheRequisitionItemToUpdate.KimbleOne__SupplierAccount__c}" size="1" required="true">
+													<apex:selectOptions value="{!theTravelCategorySuppliers[cat]}" />
+												</apex:selectList>
+											</div>
+										</apex:outputPanel>
+									</apex:pageBlockSectionItem>
+
+									<apex:pageBlockSectionItem >
+										<apex:outputLabel value="{!$Label.kimbleone__bookedamountlabel}"/>
+										<apex:outputPanel layout="none">
+											<apex:outputField value="{!BookingUpdate.KimbleOne__InputCurrency__c}"/>
+										</apex:outputPanel>
+									</apex:pageBlockSectionItem>
+									<apex:pageBlockSectionItem >
+										<apex:outputLabel value="{!$Label.kimbleone__cancelbookinglabel}"/>
+										<apex:outputPanel layout="none">
+											<apex:inputField value="{!BookingUpdate.KimbleOne__InputCheckbox__c}"/>
+										</apex:outputPanel>
+									</apex:pageBlockSectionItem>
+									<apex:pageBlockSectionItem >
+										<apex:outputLabel value="{!$Label.kimbleone__newbookedamountlabel}"/>
+										<apex:outputPanel layout="none">
+											<apex:outputText value="{!BookingUpdate.CurrencyIsoCode}" styleclass="kimbleCurrencyCode"/>
+											<apex:inputField value="{!BookingUpdate.KimbleOne__InputDecimal__c}"/>
+										</apex:outputPanel>
+									</apex:pageBlockSectionItem>
+
+
+									<apex:inputField value="{!TheRequisitionItemToUpdate.KimbleOne__BookingNotes__c}"/>
+
+									<apex:repeat value="{!$ObjectType.KimbleOne__TravelRequisitionItem__c.FieldSets.KimbleOne__TravelRequisitionItemDetails}" var="f" rendered="{!ISBLANK(TheRequisitionVersion)}">
+										<apex:inputField value="{!TheRequisitionItemToUpdate[f]}" required="{!f.Required}" />
+									</apex:repeat>
+								</apex:pageblockSection>
+							</apex:pageBlock>
+						</apex:form>
+
+					</div>
+
+				</apex:outputPanel>
+
+				<apex:outputPanel layout="none" rendered="{!!ISBLANK(TheRequisitionVersion)}">
+					<div id="FareReasonPopup" style="display:none">
+
+						<apex:form id="fareReasonForm">
+							<div id="fareReasonPopupErrors">
+								<apex:pageMessages escape="false"/>
+							</div>
+							<apex:pageBlock >
+								<apex:pageBlockButtons location="bottom">
+									<apex:commandButton styleclass="DisableButtonWhileBusy" action="{!EnterReasonAndSubmitForApproval}" value="{!$Label.kimbleone__ok}" reRender="fareReasonForm" oncomplete="hideModalBoxyWithErrorCheck('#fareReasonPopupErrors');"/>
+									<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.kimbleone__cancel}"/>
+								</apex:pageBlockButtons>
+								<apex:pageblockSection collapsible="false" showheader="true" title="{!$Label.kimbleone__enterlowestlogicalfarereasonheading}" columns="1">
+									<apex:inputField value="{!KimbleOne__TravelRequisition__c.KimbleOne__ItinerarySelectionReason__c}" required="true"/>
+								</apex:pageblockSection>
+							</apex:pageBlock>
+						</apex:form>
+
+					</div>
+
+					<div id="BookingReferencePopup" style="display:none">
+
+						<apex:form id="SelectedRequisitionItemOld">
+							<div id="BookingReferencePopupErrors">
+								<apex:pageMessages escape="false"/>
+							</div>
+							<apex:pageBlock >
+								<apex:pageBlockButtons location="bottom">
+									<apex:commandButton action="{!BookRequisitionItem}" value="{!$Label.kimbleone__bookbutton}" reRender="TheForm, SelectedRequisitionItemOld" oncomplete="hideModalBoxyWithErrorCheck('#BookingReferencePopupErrors');"/>
+									<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.kimbleone__cancel}"/>
+								</apex:pageBlockButtons>
+								<apex:pageblockSection collapsible="false" showheader="false"  columns="1">
+									<apex:outputField value="{!TheRequisitionItemToBook.Name}"/>
+									<apex:outputField value="{!TheRequisitionItemToBook.SelectedTravelItineraryItem__r.KimbleOne__ItineraryNotes__c}"/>
+									<apex:outputField value="{!TheRequisitionItemToBook.KimbleOne__NetAmount__c}"/>
+									<apex:inputField value="{!TheRequisitionItemToBook.KimbleOne__BookingReference__c}" required="true"/>
+									<apex:inputField value="{!TheRequisitionItemToBook.KimbleOne__BookingNotes__c}"/>
+
+								</apex:pageblockSection>
+							</apex:pageBlock>
+						</apex:form>
+
+					</div>
+				</apex:outputPanel>
+
+
+				<apex:outputPanel layout="none" id="ApprovalHistoryPanel">
+					<apex:relatedList list="ProcessSteps" id="requisitionApprovalHistory"></apex:relatedList>
+					<script>
+						$(document).ready(function(){
+    						$(function() {
+    							hideSalesForceApprovalProcessButtons();
+    						})
+    					});
+    					function hideSalesForceApprovalProcessButtons()
+    					{
+    							$('input[name="piSubmit"]').remove();
+    							$('input[name="piRemove"]').remove();
+    					}
+				</script>
+				</apex:outputPanel>
+			</div>
+			<div id="right" style="float:left;width:23%; margin-left:8px;margin-top:-10px;">
+				<chatter:feed id="requisitionChatter" entityId="{!KimbleOne__TravelRequisition__c.Id}"/>
+			</div>
+			<div id="clear" style="clear:both;"></div>
+			<style>
+           	.flight{height:32px;background-image: url('{!URLFOR($Resource.TravelIcons, 'Flight32.png')}');background-repeat: no-repeat;background-position-x: 8px;background-position-y: 2px;}
+           	.hotel{height:32px;background-image: url('{!URLFOR($Resource.TravelIcons, 'Hotel32.png')}');background-repeat: no-repeat;background-position-x: 8px;background-position-y: 2px;}
+           	.train{height:32px;background-image: url('{!URLFOR($Resource.TravelIcons, 'Train32.png')}');background-repeat: no-repeat;background-position-x: 8px;background-position-y: 2px;}
+           	.taxi{height:32px;background-image: url('{!URLFOR($Resource.TravelIcons, 'Taxi32.png')}');background-repeat: no-repeat;background-position-x: 8px;background-position-y: 2px;}
+           	.carHire{height:32px;background-image: url('{!URLFOR($Resource.TravelIcons, 'CarHire32.png')}');background-repeat: no-repeat;background-position-x: 8px;background-position-y: 2px;}
+           	.other{height:32px;background-image: url('{!URLFOR($Resource.TravelIcons, 'Other32.png')}');background-repeat: no-repeat;background-position-x: 8px;background-position-y: 2px;}
+           	.selectedOption{background-color:#A1F78D !important;}
+           	.unselectedOption{}
+           	.travelBasis>tbody>tr>td{border:0px !important;}
+   			.travelBasis>tbody>tr>td.label{font-weight: bold;color: #4A4A56;font-size: 91%;text-align: right;}
+   			.travelBasis>tbody>tr>td>input{vertical-align:baseline !important;}
+   			.travelBasis>tbody>tr>td{padding:2px !important; margin:0px !important;}
+   			.travelBasis>tbody>tr>td>select{margin-left:0px !important;}
+   			.travelCategoryHeading {
+				margin: 1px;
+				padding: 3px 10px;
+				position: relative;
+				vertical-align: middle;
+				line-height: 32px;}
+			.travelCategoryContent {
+			padding: 0px 10px;
+			}
+			.lineCancelled {background-image: url('{!URLFOR($Resource.AssignmentImages, 'Unavailable.png')}') !important;}
+			.hasChanges {background-image: url('{!URLFOR($Resource.AssignmentImages, 'warning.png')}') !important;background-repeat: no-repeat !important;background-position: center center !important;}
+        </style>
+		</apex:define>
+
+	</apex:composition>
+
+</apex:page>

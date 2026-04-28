@@ -1,0 +1,496 @@
+<apex:page controller="KimbleOne.AsyncJobMonitorController" showHeader="true" sidebar="false">
+
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+	<apex:outputPanel rendered="{!!ISBLANK($CurrentPage.parameters.menuContext)}">
+	<c:Menu DefaultHelpPage="TaskManagement.html" MenuContextType="{!$CurrentPage.parameters.menuContext}" MenuContextId="{!$CurrentPage.parameters.menuContextId}" MenuContextName="{!$CurrentPage.parameters.menuContextName}" />
+	</apex:outputPanel>
+</apex:define>  
+   
+<apex:define name="Content">
+	<apex:stylesheet value="{!URLFOR($Resource.KimbleOne__KimbleStyles, 'CardStyle.css')}"/>
+	
+	<div class="cardContainer">
+		<apex:outputPanel layout="none" rendered="{!!ISBLANK(JobId)}">
+			<div class="card">
+			<div class="cardHeadingContainer">
+				<div style="display:table-row">
+					<div class="cardHeadingCell">
+						<!-- <div class="card-heading-icon fa fa-circle-o-notch fa-spin" ></div> -->
+						<div class="card-title-container"><h3 class="cardTitle"><apex:outputText value="{!Title}"/></h3></div>
+					</div>
+					<!-- <div class="cardProperties cardHeadingCell cardHeadingCellFixed">
+						<div class="title-card-body-field">
+  							<apex:outputLabel styleClass="center-aligned-block label-heading" value="Job Id" />
+  							<span><apex:outputText styleClass="center-aligned-block" value="{!JobId}"/></span>
+  						</div>					  					
+					</div>-->
+				</div>
+			</div>
+			<div class="cardBody">					
+				<div class="fa fa-circle-o-notch fa-spin async-job"></div>
+				<div class="last-checked"></div>
+				<div class="failures" style="display:none">
+				    <i class="fa fa-warning error-ind"></i>
+				    <span id="error-message"></span>
+				</div>
+			</div>
+		</div>
+		<script>
+			jQuery(window).load(function(){
+          	
+          			getProgress();
+          	});
+        
+       		function getProgress()
+        	{
+        		Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.AsyncJobMonitorController.GetJobStatus}',
+        			'{!JSENCODE(JobId)}',
+      					function(result, event){          
+		             		if (event.status) 
+				            {
+								var progress = result;
+								
+								jQuery('.last-checked').text(progress.LastChecked);
+								
+								if (progress.FailedCount > 0)
+								{
+									jQuery('.async-job').hide();
+									jQuery('.last-checked').hide();
+									jQuery('.failures').show();
+									jQuery('.failures #error-message').html(progress.ErrorMessage);
+								}
+								else
+								{
+									if (progress.PercentComplete != 100)
+									{
+										// Wait 2 seconds to getProgress again
+	        							setTimeout(getProgress, 2000);
+	        						}
+	        						else
+	        						{
+	        							jQuery('.fa-circle-o-notch').removeClass('fa-spin');
+	        							
+	        							var redirectUrl = '{!JSENCODE(RedirectUrl)}';
+	        							
+	        							if (redirectUrl != '')
+	        								safeRedirectToSForceURL(redirectUrl);
+	        						}
+	        					}
+				         	} 
+				         	else if (event.type === 'exception') 
+				         	{
+				             	alert(event.message);
+				         	} 
+				         	else 
+				         	{
+				             	alert(event.message);
+				         	}
+		         	}, 
+		         	{escape: true, timeout: 60000});
+        	}
+			</script>
+		</apex:outputPanel>
+		<apex:outputPanel layout="none" rendered="{!!ISBLANK(BatchId)}">
+		<div class="card">
+			<div class="cardHeadingContainer">
+				<div style="display:table-row">
+					<div class="cardHeadingCell">
+						<div class="card-heading-icon fa fa-circle-o-notch fa-spin" ></div>
+						<div class="card-title-container"><h3 class="cardTitle"><apex:outputText value="{!Title}"/></h3></div>
+					</div>
+					<div class="cardProperties cardHeadingCell cardHeadingCellFixed">
+						<div class="title-card-body-field">
+  							<apex:outputLabel styleClass="center-aligned-block label-heading" value="Batch Id" />
+  							<span><apex:outputText styleClass="center-aligned-block" value="{!BatchId}"/></span>
+  						</div>					  					
+					</div>
+				</div>
+			</div>
+			<div class="cardBody">					
+				<div class="sharing-jobs">
+				   <div class="donut-chart less-fifty-pct" >
+				    <div class="slice one"></div>
+				    <div id="less-fifty" class="slice two"></div>
+				    <div class="chart-center">
+				       <span>
+				    		<div class="pct-value"><span style="display:none" id="batchError">Failed</span></div>
+				   			<div class="failures" style="display:none">
+				    			<i class="fa fa-warning" style="font-size: 18px;color: #B42E34;"></i>
+							</div>
+						</span>
+				    </div>
+				    
+				   </div>
+							  
+				  <div class="donut-chart more-fifty-pct" style="display:none;">
+				    <div class="slice one"></div>
+				    <div id="more-fifty" class="slice two"></div>
+				    <div class="chart-center">
+				      <span>
+				    		<div class="pct-value"></div>
+				   			<div class="failures" style="display:none">
+				    			<i class="fa fa-warning" style="font-size: 18px;color: #B42E34;"></i>
+							</div>
+						</span>
+				    </div>
+				  </div> 
+			</div>
+		</div>
+	</div><!-- card -->	
+	
+		<script>
+	
+		jQuery(window).load(function(){
+          	
+          	getProgress();
+          	
+        });
+        
+       	function getProgress()
+        {
+        	Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.AsyncJobMonitorController.GetStatus}',
+        		'{!JSENCODE(BatchId)}',
+      					function(result, event){          
+		             		if (event.status) 
+				            {
+								var progress = result;
+								
+								if (progress.PercentComplete <= 50)
+								{
+									var deg = 180 + (progress.PercentComplete * 3.6);
+									jQuery('#less-fifty').css({transform: 'rotate(' + deg + 'deg)'}).parent().show();
+									jQuery('#more-fifty').parent().hide();
+									
+									if (progress.FailedCount > 0)
+										jQuery('.less-fifty-pct').addClass('failed');
+								}
+								else
+								{
+									var deg = progress.PercentComplete * 3.6;
+									jQuery('#more-fifty').css({transform: 'rotate(' + deg + 'deg)'}).parent().show();
+									jQuery('#less-fifty').parent().hide();
+									
+									if (progress.FailedCount > 0)
+										jQuery('.more-fifty-pct .slice').addClass('failed');
+								}
+								
+								if (progress.FailedCount > 0)
+								{
+									jQuery('.failures').show();
+									jQuery('.failures').prop('title', progress.ErrorMessage);
+									jQuery('.failures i').text(progress.FailedCount);
+									jQuery('.pct-value').addClass('failed-text');
+								}
+								
+								jQuery('.pct-value').text(progress.PercentComplete + '%');
+								
+								if (progress.PercentComplete != 100)
+								{
+									// Wait 2 seconds to getProgress again
+        							setTimeout(getProgress, 2000);
+        						}
+        						else if (progress.FailedCount == 0)
+        						{
+        							jQuery('.fa-circle-o-notch').removeClass('fa-spin');
+        							
+        							var redirectUrl = '{!JSENCODE(RedirectUrl)}';
+        							
+        							if (redirectUrl != '')
+        								safeRedirectToSForceURL(redirectUrl);
+        						}
+				         	} 
+				         	else if (event.type === 'exception') 
+				         	{
+				             	alert(event.message);
+				         	}
+				         	else 
+				         	{
+				             	alert(event.message);
+				         	}
+		         }, 
+		         {escape: true, timeout: 60000});
+        }
+        	
+	</script>
+		</apex:outputPanel>
+		<apex:outputPanel layout="none" rendered="{!!ISBLANK(jobContextId)}">
+			<div class="card">
+				<div class="cardHeadingContainer">
+					<div style="display:table-row">
+						<div class="cardHeadingCell">
+							<div class="card-heading-icon fa fa-circle-o-notch fa-spin" ></div>
+							<div class="card-title-container"><h3 class="cardTitle"><apex:outputText value="{!Title}"/></h3></div>
+						</div>
+						<div class="cardProperties cardHeadingCell cardHeadingCellFixed">
+							<div class="title-card-body-field">
+								<apex:outputLabel styleClass="center-aligned-block label-heading" value="Context Id" />
+								<span><apex:outputText styleClass="center-aligned-block" value="{!jobContextId}"/></span>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="cardBody">
+					<div class="sharing-jobs">
+						<div class="donut-chart less-fifty-pct" >
+							<div class="slice one"></div>
+							<div id="less-fifty" class="slice two"></div>
+							<div class="chart-center">
+				       <span>
+				    		<div class="pct-value"><span style="display:none" id="batchError">Failed</span></div>
+				   			<div class="failures" style="display:none">
+				    			<i class="fa fa-warning" style="font-size: 18px;color: #B42E34;"></i>
+							</div>
+						</span>
+							</div>
+
+						</div>
+
+						<div class="donut-chart more-fifty-pct" style="display:none;">
+							<div class="slice one"></div>
+							<div id="more-fifty" class="slice two"></div>
+							<div class="chart-center">
+				      <span>
+				    		<div class="pct-value"></div>
+				   			<div class="failures" style="display:none">
+				    			<i class="fa fa-warning" style="font-size: 18px;color: #B42E34;"></i>
+							</div>
+						</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div><!-- card -->
+
+			<script>
+
+		jQuery(window).load(function(){
+
+          	getProgress();
+
+        });
+
+       	function getProgress()
+        {
+        	Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.AsyncJobMonitorController.GetContextJobsStatus}',
+        		'{!JSENCODE(jobContextId)}', {!WaitForJobs},
+      					function(result, event){
+		             		if (event.status)
+				            {
+								var progress = result;
+
+								if (progress.PercentComplete <= 50)
+								{
+									var deg = 180 + (progress.PercentComplete * 3.6);
+									jQuery('#less-fifty').css({transform: 'rotate(' + deg + 'deg)'}).parent().show();
+									jQuery('#more-fifty').parent().hide();
+
+									if (progress.FailedCount > 0)
+										jQuery('.less-fifty-pct').addClass('failed');
+								}
+								else
+								{
+									var deg = progress.PercentComplete * 3.6;
+									jQuery('#more-fifty').css({transform: 'rotate(' + deg + 'deg)'}).parent().show();
+									jQuery('#less-fifty').parent().hide();
+
+									if (progress.FailedCount > 0)
+										jQuery('.more-fifty-pct .slice').addClass('failed');
+								}
+
+								if (progress.FailedCount > 0)
+								{
+									jQuery('.failures').show();
+									jQuery('.failures').prop('title', progress.ErrorMessage);
+									jQuery('.failures i').text(progress.FailedCount);
+									jQuery('.pct-value').addClass('failed-text');
+								}
+
+								jQuery('.pct-value').text(progress.PercentComplete + '%');
+
+								if (progress.PercentComplete != 100)
+								{
+									// Wait 2 seconds to getProgress again
+        							setTimeout(getProgress, 2000);
+        						}
+        						else if (progress.FailedCount == 0)
+        						{
+        							jQuery('.fa-circle-o-notch').removeClass('fa-spin');
+
+        							var redirectUrl = '{!JSENCODE(RedirectUrl)}';
+
+        							if (redirectUrl != '')
+        								safeRedirectToSForceURL(redirectUrl);
+        						}
+				         	}
+				         	else if (event.type === 'exception')
+				         	{
+				             	alert(event.message);
+				         	}
+				         	else
+				         	{
+				             	alert(event.message);
+				         	}
+		         },
+		         {escape: true, timeout: 60000});
+        }
+
+	</script>
+		</apex:outputPanel>
+	
+	</div>
+	
+	
+	<style>
+				.sharing-jobs {
+				    margin: 0 20px 0 0;
+				}
+				
+				.donut-chart.more-fifty-pct {
+				    width: 200px;
+				    height: 200px;
+				    background: #e1e1e1;
+				}
+				.donut-chart.less-fifty-pct {
+				    width: 200px;
+				    height: 200px;
+				    background: #48b2c1;
+				}
+				.donut-chart {
+				    position: relative;
+				    border-radius: 50%;
+				    overflow: hidden;
+				}
+				.donut-chart.more-fifty-pct .slice.one {
+				    clip: rect(0 200px 100px 0);
+				    -webkit-transform: rotate(90deg);
+				    transform: rotate(90deg);
+				    background: #48b2c1;
+				}
+
+				.donut-chart.more-fifty-pct .slice.two {
+				    clip: rect(0 100px 200px 0);
+				    -webkit-transform: rotate(327.6deg);
+				    transform: rotate(180deg); /*180 -> 360*/
+				    background: #48b2c1;
+				}
+				
+				.donut-chart.less-fifty-pct .slice.one {
+				    clip: rect(0 200px 100px 0);
+				    -webkit-transform: rotate(90deg);
+				    transform: rotate(270deg);
+				    background: #e1e1e1;
+				}
+				
+				.donut-chart.less-fifty-pct .slice.two {
+				    clip: rect(0 100px 200px 0);
+				    -webkit-transform: rotate(180deg);
+				    transform: rotate(180deg); /*180 -> 360*/
+				    background: #e1e1e1;
+				}
+				
+				.donut-chart .slice {
+				    position: absolute;
+				    top: 0;
+				    left: 0;
+				    width: 100%;
+				    height: 100%;
+				}
+				.chart-center {
+				    top: 25px;
+				    left: 25px;
+				    width: 150px;
+				    height: 150px;
+				    background: #fff;
+				}
+				.donut-chart .chart-center {
+				    position: absolute;
+				    border-radius: 50%;
+				}
+				
+				.chart-center>span {
+				    font-size: 40px;
+				    color: #48b2c1;
+				    width: 140px;
+				    height: 140px;
+				    display: table-cell;
+				    vertical-align: middle;
+				    padding-left: 10px;
+				    text-align: center;
+				    padding-top: 4px;
+				}
+				.async-job {
+				    font-size: 40px;
+				}
+				.failed
+				{
+					background: #B42E34 !important;
+				}
+				.failed-text
+				{
+					color:#353535; !important;
+				}
+				.failures
+				{
+					height:10px;
+				}
+				.last-checked {
+				    display: inline-block;
+				    margin-left: 8px;
+				}
+				.error-ind {
+				    font-size: 26px;
+				    color: #B42E34;
+				    padding-top: 10px;
+				    padding-right: 10px;
+				}
+				
+				/*
+					CARD STYLE
+				*/
+				.cardHeadingContainer
+		    {
+		    	display: table;
+				width: 100%;
+				background-color: #FFF;
+				border-color: #DDD;
+				color: #333;
+				background-color: #FFF;
+				border-color: #DDD;
+				border-bottom: 1px solid #DDD;
+				border-top-right-radius: 3px;
+				border-top-left-radius: 3px;
+				font-size: 18px;
+		    }
+		    .cardHeadingCell
+		    {
+		    	display: table-cell;
+			   vertical-align: middle;
+			   padding: 15px;
+			   border-right: 1px solid #DDD;
+		    }
+		    .cardHeadingCellFixed
+		    {
+		    	width:1px;
+		    	white-space:nowrap;
+		    }
+		     .cardProperties {
+			  font-size: 12px;
+			}
+			.title-card-body-field
+			{
+				margin:0px;
+				padding-right:4px;
+				padding-left:0px;
+				padding-top:0px;
+				padding-bottom:0px;
+				vertical-align: middle;
+			}
+			.cardBody{min-height: 50px;}
+			
+			</style>
+</apex:define>
+</apex:composition>	
+
+</apex:page>

@@ -1,0 +1,791 @@
+<apex:page standardController="KimbleOne__DeliveryGroup__c" extensions="KimbleOne.FinancialSummaryCardController,KimbleOne.SecurityController" showHeader="false" sidebar="false" contentType="text/css" tabStyle="KimbleOne__DeliveryGroup__c">    
+	<div class="card inverted variable-width min-horizontal-padding financials-summary-card">
+		<div class="cardHeading inverted">
+			<h3 id="financialSummaryCardHeading" class="cardTitle"><apex:outputText value="{!$Label.kimbleone__deliverygroupfinancialsummary} ({!TheDisplayCurrencyIsoCode})"/></h3>
+			<apex:outputPanel layout="block" styleclass="currency-mode-toggle-container" rendered="{!CanToggleCurrencyIsoCode}">
+				<apex:outputPanel layout="inline" styleclass="undecorated-link" onclick="toggleFinancialCurrency('base', '{!JSENCODE(BaseCurrencyIsoCode)}')" rendered="{!TheDisplayCurrencyIsoCode != BaseCurrencyIsoCode}"><apex:outputText value="{!BaseCurrencyIsoCode}"/></apex:outputPanel>
+				<apex:outputText value="{!BaseCurrencyIsoCode}" rendered="{!TheDisplayCurrencyIsoCode = BaseCurrencyIsoCode}"/>
+
+				<apex:outputPanel layout="inline" styleclass="k-tgl fa fa-toggle-on" style="margin:0px 4px 0px 4px;" onclick="toggleFinancialCurrency('base', '{!JSENCODE(BaseCurrencyIsoCode)}')" rendered="{!TheDisplayCurrencyIsoCode = InvoicingCurrencyIsoCode}"></apex:outputPanel>
+				<apex:outputPanel layout="inline" styleclass="k-tgl fa fa-toggle-off" style="margin:0px 4px 0px 4px;" onclick="toggleFinancialCurrency('invoicing', '{!JSENCODE(InvoicingCurrencyIsoCode)}')" rendered="{!TheDisplayCurrencyIsoCode = BaseCurrencyIsoCode}"></apex:outputPanel>
+
+				<apex:outputPanel layout="inline" styleclass="undecorated-link" onclick="toggleFinancialCurrency('invoicing', '{!JSENCODE(InvoicingCurrencyIsoCode)}')" rendered="{!TheDisplayCurrencyIsoCode != InvoicingCurrencyIsoCode}"><apex:outputText value="{!InvoicingCurrencyIsoCode}"/></apex:outputPanel>
+				<apex:outputText value="{!InvoicingCurrencyISOCode}" rendered="{!TheDisplayCurrencyIsoCode = InvoicingCurrencyISOCode}"/>
+			</apex:outputPanel>
+		</div>
+	
+		<div class="cardBody">
+
+			<table class="list cardBodyTable" border="0" cellpadding="0" cellspacing="0">
+				<thead>
+					<tr class="headerRow">
+						<th class="headerRow" colspan="{!IF(!AllElementsSameProbability, 3, 2)}"><h2></h2></th>
+						<th colspan="2" class="headerRow"><h2></h2></th>
+						<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+							<th id="finacialsBaselineColumn" colspan="4" class="headerRow" style="text-align: center;"><h2>{!$Label.BaselineLabel} </h2></th>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!!ShowCosts}">
+							<th id="finacialsBaselineColumn" colspan="2" class="headerRow" style="text-align: center;"><h2>{!$Label.BaselineLabel} </h2></th>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+							<th id="finacialsProjectedColumn" colspan="4" class="headerRow" style="text-align: center;"><h2>{!$Label.ProjectedLabel} </h2></th>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!!ShowCosts}">
+							<th id="finacialsProjectedColumn" colspan="2" class="headerRow" style="text-align: center;"><h2>{!$Label.ProjectedLabel} </h2></th>
+						</apex:outputPanel>
+						
+						<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+							<th id="finacialsActualColumn" colspan="4" class="headerRow" style="text-align: center;"><h2>{!$Label.ActualLabel} </h2></th>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!!ShowCosts}">
+							<th id="finacialsActualColumn" colspan="2" class="headerRow" style="text-align: center;"><h2>{!$Label.ActualLabel} </h2></th>
+						</apex:outputPanel>
+					</tr>
+					<tr class="headerRow">
+						<th class="headerRow" colspan="{!IF(!AllElementsSameProbability, 3, 2)}"><h2></h2></th>
+						<th class="headerRow"><h2>{!$ObjectType.DeliveryElement__c.Fields.Name.Label}</h2></th>
+						<th class="headerRow"></th>
+						<th class="headerRow"><h2>{!$Label.kimbleone__usagelabel}</h2></th>
+						<th class="headerRow"><h2>{!$Label.kimbleone__revenuelabel}</h2></th>
+						<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+							<th class="headerRow"><h2>{!$Label.kimbleone__costlabel}</h2></th>
+							<th class="headerRow"><h2>{!$Label.kimbleone__marginlabel} (%)</h2></th>
+						</apex:outputPanel>
+						<th class="headerRow"><h2>{!$Label.kimbleone__usagelabel}</h2></th>
+						<th class="headerRow"><h2>{!$Label.kimbleone__revenuelabel}</h2></th>
+						<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+							<th class="headerRow"><h2>{!$Label.kimbleone__costlabel}</h2></th>
+							<th class="headerRow"><h2>{!$Label.kimbleone__marginlabel} (%)</h2></th>
+						</apex:outputPanel>
+						<th class="headerRow"><h2>{!$Label.kimbleone__usagelabel}</h2></th>
+						<th class="headerRow"><h2>{!$Label.kimbleone__revenuelabel}</h2></th>
+						<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+							<th class="headerRow"><h2>{!$Label.kimbleone__costlabel}</h2></th>
+							<th class="headerRow"><h2>{!$Label.kimbleone__marginlabel} (%)</h2></th>
+						</apex:outputPanel>
+					</tr>
+				</thead>
+				<tbody>	
+					<apex:repeat value="{!TheElementSequenceList}" var="theTopLevelElement">
+						<apex:variable var="fs" value="{!TheFinancialSummary.TheFinancialSummaryMap[theTopLevelElement.TheElementId]}"/>
+						<apex:variable var="elementIsBaselined" value="{!fs.IsBaselined}"/>
+						<apex:variable var="elementIsWAR" value="{!fs.IsWAR}"/>
+						<apex:variable var="elementIsWARPending" value="{!fs.IsWARPending}"/>
+						<apex:variable var="elementIsWARWithActuals" value="{!elementIsWAR && !ISNULL(fs.ActualUsage.InputDecimal__c) && fs.ActualUsage.InputDecimal__c > 0}"/>
+						<tr class="dataRow primary-row">
+							<td class="dataCell row-label-cell" id="{!JSINHTMLENCODE(fs.Id)}">
+ 								<apex:outputPanel layout="none" rendered="{!fs.ProbabilityCode = 'P1'}">
+									<div data-floating-dropdown="#{!fs.Id}-menu-data" class="fa fa-bars delivery-element-menu burger-menu"></div>
+									<div class="Loading" style="display:none"></div>
+									<div id="{!fs.Id}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-left" style="margin-top:1px">
+							   			 <ul class="floating-dropdown-menu">
+									        <apex:outputPanel layout="none" rendered="{!HasPermission['BaselineDeliveryElement']}">
+										        <li><a href="javascript:baselineElement('{!JSINHTMLENCODE(fs.Id)}');"><i class="fa fa-bookmark dropdown-icon"></i>{!$Label.BaselineThisElement}</a></li>
+											</apex:outputPanel>
+											 <apex:outputPanel layout="none" rendered="{!IsBaselineOverrideEnabled && elementIsBaselined && HasPermission['OverrideDeliveryElementBaseline']}">
+												 <li><a href="javascript:baselineOverride('{!JSINHTMLENCODE(fs.Id)}');"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.Edit} {!$Label.BaselineLabel}</a></li>
+											 </apex:outputPanel>
+										 </ul>
+									</div>
+ 								</apex:outputPanel>
+							</td>
+							<apex:outputPanel layout="none" rendered="{!!AllElementsSameProbability}">
+								<td class="dataCell row-label-cell">
+									<div class="fa fa-square kimble-probability {!JSENCODE(fs.ForecastStatusStyleClass)}" title="{!JSENCODE(fs.ForecastStatusName)}"></div>
+								</td>
+							</apex:outputPanel>
+							<td class="dataCell row-label-cell">
+								<apex:outputPanel layout="none" rendered="{!!AllElementsOperatedSeparately}">
+									<span title="{!IF(fs.IsOperatedWith, $Label.OperatedWithParentLabel + ': ' + fs.OperatedWithElementName, $Label.OperatedSeparatelyLabel)}"><i class="fa fa-pie-chart operated-with-ind {!IF(fs.IsOperatedWith, 'with-primary', '')}"></i></span>
+								</apex:outputPanel>
+								<apex:outputPanel layout="none" rendered="{!elementIsWARPending}">
+									<span class="delivery-element-war-indicator fa fa-exclamation-triangle war-icon-pending" title="{!JSINHTMLENCODE($Label.WorkingAtRiskSubmittedForApproval)}"></span>
+								</apex:outputPanel>
+								<apex:outputPanel layout="none" rendered="{!!elementIsWARPending}">
+									<span class="delivery-element-war-indicator {!IF(elementIsWAR,'fa fa-exclamation-triangle ' + IF(elementIsWARWithActuals,'war-icon-alert','war-icon-warn'),'')}" title="{!IF(elementIsWAR, $Label.WorkingAtRiskHeading + ' - ' + $ObjectType.ForecastStatus__c.Fields.ContingencyPercentage__c.Label + ': ' + fs.ContingencyPercentageAsString + '%','')}"></span>
+								</apex:outputPanel>
+							</td>
+							<td class="dataCell row-label-cell">
+								<span class="cursor-pointer" id="{!fs.Id}" onblur="safeHideSFInlineHover('{!fs.Id}');" onfocus="safeShowSFInlineHover('{!fs.Id}','{!fs.Id}');" onmouseout="safeHideSFInlineHover('{!fs.Id}');" onmouseover="safeShowSFInlineHover('{!fs.Id}','{!fs.Id}');">
+									<apex:outputText value="{!fs.DeliveryElementName}"/>
+								</span>
+							</td>
+							<td class="dataCell row-label-cell line-heading"><apex:outputText value="{!$Label.kimbleone__serviceslabel}"/></td>
+							<td class="dataCell fact-cell" style="background-color: #EEE;">
+								<apex:outputField rendered="{!fs.HasBaselineUsage}" value="{!fs.BaselineUsage.InputDecimal__c} " />
+								<apex:outputText rendered="{!fs.HasBaselineUsage}" styleClass="inline-usage-units" value=" ({!fs.UsageUnits})"/>						
+							</td>
+							<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!fs.BaselineServicesContractRevenue.InputDecimal__c}" /></td>
+							
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!fs.BaselineServicesContractCost.InputDecimal__c}" /></td>
+								<td class="rightAlignDataCell" style="background-color: #EEE; {!IF(!ISBLANK(fs.BaselineServicesContractMargin.InputInteger__c) && fs.BaselineServicesContractMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!fs.BaselineServicesContractMargin.InputInteger__c}" /></td>
+							</apex:outputPanel>
+							
+							<td class="dataCell fact-cell">
+								<apex:outputField rendered="{!fs.IsResourced}" value="{!fs.Usage.InputDecimal__c} " />
+								<apex:outputText rendered="{!fs.IsResourced}" styleClass="inline-usage-units" value=" ({!fs.UsageUnits})"/>		
+							</td>
+							<td class="rightAlignDataCell">
+								<a class="undecorated-link" href="{!IF(fs.RevenueIsUsageGenerated, $Page.KimbleOne__ActivityAssignmentsDelivery , IF (fs.RevenueIsMilestoneGenerated, $Page.KimbleOne__DeliveryGroupMilestones ,$Page.KimbleOne__DeliveryGroupAnnuities)) + '?Id=' + KimbleOne__DeliveryGroup__c.Id}">									
+									<apex:outputPanel rendered="{!fs.IsNotionalRevenue}" layout="none">
+										<span class="fa fa-info-circle notional-revenue" title="{!$Label.kimbleone__notionallabel}: {!fs.NotionalContractRevenueFormatted}"/>
+									</apex:outputPanel>
+									<apex:outputField value="{!fs.ServicesContractRevenue.InputDecimal__c}" />
+								</a>
+							</td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell">
+									<a class="undecorated-link" href="{!IF(fs.CostIsUsageGenerated, $Page.KimbleOne__ActivityAssignmentsDelivery , IF (fs.CostIsMilestoneGenerated, $Page.KimbleOne__DeliveryGroupMilestones ,$Page.KimbleOne__DeliveryGroupAnnuities)) + '?Id=' + KimbleOne__DeliveryGroup__c.Id}">
+										<apex:outputField value="{!fs.ServicesContractCost.InputDecimal__c}" />
+									</a>
+								</td>
+								<td class="rightAlignDataCell" style="{!IF(!ISBLANK(fs.ServicesContractMargin.InputInteger__c) && fs.ServicesContractMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!fs.ServicesContractMargin.InputInteger__c}" /></td>
+							</apex:outputPanel>
+							
+							<td class="dataCell fact-cell">
+								<apex:outputField rendered="{!fs.IsResourced}" value="{!fs.ActualUsage.InputDecimal__c} " />
+								<apex:outputText rendered="{!fs.IsResourced}" styleClass="inline-usage-units" value=" ({!fs.UsageUnits})"/>	
+							</td>
+							<td class="rightAlignDataCell"><apex:outputField value="{!fs.RecognisedServicesRevenue.InputDecimal__c}" /></td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell"><apex:outputField value="{!fs.RecognisedServicesCost.InputDecimal__c}" /></td>
+								<td class="rightAlignDataCell" style="{!IF(!ISBLANK(fs.RecognisedServicesMargin.InputInteger__c) && fs.RecognisedServicesMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!fs.RecognisedServicesMargin.InputInteger__c}" /></td>
+							</apex:outputPanel>
+						</tr>
+						<apex:variable value="{!fs.HasExpenseTotals}" var="displayExpenseTotals"/>
+						<apex:outputPanel layout="none" rendered="{!displayExpenseTotals}">
+							<tr class="dataRow">
+								<apex:outputPanel layout="none" rendered="{!!AllElementsSameProbability}">
+									<td class="dataCell"></td>
+								</apex:outputPanel>
+								<td class="dataCell"></td>
+								<td class="dataCell"></td>
+								<td class="dataCell"></td>
+								<td class="dataCell line-heading"><apex:outputText value="{!$Label.kimbleone__expenseslabel}"/></td>
+								<td class="dataCell fact-cell" style="background-color: #EEE;"></td>
+								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!fs.BaselineExpensesContractRevenue.InputDecimal__c}" /></td>
+								<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+									<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!fs.BaselineExpensesContractCost.InputDecimal__c}" /></td>
+									<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!fs.BaselineExpensesContractMargin.InputInteger__c}" /></td>
+								</apex:outputPanel>
+								<td class="dataCell fact-cell"></td>
+								<td class="rightAlignDataCell"><apex:outputField value="{!fs.ExpensesContractRevenue.InputDecimal__c}" /></td>
+								<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+									<td class="rightAlignDataCell"><apex:outputField value="{!fs.ExpensesContractCost.InputDecimal__c}" /></td>
+									<td class="rightAlignDataCell"><apex:outputField value="{!fs.ExpensesContractMargin.InputInteger__c}" /></td>
+								</apex:outputPanel>
+								<td class="dataCell fact-cell"></td>
+								<td class="rightAlignDataCell"><apex:outputField value="{!fs.RecognisedExpensesRevenue.InputDecimal__c}" /></td>
+								<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+									<td class="rightAlignDataCell"><apex:outputField value="{!fs.RecognisedExpensesCost.InputDecimal__c}" /></td>
+									<td class="rightAlignDataCell"><apex:outputField value="{!fs.RecognisedExpensesMargin.InputInteger__c}" /></td>
+								</apex:outputPanel>
+							</tr>
+						</apex:outputPanel>
+
+						<!-- TheScopedWithElements belonging to the parent element -->						
+						<apex:repeat value="{!theTopLevelElement.TheScopedWithElements}" var="theTopLevelElementScopedWithElement">
+							<apex:variable var="topLevelElementScopedWithElementfs" value="{!TheFinancialSummary.TheFinancialSummaryMap[theTopLevelElementScopedWithElement.TheElementId]}"/>
+							<apex:variable var="elementIsWAR" value="{!topLevelElementScopedWithElementfs.IsWAR}"/>
+							<apex:variable var="elementIsWARPending" value="{!topLevelElementScopedWithElementfs.IsWARPending}"/>
+							<apex:variable var="elementIsWARWithActuals" value="{!elementIsWAR && !ISNULL(topLevelElementScopedWithElementfs.ActualUsage.InputDecimal__c) && topLevelElementScopedWithElementfs.ActualUsage.InputDecimal__c > 0}"/>
+							<tr class="dataRow">
+								<td class="dataCell row-label-cell" id="{!JSINHTMLENCODE(topLevelElementScopedWithElementfs.Id)}">
+									<apex:outputPanel layout="none" rendered="{!topLevelElementScopedWithElementfs.ProbabilityCode = 'P1'}">
+										<div data-floating-dropdown="#{!topLevelElementScopedWithElementfs.Id}-menu-data" class="fa fa-bars delivery-element-menu burger-menu"></div>
+										<div class="Loading" style="display:none"></div>
+										<div id="{!topLevelElementScopedWithElementfs.Id}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-left" style="margin-top:1px">
+											 <ul class="floating-dropdown-menu">
+												<apex:outputPanel layout="none" rendered="{!HasPermission['BaselineDeliveryElement']}">
+													<li><a href="javascript:baselineElement('{!JSINHTMLENCODE(topLevelElementScopedWithElementfs.Id)}');"><i class="fa fa-bookmark dropdown-icon"></i>{!$Label.BaselineThisElement}</a></li>
+												</apex:outputPanel>
+											 </ul>
+										</div>
+									</apex:outputPanel>
+								</td>
+								<apex:outputPanel layout="none" rendered="{!!AllElementsSameProbability}">
+									<td class="dataCell row-label-cell">
+										<!-- we don't display forecast status on scoped with elements -->
+									</td>
+								</apex:outputPanel>
+								<td class="dataCell row-label-cell">
+									<apex:outputPanel layout="none" rendered="{!!AllElementsOperatedSeparately}">
+										<!-- we don't display operated with status on scoped with elements -->
+									</apex:outputPanel>
+									<apex:outputPanel layout="none" rendered="{!elementIsWARPending}">
+										<span class="delivery-element-war-indicator fa fa-exclamation-triangle war-icon-pending" title="{!JSINHTMLENCODE($Label.WorkingAtRiskSubmittedForApproval)}"></span>
+									</apex:outputPanel>
+									<apex:outputPanel layout="none" rendered="{!!elementIsWARPending}">
+										<span class="delivery-element-war-indicator {!IF(elementIsWAR,'fa fa-exclamation-triangle ' + IF(elementIsWARWithActuals,'war-icon-alert','war-icon-warn'),'')}" title="{!IF(elementIsWAR, $Label.WorkingAtRiskHeading + ' - ' + $ObjectType.ForecastStatus__c.Fields.ContingencyPercentage__c.Label + ': ' + topLevelElementScopedWithElementfs.ContingencyPercentageAsString + '%','')}"></span>
+									</apex:outputPanel>
+								</td>
+								<td class="dataCell row-label-cell">
+									<span class="cursor-pointer" id="{!topLevelElementScopedWithElementfs.Id}" onblur="safeHideSFInlineHover('{!topLevelElementScopedWithElementfs.Id}');" onfocus="safeShowSFInlineHover('{!topLevelElementScopedWithElementfs.Id}','{!topLevelElementScopedWithElementfs.Id}');" onmouseout="safeHideSFInlineHover('{!topLevelElementScopedWithElementfs.Id}');" onmouseover="safeShowSFInlineHover('{!topLevelElementScopedWithElementfs.Id}','{!topLevelElementScopedWithElementfs.Id}');">
+										<span class="scoped-with-element-ind fa fa-angle-right"/>
+										<span class="scoped-with-element"><apex:outputText value="{!topLevelElementScopedWithElementfs.DeliveryElementName}"/></span>
+									</span>
+								</td>
+								<td class="dataCell row-label-cell line-heading"><apex:outputText value="{!$Label.kimbleone__serviceslabel}"/></td>
+								<td class="dataCell fact-cell" style="background-color: #EEE;">
+									<apex:outputField rendered="{!topLevelElementScopedWithElementfs.HasBaselineUsage}" value="{!topLevelElementScopedWithElementfs.BaselineUsage.InputDecimal__c} " />
+									<apex:outputText rendered="{!topLevelElementScopedWithElementfs.HasBaselineUsage}" styleClass="inline-usage-units" value=" ({!topLevelElementScopedWithElementfs.UsageUnits})"/>						
+								</td>
+								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!topLevelElementScopedWithElementfs.BaselineServicesContractRevenue.InputDecimal__c}" /></td>
+								
+								<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+									<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!topLevelElementScopedWithElementfs.BaselineServicesContractCost.InputDecimal__c}" /></td>
+									<td class="rightAlignDataCell" style="background-color: #EEE; {!IF(!ISBLANK(topLevelElementScopedWithElementfs.BaselineServicesContractMargin.InputInteger__c) && topLevelElementScopedWithElementfs.BaselineServicesContractMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!topLevelElementScopedWithElementfs.BaselineServicesContractMargin.InputInteger__c}" /></td>
+								</apex:outputPanel>
+								
+								<td class="dataCell fact-cell">
+									<apex:outputField rendered="{!topLevelElementScopedWithElementfs.IsResourced}" value="{!topLevelElementScopedWithElementfs.Usage.InputDecimal__c} " />
+									<apex:outputText rendered="{!topLevelElementScopedWithElementfs.IsResourced}" styleClass="inline-usage-units" value=" ({!topLevelElementScopedWithElementfs.UsageUnits})"/>		
+								</td>
+								<td class="rightAlignDataCell">
+									<a class="undecorated-link" href="{!IF(topLevelElementScopedWithElementfs.RevenueIsUsageGenerated, $Page.KimbleOne__ActivityAssignmentsDelivery , IF (topLevelElementScopedWithElementfs.RevenueIsMilestoneGenerated, $Page.KimbleOne__DeliveryGroupMilestones ,$Page.KimbleOne__DeliveryGroupAnnuities)) + '?Id=' + KimbleOne__DeliveryGroup__c.Id}">
+										<apex:outputField value="{!topLevelElementScopedWithElementfs.ServicesContractRevenue.InputDecimal__c}" />
+									</a>
+								</td>
+								<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+									<td class="rightAlignDataCell">
+										<a class="undecorated-link" href="{!IF(topLevelElementScopedWithElementfs.CostIsUsageGenerated, $Page.KimbleOne__ActivityAssignmentsDelivery , IF (topLevelElementScopedWithElementfs.CostIsMilestoneGenerated, $Page.KimbleOne__DeliveryGroupMilestones ,$Page.KimbleOne__DeliveryGroupAnnuities)) + '?Id=' + KimbleOne__DeliveryGroup__c.Id}">
+											<apex:outputField value="{!topLevelElementScopedWithElementfs.ServicesContractCost.InputDecimal__c}" />
+										</a>
+									</td>
+									<td class="rightAlignDataCell" style="{!IF(!ISBLANK(topLevelElementScopedWithElementfs.ServicesContractMargin.InputInteger__c) && topLevelElementScopedWithElementfs.ServicesContractMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!topLevelElementScopedWithElementfs.ServicesContractMargin.InputInteger__c}" /></td>
+								</apex:outputPanel>
+								
+								<td class="dataCell fact-cell">
+									<apex:outputField rendered="{!topLevelElementScopedWithElementfs.IsResourced}" value="{!topLevelElementScopedWithElementfs.ActualUsage.InputDecimal__c} " />
+									<apex:outputText rendered="{!topLevelElementScopedWithElementfs.IsResourced}" styleClass="inline-usage-units" value=" ({!topLevelElementScopedWithElementfs.UsageUnits})"/>	
+								</td>
+								<td class="rightAlignDataCell"><apex:outputField value="{!topLevelElementScopedWithElementfs.RecognisedServicesRevenue.InputDecimal__c}" /></td>
+								<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+									<td class="rightAlignDataCell"><apex:outputField value="{!topLevelElementScopedWithElementfs.RecognisedServicesCost.InputDecimal__c}" /></td>
+									<td class="rightAlignDataCell" style="{!IF(!ISBLANK(topLevelElementScopedWithElementfs.RecognisedServicesMargin.InputInteger__c) && topLevelElementScopedWithElementfs.RecognisedServicesMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!topLevelElementScopedWithElementfs.RecognisedServicesMargin.InputInteger__c}" /></td>
+								</apex:outputPanel>
+							</tr>
+							<!-- Scoped With Elements don't have expenses -->
+						</apex:repeat>						
+						<!-- End of TheScopedWithElements belonging to the change request -->						
+
+
+						<!-- TheChangeRequestElements -->						
+						<apex:repeat value="{!theTopLevelElement.TheChangeRequestElements}" var="theChangeRequestElement">
+							<apex:variable var="changeRequestfs" value="{!TheFinancialSummary.TheFinancialSummaryMap[theChangeRequestElement.TheElementId]}"/>
+							<apex:variable var="elementIsBaselined" value="{!changeRequestfs.IsBaselined}"/>
+							<apex:variable var="elementIsWAR" value="{!changeRequestfs.IsWAR}"/>
+							<apex:variable var="elementIsWARPending" value="{!changeRequestfs.IsWARPending}"/>
+							<apex:variable var="elementIsWARWithActuals" value="{!elementIsWAR && !ISNULL(changeRequestfs.ActualUsage.InputDecimal__c) && changeRequestfs.ActualUsage.InputDecimal__c > 0}"/>
+							<tr class="dataRow">
+								<td class="dataCell row-label-cell" id="{!JSINHTMLENCODE(changeRequestfs.Id)}">
+	 								<apex:outputPanel layout="none" rendered="{!changeRequestfs.ProbabilityCode = 'P1'}">
+										<div data-floating-dropdown="#{!changeRequestfs.Id}-menu-data" class="fa fa-bars delivery-element-menu burger-menu"></div>
+										<div class="Loading" style="display:none"></div>
+										<div id="{!changeRequestfs.Id}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-left" style="margin-top:1px">
+								   			 <ul class="floating-dropdown-menu">
+										        <apex:outputPanel layout="none" rendered="{!HasPermission['BaselineDeliveryElement']}">
+											        <li><a href="javascript:baselineElement('{!JSINHTMLENCODE(changeRequestfs.Id)}');"><i class="fa fa-bookmark dropdown-icon"></i>{!$Label.BaselineThisElement}</a></li>
+												</apex:outputPanel>
+												 <apex:outputPanel layout="none" rendered="{!IsBaselineOverrideEnabled && elementIsBaselined && HasPermission['OverrideDeliveryElementBaseline']}">
+													 <li><a href="javascript:baselineOverride('{!JSINHTMLENCODE(changeRequestfs.Id)}');"><i class="fa fa-pencil-square-o dropdown-icon"></i>{!$Label.Edit} {!$Label.BaselineLabel}</a></li>
+												 </apex:outputPanel>
+										     </ul>
+										</div>
+	 								</apex:outputPanel>
+								</td>
+								<apex:outputPanel layout="none" rendered="{!!AllElementsSameProbability}">
+									<td class="dataCell row-label-cell">
+										<div class="fa fa-square kimble-probability {!JSENCODE(changeRequestfs.ForecastStatusStyleClass)}" title="{!JSENCODE(changeRequestfs.ForecastStatusName)}"></div>
+									</td>
+								</apex:outputPanel>
+								<td class="dataCell row-label-cell">
+									<apex:outputPanel layout="none" rendered="{!!AllElementsOperatedSeparately}">
+										<span title="{!IF(changeRequestfs.IsOperatedWith, $Label.OperatedWithParentLabel + ': ' + changeRequestfs.OperatedWithElementName, $Label.OperatedSeparatelyLabel)}"><i class="fa fa-pie-chart operated-with-ind {!IF(changeRequestfs.IsOperatedWith, 'with-primary', '')}"></i></span>
+									</apex:outputPanel>
+									<apex:outputPanel layout="none" rendered="{!elementIsWARPending}">
+										<span class="delivery-element-war-indicator fa fa-exclamation-triangle war-icon-pending" title="{!JSINHTMLENCODE($Label.WorkingAtRiskSubmittedForApproval)}"></span>
+									</apex:outputPanel>
+									<apex:outputPanel layout="none" rendered="{!!elementIsWARPending}">
+										<span class="delivery-element-war-indicator {!IF(elementIsWAR,'fa fa-exclamation-triangle ' + IF(elementIsWARWithActuals,'war-icon-alert','war-icon-warn'),'')}" title="{!IF(elementIsWAR, $Label.WorkingAtRiskHeading + ' - ' + $ObjectType.ForecastStatus__c.Fields.ContingencyPercentage__c.Label + ': ' + changeRequestfs.ContingencyPercentageAsString + '%','')}"></span>
+									</apex:outputPanel>
+								</td>
+								<td class="dataCell row-label-cell">
+									<span class="cursor-pointer" id="{!changeRequestfs.Id}" onblur="safeHideSFInlineHover('{!changeRequestfs.Id}');" onfocus="safeShowSFInlineHover('{!changeRequestfs.Id}','{!changeRequestfs.Id}');" onmouseout="safeHideSFInlineHover('{!changeRequestfs.Id}');" onmouseover="safeShowSFInlineHover('{!changeRequestfs.Id}','{!changeRequestfs.Id}');">
+										<apex:outputText value="{!changeRequestfs.DeliveryElementName}"/>
+									</span>
+								</td>
+								<td class="dataCell row-label-cell line-heading"><apex:outputText value="{!$Label.kimbleone__serviceslabel}"/></td>
+								<td class="dataCell fact-cell" style="background-color: #EEE;">
+									<apex:outputField rendered="{!changeRequestfs.HasBaselineUsage}" value="{!changeRequestfs.BaselineUsage.InputDecimal__c} " />
+									<apex:outputText rendered="{!changeRequestfs.HasBaselineUsage}" styleClass="inline-usage-units" value=" ({!changeRequestfs.UsageUnits})"/>						
+								</td>
+								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!changeRequestfs.BaselineServicesContractRevenue.InputDecimal__c}" /></td>
+								
+								<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+									<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!changeRequestfs.BaselineServicesContractCost.InputDecimal__c}" /></td>
+									<td class="rightAlignDataCell" style="background-color: #EEE; {!IF(!ISBLANK(changeRequestfs.BaselineServicesContractMargin.InputInteger__c) && changeRequestfs.BaselineServicesContractMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!changeRequestfs.BaselineServicesContractMargin.InputInteger__c}" /></td>
+								</apex:outputPanel>
+								
+								<td class="dataCell fact-cell">
+									<apex:outputField rendered="{!changeRequestfs.IsResourced}" value="{!changeRequestfs.Usage.InputDecimal__c} " />
+									<apex:outputText rendered="{!changeRequestfs.IsResourced}" styleClass="inline-usage-units" value=" ({!changeRequestfs.UsageUnits})"/>		
+								</td>
+								<td class="rightAlignDataCell">
+									<a class="undecorated-link" href="{!IF(changeRequestfs.RevenueIsUsageGenerated, $Page.KimbleOne__ActivityAssignmentsDelivery , IF (changeRequestfs.RevenueIsMilestoneGenerated, $Page.KimbleOne__DeliveryGroupMilestones ,$Page.KimbleOne__DeliveryGroupAnnuities)) + '?Id=' + KimbleOne__DeliveryGroup__c.Id}">
+										<apex:outputField value="{!changeRequestfs.ServicesContractRevenue.InputDecimal__c}" />
+									</a>
+								</td>
+								<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+									<td class="rightAlignDataCell">
+										<a class="undecorated-link" href="{!IF(changeRequestfs.CostIsUsageGenerated, $Page.KimbleOne__ActivityAssignmentsDelivery , IF (changeRequestfs.CostIsMilestoneGenerated, $Page.KimbleOne__DeliveryGroupMilestones ,$Page.KimbleOne__DeliveryGroupAnnuities)) + '?Id=' + KimbleOne__DeliveryGroup__c.Id}">
+											<apex:outputField value="{!changeRequestfs.ServicesContractCost.InputDecimal__c}" />
+										</a>
+									</td>
+									<td class="rightAlignDataCell" style="{!IF(!ISBLANK(changeRequestfs.ServicesContractMargin.InputInteger__c) && changeRequestfs.ServicesContractMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!changeRequestfs.ServicesContractMargin.InputInteger__c}" /></td>
+								</apex:outputPanel>
+								
+								<td class="dataCell fact-cell">
+									<apex:outputField rendered="{!changeRequestfs.IsResourced}" value="{!changeRequestfs.ActualUsage.InputDecimal__c} " />
+									<apex:outputText rendered="{!changeRequestfs.IsResourced}" styleClass="inline-usage-units" value=" ({!changeRequestfs.UsageUnits})"/>	
+								</td>
+								<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestfs.RecognisedServicesRevenue.InputDecimal__c}" /></td>
+								<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+									<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestfs.RecognisedServicesCost.InputDecimal__c}" /></td>
+									<td class="rightAlignDataCell" style="{!IF(!ISBLANK(changeRequestfs.RecognisedServicesMargin.InputInteger__c) && changeRequestfs.RecognisedServicesMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!changeRequestfs.RecognisedServicesMargin.InputInteger__c}" /></td>
+								</apex:outputPanel>
+							</tr>
+							<apex:variable value="{!changeRequestfs.HasExpenseTotals}" var="changeRequestDisplayExpenseTotals"/>
+							<apex:outputPanel layout="none" rendered="{!changeRequestDisplayExpenseTotals}">
+								<tr class="dataRow">
+									<apex:outputPanel layout="none" rendered="{!!AllElementsSameProbability}">
+										<td class="dataCell"></td>
+									</apex:outputPanel>
+									<td class="dataCell"></td>
+									<td class="dataCell"></td>
+									<td class="dataCell"></td>
+									<td class="dataCell line-heading"><apex:outputText value="{!$Label.kimbleone__expenseslabel}"/></td>
+									<td class="dataCell fact-cell" style="background-color: #EEE;"></td>
+									<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!changeRequestfs.BaselineExpensesContractRevenue.InputDecimal__c}" /></td>
+									<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+										<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!changeRequestfs.BaselineExpensesContractCost.InputDecimal__c}" /></td>
+										<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!changeRequestfs.BaselineExpensesContractMargin.InputInteger__c}" /></td>
+									</apex:outputPanel>
+									<td class="dataCell fact-cell"></td>
+									<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestfs.ExpensesContractRevenue.InputDecimal__c}" /></td>
+									<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+										<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestfs.ExpensesContractCost.InputDecimal__c}" /></td>
+										<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestfs.ExpensesContractMargin.InputInteger__c}" /></td>
+									</apex:outputPanel>
+									<td class="dataCell fact-cell"></td>
+									<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestfs.RecognisedExpensesRevenue.InputDecimal__c}" /></td>
+									<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+										<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestfs.RecognisedExpensesCost.InputDecimal__c}" /></td>
+										<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestfs.RecognisedExpensesMargin.InputInteger__c}" /></td>
+									</apex:outputPanel>
+								</tr>
+							</apex:outputPanel>
+							
+							<!-- TheScopedWithElements belonging to the change request -->						
+							<apex:repeat value="{!theChangeRequestElement.TheScopedWithElements}" var="theChangeRequestScopedWithElement">
+								<apex:variable var="changeRequestScopedWithElementfs" value="{!TheFinancialSummary.TheFinancialSummaryMap[theChangeRequestScopedWithElement.TheElementId]}"/>
+								<apex:variable var="elementIsWAR" value="{!changeRequestScopedWithElementfs.IsWAR}"/>
+								<apex:variable var="elementIsWARPending" value="{!changeRequestScopedWithElementfs.IsWARPending}"/>
+								<apex:variable var="elementIsWARWithActuals" value="{!elementIsWAR && !ISNULL(changeRequestScopedWithElementfs.ActualUsage.InputDecimal__c) && changeRequestScopedWithElementfs.ActualUsage.InputDecimal__c > 0}"/>
+								<tr class="dataRow">
+									<td class="dataCell row-label-cell" id="{!JSINHTMLENCODE(changeRequestScopedWithElementfs.Id)}">
+										<apex:outputPanel layout="none" rendered="{!changeRequestScopedWithElementfs.ProbabilityCode = 'P1'}">
+											<div data-floating-dropdown="#{!changeRequestScopedWithElementfs.Id}-menu-data" class="fa fa-bars delivery-element-menu burger-menu"></div>
+											<div class="Loading" style="display:none"></div>
+											<div id="{!changeRequestScopedWithElementfs.Id}-menu-data" class="floating-dropdown floating-dropdown-relative floating-dropdown-anchor-left" style="margin-top:1px">
+												 <ul class="floating-dropdown-menu">
+													<apex:outputPanel layout="none" rendered="{!HasPermission['BaselineDeliveryElement']}">
+														<li><a href="javascript:baselineElement('{!JSINHTMLENCODE(changeRequestScopedWithElementfs.Id)}');"><i class="fa fa-bookmark dropdown-icon"></i>{!$Label.BaselineThisElement}</a></li>
+													</apex:outputPanel>
+												 </ul>
+											</div>
+										</apex:outputPanel>
+									</td>
+									<apex:outputPanel layout="none" rendered="{!!AllElementsSameProbability}">
+										<td class="dataCell row-label-cell">
+											<!-- we don't display forecast status on scoped with elements -->
+										</td>
+									</apex:outputPanel>
+									<td class="dataCell row-label-cell">
+										<apex:outputPanel layout="none" rendered="{!!AllElementsOperatedSeparately}">
+											<!-- we don't display operated with status on scoped with elements -->
+										</apex:outputPanel>
+										<apex:outputPanel layout="none" rendered="{!elementIsWARPending}">
+											<span class="delivery-element-war-indicator fa fa-exclamation-triangle war-icon-pending" title="{!JSINHTMLENCODE($Label.WorkingAtRiskSubmittedForApproval)}"></span>
+										</apex:outputPanel>
+										<apex:outputPanel layout="none" rendered="{!!elementIsWARPending}">			
+											<span class="delivery-element-war-indicator {!IF(elementIsWAR,'fa fa-exclamation-triangle ' + IF(elementIsWARWithActuals,'war-icon-alert','war-icon-warn'),'')}" title="{!IF(elementIsWAR, $Label.WorkingAtRiskHeading + ' - ' + $ObjectType.ForecastStatus__c.Fields.ContingencyPercentage__c.Label + ': ' + changeRequestScopedWithElementfs.ContingencyPercentageAsString + '%','')}"></span>
+										</apex:outputPanel>
+									</td>
+									<td class="dataCell row-label-cell">
+										<span class="cursor-pointer" id="{!changeRequestScopedWithElementfs.Id}" onblur="safeHideSFInlineHover('{!changeRequestScopedWithElementfs.Id}');" onfocus="safeShowSFInlineHover('{!changeRequestScopedWithElementfs.Id}','{!changeRequestScopedWithElementfs.Id}');" onmouseout="safeHideSFInlineHover('{!changeRequestScopedWithElementfs.Id}');" onmouseover="safeShowSFInlineHover('{!changeRequestScopedWithElementfs.Id}','{!changeRequestScopedWithElementfs.Id}');">
+											<span class="scoped-with-element-ind fa fa-angle-right"/>
+											<span class="scoped-with-element"><apex:outputText value="{!changeRequestScopedWithElementfs.DeliveryElementName}"/></span>
+										</span>
+									</td>
+									<td class="dataCell row-label-cell line-heading"><apex:outputText value="{!$Label.kimbleone__serviceslabel}"/></td>
+									<td class="dataCell fact-cell" style="background-color: #EEE;">
+										<apex:outputField rendered="{!changeRequestScopedWithElementfs.HasBaselineUsage}" value="{!changeRequestScopedWithElementfs.BaselineUsage.InputDecimal__c} " />
+										<apex:outputText rendered="{!changeRequestScopedWithElementfs.HasBaselineUsage}" styleClass="inline-usage-units" value=" ({!changeRequestScopedWithElementfs.UsageUnits})"/>						
+									</td>
+									<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!changeRequestScopedWithElementfs.BaselineServicesContractRevenue.InputDecimal__c}" /></td>
+									
+									<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+										<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!changeRequestScopedWithElementfs.BaselineServicesContractCost.InputDecimal__c}" /></td>
+										<td class="rightAlignDataCell" style="background-color: #EEE; {!IF(!ISBLANK(changeRequestScopedWithElementfs.BaselineServicesContractMargin.InputInteger__c) && changeRequestScopedWithElementfs.BaselineServicesContractMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!changeRequestScopedWithElementfs.BaselineServicesContractMargin.InputInteger__c}" /></td>
+									</apex:outputPanel>
+									
+									<td class="dataCell fact-cell">
+										<apex:outputField rendered="{!changeRequestScopedWithElementfs.IsResourced}" value="{!changeRequestScopedWithElementfs.Usage.InputDecimal__c} " />
+										<apex:outputText rendered="{!changeRequestScopedWithElementfs.IsResourced}" styleClass="inline-usage-units" value=" ({!changeRequestScopedWithElementfs.UsageUnits})"/>		
+									</td>
+									<td class="rightAlignDataCell">
+										<a class="undecorated-link" href="{!IF(changeRequestScopedWithElementfs.RevenueIsUsageGenerated, $Page.KimbleOne__ActivityAssignmentsDelivery , IF (changeRequestScopedWithElementfs.RevenueIsMilestoneGenerated, $Page.KimbleOne__DeliveryGroupMilestones ,$Page.KimbleOne__DeliveryGroupAnnuities)) + '?Id=' + KimbleOne__DeliveryGroup__c.Id}">
+											<apex:outputField value="{!changeRequestScopedWithElementfs.ServicesContractRevenue.InputDecimal__c}" />
+										</a>
+									</td>
+									<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+										<td class="rightAlignDataCell">
+											<a class="undecorated-link" href="{!IF(changeRequestScopedWithElementfs.CostIsUsageGenerated, $Page.KimbleOne__ActivityAssignmentsDelivery , IF (changeRequestScopedWithElementfs.CostIsMilestoneGenerated, $Page.KimbleOne__DeliveryGroupMilestones ,$Page.KimbleOne__DeliveryGroupAnnuities)) + '?Id=' + KimbleOne__DeliveryGroup__c.Id}">
+												<apex:outputField value="{!changeRequestScopedWithElementfs.ServicesContractCost.InputDecimal__c}" />
+											</a>
+										</td>
+										<td class="rightAlignDataCell" style="{!IF(!ISBLANK(changeRequestScopedWithElementfs.ServicesContractMargin.InputInteger__c) && changeRequestScopedWithElementfs.ServicesContractMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!changeRequestScopedWithElementfs.ServicesContractMargin.InputInteger__c}" /></td>
+									</apex:outputPanel>
+									
+									<td class="dataCell fact-cell">
+										<apex:outputField rendered="{!changeRequestScopedWithElementfs.IsResourced}" value="{!changeRequestScopedWithElementfs.ActualUsage.InputDecimal__c} " />
+										<apex:outputText rendered="{!changeRequestScopedWithElementfs.IsResourced}" styleClass="inline-usage-units" value=" ({!changeRequestScopedWithElementfs.UsageUnits})"/>	
+									</td>
+									<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestScopedWithElementfs.RecognisedServicesRevenue.InputDecimal__c}" /></td>
+									<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+										<td class="rightAlignDataCell"><apex:outputField value="{!changeRequestScopedWithElementfs.RecognisedServicesCost.InputDecimal__c}" /></td>
+										<td class="rightAlignDataCell" style="{!IF(!ISBLANK(changeRequestScopedWithElementfs.RecognisedServicesMargin.InputInteger__c) && changeRequestScopedWithElementfs.RecognisedServicesMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!changeRequestScopedWithElementfs.RecognisedServicesMargin.InputInteger__c}" /></td>
+									</apex:outputPanel>
+								</tr>
+								<!-- Scoped With Elements don't have expenses -->
+							</apex:repeat>						
+							<!-- End of TheScopedWithElements belonging to the change request -->							
+							
+						</apex:repeat>						
+						<!-- End of TheChangeRequestElements -->
+
+						<!-- Element Totals for Parents -->
+						<apex:outputPanel layout="none" rendered="{!ShowDeliveryGroupParentElementTotals && theTopLevelElement.IsPrimaryElement}">
+						<apex:variable var="elementTotalRow" value="{!TheFinancialSummary.ParentTotalsMap[theTopLevelElement.TheElementId]}"/>
+						<apex:outputPanel layout="none" rendered="{!TheElementSequenceList.size > 1 && elementTotalRow.HasExpenseTotals}">
+						<tr class="dataRow sub-total-row">
+							<td class="dataCell row-label-cell"></td>
+							<apex:outputPanel layout="none" rendered="{!!AllElementsSameProbability}">
+								<td class="dataCell row-label-cell"></td>
+							</apex:outputPanel>
+							<td class="dataCell row-label-cell"></td>
+ 							<td class="dataCell row-label-cell line-heading" colspan="2"><apex:outputText value="{!$Label.kimbleone__subtotalservicesheading}"/></td>
+							<td class="dataCell fact-cell" style="background-color: #EEE;"><apex:outputField value="{!elementTotalRow.BaselineUsage.InputDecimal__c}" rendered="{!elementTotalRow.ShowUsageTotals && !ISBLANK(elementTotalRow.UsageUnits) && elementTotalRow.HasBaselineUsage}"/><apex:outputText value=" ({!elementTotalRow.UsageUnits})" styleClass="inline-usage-units" rendered="{!elementTotalRow.ShowUsageTotals && !ISBLANK(elementTotalRow.UsageUnits) && elementTotalRow.HasBaselineUsage}"/></td>
+ 							<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!elementTotalRow.BaselineServicesContractRevenue.InputDecimal__c}" /></td>
+							
+ 							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+ 								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!elementTotalRow.BaselineServicesContractCost.InputDecimal__c}" /></td>
+ 								<td class="rightAlignDataCell" style="background-color: #EEE; {!IF(!ISBLANK(elementTotalRow.BaselineServicesContractMargin.InputInteger__c) && elementTotalRow.BaselineServicesContractMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!elementTotalRow.BaselineServicesContractMargin.InputInteger__c}" /></td>
+ 							</apex:outputPanel>
+							
+							<td class="dataCell fact-cell"><apex:outputField value="{!elementTotalRow.Usage.InputDecimal__c}" rendered="{!elementTotalRow.ShowUsageTotals && !ISBLANK(elementTotalRow.UsageUnits)}"/><apex:outputText value=" ({!elementTotalRow.UsageUnits})" styleClass="inline-usage-units" rendered="{!elementTotalRow.ShowUsageTotals && !ISBLANK(elementTotalRow.UsageUnits)}"/></td>
+ 							<td class="rightAlignDataCell">
+								<apex:outputPanel rendered="{!elementTotalRow.IsNotionalRevenue}" layout="none">
+									<span class="fa fa-info-circle notional-revenue" title="{!$Label.kimbleone__notionallabel}: {!elementTotalRow.NotionalContractRevenueFormatted}"/>
+								</apex:outputPanel>
+								<apex:outputField value="{!elementTotalRow.ServicesContractRevenue.InputDecimal__c}" />
+ 							</td>
+ 							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+ 								<td class="rightAlignDataCell"><apex:outputField value="{!elementTotalRow.ServicesContractCost.InputDecimal__c}" /></td>
+ 								<td class="rightAlignDataCell" style="{!IF(!ISBLANK(elementTotalRow.ServicesContractMargin.InputInteger__c) && elementTotalRow.ServicesContractMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!elementTotalRow.ServicesContractMargin.InputInteger__c}" /></td>
+ 							</apex:outputPanel>
+							
+							<td class="dataCell fact-cell"><apex:outputField value="{!elementTotalRow.ActualUsage.InputDecimal__c}" rendered="{!elementTotalRow.ShowUsageTotals && !ISBLANK(elementTotalRow.UsageUnits)}"/><apex:outputText value=" ({!elementTotalRow.UsageUnits})" styleClass="inline-usage-units" rendered="{!elementTotalRow.ShowUsageTotals && !ISBLANK(elementTotalRow.UsageUnits)}"/></td>
+ 							<td class="rightAlignDataCell"><apex:outputField value="{!elementTotalRow.RecognisedServicesRevenue.InputDecimal__c}" /></td>
+ 							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+ 								<td class="rightAlignDataCell"><apex:outputField value="{!elementTotalRow.RecognisedServicesCost.InputDecimal__c}" /></td>
+ 								<td class="rightAlignDataCell" style="{!IF(!ISBLANK(elementTotalRow.RecognisedServicesMargin.InputInteger__c) && elementTotalRow.RecognisedServicesMargin.InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!elementTotalRow.RecognisedServicesMargin.InputInteger__c}" /></td>
+ 							</apex:outputPanel>
+						</tr>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!TheElementSequenceList.size > 1 && elementTotalRow.HasExpenseTotals}">
+						<tr class="dataRow sub-total-row">
+							<apex:outputPanel layout="none" rendered="{!!AllElementsSameProbability}">
+								<td class="dataCell"></td>
+							</apex:outputPanel>
+							<td class="dataCell"></td>
+							<td class="dataCell"></td>
+							<td class="dataCell line-heading" colspan="2"><apex:outputText value="{!$Label.kimbleone__subtotalexpensesheading}"/></td>
+							<td class="dataCell fact-cell" style="background-color: #EEE;"></td>
+							<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!elementTotalRow.BaselineExpensesContractRevenue.InputDecimal__c}" /></td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!elementTotalRow.BaselineExpensesContractCost.InputDecimal__c}" /></td>
+								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!elementTotalRow.BaselineExpensesContractMargin.InputInteger__c}" /></td>
+							</apex:outputPanel>
+							<td class="dataCell fact-cell"></td>
+							<td class="rightAlignDataCell"><apex:outputField value="{!elementTotalRow.ExpensesContractRevenue.InputDecimal__c}" /></td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell"><apex:outputField value="{!elementTotalRow.ExpensesContractCost.InputDecimal__c}" /></td>
+								<td class="rightAlignDataCell"><apex:outputField value="{!elementTotalRow.ExpensesContractMargin.InputInteger__c}" /></td>
+							</apex:outputPanel>
+							<td class="dataCell fact-cell"></td>
+							<td class="rightAlignDataCell"><apex:outputField value="{!elementTotalRow.RecognisedExpensesRevenue.InputDecimal__c}" /></td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell"><apex:outputField value="{!elementTotalRow.RecognisedExpensesCost.InputDecimal__c}" /></td>
+								<td class="rightAlignDataCell"><apex:outputField value="{!elementTotalRow.RecognisedExpensesMargin.InputInteger__c}" /></td>
+							</apex:outputPanel>
+						</tr>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!elementTotalRow.HasExpenseTotals || TheElementSequenceList.size > 1}">
+						<tr class="dataRow sub-total-row">
+							<apex:outputPanel layout="none" rendered="{!!AllElementsSameProbability}">
+								<td class="dataCell"></td>
+							</apex:outputPanel>
+							<td class="dataCell"></td>
+							<td class="dataCell"></td>
+							<td class="dataCell line-heading" colspan="2"><apex:outputText value="{!$Label.kimbleone__subtotal}"/></td>
+							<td class="dataCell fact-cell" style="background-color: #EEE;"><apex:outputField value="{!elementTotalRow.BaselineUsage.InputDecimal__c}" rendered="{!elementTotalRow.ShowUsageTotals && !ISBLANK(elementTotalRow.UsageUnits) && !ISBLANK(elementTotalRow.UsageUnits) && elementTotalRow.HasBaselineUsage}"/><apex:outputText styleClass="inline-usage-units" value=" ({!elementTotalRow.UsageUnits})" rendered="{!elementTotalRow.ShowUsageTotals && !ISBLANK(elementTotalRow.UsageUnits) && elementTotalRow.HasBaselineUsage}"/></td>
+							<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!elementTotalRow.BaselineContractRevenue.InputDecimal__c}" /></td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!elementTotalRow.BaselineContractCost.InputDecimal__c}" /></td>
+								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!elementTotalRow.BaselineContractMargin.InputInteger__c}" /></td>
+							</apex:outputPanel>
+							<td class="dataCell fact-cell"><apex:outputField value="{!elementTotalRow.Usage.InputDecimal__c}" rendered="{!elementTotalRow.ShowUsageTotals && !ISBLANK(elementTotalRow.UsageUnits)}"/><apex:outputText value=" ({!elementTotalRow.UsageUnits})" styleClass="inline-usage-units" rendered="{!elementTotalRow.ShowUsageTotals && !ISBLANK(elementTotalRow.UsageUnits)}"/></td>
+							<td class="rightAlignDataCell"><apex:outputField value="{!elementTotalRow.ContractRevenue.InputDecimal__c}" /></td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell"><apex:outputField value="{!elementTotalRow.ContractCost.InputDecimal__c}" /></td>
+								<td class="rightAlignDataCell"><apex:outputField value="{!elementTotalRow.ContractMargin.InputInteger__c}" /></td>
+							</apex:outputPanel>
+							<td class="dataCell fact-cell"><apex:outputField value="{!elementTotalRow.ActualUsage.InputDecimal__c}" rendered="{!elementTotalRow.ShowUsageTotals && !ISBLANK(elementTotalRow.UsageUnits)}"/><apex:outputText value=" ({!elementTotalRow.UsageUnits})" styleClass="inline-usage-units" rendered="{!elementTotalRow.ShowUsageTotals && !ISBLANK(elementTotalRow.UsageUnits)}"/></td>
+ 							<td class="rightAlignDataCell"><apex:outputField value="{!elementTotalRow.RecognisedRevenue.InputDecimal__c}" /></td>
+ 							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+ 								<td class="rightAlignDataCell"><apex:outputField value="{!elementTotalRow.RecognisedCost.InputDecimal__c}" /></td>
+ 								<td class="rightAlignDataCell"><apex:outputField value="{!elementTotalRow.RecognisedMargin.InputInteger__c}" /></td>
+ 							</apex:outputPanel>
+						</tr>
+						</apex:outputPanel>					
+					</apex:outputPanel>
+					</apex:repeat>
+
+					<!-- Group Totals -->
+					<apex:outputPanel layout="none" rendered="{!ShowDeliveryGroupFinSummaryTotals}">
+						<apex:variable var="totalRow" value="{!TheFinancialSummary.FinancialSummaryTotal}"/>
+						<apex:outputPanel layout="none" rendered="{!totalRow.NumberOfServicesElements != null && totalRow.NumberOfServicesElements > 1 && totalRow.HasExpenseTotals}">
+						<tr class="dataRow total-row">
+							<td class="dataCell row-label-cell"></td>
+							<apex:outputPanel layout="none" rendered="{!!AllElementsSameProbability}">
+								<td class="dataCell row-label-cell"></td>
+							</apex:outputPanel>
+							<td class="dataCell row-label-cell"></td>
+ 							<td class="dataCell row-label-cell line-heading" colspan="2"><apex:outputText value="{!$Label.kimbleone__totalservicesheading}"/></td>
+							<td class="dataCell fact-cell" style="background-color: #EEE;"><apex:outputField value="{!totalRow.BaselineUsage.KimbleOne__InputDecimal__c}" rendered="{!totalRow.ShowUsageTotals && !ISBLANK(totalRow.UsageUnits) && totalRow.HasBaselineUsage}"/><apex:outputText value=" ({!totalRow.UsageUnits})" styleClass="inline-usage-units" rendered="{!totalRow.ShowUsageTotals && !ISBLANK(totalRow.UsageUnits) && totalRow.HasBaselineUsage}"/></td>
+ 							<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!totalRow.BaselineServicesContractRevenue.KimbleOne__InputDecimal__c}" /></td>
+							
+ 							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+ 								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!totalRow.BaselineServicesContractCost.KimbleOne__InputDecimal__c}" /></td>
+ 								<td class="rightAlignDataCell" style="background-color: #EEE; {!IF(!ISBLANK(totalRow.BaselineServicesContractMargin.KimbleOne__InputInteger__c) && totalRow.BaselineServicesContractMargin.KimbleOne__InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!totalRow.BaselineServicesContractMargin.KimbleOne__InputInteger__c}" /></td>
+ 							</apex:outputPanel>
+							
+							<td class="dataCell fact-cell"><apex:outputField value="{!totalRow.Usage.KimbleOne__InputDecimal__c}" rendered="{!totalRow.ShowUsageTotals && !ISBLANK(totalRow.UsageUnits)}"/><apex:outputText value=" ({!totalRow.UsageUnits})" styleClass="inline-usage-units" rendered="{!totalRow.ShowUsageTotals && !ISBLANK(totalRow.UsageUnits)}"/></td>
+ 							<td class="rightAlignDataCell">
+								<apex:outputPanel rendered="{!totalRow.IsNotionalRevenue}" layout="none">
+									<span class="fa fa-info-circle notional-revenue" title="{!$Label.kimbleone__notionallabel}: {!totalRow.NotionalContractRevenueFormatted}"/>
+								</apex:outputPanel>
+								<apex:outputField value="{!totalRow.ServicesContractRevenue.KimbleOne__InputDecimal__c}" />
+ 							</td>
+ 							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+ 								<td class="rightAlignDataCell"><apex:outputField value="{!totalRow.ServicesContractCost.KimbleOne__InputDecimal__c}" /></td>
+ 								<td class="rightAlignDataCell" style="{!IF(!ISBLANK(totalRow.ServicesContractMargin.KimbleOne__InputInteger__c) && totalRow.ServicesContractMargin.KimbleOne__InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!totalRow.ServicesContractMargin.KimbleOne__InputInteger__c}" /></td>
+ 							</apex:outputPanel>
+							
+							<td class="dataCell fact-cell"><apex:outputField value="{!totalRow.ActualUsage.KimbleOne__InputDecimal__c}" rendered="{!totalRow.ShowUsageTotals && !ISBLANK(totalRow.UsageUnits)}"/><apex:outputText value=" ({!totalRow.UsageUnits})" styleClass="inline-usage-units" rendered="{!totalRow.ShowUsageTotals && !ISBLANK(totalRow.UsageUnits)}"/></td>
+ 							<td class="rightAlignDataCell"><apex:outputField value="{!totalRow.RecognisedServicesRevenue.KimbleOne__InputDecimal__c}" /></td>
+ 							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+ 								<td class="rightAlignDataCell"><apex:outputField value="{!totalRow.RecognisedServicesCost.KimbleOne__InputDecimal__c}" /></td>
+ 								<td class="rightAlignDataCell" style="{!IF(!ISBLANK(totalRow.RecognisedServicesMargin.KimbleOne__InputInteger__c) && totalRow.RecognisedServicesMargin.KimbleOne__InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!totalRow.RecognisedServicesMargin.KimbleOne__InputInteger__c}" /></td>
+ 							</apex:outputPanel>
+						</tr>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!totalRow.NumberOfServicesElements != null && totalRow.NumberOfServicesElements > 1 && totalRow.HasExpenseTotals}">
+						<tr class="dataRow total-row">
+							<apex:outputPanel layout="none" rendered="{!!AllElementsSameProbability}">
+								<td class="dataCell"></td>
+							</apex:outputPanel>
+							<td class="dataCell"></td>
+							<td class="dataCell"></td>
+							<td class="dataCell line-heading" colspan="2"><apex:outputText value="{!$Label.kimbleone__totalexpensesheading}"/></td>
+							<td class="dataCell fact-cell" style="background-color: #EEE;"></td>
+							<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!totalRow.BaselineExpensesContractRevenue.KimbleOne__InputDecimal__c}" /></td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!totalRow.BaselineExpensesContractCost.KimbleOne__InputDecimal__c}" /></td>
+								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!totalRow.BaselineExpensesContractMargin.KimbleOne__InputInteger__c}" /></td>
+							</apex:outputPanel>
+							<td class="dataCell fact-cell"></td>
+							<td class="rightAlignDataCell"><apex:outputField value="{!totalRow.ExpensesContractRevenue.KimbleOne__InputDecimal__c}" /></td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell"><apex:outputField value="{!totalRow.ExpensesContractCost.KimbleOne__InputDecimal__c}" /></td>
+								<td class="rightAlignDataCell"><apex:outputField value="{!totalRow.ExpensesContractMargin.KimbleOne__InputInteger__c}" /></td>
+							</apex:outputPanel>
+							<td class="dataCell fact-cell"></td>
+							<td class="rightAlignDataCell"><apex:outputField value="{!totalRow.RecognisedExpensesRevenue.KimbleOne__InputDecimal__c}" /></td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell"><apex:outputField value="{!totalRow.RecognisedExpensesCost.KimbleOne__InputDecimal__c}" /></td>
+								<td class="rightAlignDataCell"><apex:outputField value="{!totalRow.RecognisedExpensesMargin.KimbleOne__InputInteger__c}" /></td>
+							</apex:outputPanel>
+						</tr>
+						</apex:outputPanel>
+						<apex:outputPanel layout="none" rendered="{!totalRow.HasExpenseTotals || (totalRow.NumberOfServicesElements != null && totalRow.NumberOfServicesElements > 1)}">
+						<tr class="dataRow total-row">
+							<apex:outputPanel layout="none" rendered="{!!AllElementsSameProbability}">
+								<td class="dataCell"></td>
+							</apex:outputPanel>
+							<td class="dataCell"></td>
+							<td class="dataCell"></td>
+							<td class="dataCell line-heading" colspan="2"><apex:outputText value="{!$Label.kimbleone__total}"/></td>
+							<td class="dataCell fact-cell" style="background-color: #EEE;"><apex:outputField value="{!totalRow.BaselineUsage.KimbleOne__InputDecimal__c}" rendered="{!totalRow.ShowUsageTotals && !ISBLANK(totalRow.UsageUnits) && totalRow.HasBaselineUsage}"/><apex:outputText value=" ({!totalRow.UsageUnits})" styleClass="inline-usage-units" rendered="{!totalRow.ShowUsageTotals && !ISBLANK(totalRow.UsageUnits) && totalRow.HasBaselineUsage}"/></td>
+							<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!totalRow.BaselineContractRevenue.KimbleOne__InputDecimal__c}" /></td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell" style="background-color: #EEE;"><apex:outputField value="{!totalRow.BaselineContractCost.KimbleOne__InputDecimal__c}" /></td>
+ 								<td class="rightAlignDataCell" style="background-color: #EEE; {!IF(!ISBLANK(totalRow.BaselineContractMargin.KimbleOne__InputInteger__c) && totalRow.BaselineContractMargin.KimbleOne__InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!totalRow.BaselineContractMargin.KimbleOne__InputInteger__c}" /></td>
+							</apex:outputPanel>
+							<td class="dataCell fact-cell"><apex:outputField value="{!totalRow.Usage.KimbleOne__InputDecimal__c}" rendered="{!totalRow.ShowUsageTotals && !ISBLANK(totalRow.UsageUnits)}"/><apex:outputText value=" ({!totalRow.UsageUnits})" styleClass="inline-usage-units" rendered="{!totalRow.ShowUsageTotals && !ISBLANK(totalRow.UsageUnits)}"/></td>
+							<td class="rightAlignDataCell"><apex:outputField value="{!totalRow.ContractRevenue.KimbleOne__InputDecimal__c}" /></td>
+							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+								<td class="rightAlignDataCell"><apex:outputField value="{!totalRow.ContractCost.KimbleOne__InputDecimal__c}" /></td>
+ 								<td class="rightAlignDataCell" style="{!IF(!ISBLANK(totalRow.ContractMargin.KimbleOne__InputInteger__c) && totalRow.ContractMargin.KimbleOne__InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!totalRow.ContractMargin.KimbleOne__InputInteger__c}" /></td>
+							</apex:outputPanel>
+							<td class="dataCell fact-cell"><apex:outputField value="{!totalRow.ActualUsage.KimbleOne__InputDecimal__c}" rendered="{!totalRow.ShowUsageTotals && !ISBLANK(totalRow.UsageUnits)}"/><apex:outputText value=" ({!totalRow.UsageUnits})" styleClass="inline-usage-units" rendered="{!totalRow.ShowUsageTotals && !ISBLANK(totalRow.UsageUnits)}"/></td>
+ 							<td class="rightAlignDataCell"><apex:outputField value="{!totalRow.RecognisedRevenue.KimbleOne__InputDecimal__c}" /></td>
+ 							<apex:outputPanel layout="none" rendered="{!ShowCosts}">
+ 								<td class="rightAlignDataCell"><apex:outputField value="{!totalRow.RecognisedCost.KimbleOne__InputDecimal__c}" /></td>
+ 								<td class="rightAlignDataCell" style="{!IF(!ISBLANK(totalRow.RecognisedMargin.KimbleOne__InputInteger__c) && totalRow.RecognisedMargin.KimbleOne__InputInteger__c < 0, 'color:red;font-weight:bold;','')}"><apex:outputField value="{!totalRow.RecognisedMargin.KimbleOne__InputInteger__c}" /></td>
+ 							</apex:outputPanel>
+						</tr>
+						</apex:outputPanel>					
+					</apex:outputPanel>
+				</tbody>
+			</table>
+	
+		</div>
+	</div>
+    
+    <style>
+		.war-icon-warn
+		{
+			color: #E58E1A;
+		}
+		.war-icon-alert
+		{
+			color: #B42E34;
+		}
+		.war-icon-pending
+		{
+			color: #404041;
+		}
+		.delivery-element-menu.burger-menu {
+		    font-size: 14px;
+		    cursor:pointer;
+		}
+		.cursor-pointer {
+			cursor:pointer;
+		}
+		.Loading 
+		{
+			background-image: url('{!URLFOR($Resource.JobImages, 'running16.gif')}') !important;
+			background-repeat:no-repeat !important;
+			background-position: 50%, 50%;
+			width:18px;
+			height:18px;
+		}
+		
+		.rightAlignDataCell {
+		    text-align: right;
+		}
+		.scoped-with-element-ind {
+				padding-left: 5px;
+		}
+		.scoped-with-element {
+				padding-left: 5px;
+		}
+		.operated-with-ind {
+		    font-size: 16px;
+		}
+		.with-primary
+		{
+			color:#dedede;
+		}
+		.scoped-with-element-ind {
+				padding-left: 5px;
+		}
+		.scoped-with-element {
+				padding-left: 5px;
+		}
+		.cardBodyTable tr:not(:first-child).primary-row td
+		{
+		    border-top: 2px solid #D6D6D6 !important;
+		}
+		.cardBodyTable {
+    		border-bottom: 1px solid #ececec !important;		
+		}
+		td.dataCell {
+		    border-bottom: none !important;
+		}
+		td.row-label-cell {
+		    border-top: 1px solid #ececec !important;
+		}
+		td.fact-cell {
+		    border-bottom: 1px solid #ececec !important;
+		}
+		.notional-revenue
+		{
+			font-size: 14px;
+		    color: #428BCA;
+		    margin-right: 2px;
+		    cursor: pointer;
+		}
+		tr.total-row {
+		    font-weight: bold;
+		}
+		tr.total-row td {
+			border-top: 2px solid #D6D6D6 !important;
+		}
+		tr.sub-total-row {
+		    font-style: italic;
+		}
+		tr.sub-total-row td {
+			border-top: 1px solid #D6D6D6 !important;
+		}
+		td.line-heading {
+			text-align: right;
+			padding-right: 5px;
+		}
+		span.inline-usage-units {
+		    font-size: 10px;
+		}		
+    </style>
+    
+    <script>
+ 		jQuery('.delivery-element-war-indicator').qtip({style: {classes: 'qtip-light qtip-shadow qtip-rounded'}});
+
+ 		function toggleFinancialCurrency( mode, currencyCode)
+		{
+			var container =	jQuery('.financials-summary-card').closest('[pagesource]');
+
+			container.attr('display-currency', currencyCode);
+			jQuery(".DefaultCurrencyForDeliveryElementUpdate").val(currencyCode);
+			loadDashboardComponent(container);
+		}
+
+		jQuery(document).ready(function(){
+			jQuery(".DefaultCurrencyForDeliveryElementUpdate").val("{!JSENCODE(TheDisplayCurrencyIsoCode)}");
+		});
+
+    </script>
+</apex:page>

@@ -1,0 +1,643 @@
+<apex:page standardController="KimbleOne__ActivityAssignmentClass__c" extensions="KimbleOne.ActivityAssignmentClassHomeController" action="{!Redirect}" sidebar="false" >
+ 
+<apex:composition template="KimbleOne__SiteMaster">
+
+<apex:define name="Menu">
+
+</apex:define>
+    
+<apex:define name="Content">
+	<apex:stylesheet value="{!URLFOR($Page.KimbleOne__GanttViewCss)}"/>
+<style>
+	.job
+	{
+		padding-left: 20px;
+		background-repeat: no-repeat;
+		padding-right: 12px;
+		height: 18px;
+		display: block;
+		line-height: 18px;
+		font-weight:bold;
+	}
+	.processing 
+	{
+		background-image: url('{!URLFOR($Resource.JobImages, 'running16.gif')}');
+	}
+	div.lookupHoverDetailOverridable {
+		z-index: 9999;
+	}
+	.pbButton form {
+		display: inline-block;
+		vertical-align: top;
+	}
+	.pbButton form input {
+		vertical-align: top;
+	}
+	td.gantt-demo {
+		background-color: black;
+		color:white;
+		border-radius: 2px;
+	}
+	.class-container {
+		width: 100%;
+		display: table-cell;
+	}
+	.page-container {
+		display: table-row;
+	}
+	.nav-container {
+		width: 240px !important;
+		display: inline-block;
+		vertical-align: top;
+		border-radius: 4px;
+		background-color: #f8f8f8;
+		border: 1px solid #ececec;
+		margin-right: 2px;
+	}
+	.title-container {
+	    padding: 14px 12px;
+		font-weight: bold;
+		font-size: 14px;
+		border-bottom: 1px solid #dbdbdb;
+ 	}
+ 	.btn-container {
+		margin-top: 6px;
+	}
+	.cls-nav {
+    	cursor: pointer;
+		padding: 9px;
+		margin: 4px 6px 4px 3px;
+		border-radius: 2px;
+		position: relative;
+	}
+	.cls-nav:hover {
+		color: black !important;
+		font-weight: bold;
+	}
+	i.this-cls-ind,
+	i.reorder-ind {
+		position: absolute;
+		right: 9px;
+		font-size: 14px;
+		top: 9px;
+	}
+	i.this-cls-ind {
+	    color: #729BC8;
+ 	}
+	i.reorder-ind {
+		color: black;
+ 	}
+	.cls-nav.this-cls i.this-cls-ind {
+		display: block;
+	}
+	.cls-nav:not(.this-cls) i.this-cls-ind {
+		display: none;
+	}
+	.nav-container.ui-sortable i.this-cls-ind {
+		display: none;
+	}
+	th.labelCol {
+		white-space: nowrap !important;
+	}
+	</style>
+
+<script>
+ 		function initialisePopup()
+ 		{
+ 			showModalBoxy();
+ 			getReferenceData();
+ 			jQuery('[id$="criterion-field-name"]').fieldSelector({rootObject:'{!$ObjectType.ActivityAssignment__c.Name}'});
+ 		}
+ 		function afterSubmit()
+ 		{
+ 			jQuery('[id$="criterion-field-name"]').fieldSelector({rootObject:'{!$ObjectType.ActivityAssignment__c.Name}'});
+ 		}
+
+		var activityAssignmentObj='{!JSINHTMLENCODE(AssignmentObjectName)}';
+		var fieldType;
+		function validateFieldName()
+		{
+			try
+			{
+			BlockSection('#CriterionPanel');
+			var value=jQuery('.FieldName').val();
+			var isValidQuery;
+			if(value.lastIndexOf('__r')==value.length-3)
+			{
+			//should return false
+			isValidQuery=1;
+			}
+			else if(value!=null && value!='')
+			{
+				var fields=jQuery('.FieldName').val().split('.');
+				
+				var nextObjectToQuery;
+				isValidQuery=fields.length;
+				jQuery.each(fields, function(index, value)
+				{
+					var sfObject;
+					if(index==0)
+						sfObject=sforce.connection.describeSObject(activityAssignmentObj);
+					else
+						sfObject=sforce.connection.describeSObject(nextObjectToQuery);
+					
+					var field=value;
+					var sfObjectFields=sfObject.fields;
+					var isValidField=false;
+					jQuery.each(sfObjectFields, function(index1, value)
+					{
+						if(field == sfObjectFields[index1].name)
+						{
+							isValidField=true;
+							isValidQuery=isValidQuery-1;
+							fieldType = sfObjectFields[index1].type;
+							nextObjectToQuery=null;
+					
+						}
+						else if(field  == sfObjectFields[index1].relationshipName)
+						{
+							isValidField=true;
+							isValidQuery=isValidQuery-1;
+							fieldType = sfObjectFields[index1].type;
+							nextObjectToQuery=sfObjectFields[index1].referenceTo;
+						}
+						
+					});
+					
+				});
+			}
+		
+			}
+			catch(e)
+			{
+				isValidQuery=1;
+			}	
+			UnblockSection('#CriterionPanel');
+			
+			var valid=(isValidQuery==0);
+			
+			if(fieldType=='boolean')
+			{
+				jQuery('.Operator').next().find("option").removeAttr('disabled');
+				jQuery('.Operator').next().find("option[value!='{!JSINHTMLENCODE(OperatorEquals)}']").attr('disabled','disabled');
+				jQuery('.Operator').next().val('{!JSINHTMLENCODE(OperatorEquals)}');
+				jQuery('.Operator').val('{!JSINHTMLENCODE(OperatorEquals)}');
+			}
+			else if(fieldType=='numeric' || fieldType=='double' || fieldType=='decimal')
+			{
+				jQuery('.Operator').next().find("option").removeAttr('disabled');
+				jQuery('.Operator').next().find("option[value='{!JSINHTMLENCODE(OperatorIsIn)}']").attr('disabled','disabled');
+				jQuery('.Operator').next().find("option[value='{!JSINHTMLENCODE(OperatorIsNotIn)}']").attr('disabled','disabled');
+				if(jQuery('.Operator').next().val()=='{!JSINHTMLENCODE(OperatorIsIn)}' || jQuery('.Operator').next().val()=='{!JSINHTMLENCODE(OperatorIsNotIn)}' || jQuery('.Operator').next().val()==null)
+				{
+					jQuery('.Operator').next().find("option").each(function(key,value)
+					{
+						if(jQuery(this).attr('disabled')!='disabled')
+						{	
+							jQuery('.Operator').next().val(jQuery(this).val());
+							 return false;
+						}
+					});
+				}
+			}
+			else if(fieldType=='date' || fieldType=='datetime')
+			{
+				jQuery('.FieldName').css('background-color','yellow');
+				DisableButton('SaveButton');
+				jQuery('#CriterionErrorsExt').show();
+				jQuery('#CriterionErrorsExtMsg').html('Cannot specify a field of date type.');
+				return false;
+			}
+			else if(fieldType=='string' || fieldType=='id' || fieldType=='reference')
+			{
+				jQuery('.Operator').next().find("option").removeAttr('disabled');
+				jQuery('.Operator').next().find("option[value='{!JSINHTMLENCODE(OperatorGreaterThan)}']").attr('disabled','disabled');
+				jQuery('.Operator').next().find("option[value='{!JSINHTMLENCODE(OperatorLessThan)}']").attr('disabled','disabled');
+				if(jQuery('.Operator').next().val()=='{!JSINHTMLENCODE(OperatorGreaterThan)}' || jQuery('.Operator').next().val()=='{!JSINHTMLENCODE(OperatorLessThan)}' || jQuery('.Operator').next().val()==null)
+				{//Do we need to change it
+					jQuery('.Operator').next().find("option").each(function(key,value)
+					{
+						if(jQuery(this).attr('disabled')!='disabled')
+						{
+							jQuery('.Operator').next().val(jQuery(this).val());
+							 return false;
+						}
+					});
+				}
+			}
+			if(!valid)
+			{
+				jQuery('.FieldName').css('background-color','yellow');
+				DisableButton('SaveButton');
+				jQuery('#CriterionErrorsExt').css('display','');
+				jQuery('#CriterionErrorsExtMsg').html('Syntax incorrect!');
+				
+			}
+			else
+			{
+			
+				decideHide();		
+				jQuery('.FieldName').css('background-color','');
+				jQuery('#CriterionErrorsExt').css('display','none');
+				EnableButton('SaveButton');
+					
+			
+				
+			}
+			return valid;
+		}
+		function setOperatorValueToFirst()
+		{
+			jQuery('.Operator').next().find("option").each(function(key,value)
+			{
+				if(jQuery(this).attr('disabled')!='disabled')
+				{
+					jQuery('.Operator').next().val(jQuery(this).val());
+					jQuery('.Operator').val(jQuery(this).val());
+					 return false;
+				}
+			});
+		}
+		function validateNumeric()
+		{
+			if((fieldType=='numeric' || fieldType=='double' || fieldType=='decimal') && isNaN(jQuery('.PreEnteredValue').val()))
+			{
+				jQuery('#CriterionErrorsExt').show();
+				jQuery('#CriterionErrorsExtMsg').html('Value should be numeric.');
+				return false;
+			}
+			else if(fieldType=='date' || fieldType=='datetime')
+			{
+			 	jQuery('#CriterionErrorsExt').show();
+				jQuery('#CriterionErrorsExtMsg').html('Cannot specify a field of date type.');
+				return false;
+			}
+			return true;
+		}
+		
+		function decideHide()
+		{
+			if(jQuery('.Operator').next().val()!='{!JSINHTMLENCODE(OperatorIsIn)}' && jQuery('.Operator').next().val()!='{!JSINHTMLENCODE(OperatorIsNotIn)}')
+			{
+				jQuery('.SelectedValuePanel').css('display','none');
+				
+				if(fieldType=='numeric' || fieldType=='double' || fieldType=='decimal')
+				{
+					jQuery('.EnteredValuePanel').css('display','block');
+					jQuery('.CheckedValuePanel').css('display','none');
+					if(jQuery('.FieldValue').val()!='')
+					{
+						if(jQuery('.PreEnteredValue').val()=='')
+							jQuery('.PreEnteredValue').val(jQuery('.FieldValue').val());
+					}
+				}
+				else if(fieldType=='string' || fieldType=='id' || fieldType=='reference')
+				{	
+					jQuery('.EnteredValuePanel').css('display','block');
+					jQuery('.CheckedValuePanel').css('display','none');
+					if(jQuery('.FieldValue').val()!='')
+					{
+						if(jQuery('.PreEnteredValue').val()=='')
+						{
+							var fieldValue = jQuery('.FieldValue').val();
+							var fieldResult = fieldValue.replaceAt(0,' ');
+							fieldResult = fieldResult.replaceAt(fieldResult.length-1,' ');
+							fieldResult=trim(fieldResult);
+							jQuery('.PreEnteredValue').val(fieldResult);
+						}
+					}
+				}
+				else if(fieldType=='boolean')
+				{
+					jQuery('.CheckedValuePanel').css('display','block');
+					jQuery('.EnteredValuePanel').css('display','none');
+					if(jQuery('.FieldValue').val()!='')
+					{
+						var value=jQuery.parseJSON(jQuery('.FieldValue').val());
+						if(jQuery('[name=CheckedValue][value=false]:checked').length==0 && jQuery('[name=CheckedValue][value=true]:checked').length==0)
+						{
+							if(value==true)
+								jQuery('[name=CheckedValue][value=true]').prop('checked', true);
+							else
+								jQuery('[name=CheckedValue][value=false]').prop('checked', true);
+						}	
+					}
+				}
+			}
+			else
+			{
+				jQuery('.SelectedValuePanel').css('display','block');
+				jQuery('.EnteredValuePanel').css('display','none');
+				jQuery('.CheckedValuePanel').css('display','none');
+				if(jQuery('.FieldValue').val()!='')
+				{
+					var selectedvalues=jQuery.parseJSON(jQuery('.FieldValue').val());
+					jQuery('#SelectedValues').html('');
+					jQuery.each(selectedvalues, function(i, value)
+					{
+						if(selectedvalues[i]!='')
+							jQuery('#SelectedValues').append(jQuery('<option></option>').attr('value',selectedvalues[i]).text(selectedvalues[i])); 
+					});
+				}
+			}
+			decideDisableSaveButton();
+		}
+		function beforeSave()
+		{
+		
+			if(jQuery('.Operator').next().val()!='{!JSINHTMLENCODE(OperatorIsIn)}' && jQuery('.Operator').next().val()!='{!JSINHTMLENCODE(OperatorIsNotIn)}')
+			{
+				if(fieldType=='numeric' || fieldType=='double' || fieldType=='decimal' )
+				{
+					jQuery('.EnteredValuePanel').css('display','block');
+					jQuery('.FieldValue').val(jQuery('.PreEnteredValue').val());
+				}
+				else if(fieldType=='string'|| fieldType=='id'  || fieldType=='reference')
+				{
+					jQuery('.FieldValue').val('"'+jQuery('.PreEnteredValue').val()+'"');
+				}
+				else if(fieldType=='boolean')
+				{
+					if(jQuery('[name=CheckedValue][value=true]:checked').length>0)
+						jQuery('.FieldValue').val('true');
+					else
+						jQuery('.FieldValue').val('false');
+					
+				}
+			
+			}
+			else
+			{
+				var selectedvalues='';
+				jQuery("#SelectedValues option").each(function(key,value)
+				{
+					selectedvalues+='"'+jQuery(this).val()+'"';
+					if(jQuery("#SelectedValues option").length!=(key+1))
+						selectedvalues+=',';
+						
+				});
+					jQuery('.FieldValue').val('['+selectedvalues+']');
+			}
+		}
+		function decideDisableSaveButton()
+		{
+			if((jQuery('.Operator').next().val()=='{!JSINHTMLENCODE(OperatorIsIn)}' || jQuery('.Operator').next().val()=='{!JSINHTMLENCODE(OperatorIsNotIn)}') && jQuery("#SelectedValues option").length==0)
+				DisableButton('SaveButton');
+			else
+				EnableButton('SaveButton');
+		}
+
+		function reorderClasses()
+		{
+			jQuery('.nav-container').sortable();
+			jQuery('.save-order, .reorder-ind, .cancel-reorder').removeClass('hidden-item');
+			jQuery('.reorder-btn').addClass('hidden-item');
+  		}
+
+		function saveReorderedClasses()
+		{
+		    var orderedIds = [];
+
+		    jQuery.each(jQuery('.cls-nav[cls-id]'), function (i, obj) {
+      			var c = jQuery(obj);
+      			orderedIds.push(c.attr('cls-id'));
+			});
+
+			Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentClassHomeController.SaveOrderedClasses}',
+				orderedIds,
+	      		function(result, event){
+					if (event.status)
+					{
+						//reload screen
+						window.location.reload();
+					}
+					else
+					{
+						alert(event.message);
+					}
+
+					jQuery('.save-order, .reorder-ind, .cancel-reorder').addClass('hidden-item');
+					jQuery('.reorder-btn').removeClass('hidden-item');
+	 			},
+	            {escape: true, buffer: false, timeout: 120000});
+  		}
+
+		
+ 	</script>
+		<apex:pagemessages escape="false"/>
+
+		<div class="page-container">
+		<div class="nav-container">
+			<div class="title-container">
+				<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignmentClass__c.LabelPlural}"></apex:outputText>
+			</div>
+			<apex:repeat value="{!AllClasses}" var="cls">
+			<div class="cls-nav {!JSENCODE(cls.KimbleOne__StyleClass__c)} {!IF(KimbleOne__ActivityAssignmentClass__c.Id == cls.Id, 'this-cls', '')}" cls-id="{!JSENCODE(cls.Id)}" onclick="safeNavigateToSForceURL('{!$Page.KimbleOne__ActivityAssignmentClassHome}?id={!cls.Id}');"><apex:outputText value="{!cls.Name}"></apex:outputText><i class="fa fa-circle this-cls-ind"></i><i class="fa fa-arrows-v hidden-item reorder-ind"></i></div>
+			</apex:repeat>
+			<div class="btn-container">
+				<button  class="btn reorder-btn" onclick="reorderClasses();">
+					<div style="float:left;padding:2px">{!JSENCODE($Label.Edit)} {!$Label.Sequence}</div>
+				</button>
+				<button class="btn save-order hidden-item" onclick="saveReorderedClasses();">
+					<div style="float:left;padding:2px">{!JSENCODE($Label.Save)}</div>
+				</button>
+				<button class="btn cancel-reorder hidden-item" onclick="window.location.reload();">
+					<div style="float:left;padding:2px">{!JSENCODE($Label.Cancel)}</div>
+				</button>
+			</div>
+		</div>
+		<div class="class-container">
+		<apex:pageBlock id="class">
+			<div id="ClassErrorsExt" style="display:none">
+				<apex:pageMessage summary="{!$Label.kimbleone__errors}" severity="warning" strength="2" rendered="true">
+					<ul style=" margin:0px ;padding:0">
+						<li id="ClassErrorsExtMsg" class="ClassErrorsExtMsg" >
+							&nbsp;
+						</li>
+					</ul>
+				</apex:pageMessage>
+			</div>
+			<apex:pageBlockButtons location="top"  >
+			<apex:form >
+			<apex:commandButton id="reclassifyAllAssignments" onclick="if(!confirm('{!JSENCODE($Label.kimbleone__areyousure)}'))return;" action="{!ReclassifyAssignments}" value="{!JSENCODE($Label.kimbleone__reclassify)}"/>
+			<apex:commandButton styleClass="clone-btn" value="{!$Label.kimbleone__clonelabel}" onclick="return confirm('{!JSENCODE($Label.kimbleone__areyousure)}');" action="{!CloneClassAndCriterion}"/>
+			<apex:commandButton styleClass="clone-btn" value="{!$Label.kimbleone__deletebutton}" onclick="return confirm('{!JSENCODE($Label.kimbleone__areyousure)}');" action="{!DeleteClassAndCriterion}"/>
+			</apex:form>
+			<button  class="btn" onclick="safeNavigateToSForceURL('{!$Page.ActivityAssignmentClassEdit}?id={!ActivityAssignmentClass__c.Id}');">
+				<div style="float:left;padding:2px">{!JSENCODE($Label.Edit)}</div>
+			</button>
+			<button  class="btn" onclick="initialiseModalBoxy('#TestPopup', '{!JSENCODE($Label.Test)} {!$ObjectType.KimbleOne__ActivityAssignment__c.Label}');newActivityAssignment()">
+				<div style="float:left;padding:2px">{!JSENCODE($Label.Test)}</div>
+			</button>
+
+		    </apex:pageBlockButtons>
+			<apex:pageblockSection collapsible="false" showheader="false"  columns="2">
+
+				<apex:outputfield id="className" value="{!KimbleOne__ActivityAssignmentClass__c.Name}" />
+				<apex:outputfield id="classIncludeInAggregate" value="{!KimbleOne__ActivityAssignmentClass__c.KimbleOne__IncludeInAggregateUtilisationPercentage__c}" />
+				<apex:pageBlockSectionItem dataStyleClass="{!KimbleOne__ActivityAssignmentClass__c.KimbleOne__StyleClass__c} gantt-demo">
+					<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityAssignmentClass__c.fields.KimbleOne__StyleClass__c.label}" />
+					<apex:outputfield id="classStyleClass" value="{!KimbleOne__ActivityAssignmentClass__c.KimbleOne__StyleClass__c}" title="{!KimbleOne__ActivityAssignmentClass__c.KimbleOne__StyleClass__c}" />
+				</apex:pageBlockSectionItem>
+				<apex:outputfield id="classIncludeInAvailabilityScore" value="{!KimbleOne__ActivityAssignmentClass__c.KimbleOne__IncludeInAvailabilityScorePercentage__c}" />
+				<apex:outputfield id="classPriority" value="{!KimbleOne__ActivityAssignmentClass__c.KimbleOne__Priority__c}" />
+				<apex:outputfield id="classIncludeInAutoMatchScore" value="{!KimbleOne__ActivityAssignmentClass__c.KimbleOne__IncludeInAutoMatchScorePercentage__c}" />
+
+            </apex:pageblockSection>
+
+		</apex:pageBlock>
+
+	<apex:outputPanel id="ClassCriteriaPanel">
+        
+		<apex:form id="TheForm"> 
+          		<apex:actionFunction action="{!NewCriterion}" name="newClassCriterion" rerender="ClassCriterion" oncomplete="initialisePopup();setOperatorValueToFirst();">
+				</apex:actionFunction>
+				<apex:actionFunction action="{!EditCriterion}" name="editClassCriterion" rerender="ClassCriterion"  oncomplete="initialisePopup();validateFieldName()">
+       			<apex:param name="cId" value="" />
+				</apex:actionFunction>
+				
+				
+          	<apex:pageMessages escape="False" />    
+          
+			<apex:pageBlock id="classCriteria" title="{!$ObjectType.KimbleOne__ActivityAssignmentClassCriterion__c.LabelPlural}">
+          
+            	<apex:pageBlockButtons location="top"  >
+					<input type="button" id="ReClasActivityButton" class="btn" value="{!$Label.New}" onclick="initialiseModalBoxy('#CriterionPopup', '{!JSENCODE($Label.New)} {!$ObjectType.ActivityAssignmentClassCriterion__c.Label}');newClassCriterion()"></input>
+            	</apex:pageBlockButtons>
+
+            	<apex:pageBlockTable value="{!Criterions}" var="criterion" >
+					<apex:column headerValue="{!$Label.kimbleone__actionlinksheader}">
+        				<apex:outputLink value="#" onclick="initialiseModalBoxy('#CriterionPopup', '{!JSENCODE($Label.kimbleone__edit)} {!$ObjectType.KimbleOne__ActivityAssignmentClassCriterion__c.label}');editClassCriterion('{!JSENCODE(criterion.Id)}')">{!$Label.kimbleone__edit}</apex:outputLink>&nbsp;|&nbsp;
+     					<apex:commandLink onclick="var d = confirmDelete();if(!d) return;" action="{!DeleteCriterion}" reRender="TheForm" >{!$Label.kimbleone__delete}
+							<apex:param name="cId" value="{!criterion.Id}" />
+						</apex:commandLink>
+			 	 	</apex:column>
+				    <apex:column value="{!criterion.KimbleOne__FieldName__c}" />	
+		            <apex:column value="{!criterion.Operator__r.Name}" headerValue="{!$ObjectType.KimbleOne__ActivityAssignmentClassCriterion__c.Fields.KimbleOne__Operator__c.Label}"/>	
+		            <apex:column value="{!criterion.KimbleOne__Value__c}" />	
+    	        </apex:pageBlockTable> 
+
+        	</apex:pageBlock> 
+
+			
+		</apex:form>
+	
+	</apex:outputPanel>
+
+	</div>
+	</div>
+
+	
+	<div id="CriterionPopup" style="display:none">
+		
+			<apex:form >
+			<apex:outputPanel id="ClassCriterion" >
+				<div id="CriterionErrors">
+					<apex:pageMessages escape="false" />
+				</div>
+				
+				<div id="CriterionErrorsExt" style="display:none">
+					<apex:pageMessage summary="{!$Label.kimbleone__errors}" severity="warning" strength="2" rendered="true">
+						<ul style=" margin:0px ;padding:0">
+							<li id="CriterionErrorsExtMsg" class="CriterionErrorsExtMsg" >
+								&nbsp;
+							</li>
+						</ul>
+					</apex:pageMessage>
+				</div>
+				<div id="CriterionPanel">
+				<apex:pageBlock >
+					<apex:pageblockSection collapsible="false" showheader="false" columns="1">	
+						<apex:pageBlockSectionItem >
+               				<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityAssignmentClassCriterion__c.Fields.KimbleOne__FieldName__c.Label}" />	
+               				<apex:inputText id="criterion-field-name" value="{!criterion.KimbleOne__FieldName__c}" styleclass="FieldName"  onchange="validateFieldName()" style="width:400px;" />
+               			</apex:pageBlockSectionItem>
+						<apex:pageBlockSectionItem >
+               				<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityAssignmentClassCriterion__c.Fields.KimbleOne__Operator__c.Label}" />	
+               				<apex:inputText value="{!criterion.KimbleOne__Operator__c}" styleclass="kimbledropdown Operator" onchange="decideHide()"/>
+               			</apex:pageBlockSectionItem>
+               			<apex:inputText value="{!criterion.KimbleOne__Value__c}" styleclass="FieldValue HideControl"/>
+						<apex:pageblockSectionItem >
+							<apex:outputText value="{!$ObjectType.KimbleOne__ActivityAssignmentClassCriterion__c.Fields.KimbleOne__Value__c.Label}" styleclass="" />
+								<apex:outputPanel layout="none" >
+									<apex:panelGrid columns="2"  styleclass="SelectedValuePanel" style="display:none;vertical-align:top">
+										<apex:outputPanel >
+											<input type="text" id="PreSelectedValues" size="8" style="width:200px" />
+										</apex:outputPanel>
+										<apex:outputPanel >
+											<input id="addButton" type="button" value="{!$Label.AddButton}" onclick="if($('#PreSelectedValues').val()=='')return false;$('#SelectedValues').append($('<option></option>').attr('value',jQuery.trim($('#PreSelectedValues').val())).text(jQuery.trim($('#PreSelectedValues').val()))); $('#PreSelectedValues').val('');decideDisableSaveButton()"/>
+										</apex:outputPanel>
+										<apex:outputPanel >
+											<select Id="SelectedValues"  multiple="multiple" size="5" style="width:200px" 
+												onclick="if(	$('#SelectedValues option:selected').length>0) $('#removeButton').removeAttr('disabled'); else $('#removeButton').attr('disabled','disabled');">
+											</select>
+										</apex:outputPanel>
+										<apex:outputPanel >
+											<input id="removeButton" type="button" value="{!$Label.RemoveButton}" onclick="$('#SelectedValues option:selected').remove();$('#removeButton').attr('disabled','disabled'); decideDisableSaveButton()" disabled="disabled"/>
+										</apex:outputPanel>
+									</apex:panelGrid>
+									<apex:outputPanel styleclass="EnteredValuePanel" >
+											<input type="text" id="PreEnteredValue" class="PreEnteredValue"  size="8" style="width:200px" />
+									</apex:outputPanel>
+									<apex:outputPanel styleclass="CheckedValuePanel" style="display:none">
+										<label><input type="radio" id="CheckedValueTrue" name="CheckedValue" value="true"/>True</label>
+										<label><input type="radio" id="CheckedValueFalse" name="CheckedValue" value="false"/>False</label>
+									</apex:outputPanel>
+								</apex:outputPanel>
+						</apex:pageblockSectionItem>
+						
+						
+					</apex:pageblockSection>
+				
+					<apex:pageBlockButtons location="bottom">
+						<apex:commandButton id="save" action="{!SaveCriterion}" value="{!$Label.kimbleone__save}" oncomplete="getReferenceData();hideModalBoxyWithErrorCheck('#CriterionErrors');decideHide();afterSubmit()" rerender="ClassCriterion,ClassCriteriaPanel" onclick="if(!validateNumeric())return false;else beforeSave();" styleclass="DisableButtonWhileBusy, SaveButton" />
+						<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}"/>
+            		</apex:pageBlockButtons>	
+				
+				</apex:pageBlock>
+				</div>
+				</apex:outputPanel>
+			</apex:form>
+	</div>
+	
+    
+    <div id="TestPopup"  style="display: none">
+		<apex:outputPanel id="TestActivityAssignment">
+			<div id="TestErrors">
+				<apex:pagemessages escape="false"/>
+			</div>
+			<apex:form >
+				<apex:actionFunction action="{!newActivityAssignment}" name="newActivityAssignment" rerender="TestActivityAssignment" oncomplete="showModalBoxy()" immediate="true">
+				</apex:actionFunction>
+			
+				<apex:pageBlock >
+					<apex:pageBlockButtons location="bottom"  >
+						<apex:commandButton action="{!GetActivityAssignmentClass}" value="{!$Label.kimbleone__get}"
+									reRender="TestActivityAssignment" styleclass="DisableButtonWhileBusy" />
+									<input class="btn" type="button" onclick="hideModalBoxy();" value="{!$Label.Cancel}" />
+					</apex:pageBlockButtons>
+					<apex:pageblockSection collapsible="false" showheader="false"  columns="1"> 
+						<apex:pageblockSectionItem >
+							<apex:outputLabel value="{!$ObjectType.KimbleOne__ActivityAssignment__c.Label}"/>
+							<apex:outputPanel layout="none">
+								<div class="requiredInput">
+									<div class="requiredBlock"></div>
+										<apex:inputText required="true" value="{!dummyActivityAssignment.KimbleOne__ActivityAssignment__c}"/>
+								</div>
+							</apex:outputPanel>
+						</apex:pageblockSectionItem>
+						<apex:pageblockSectionItem dataStyleClass="{!dummyActivityAssignmentStyle} gantt-demo">
+							<apex:outputLabel value="{!$Label.kimbleone__result}"/>
+							<apex:outputField value="{!dummyActivityAssignment.KimbleOne__ActivityAssignmentClass__c}"/>
+						</apex:pageblockSectionItem>
+					</apex:pageblockSection>
+				</apex:pageBlock>
+			</apex:form>
+		</apex:outputPanel>
+	</div>
+	<c:ResourceAssignmentCalendar />
+</apex:define>
+
+</apex:composition>
+
+</apex:page>

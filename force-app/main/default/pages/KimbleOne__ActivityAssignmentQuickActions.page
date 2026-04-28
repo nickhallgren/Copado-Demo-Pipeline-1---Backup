@@ -1,0 +1,2072 @@
+<apex:page controller="KimbleOne.ActivityAssignmentQuickActionsController" extensions="KimbleOne.ActivityAssignmentRemoteActions" showHeader="false" sidebar="false">
+    <div id="quick-add-assignment-fields">
+        <div>
+        <apex:form id="CreateAndScheduleAssignmentForm">
+            <div>
+                <div id="quick-add-assignment-error" style="display:none"><span><div class="message errorM3"><table border="0" cellpadding="0" cellspacing="0" class="messageTable" style="padding:0px;margin:0px;"><tbody><tr valign="top"><td><img alt="error" class="msgIcon" src="/s.gif" title="{!$Label.Error}"/></td><td class="messageCell"><div class="messageText" id="quick-add-assignment-error-text"><br/></div></td></tr><tr><td></td><td></td></tr></tbody></table></div></span></div>
+                <table cellpadding="0" cellspacing="0" border="0">
+                    <tr style="height: 30px;display:none;" id="save-and-schedule-activity-row">
+                        <td class="edit-label">{!$ObjectType.ActivityAssignment__c.Fields.ResourcedActivity__c.Label}</td>
+                        <td>
+                            <select onchange="saveAndScheduleActivityChange(this)"></select>
+                        </td>
+
+                    </tr>
+                    <tr style="height: 30px;" id="save-and-schedule-resource-row">
+                        <td class="edit-label">{!$ObjectType.ActivityAssignment__c.Fields.Resource__c.Label}</td>
+                        <td>
+                            <div class="required-input"></div>
+                            <apex:selectList value="{!DummyAssignment.KimbleOne__Resource__c}" size="1" rendered="{!!UseResourceEnhancedLookup}" onchange="getSchedulingDetails()">
+                                <apex:selectOptions value="{!TheResourceOptions}" />
+                            </apex:selectList>
+
+                            <apex:actionRegion >
+                                <apex:outputPanel id="resource-panel">
+                                    <apex:inputField value="{!DummyAssignment.KimbleOne__Resource__c}" styleclass="kimbleSearch "  rendered="{!UseResourceEnhancedLookup}">
+                                        <apex:actionSupport onsubmit="jQuery('#save-and-schedule-assignment-container .btn').prop('disabled', true);" event="onchange" action="{!ValidateResourceChange}" rerender="resource-panel, Error-panel" oncomplete="jQuery('#save-and-schedule-assignment-container .btn').prop('disabled', false);getSchedulingDetails();" />
+                                    </apex:inputField>
+                                </apex:outputPanel>
+                            </apex:actionRegion>
+                        </td>
+                    </tr>
+                    <tr style="height: 30px;" id="save-and-schedule-role-row">
+                        <td class="edit-label">{!$ObjectType.ActivityAssignment__c.Fields.ActivityRole__c.Label}</td>
+                        <td>
+                            <div class="required-input"></div>
+                            <select></select>
+                        </td>
+                    </tr>
+                    <tr style="height: 30px;" id="save-and-schedule-location-row">
+                        <td class="edit-label">{!$ObjectType.ActivityAssignment__c.Fields.Location__c.Label}</td>
+                        <td>
+                            <div class="required-input"></div>
+                            <apex:selectList id="simple-input-location" value="{!DummyAssignment.KimbleOne__Location__c}" size="1" rendered="{!!UseLocationEnhancedLookup}" >
+                                <apex:selectOptions value="{!TheLocationOptions}" />
+                            </apex:selectList>
+
+                            <apex:actionRegion >
+                                <apex:outputPanel id="location-panel">
+                                    <apex:inputField id="enhanced-input-location" styleclass="kimbleSearch " value="{!DummyAssignment.KimbleOne__Location__c}" rendered="{!UseLocationEnhancedLookup}">
+                                        <apex:actionSupport event="onchange" action="{!ValidateResourceChange}" rerender="location-panel, Error-panel"/>
+                                    </apex:inputField>
+                                </apex:outputPanel>
+                            </apex:actionRegion>
+                        </td>
+                    </tr>
+
+                </table>
+            </div>
+        </apex:form>
+        </div>
+    </div>
+    <apex:form >
+    <div id="scheduled-day-fields">
+        <div>
+            <table cellpadding="0" cellspacing="0" border="0" id="edit-fte-additional">
+
+                <apex:repeat value="{!$ObjectType.KimbleOne__ForecastTimeEntry__c.FieldSets.KimbleOne__ForecastTimeEntryDetails}" var="f" >
+                    <apex:outputPanel layout="none" rendered="{!!CONTAINS(f.FieldPath,'.')}">
+                        <tr style="height: 30px;">
+                            <td class="edit-label"><apex:outputText value="{!f.Label}"/></td>
+                            <td>
+                                <apex:inputField onchange="assignmentScheduleChange(this);" value="{!DummyFTE[f]}" styleclass="fte-details-field" html-data-fld-type="{!f.Type}" html-data-fld-name="{!f.SObjectField}" html-data-field-path="{!f.FieldPath}"  html-data-reference="{!f.SObjectField}" required="{!OR(f.required, f.dbrequired)}"/>
+                            </td>
+                        </tr>
+                    </apex:outputPanel>
+                </apex:repeat>
+
+            </table>
+        </div>
+    </div>
+    </apex:form>
+
+    <apex:includeScript value="{!URLFOR($Resource.KimbleOne__ActivityAssignmentQuickActions)}" />
+
+    <script>
+
+        var fteHtml = '';
+        var addAndScheduleAssignmentHtml = '';
+        var maxLabel = '{!JSENCODE($Label.MaxDaysLabel)}'; //Actually period type injected - i.e Max ({0});
+		var minLabel = '{!JSENCODE($Label.MinDaysLabel)}'; //Actually period type injected - i.e Min ({0});
+
+        var activityAssignmentQuickActions = {assignments:{}, original:{}, scheduledAssignmentsConfig:null, assignmentsToSaveCount:0, redrawAssignments:null};
+
+        jQuery(window).load(function(){
+            fteHtml = jQuery('#scheduled-day-fields').remove().html();
+            addAndScheduleAssignmentHtml = jQuery('#quick-add-assignment-fields').remove().html();
+        });
+
+        function initialiseForSingleEdit(opts)
+        {
+            activityAssignmentQuickActions = {mode:'single', assignments:{}, original:{}, scheduledAssignmentsConfig:null, assignmentsToSaveCount:0, redrawAssignments:null};
+
+            activityAssignmentQuickActions.scheduleClickOff = function() {
+                jQuery(document).off('click', '.scheduled-slot-container');
+            };
+
+            activityAssignmentQuickActions.scheduleClickOn = function() {
+                jQuery(document).on('click', '.scheduled-slot-container', function (e){
+                    var offset = e.offsetX + jQuery(e.target).offset().left;
+
+                    jQuery('.day-to-schedule').remove();
+
+                    var $day = jQuery(document.elementFromPoint(offset + inGanttActionCursorOffset, Math.ceil(jQuery('#days-header').offset().top) - jQuery(window).scrollTop()));
+
+                    var pos = $day.position().left + jQuery('#gantt-view').scrollLeft();
+
+                    var $d = jQuery('<div class="day-to-schedule" style="left:' + pos + 'px"></div>');
+
+                    var $j = jQuery(this).closest('.activity-assignment-gantt');
+                    var $c = $j.closest('.gantt-container');
+                    var assId = $j.attr('assignment-id');
+                    var fn = function(api){return getAssignmentScheduleEditPopupHtml($day.closest('td').attr('dte'), assId, api)};
+
+                    $c.append($d);
+
+                     //Resource search needs #matching-gantt-lines, assignments.component needs #gantt-lines
+
+                    showScheduledDayPopup($d, $c, jQuery('#qtip-gantt-viewport'), fn);
+                });
+            };
+
+            activityAssignmentQuickActions.scheduleTimeChangeOn = function() {
+                jQuery(document).on('change', '#scheduled-start-time.inline-time-picker', function ()
+                {
+                    if(jQuery(this).val() > jQuery('#scheduled-end-time.inline-time-picker').val() || jQuery('#scheduled-end-time.inline-time-picker').val() == '')
+                    {
+                        jQuery('#scheduled-end-time.inline-time-picker').val(jQuery(this).val());
+                    }
+
+                    scheduledTimeChange(this)
+                });
+
+                jQuery(document).on('change', '#scheduled-end-time.inline-time-picker', function ()
+                {
+                    if(jQuery(this).val() < jQuery('#scheduled-start-time.inline-time-picker').val() || jQuery('#scheduled-start-time.inline-time-picker').val() == '')
+                    {
+                        jQuery('#scheduled-start-time.inline-time-picker').val(jQuery(this).val());
+                    }
+
+                    scheduledTimeChange(this)
+                });
+            };
+
+            activityAssignmentQuickActions.scheduleTimeChangeOff = function() {
+                jQuery(document).off('change', '#scheduled-start-time.inline-time-picker');
+                jQuery(document).off('change', '#scheduled-end-time.inline-time-picker');
+            };
+
+            if (typeof opts == 'object')
+            {
+                if (opts.scheduleClickOff != null) activityAssignmentQuickActions.scheduleClickOff = opts.scheduleClickOff;
+                if (opts.scheduleClickOn != null) activityAssignmentQuickActions.scheduleClickOn = opts.scheduleClickOn;
+
+                if (opts.scheduleTimeChangeOff != null) activityAssignmentQuickActions.scheduleTimeChangeOff = opts.scheduleTimeChangeOff;
+                if (opts.scheduleTimeChangeOn != null) activityAssignmentQuickActions.scheduleTimeChangeOn = opts.scheduleTimeChangeOn;
+            }
+
+            getScheduledAssignmentConfiguration();
+        }
+
+        var quickAddAssignmentConfig;
+
+        var inGanttActionCursorOffset = 0;
+
+        function intialiseForQuickAdd(opts)
+        {
+            quickAddAssignmentConfig = {contexts:{}};
+
+            jQuery(document).off('mouseout', '.gantt-timeline-node');
+            jQuery(document).on('mouseout', '#container[mode="view"] .gantt-timeline-node', function (e){
+                    jQuery('.day-head.selected').removeClass('selected');
+                    jQuery('.quick-add-cursor').removeClass('quick-add-cursor');
+                });
+
+            jQuery(document).off('mousemove', '.gantt-timeline-node');
+            jQuery(document).on('mousemove', '#container[mode="view"] .gantt-timeline-node', function (e){
+
+                    jQuery('.day-head.selected').removeClass('selected');
+                    jQuery('.quick-add-cursor').removeClass('quick-add-cursor');
+
+                    var offset = e.offsetX + jQuery(e.target).offset().left;
+
+                    var $d = jQuery(document.elementFromPoint(offset + inGanttActionCursorOffset, Math.ceil(jQuery('#days-header').offset().top) - jQuery(window).scrollTop()));
+
+                    if(!$d.hasClass('day-head')) return;
+
+                    var dte = $d.closest('td').attr('dte');
+
+                    $d.addClass('selected');
+                    jQuery(this).addClass('quick-add-cursor');
+            });
+
+            jQuery(document).off('click', '.gantt-timeline-node');
+            jQuery(document).on('click', '#container[mode="view"] .gantt-timeline-node', function (e){
+
+                    var offset = e.offsetX + jQuery(e.target).offset().left;
+
+                    jQuery('.day-to-schedule').remove();
+                    jQuery('.day-head.schedule').removeClass('schedule');
+
+                    var $day = jQuery(document.elementFromPoint(offset + inGanttActionCursorOffset, Math.ceil(jQuery('#days-header').offset().top) - jQuery(window).scrollTop()));
+
+                    if (!$day.hasClass('selected')) return;
+
+                    $day.addClass('schedule');
+
+                    var pos = $day.position().left + jQuery('#gantt-view').scrollLeft();
+
+                    var $d = jQuery('<div class="day-to-schedule" style="left:' + pos + 'px"></div>');
+
+                    //qTip stuff!
+
+                    var $c = jQuery(this).closest('.gantt-timeline-container');
+                    var contextId = $c.attr('node-id');
+                    fn = function(api){return getQuickAddAssignmentPopupHtml($day.closest('td').attr('dte'), contextId, api)};
+
+                    $c.append($d);
+                    showScheduledDayPopup($d, $c, jQuery('#qtip-gantt-viewport'), fn);
+                });
+        }
+
+        //initialises page for scheduling assignments - gets default configuration etc
+        function initialiseForScheduledAssignments(opts)
+        {
+            activityAssignmentQuickActions.mode = 'bulk';
+
+            activityAssignmentQuickActions.mouseoutOff = function() {
+                jQuery(document).off('mouseout', '.gantt-container-middle');
+            };
+
+            activityAssignmentQuickActions.mouseoutOn = function() {
+                jQuery(document).on('mouseout', '.gantt-container-middle', function (e){
+                    jQuery('.day-head.selected').removeClass('selected');
+                    jQuery('.schedule-cursor').removeClass('schedule-cursor');
+                    jQuery('.no-action').removeClass('no-action');
+                });
+            };
+
+            activityAssignmentQuickActions.mouseoverOff = function() {
+                jQuery(document).off('mousemove', '.gantt-container-middle');
+            };
+
+            activityAssignmentQuickActions.mouseoverOn = function() {
+                jQuery(document).on('mousemove', '.gantt-container-middle', function (e){
+
+                    jQuery('.day-head.selected').removeClass('selected');
+                    jQuery('.schedule-cursor').removeClass('schedule-cursor');
+                    jQuery(this).removeClass('no-action');
+
+                    var offset = e.offsetX + jQuery(e.target).offset().left;
+
+                    var $d = jQuery(document.elementFromPoint(offset + inGanttActionCursorOffset, Math.ceil(jQuery('#days-header').offset().top) - jQuery(window).scrollTop()));
+
+                    if(!$d.hasClass('day-head')) return;
+
+                    var dte = $d.closest('td').attr('dte');
+
+                    //if (dte.toDate() < new Date()) return;
+                    var $j = jQuery(this).find('.activity-assignment-gantt');
+
+                    if ($j.length > 0)
+                    {
+                        var $dte = $d.closest('td').attr('dte').toDate();
+                        var $ass = findAssignmentById($j.attr('assignment-id'));
+
+                        if ($ass != undefined && $dte != undefined)
+                        {
+
+                            if(($ass.EarliestOpenPeriodStartDate != undefined && $dte < $ass.EarliestOpenPeriodStartDate.toDate())
+                                || $ass.AssignmentType == 'Framework' || $ass.AssignmentType == 'Model' || $ass.AssignmentType == 'AppliedModel'
+                                || ($ass.UsageBehaviourRule != null && $ass.UsageBehaviourRule.EntrySpecification == 'TaskUsage')
+                                || !canScheduleOnDate($ass, $dte))
+                            {
+                                jQuery(this).addClass('no-action');
+                                return;
+                            }
+                        }
+                    }
+
+                    $d.addClass('selected');
+                    jQuery(this).addClass('schedule-cursor');
+
+                });
+            };
+
+            activityAssignmentQuickActions.scheduleClickOff = function() {
+                jQuery(document).off('click', '.gantt-container-middle');
+                jQuery(document).off('click', '.scheduled-slot-container');
+            };
+
+            activityAssignmentQuickActions.scheduleClickOn = function() {
+                jQuery(document).on('click', '.gantt-container-middle', function (e){
+
+                    var offset = e.offsetX + jQuery(e.target).offset().left;
+
+                    jQuery('.day-to-schedule').remove();
+                    jQuery('.day-head.schedule').removeClass('schedule');
+
+                    var $day = jQuery(document.elementFromPoint(offset + inGanttActionCursorOffset, Math.ceil(jQuery('#days-header').offset().top) - jQuery(window).scrollTop()));
+
+                    if (!$day.hasClass('selected')) return;
+
+                    $day.addClass('schedule');
+
+                    var pos = $day.position().left + jQuery('#gantt-view').scrollLeft();
+
+                    var $d = jQuery('<div class="day-to-schedule" style="left:' + pos + 'px"></div>');
+
+                    var $j = jQuery(this).find('.activity-assignment-gantt');
+                    var $c;
+
+                    var fn;
+
+                    $c = $j.closest('.gantt-container');
+                    var assId = $j.attr('assignment-id');
+                    fn = function(api){return getAssignmentScheduleEditPopupHtml($day.closest('td').attr('dte'), assId, api)};
+
+                    $c.append($d);
+                    showScheduledDayPopup($d, $c, jQuery('#qtip-gantt-viewport'), fn);
+                });
+            };
+
+            activityAssignmentQuickActions.scheduleTimeChangeOn = function() {
+                jQuery(document).on('change', '#scheduled-start-time.inline-time-picker', function ()
+                {
+                    if(jQuery(this).val() > jQuery('#scheduled-end-time.inline-time-picker').val() || jQuery('#scheduled-end-time.inline-time-picker').val() == '')
+                    {
+                        jQuery('#scheduled-end-time.inline-time-picker').val(jQuery(this).val());
+                    }
+
+                    scheduledTimeChange(this)
+                });
+
+                jQuery(document).on('change', '#scheduled-end-time.inline-time-picker', function ()
+                {
+                    if(jQuery(this).val() < jQuery('#scheduled-start-time.inline-time-picker').val() || jQuery('#scheduled-start-time.inline-time-picker').val() == '')
+                    {
+                        jQuery('#scheduled-start-time.inline-time-picker').val(jQuery(this).val());
+                    }
+
+                    scheduledTimeChange(this)
+                });
+            };
+
+            activityAssignmentQuickActions.scheduleTimeChangeOff = function() {
+                jQuery(document).off('change', '#scheduled-start-time.inline-time-picker');
+                jQuery(document).off('change', '#scheduled-end-time.inline-time-picker');
+            };
+
+            if (typeof opts === 'function')
+            {
+                activityAssignmentQuickActions.redrawAssignments = opts;
+            }
+            else if (typeof opts == 'object')
+            {
+                if (opts.redrawAssignments != null) activityAssignmentQuickActions.redrawAssignments = opts.redrawAssignments;
+
+                if (opts.mouseoutOff != null) activityAssignmentQuickActions.mouseoutOff = opts.mouseoutOff;
+                if (opts.mouseoutOn != null) activityAssignmentQuickActions.mouseoutOn = opts.mouseoutOn;
+
+                if (opts.mouseoverOff != null) activityAssignmentQuickActions.mouseoverOff = opts.mouseoverOff;
+                if (opts.mouseoverOn != null) activityAssignmentQuickActions.mouseoverOn = opts.mouseoverOn;
+
+                if (opts.scheduleClickOff != null) activityAssignmentQuickActions.scheduleClickOff = opts.scheduleClickOff;
+                if (opts.scheduleClickOn != null) activityAssignmentQuickActions.scheduleClickOn = opts.scheduleClickOn;
+
+                if (opts.scheduleTimeChangeOff != null) activityAssignmentQuickActions.scheduleTimeChangeOff = opts.scheduleTimeChangeOff;
+                if (opts.scheduleTimeChangeOn != null) activityAssignmentQuickActions.scheduleTimeChangeOn = opts.scheduleTimeChangeOn;
+            }
+
+            getScheduledAssignmentConfiguration();
+        }
+
+        function canScheduleOnDate(assignment, dte) {
+            if (assignment.UsagePattern == null) return false;
+
+            var usagePattern = new ActivityAssignmentUsagePattern(assignment.HoursPerDay, assignment.StartDate.toDate(), assignment.UsagePattern, assignment.Utilisation, assignment.BaselineUtilisation);
+            var availability = assignment.ResourceAvailability;
+
+            if (availability.isUnavailableDate(dte)) return false;
+
+            return !usagePattern.hasActualOnDate(dte);
+        }
+
+        function getScheduledAssignmentConfiguration()
+        {
+            if (activityAssignmentQuickActions.scheduledAssignmentsConfig == null)
+            {
+                Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentQuickActionsController.GetScheduledAssignmentConfiguration}',
+                    function(result, event){
+                            if (event.status)
+                            {
+                                activityAssignmentQuickActions.scheduledAssignmentsConfig = result;
+
+                                initialiseUIEvents();
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                alert(event.message);
+                            }
+                            else
+                            {
+                                alert(event.message);
+                            }
+                    },
+                    {buffer: false, escape: true, timeout: 60000}
+                );
+            }
+            else
+            {
+                initialiseUIEvents();
+            }
+        }
+
+        function showScheduledDayPopup($ele, $container, $viewport, fnGetHtml)
+        {
+            jQuery('.qtip').qtip('destroy', true);
+
+            $ele.qtip({
+                overwrite: true,
+                    show: {
+                        solo:true,
+                        event: 'click', // Use the same event type as above
+                        ready: true, // Show immediately - important!
+                        modal: {
+                            on: false,
+                        }
+                    },
+                    hide: {
+                        event: false
+                    },
+                    style: {
+                        classes: 'qtip-light qtip-shadow day-summary-qtip'
+                    },
+                    content: {
+                        button: 'Close',
+                        text: function(event, api) {
+                            var h = fnGetHtml(api);
+                            return h;
+                        }
+                    },
+                    events: {
+                        visible: function(event, api) {
+                            //TODO:move into initiliasePopupControls function
+                            jQuery('.kimbleTimePicker').timepicker({ 'timeFormat': 'H:i', 'show2400': 'true'});
+                            jQuery('.scheduled-date-entry input').datepicker({
+                                                                        dateFormat: kimble.regional.dateFormat,
+                                                                        showOtherMonths: true,
+                                                                        selectOtherMonths: true
+                                                                    });
+                        },
+					    hide: function(event, api) {
+                            closeSchedulePopup();
+                        }
+                    },
+                    position: {
+                        my: 'top center',
+                        at: 'bottom center',
+                        container: $container,
+                        adjust: {method: 'flip flip'},
+                        viewport: $viewport
+                    }
+                });
+        }
+
+        function initialiseUIEvents()
+        {
+            if (activityAssignmentQuickActions.mode != 'single')
+            {
+                jQuery('.assignment-snip').hide();
+
+                activityAssignmentQuickActions.mouseoutOff();
+                activityAssignmentQuickActions.mouseoutOn();
+
+                activityAssignmentQuickActions.mouseoverOff();
+                activityAssignmentQuickActions.mouseoverOn();
+            }
+
+            activityAssignmentQuickActions.scheduleClickOff();
+            activityAssignmentQuickActions.scheduleClickOn();
+
+            activityAssignmentQuickActions.scheduleTimeChangeOff();
+            activityAssignmentQuickActions.scheduleTimeChangeOn();
+        }
+
+        function cancelAssignmentsSchedule()
+        {
+            //redraw assignments based on original data
+            var assignments = [];
+
+            jQuery.each(Object.keys(activityAssignmentQuickActions.original), function(i, key) {
+
+                assignments.push(activityAssignmentQuickActions.original[key]);
+            });
+
+            jQuery('.day-to-schedule').remove();
+            jQuery('.schedule').removeClass('schedule');
+            jQuery('.highlight').removeClass('highlight');
+
+            jQuery('.assignment-snip').show();
+
+            if (activityAssignmentQuickActions != null) {
+                activityAssignmentQuickActions.redrawAssignments(assignments);
+
+                activityAssignmentQuickActions.assignments = {};
+                activityAssignmentQuickActions.original = {};
+                activityAssignmentQuickActions.assignmentsToSaveCount= 0;
+
+                activityAssignmentQuickActions.mouseoutOff();
+                activityAssignmentQuickActions.mouseoverOff();
+                activityAssignmentQuickActions.scheduleClickOff();
+                activityAssignmentQuickActions.scheduleTimeChangeOff();
+            }
+        }
+
+        function clearAssignmentSchedule(assignmentId)
+        {
+            delete activityAssignmentQuickActions.assignments[assignmentId];
+        }
+
+        //Fetches assignment and all scheduled days with custom fields / start & end times etc.
+        function getAssignmentSchedule(assignmentId, oncomplete)
+        {
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentQuickActionsController.GetAssignmentSchedule}',
+                        assignmentId, function(result, event){
+                                if (event.status)
+                                {
+                                    activityAssignmentQuickActions.assignments[assignmentId] = result;
+                                    oncomplete(activityAssignmentQuickActions.assignments[assignmentId]);
+                                }
+                                else if (event.type === 'exception')
+                                {
+                                    alert(event.message);
+                                }
+                                else
+                                {
+                                    alert(event.message);
+                                }
+                        },
+                        {buffer: false, escape: true, timeout: 60000}
+                    );
+        }
+
+        function getGetQuickAddConfigForContextRemoteAction(contextId, oncomplete)
+        {
+             Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentQuickActionsController.GetQuickAddConfigForContext}',
+                        contextId, function(result, event){
+                                if (event.status)
+                                {
+                                    quickAddAssignmentConfig.contexts[contextId] = result;
+                                    oncomplete(quickAddAssignmentConfig.contexts[contextId]);
+                                }
+                                else if (event.type === 'exception')
+                                {
+                                    alert(event.message);
+                                }
+                                else
+                                {
+                                    alert(event.message);
+                                }
+                        },
+                        {buffer: false, escape: true, timeout: 60000}
+                    );
+        }
+
+        //Gets the popup html for scheduling a day
+        function getAssignmentScheduleEditPopupHtml(dte, assignmentId, api)
+        {
+            if (activityAssignmentQuickActions.assignments[assignmentId] != null)
+            {
+                return getAssignmentScheduleEditHtml(dte, activityAssignmentQuickActions.assignments[assignmentId]);
+            }
+
+            getAssignmentSchedule(assignmentId, function(assignment){
+
+                var html = getAssignmentScheduleEditHtml(dte, assignment);
+
+                api.set('content.text', html);
+                jQuery('.kimbleTimePicker').timepicker({ 'timeFormat': 'H:i', 'show2400': 'true'});
+                jQuery('.scheduled-date-entry input').datepicker({
+                    dateFormat: kimble.regional.dateFormat,
+                    showOtherMonths: true,
+                    selectOtherMonths: true
+                });
+            });
+
+            return '<span class="fa fa-circle-o-notch fa-spin load-summary-view"></span>';
+        }
+
+        function getQuickAddAssignmentHtml(dte, config)
+        {
+            // Show / Populate Scheduling details!
+            var html = '<div id="save-and-schedule-assignment-container" scoping-activity-id="' + config.Activities[0].id + '" dte="' + dte + '" class="edit-assignment-schedule-container">';
+
+            var t = '{!JSENCODE($Label.QuickAddAssignmentTitle)}';
+
+            var canEditAssignment = {!$ObjectType.ActivityAssignment__c.updateable};
+
+            html += '<div class="schedule-assignments-card"><div class="schedule-assignments-header">' + t.format(kimble.formatDate(dte)) + '</div>';
+
+            html += addAndScheduleAssignmentHtml;
+
+            html += '<div id="save-and-schedule-details"></div>';
+
+            html += '<div class="schedule-save-buttons">';
+
+            if (canEditAssignment) html += '<input class="btn" type="button" value="{!JSENCODE($Label.Save)}" onclick="saveAndScheduleNewAssignment();"/>';
+            html += '<input class="btn" type="button" value="{!JSENCODE($Label.Close)}" onclick="closeSaveAndScheduleNewAssignment();"/>';
+
+            html += '</div>';
+
+            html += '</div>';
+
+            var $h = jQuery('<div>' + html + '</div>');
+
+            if (config.Activities.length > 1) {
+                $h.find('#save-and-schedule-activity-row').show();
+
+                config.Activities.forEach(function(act, i) {
+                    $h.find('#save-and-schedule-activity-row select').append(jQuery('<option value="' + act.id + '">' + act.text + '</option>'));
+                });
+
+            }
+            else {
+                $h.find('#save-and-schedule-activity-row').hide();
+            }
+
+            $h.find('#save-and-schedule-role-row select').empty();
+
+            if (config.IsRoleMandatory) {
+                config.TheActivityRoles.forEach(function(r, i) {
+                    $h.find('#save-and-schedule-role-row select').append(jQuery('<option value="' + r.id + '">' + r.text + '</option>'));
+                });
+            }
+            else {
+                $h.find('#save-and-schedule-role-row').remove();
+            }
+
+            if (!config.IsLocationMandatory) {
+                $h.find('#save-and-schedule-location-row').remove();
+            }
+
+            return $h.html();
+        }
+
+        function saveAndScheduleActivityChange(obj) {
+            jQuery('#save-and-schedule-assignment-container').attr('scoping-activity-id', jQuery(obj).val());
+            getSchedulingDetails();
+        }
+
+        function getQuickAddAssignmentPopupHtml(dte, contextId, api)
+        {
+            //need to get activities list and config for contextId
+            if (quickAddAssignmentConfig.contexts[contextId] != null)
+            {
+                return getQuickAddAssignmentHtml(dte, quickAddAssignmentConfig.contexts[contextId]);
+            }
+
+            getGetQuickAddConfigForContextRemoteAction(contextId, function(result){
+                var html = getQuickAddAssignmentHtml(dte, result);
+
+                api.set('content.text', html);
+
+                jQuery('.kimbleTimePicker').timepicker({ 'timeFormat': 'H:i', 'show2400': 'true'});
+                jQuery('.scheduled-date-entry input').datepicker({
+                    dateFormat: kimble.regional.dateFormat,
+                    showOtherMonths: true,
+                    selectOtherMonths: true
+                });
+            });
+
+            return '<span class="fa fa-circle-o-notch fa-spin load-summary-view"></span>';
+        }
+
+        function scheduledTimeChange()
+        {
+            jQuery('#time-toggle').prop('checked', true);
+
+            assignmentScheduleChange(jQuery('#time-toggle'));
+        }
+
+        function assignmentScheduleChange(obj, override)
+        {
+            //if mode = bulk don't save else show save button and save assignment and re-draw!
+            var $o = jQuery(obj);
+            var $c = $o.closest('.edit-assignment-schedule-container');
+
+            var assignmentId = $c.attr('assignment-id');
+
+            if(assignmentId == null)
+            {
+                // no assignment could mean we are in the quick assign popup
+                if(jQuery('#sheduled-units:visible').length > 0 && jQuery('#scheduled-start-time').val() != '' && jQuery('#scheduled-end-time').val() != '')
+                {
+                    jQuery('#quick-add-assignment-error-text').text('');
+                    jQuery('#quick-add-assignment-error').hide();
+
+                    var timeDifference = timeDiff(jQuery('#scheduled-start-time').val(), jQuery('#scheduled-end-time').val());
+                    var dayUsageKey = HoursToKeyUsagePatternMap[timeDifference.toFixed(2)];
+
+                    if(dayUsageKey == undefined || dayUsageKey == null)
+                    {
+                       var e = '{!JSENCODE($Label.InvalidTimeInterval)}';
+                        $c.find('#quick-add-assignment-error-text').append('<span>' + e + '</span>');
+                        $c.find('#quick-add-assignment-error').show();
+                        return;
+                    }
+
+                    jQuery('#sheduled-units').text(kimble.formatNumber(timeDifference, '0.00 '));
+                }
+                return;
+            }
+
+            var dte = $c.attr('dte');
+
+            var newDte = kimble.parseDate($c.find('.scheduled-date-entry input').val());
+
+            var assignment = activityAssignmentQuickActions.assignments[assignmentId];
+            var usagePattern = new ActivityAssignmentUsagePattern(assignment.TheAssignment.HoursPerDay, assignment.TheAssignment.StartDate.toDate(), assignment.TheAssignment.UsagePattern, assignment.TheAssignment.Utilisation, assignment.TheAssignment.BaselineUtilisation);
+            var availability = new ResourceAvailabilityUsagePattern(assignment.ResourceAvailability, assignment.IsUnavailableAssignment);
+            if (activityAssignmentQuickActions.original[assignmentId] == null) activityAssignmentQuickActions.original[assignmentId] = JSON.parse(JSON.stringify(assignment.TheAssignment));
+
+            $c.find('.error-container').hide();
+            $c.find('.error-message').empty();
+
+            if (newDte != dte)
+            {
+                // is valid date change?
+                if (assignment.EarliestOpenTrackingPeriod.toDate() > newDte.toDate())
+                {
+                    var e = '{!JSENCODE($Label.CannotScheduleDayBefore)}';
+                    $c.find('.error-message').append('<span>' + e.format(kimble.formatDate(assignment.EarliestOpenTrackingPeriod)) + '</span>');
+                    $c.find('.error-container').show();
+                    return;
+                }
+
+                if (assignment.TheAssignment.LatestTimeEntryDate != undefined && assignment.TheAssignment.LatestTimeEntryDate != '' && assignment.TheAssignment.LatestTimeEntryDate.toDate() >= newDte.toDate())
+                {
+                    var e = '{!JSENCODE($Label.CannotScheduleDayBefore)}';
+                    $c.find('.error-message').append('<span>' + e.format(kimble.formatDate(assignment.TheAssignment.LatestTimeEntryDate)) + '</span>');
+                    $c.find('.error-container').show();
+                    return;
+                }
+
+                if (availability.isUnavailableDate(newDte.toDate()))
+                {
+                    var e = '{!JSENCODE($Label.ResourceIsUnavailableOn)}';
+                    $c.find('.error-message').append('<span>' + e.format(kimble.formatDate(dte)) + '</span>');
+                    $c.find('.error-container').show();
+                    return;
+                }
+
+                var newDay = assignment.TheScheduledDays[newDte];
+                if (!override && newDay != null && newDay.RevertToUtilisation != true)
+                {
+                    var e = '{!JSENCODE($Label.OverrideExistingScheduledDay)}';
+                    $c.find('.error-message').append('<span>' + e.format(kimble.formatDate(newDte)) + '</span><input class="btn" type="button" value="{!JSENCODE($Label.Replace)}" onclick="assignmentScheduleChange(this, true)"/>');
+                    $c.find('.error-container').show();
+                    return;
+                }
+
+                // need to update dte to @utilisation and update newDte
+                var oldDay = assignment.TheScheduledDays[dte];
+                oldDay.HasChanges = true;
+                oldDay.RevertToUtilisation = true;
+                oldDay.ScheduledValue = null;
+                oldDay.StartTime = null;
+                oldDay.EndTime =  null;
+                usagePattern.addScheduledDay(dte.toDate(), dayUsageKey);
+
+                if (assignment.TheAssignment.TheTimeSlots != null && assignment.TheAssignment.TheTimeSlots[dte] != null)
+                    delete assignment.TheAssignment.TheTimeSlots[dte];
+
+                assignment.TheAssignment.UsagePattern = usagePattern.usagePattern;
+
+                if (activityAssignmentQuickActions.mode != 'single')
+                {
+                    usagePattern = recalculateAssignmentUsage(assignment.TheAssignment, availability , assignment.TheAssignment.HoursPerDay);
+
+                    assignment.TheAssignment.EndDate = usagePattern.endDate.toKimbleUTC();
+                    assignment.TheAssignment.Utilisation = usagePattern.actualUtilisation;
+                    assignment.TheAssignment.UsagePattern = usagePattern.usagePattern;
+                }
+
+                assignment.HasChanges = true;
+
+                dte = newDte;
+                $c.attr('dte', newDte);
+            }
+
+            //create or remove scheduled day
+            //scheduled day dto {ScheduledValue:0, RevertToUtilisation:false, ForecastEntryId:null, StartTime:null, EndTime:null, TimeZoneSidKey:null, CustomFields:{}};
+
+            var day = assignment.TheScheduledDays[dte];
+
+            if (day == null)
+            {
+                day = {ScheduledValue:null, HasChanges:false, RevertToUtilisation:true, ForecastEntryId:null, StartTime:null, EndTime:null, TimeZoneSidKey:null, CustomFields:{}};
+                assignment.TheScheduledDays[dte] = day;
+            }
+
+            day.HasChanges = true;
+            day.StartTime = null;
+            day.EndTime = null;
+            day.TimeZoneSidKey = null;
+
+            if (assignment.TheAssignment.TheTimeSlots != null && assignment.TheAssignment.TheTimeSlots[dte] != null)
+                delete assignment.TheAssignment.TheTimeSlots[dte];
+
+            var dayUsageKey;
+
+            jQuery('#edit-fte-additional input, #edit-fte-additional textarea, #edit-fte-additional select').prop('disabled', true);
+            jQuery('#edit-fte-additional a').hide();
+
+            jQuery('#scheduled-start-time, #scheduled-end-time').prop('disabled', true);
+
+            if ($o.is('select'))
+                jQuery('#specific-toggle').prop('checked', true);
+
+            if (jQuery('#pct-toggle').prop('checked'))
+            {
+                day.RevertToUtilisation = true;
+                day.ScheduledValue = null;
+                day.StartTime = null;
+                day.EndTime =  null;
+                dayUsageKey = assignment.TheAssignment.BaselineUtilisation;
+            }
+            else if (jQuery('#specific-toggle').prop('checked'))
+            {
+                day.RevertToUtilisation = false;
+                dayUsageKey = $c.find('select').val();
+
+                day.ScheduledValue = KeyToHoursUsagePatternMap[dayUsageKey];
+
+                day.CustomFields = getCustomFields();
+            }
+            else if (jQuery('#time-toggle').prop('checked'))
+            {
+                day.RevertToUtilisation = false;
+                //enable time fields
+                jQuery('#scheduled-start-time, #scheduled-end-time').prop('disabled', false);
+
+                if (jQuery('#scheduled-start-time').val() == '' && jQuery('#scheduled-end-time').val() == '')
+                {
+                    jQuery('#scheduled-start-time').val('00:00');
+                    jQuery('#scheduled-end-time').val('00:00');
+                }
+
+                if (jQuery('#scheduled-start-time').val() == '' && jQuery('#scheduled-end-time').val() != '')
+                    jQuery('#scheduled-start-time').val(jQuery('#scheduled-end-time').val());
+
+                if(jQuery('#scheduled-start-time').val() > jQuery('#scheduled-end-time').val() || jQuery('#scheduled-end-time').val() == '')
+                    jQuery('#scheduled-end-time').val(jQuery('#scheduled-start-time').val());
+
+                var timeDifference = timeDiff(jQuery('#scheduled-start-time').val(), jQuery('#scheduled-end-time').val());
+
+                var dayUsageKey = HoursToKeyUsagePatternMap[timeDifference.toFixed(2)];
+
+                if(dayUsageKey == undefined || dayUsageKey == null)
+                {
+                   var e = '{!JSENCODE($Label.InvalidTimeInterval)}';
+                    $c.find('.error-message').append('<span>' + e + '</span>');
+                    $c.find('.error-container').show();
+                    return;
+                }
+
+                jQuery('#sheduled-units').text(kimble.formatNumber(timeDifference, '0.00 '));
+
+                day.ScheduledValue = KeyToHoursUsagePatternMap[dayUsageKey];
+
+                day.StartTime = jQuery('#scheduled-start-time').val();
+                day.EndTime = jQuery('#scheduled-end-time').val();
+
+                if (jQuery('#scheduled-time-zone').val() != '')
+                    day.TimeZoneSidKey = jQuery('#scheduled-time-zone').val();
+
+                if (assignment.TheAssignment.TheTimeSlots == null) assignment.TheAssignment.TheTimeSlots = {};
+                if (assignment.TheAssignment.TheTimeSlots[dte] == null) assignment.TheAssignment.TheTimeSlots[dte] = [];
+                assignment.TheAssignment.TheTimeSlots[dte] = [{StartTime:day.StartTime, EndTime:day.EndTime}];
+
+                jQuery('#edit-fte-additional input, #edit-fte-additional textarea, #edit-fte-additional select').prop('disabled', false);
+                jQuery('#edit-fte-additional a').show();
+
+                day.CustomFields = getCustomFields();
+            }
+            else if (jQuery('#off-toggle').prop('checked'))
+            {
+                day.RevertToUtilisation = false;
+                day.ScheduledValue = 0;
+                dayUsageKey = 'a';
+            }
+
+            assignment.HasChanges = true;
+
+            if (activityAssignmentQuickActions.mode != 'single')
+            {
+                if (dte.toDate() < assignment.TheAssignment.StartDate.toDate() || dte.toDate() > assignment.TheAssignment.EndDate.toDate())
+                {
+                    if (dte.toDate() < assignment.TheAssignment.StartDate.toDate())
+                    {
+                        assignment.TheAssignment.StartDate = dte;
+                    }
+                    else if (dte.toDate() > assignment.TheAssignment.EndDate.toDate())
+                    {
+                        assignment.TheAssignment.EndDate = dte;
+                    }
+                    usagePattern = usagePattern.createForDerivedUsage(assignment.TheAssignment.StartDate.toDate(), assignment.TheAssignment.EndDate.toDate(), assignment.TheAssignment.BaselineUtilisation, availability, null, assignment.TheAssignment.HoursPerDay);
+                }
+
+                usagePattern.addScheduledDay(dte.toDate(), dayUsageKey);
+                assignment.TheAssignment.UsagePattern = usagePattern.usagePattern;
+
+                usagePattern = recalculateAssignmentUsage(assignment.TheAssignment, availability , assignment.TheAssignment.HoursPerDay);
+
+                assignment.TheAssignment.EndDate = usagePattern.endDate.toKimbleUTC();
+                assignment.TheAssignment.Utilisation = usagePattern.actualUtilisation;
+                assignment.TheAssignment.UsagePattern = usagePattern.usagePattern;
+
+                // re-draw assigment since % usage may flatten on other days
+                activityAssignmentQuickActions.redrawAssignments([assignment.TheAssignment]);
+            }
+        }
+
+        function getCustomFields()
+        {
+            var customFields = {};
+
+            jQuery.each(jQuery('.fte-details-field'), function(i, obj){
+                   var fld = jQuery(obj);
+
+                    var typ = fld.attr('data-fld-type').toUpperCase();
+                    var fldName = fld.attr('data-fld-name');
+                    var val = null;
+
+                    if (typ == 'REFERENCE')
+                    {
+                        val = fld.closest('td').find('[id $= "lkid"]').val();
+                    }
+                    else if (typ == 'INTEGER' || typ == 'LONG')
+                    {
+                        val = kimble.parseNumber(fld.val(), '#,###');
+                    }
+                    else if (typ == 'DOUBLE' || typ == 'PERCENT')
+                    {
+                        val = kimble.parseNumber(fld.val(),'#,###.####');
+                    }
+                    else if (typ == 'DATE')
+                    {
+                        val = kimble.parseDate(fld.val());
+                    }
+                    else if (typ == 'BOOLEAN')
+                    {
+                        val = fld.prop('checked');
+                    }
+                    else
+                    {
+                        val = fld.val();
+                    }
+
+                   customFields[fldName] = {Name:fldName, DisplayType:typ, Value:val};
+            });
+
+            jQuery('#edit-fte-additional input, #edit-fte-additional textarea, #edit-fte-additional select').prop('disabled', false);
+            jQuery('#edit-fte-additional a').show();
+
+            return customFields;
+        }
+
+        function getSaveAndScheduleHtml(config)
+        {
+            var html = '';
+
+            html += '<div class="scheduled-usage-entry">';
+            html += '<span class="utilisation-block"></span><input checked="checked" id="pct-toggle" type="radio" name="scheduled-usage-toggle" /><label for="pct-toggle">{!JSENCODE($Label.AtUtilisationLabel)}</label>'
+            html += '</div>';
+
+            html += '<div class="scheduled-usage-entry">';
+            html += '<span class="utilisation-block"><span class="fa fa-thumb-tack"></span></span><input id="specific-toggle" type="radio" name="scheduled-usage-toggle" /><label for="specific-toggle">{!JSENCODE($Label.AtLabel)}</label><select>';
+
+            for (var i = 1; i <= config.MaximumUsage / (config.UsageForecastFormat * config.UsageUnitToHourConversionFactor); i++)
+            {
+                var m = i * config.UsageForecastFormat * config.UsageUnitToHourConversionFactor;
+                var n = jQuery.formatNumber(m, {format: "0.00"});
+
+                var key = (i * config.UsageForecastFormat);
+
+                html += '<option selected="selected" value="' + key  + '">' + jQuery.formatNumber(key, {format: "0.##", locale:kimble.locale, isFullLocale:false}); + '</option>';
+            }
+
+            html += '</select></div>';
+
+            if (config.ScheduleWithTime)
+            {
+                html += '<div class="scheduled-usage-entry">';
+                html += '<span class="utilisation-block"><span class="fa fa-clock-o"></span></span><input id="time-toggle" type="radio" name="scheduled-usage-toggle"/><label for="time-toggle">{!JSENCODE($Label.AtASpecificTimeLabel)}: {!$ObjectType.ForecastTimeEntry__c.Fields.StartTime__c.Label}<input onchange="scheduledTimeChange()" id="scheduled-start-time" class=" inline-time-picker kimbleTimePicker"/>{!$ObjectType.ForecastTimeEntry__c.Fields.EndTime__c.Label}<input onchange="scheduledTimeChange()" id="scheduled-end-time" class=" inline-time-picker kimbleTimePicker" /><span><span id="sheduled-units"></span><span>' + config.UsageUnitsSuffix + '</span></span>';
+
+                if (activityAssignmentQuickActions.scheduledAssignmentsConfig.TheTimeZones != null)
+                {
+                    html += '<div class="scheduled-time-zones"><span>{!$ObjectType.ForecastTimeEntry__c.fields.TimeZoneSidKey__c.Label}:</span><select id="scheduled-time-zone" onchange="scheduledTimeChange()">';
+                    var tZones = activityAssignmentQuickActions.scheduledAssignmentsConfig.TheTimeZones;
+
+                    var day = {ScheduledValue:null, HasChanges:false, RevertToUtilisation:true, ForecastEntryId:null, StartTime:null, EndTime:null, TimeZoneSidKey:null, CustomFields:{}};
+
+                    for (var t=0;t<tZones.length;t++)
+                    {
+                        html += '<option value="' + tZones[t].id + '" ' + (tZones[t].id == day.TimeZoneSidKey || (day.TimeZoneSidKey == null && tZones[t].id == config.TheDefaultTimeZone)? ' selected="selected"':'') + '>' + tZones[t].text + '</option>';
+                    }
+
+                    html += '</select></div>';
+                }
+
+                html += '</label>';
+            }
+
+
+            html += '<div class="scheduled-usage-entry">';
+            html += '<span class="assignment-off utilisation-block"></span><input id="off-toggle" type="radio" name="scheduled-usage-toggle" /><label for="off-toggle">{!JSENCODE($Label.OffLabel)}</label>';
+            html += '</div>';
+
+            if (config.HasForecastTimeEntry)
+            {
+                html += '<div class="scheduled-day-details">';
+
+                var $fteHtml = jQuery(fteHtml);
+
+                //$fteHtml.find('input, select, textarea').prop('disabled', true);
+                html += $fteHtml.html();
+
+                html += '</div>';
+           }
+
+           return html;
+        }
+
+        function getAssignmentScheduleEditHtml(dte, assignment)
+        {
+            // Can schedule on this day?
+            // Actual on day?
+            // before earliest open period
+
+            // Is scheduled date outside assignment bounds? (before start / after end)
+
+            var html = '<div dte="' + dte + '" assignment-id="' + assignment.AssignmentId + '" class="edit-assignment-schedule-container">';
+
+            html += '<div class="schedule-assignments-card"><div class="schedule-assignments-header">';
+            html += '<div class="scheduled-date-entry"><span>{!$ObjectType.ForecastTimeEntry__c.Fields.TimePeriodStartDate__c.label}</span><span><input onchange="assignmentScheduleChange(this);" type="text" value="' + kimble.formatDate(dte) + '"/></span></div>';
+
+            html += '<span class="resource-name">' + assignment.TheAssignment.ResourceName + '</span>';
+            html += '</div>';
+
+            html += '<div class="error-container" style="display:none"><span><div class="message errorM3"><table border="0" cellpadding="0" cellspacing="0" class="messageTable" style="padding:0px;margin:0px;"><tbody><tr valign="top"><td><img alt="error" class="msgIcon" src="/s.gif" title="{!JSENCODE($Label.Error)}"></td><td class="messageCell error-message"></td></tr><tr><td></td><td></td></tr></tbody></table></div></span></div>';
+
+
+            //get scheduled day
+            var day = assignment.TheScheduledDays[dte];
+
+            if (day == null)
+            {
+                day = {ScheduledValue:null, HasChanges:false, RevertToUtilisation:true, ForecastEntryId:null, StartTime:null, EndTime:null, TimeZoneSidKey:null, CustomFields:{}};
+                assignment.TheScheduledDays[dte] = day;
+            }
+
+            var isExtension = (dte.toDate() > assignment.TheAssignment.EndDate.toDate());
+
+            html += '<div class="scheduled-usage-entry">';
+            html += '<span class="' + assignment.TheAssignment.StyleClass + ' utilisation-block"></span><input onchange="assignmentScheduleChange(this);"' + (day.RevertToUtilisation  && !isExtension?' checked="checked" ':'') + ' id="pct-toggle" type="radio" name="scheduled-usage-toggle" /><label for="pct-toggle">{!JSENCODE($Label.AtUtilisationLabel)}</label>'
+            html += '</div>';
+
+            if (assignment.CanScheduleDay)
+            {
+                html += '<div class="scheduled-usage-entry">';
+
+                var scheduledKey;
+                if (day.ScheduledValue != null)
+                {
+                    var n = jQuery.formatNumber(day.ScheduledValue, {format: "0.00"});
+                    scheduledKey = HoursToKeyUsagePatternMap[n];
+                }
+
+                html += '<span class="' + assignment.TheAssignment.StyleClass + ' utilisation-block"><span class="fa fa-thumb-tack"></span></span><input onchange="assignmentScheduleChange(this);" ' + (scheduledKey != null && scheduledKey != 'a' && day.StartTime == null ?' checked="checked" ':'') + ' id="specific-toggle" type="radio" name="scheduled-usage-toggle" /><label for="specific-toggle">{!JSENCODE($Label.AtLabel)}</label><select onchange="assignmentScheduleChange(this);">';
+
+                for (var i = 1; i <= assignment.MaximumUsage / (assignment.UsageForecastFormat * assignment.UsageUnitToHourConversionFactor); i++)
+                {
+                    var m = i * assignment.UsageForecastFormat * assignment.UsageUnitToHourConversionFactor;
+                    var n = jQuery.formatNumber(m, {format: "0.00"});
+
+                    var key = HoursToKeyUsagePatternMap[n];
+                    var selected = '';
+
+                    if ((scheduledKey == null && assignment.TheAssignment.HoursPerDay == m) || scheduledKey == key) selected = ' selected="true" ';
+
+                    html += '<option ' + selected + ' value="' + key  + '">' + jQuery.formatNumber((i * assignment.UsageForecastFormat), {format: "0.##", locale:kimble.locale, isFullLocale:false}) + '</option>';
+                }
+
+                html += '</select><span class="usage-units">' + assignment.UsageUnitsSuffix + '</span></div>';
+
+                if (assignment.ScheduleWithTime)
+                {
+                    html += '<div class="scheduled-usage-entry">';
+                    html += '<span class="utilisation-block"><span class="fa fa-clock-o"></span></span><input onchange="assignmentScheduleChange(this);" id="time-toggle" type="radio" name="scheduled-usage-toggle" ' + (scheduledKey != null && scheduledKey != 'a' && day.StartTime != null ?' checked="checked" ':'') + '/><label for="time-toggle">{!JSENCODE($Label.AtASpecificTimeLabel)}: {!$ObjectType.ForecastTimeEntry__c.Fields.StartTime__c.Label}<input id="scheduled-start-time" class=" inline-time-picker kimbleTimePicker" value="' + (day.StartTime == null ? '':day.StartTime) + '"/>{!$ObjectType.ForecastTimeEntry__c.Fields.EndTime__c.Label}<input id="scheduled-end-time" class=" inline-time-picker kimbleTimePicker" value="' + (day.EndTime == null ? '':day.EndTime) + '"/><span><span id="sheduled-units">' + (day.StartTime != null && day.EndTime != null ? kimble.formatNumber(timeDiff(day.StartTime, day.EndTime), '0.00 ') : '') + '</span><span>' + assignment.UsageUnitsSuffix + '</span></span>';
+
+                    if (activityAssignmentQuickActions.scheduledAssignmentsConfig.TheTimeZones != null)
+                    {
+                        html += '<div class="scheduled-time-zones"><span>{!$ObjectType.ForecastTimeEntry__c.fields.TimeZoneSidKey__c.Label}:</span><select id="scheduled-time-zone" onchange="scheduledTimeChange()">';
+                        var tZones = activityAssignmentQuickActions.scheduledAssignmentsConfig.TheTimeZones;
+
+                        for (var t=0;t<tZones.length;t++)
+                        {
+                            html += '<option value="' + tZones[t].id + '" ' + (tZones[t].id == day.TimeZoneSidKey || (day.TimeZoneSidKey == null && tZones[t].id == assignment.TheDefaultTimeZone)? ' selected="selected"':'') + '>' + tZones[t].text + '</option>';
+                        }
+
+                        html += '</select></div>';
+                    }
+
+                    html += '</label>';
+                }
+            }
+
+            html += '<div class="scheduled-usage-entry">';
+            html += '<span class="assignment-off utilisation-block"></span><input onchange="assignmentScheduleChange(this);" ' + (scheduledKey == 'a'?' checked="checked" ':'') + ' id="off-toggle" type="radio" name="scheduled-usage-toggle" /><label for="off-toggle">{!JSENCODE($Label.OffLabel)}</label>';
+            html += '</div>';
+
+            if (assignment.HasForecastTimeEntry)
+            {
+                html += '<div class="scheduled-day-details">';
+
+                var $fteHtml = jQuery(fteHtml);
+
+                if (scheduledKey != null && scheduledKey != 'a')
+                {
+                   $fteHtml.find('input, select, textarea').prop('disabled', false);
+
+                   //set the field values
+                   jQuery.each($fteHtml.find('.fte-details-field'), function (i, obj) {
+
+                    var fld = jQuery(obj);
+
+                    var typ = fld.attr('data-fld-type').toUpperCase();
+
+                    var val = day.CustomFields[fld.attr('data-fld-name')];
+
+                    val = val.Value;
+
+                    if (val != null && val != '')
+                    {
+                        if (typ == 'REFERENCE')
+                        {
+                            var ref = fld.attr('data-reference');
+
+                            var sObject = sforce.connection.query("SELECT Id, Name FROM " + ref + " WHERE Id = '" + val + "'");
+                            fld.attr('value', sObject.records.Name);
+
+                            fld.closest('td').find('[id $= "lkid"]').val(val);
+                        }
+                        else if (typ == 'INTEGER' || typ == 'LONG')
+                        {
+                            fld.attr('value', kimble.formatNumber(val, '#,###'));
+                        }
+                        else if (typ == 'DOUBLE' || typ == 'PERCENT')
+                        {
+                            fld.attr('value', kimble.formatNumber(val, '#,###.####'));
+                        }
+                        else if (typ == 'DATE')
+                        {
+                            fld.attr('value', kimble.formatDate((new Date(val)).toKimbleUTC()));
+                        }
+                        else if (typ == 'TEXTAREA')
+                        {
+                            fld.text(val);
+                        }
+                        else if (typ == 'BOOLEAN')
+                        {
+                            if (val)
+                                fld.attr('checked','checked');
+                            else
+                                fld.removeAttr('checked');
+                        }
+                        else if (typ == 'PICKLIST')
+                        {
+                            for (var i=0;i<fld[0].options.length;i++){
+                                if (fld[0].options[i].value == val){
+                                    fld[0].options[i].setAttribute('selected','true');
+                                }
+                            }
+                        }
+                        else
+                        {
+                            fld.attr('value', val);
+                        }
+                    }
+                    else
+                    {
+                        if (typ == 'BOOLEAN')
+                        {
+                            fld.removeAttr('checked');
+                        }
+                        else
+                        {
+                            fld.attr('value', '');
+                        }
+                    }
+                });
+                }
+                else
+                {
+                    $fteHtml.find('input, select, textarea').prop('disabled', true);
+                }
+
+                html += $fteHtml.html();
+
+                html  += '</div>';
+            }
+
+            html += '<div class="schedule-save-buttons">';
+
+            if (activityAssignmentQuickActions.mode == 'single')
+            {
+                var canEditAssignment = {!$ObjectType.ActivityAssignment__c.updateable};
+                if (canEditAssignment) html += '<input class="btn" type="button" value="{!JSENCODE($Label.Save)}" onclick="saveSchedulePopup();"/>';
+                html += '<input class="btn" type="button" value="{!JSENCODE($Label.Close)}" onclick="closeSchedulePopup();"/>';
+            }
+            else
+            {
+                html += '<input class="btn" type="button" value="{!JSENCODE($Label.Close)}" onclick="closeSchedulePopup();"/>';
+            }
+
+            html += '</div></div></div>';
+
+            return html;
+        }
+
+        function saveSchedulePopup()
+        {
+            jQuery('#loadingIndicatorOuterContainer').parent().show();
+
+            saveAssignmentSchedules(function(assignmentIds){
+                //TODO:needs to publish resource Id in ResourceSearch
+                jQuery.publish('kimble.assignmentChanged', {assignmentId:assignmentIds[0]});
+            });
+        }
+
+        function closeSchedulePopup()
+        {
+            if (activityAssignmentQuickActions.mode == 'single')  {
+
+                //revert changes back
+                activityAssignmentQuickActions.assignments = {};
+                activityAssignmentQuickActions.original = {};
+                activityAssignmentQuickActions.assignmentsToSaveCount= 0;
+            }
+
+            jQuery('.day-to-schedule').remove();
+        }
+
+        function saveAssignmentSchedules(oncomplete, onerror)
+        {
+            //save assignments that have changed.
+            var assignmentsToSave = {};
+            var assignmentsToSaveIds = [];
+
+            //jQuery('.gantt-container').qtip('destroy', true);
+
+            jQuery.each(Object.keys(activityAssignmentQuickActions.assignments), function(i, key) {
+
+                var a = activityAssignmentQuickActions.assignments[key];
+
+                var hasError = false;
+
+                if (a.HasChanges)
+                {
+                    if (assignmentsToSave[a.TheAssignment.ScopingActivityId] == null) assignmentsToSave[a.TheAssignment.ScopingActivityId] = {};
+
+                    assignmentsToSave[a.TheAssignment.ScopingActivityId][a.AssignmentId] = {AssignmentId:a.AssignmentId, CalendarId:a.TheAssignment.ResourceCalendarId, ResourceId:a.TheAssignment.ResourceId, ScheduleWithTime: a.ScheduleWithTime, HasForecastTimeEntry: a.HasForecastTimeEntry, TheScheduledDays:a.TheScheduledDays};
+
+                    assignmentsToSaveIds.push(a.AssignmentId);
+                }
+            });
+
+            if(Object.keys(assignmentsToSave).length == 0) {
+                cancelAssignmentsSchedule();
+                oncomplete();
+
+                return;
+            }
+            //loop through scoping activities to save
+            activityAssignmentQuickActions.assignmentsToSaveCount = 0;
+
+            jQuery.each(Object.keys(assignmentsToSave), function(i, key){
+
+                saveAssignmentSchedulesRemoteAction(key, assignmentsToSave[key], function(){
+                activityAssignmentQuickActions.assignmentsToSaveCount--;
+
+                if (activityAssignmentQuickActions.assignmentsToSaveCount == 0)
+                {
+                    activityAssignmentQuickActions.assignments = {};
+                    activityAssignmentQuickActions.original = {};
+
+                    if (activityAssignmentQuickActions.mode != 'single')
+                    {
+                        cancelAssignmentsSchedule();
+
+                        jQuery('.action-col a').show();
+
+                        jQuery('.assignment-snip').show();
+
+                        //TODO_SGT - Handle save errors
+                    }
+
+                    oncomplete(assignmentsToSaveIds);
+                }
+            }, onerror);
+                activityAssignmentQuickActions.assignmentsToSaveCount ++;
+            });
+        }
+
+        function saveAssignmentSchedulesRemoteAction(activityId, assignmentsToSave, oncomplete, onerror)
+        {
+
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentQuickActionsController.ScheduleAssignments}',
+                    activityId, assignmentsToSave,
+                        function(result, event){
+                            if (event.status)
+                            {
+                                oncomplete();
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                if (onerror == null) {
+                                    alert(event.message);
+                                }
+                                else {
+                                    onerror(event.message);
+                                }
+                            }
+                            else
+                            {
+                                alert(event.message);
+                            }
+                    },
+                    {buffer: false, escape: true, timeout: 60000}
+                );
+        }
+
+        function saveProfiledAssignments($assignmentContainers, resources, findAssignment, mode, oncomplete, onerror)
+        {
+            //save assignments that have changed.
+            var assignmentsToSave = {};
+            var assignmentsToSaveIds = [];
+
+            // Assignments to save //
+            jQuery.each($assignmentContainers, function(i, obj) {
+
+                var $o = jQuery(obj);
+
+                var hasError = false;
+
+                if ($o.find('.has-changes').length > 0)
+                {
+                    var ass = findAssignment($o)
+                    var availability = new ResourceAvailabilityUsagePattern(JSON.parse(resources[ass.ResourceId].AvailabilityPattern), false);
+
+                    var usagePattern = '';
+
+                    var assignmentUsage = new ActivityAssignmentUsagePattern(ass.HoursPerDay, ass.StartDate.toDate(), ass.UsagePattern, ass.Utilisation, ass.Utilisation);
+
+                    var oldPattern = ass.UsagePattern;
+                    var oldStart = ass.StartDate;
+
+                    //mode is either usage or model-usage
+                    var inputs = $o.find('input.' + mode).filter(function () {return this.value.length > 0});
+
+                    var earliest;
+                    var latest;
+
+                    if (inputs.length > 0)
+                    {
+                        if (jQuery(inputs[0]).prop('disabled'))
+                        {
+                            earliest = ass.StartDate.toDate();
+                        }
+                        else
+                        {
+                            earliest = jQuery(inputs[0]).closest('.day-content').attr('start-dte').toDate();
+
+                            while(!availability.isForecastingDate(earliest))
+                            {
+                                earliest = kimble.addDays(earliest, 1);
+                            }
+                        }
+
+                        latest = jQuery(inputs[inputs.length-1]).closest('.day-content').attr('end-dte').toDate();
+
+                        while(!availability.isForecastingDate(latest))
+                        {
+                            latest = kimble.addDays(latest, -1);
+                        }
+                    }
+
+                    var startDate = earliest;
+                    if (assignmentUsage.earliestFirmDate != null && assignmentUsage.earliestFirmDate < startDate) startDate = assignmentUsage.earliestFirmDate;
+                    if (ass.EarliestTimeEntryDate != null && ass.EarliestTimeEntryDate.toDate() < startDate) startDate = ass.EarliestTimeEntryDate.toDate();
+
+                    var endDate = latest;
+                    if (assignmentUsage.latestFirmDate != null && assignmentUsage.latestFirmDate > endDate) endDate = assignmentUsage.latestFirmDate;
+                    if (ass.LatestTimeEntryDate != null && ass.LatestTimeEntryDate.toDate() > endDate) endDate = ass.LatestTimeEntryDate.toDate();
+
+                    ass.StartDate = startDate.toKimbleUTC();
+
+                    //loop through all dates
+                    while (startDate.valueOf() <= endDate.valueOf())
+                    {
+                        var thisDate =  startDate;
+
+                        startDate = new Date(thisDate.getFullYear(), thisDate.getMonth(), thisDate.getDate() + 1, 0, 0, 0, 0);
+
+                        var $c = $o.find('.day-content').filter(function() {return jQuery(this).attr('start-dte').toDate() <= thisDate && jQuery(this).attr('end-dte').toDate() >= thisDate});
+
+                        if (assignmentUsage.startDate <= thisDate && assignmentUsage.endDate >= thisDate && ($c.length == 0 || assignmentUsage.getActualInHoursOnDate(thisDate) > 0 || !assignmentUsage.isUtilisationDay(thisDate)) || !availability.isForecastingDate(thisDate))
+                        {
+                           var u = assignmentUsage.getUsagePatternOnDate(thisDate);
+
+                           if (u == null || u == '') u = (NONFORECASTDAY + ':0');
+
+                           usagePattern += (u + ',');
+                        }
+                        else
+                        {
+
+                          var val = kimble.parseNumber($c.find('input.' + mode).val());
+
+                           var min = new Number($c.find('input.' + mode).prop('min'));
+
+                           if (val == null) val = 0;
+
+                           if (val < min)
+                           {
+                               hasError = true;
+                           }
+
+                           var valToForecast = val - min;
+
+                           //need to divide val between number of utilisation days between start and end
+                            var utilDays = $c.attr('util-days');
+
+                            if (mode == 'model-usage')
+                            {
+                                usagePattern += ((valToForecast * ass.Utilisation).toFixed(6) + ':0,');
+                            }
+                            else
+                            {
+                                valToForecast = valToForecast / utilDays;
+
+                                if (!$o.hasClass('gantt-daily-usage') && ass.ForecastUnitsEnum == 'Day') valToForecast = valToForecast * ass.HoursPerDay;
+                                usagePattern += (((valToForecast / ass.HoursPerDay) * 100).toFixed(6) + ':0,');
+                            }
+                        }
+                    }
+
+                    if (!hasError && (oldPattern != usagePattern || oldStart != ass.StartDate))
+                    {
+                        if (assignmentsToSave[ass.ScopingActivityId] == null) assignmentsToSave[ass.ScopingActivityId] = {};
+
+                        assignmentsToSave[ass.ScopingActivityId][ass.Id] = {StartDate:ass.StartDate, NewUsagePattern:usagePattern, OldUsagePattern:ass.UsagePattern};
+
+                        assignmentsToSaveIds.push(ass.Id);
+                    }
+                }
+            });
+
+            if(Object.keys(assignmentsToSave).length == 0)
+            {
+                oncomplete([]);
+                return;
+            }
+            //loop through scoping activities to save
+            activityAssignmentQuickActions.assignmentsToSaveCount = 0;
+
+            jQuery.each(Object.keys(assignmentsToSave), function(i, key){
+
+                saveProfiledAssignmentsRemoteAction(assignmentsToSave[key], function(){
+                    activityAssignmentQuickActions.assignmentsToSaveCount--;
+
+                    if (activityAssignmentQuickActions.assignmentsToSaveCount == 0)
+                    {
+                        //TODO_SGT - Handle save errors
+
+                        oncomplete(assignmentsToSaveIds);
+                    }
+                }, onerror);
+
+                activityAssignmentQuickActions.assignmentsToSaveCount ++;
+            });
+        }
+
+        function saveProfiledAssignmentsRemoteAction(assignmentsToSave, oncomplete, onerror)
+        {
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentRemoteActions.ProfileAssignmentUsagePattern}',
+                    assignmentsToSave,
+                        function(result, event){
+                            if (event.status)
+                            {
+                                oncomplete();
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                if (onerror != null)
+                                    onerror(event.message);
+                                else
+                                    alert(event.message);
+                            }
+                            else
+                            {
+                                alert(event.message);
+                            }
+                    },
+                    {buffer: false, escape: true, timeout: 60000}
+                );
+        }
+
+        function getSchedulingDetails()
+        {
+            jQuery('#save-and-schedule-assignment-container .btn').prop('disabled', true);
+
+            var $c = jQuery('#save-and-schedule-assignment-container');
+            var activityId = $c.attr('scoping-activity-id');
+            var resourceId = kimble.parseId(jQuery('#save-and-schedule-resource-row:visible input:hidden[id$="lkid"], #save-and-schedule-resource-row:visible select').val());
+
+            if (resourceId == null || resourceId == '' || resourceId == '000000000000000') return;
+
+            getActivitySchedulingConfigRemoteAction(activityId, resourceId);
+        }
+
+        function getActivitySchedulingConfigRemoteAction(activityId, resourceId)
+        {
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentQuickActionsController.GetActivitySchedulingConfig}',
+                    activityId, resourceId,
+                        function(result, event){
+                            if (event.status)
+                            {
+                                jQuery('#save-and-schedule-details').empty();
+                                jQuery('#save-and-schedule-details').append(getSaveAndScheduleHtml(result));
+                                jQuery('#save-and-schedule-details .kimbleTimePicker').timepicker({ 'timeFormat': 'H:i', 'show2400': 'true'});
+
+                                jQuery('#save-and-schedule-assignment-container .btn').prop('disabled', false);
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                alert(event.message);
+                            }
+                            else
+                            {
+                                alert(event.message);
+                            }
+                    },
+                    {buffer: false, escape: true, timeout: 60000}
+                );
+        }
+
+        function saveAndScheduleNewAssignment()
+        {
+            var $c = jQuery('#save-and-schedule-assignment-container');
+            var activityId = $c.attr('scoping-activity-id');
+            var dte = $c.attr('dte');
+            var resourceId = kimble.parseId(jQuery('#save-and-schedule-resource-row:visible input:hidden[id$="lkid"], #save-and-schedule-resource-row:visible select').val());
+            if (resourceId == null || resourceId == '' || resourceId == '000000000000000')
+            {
+                var errorMessage = ('{!JSENCODE($label.RequiredValue)}').replace('{0}', '{!JSENCODE($ObjectType.ActivityAssignment__c.Fields.Resource__c.Label)}');
+                alert(errorMessage);
+                return;
+            }
+
+            var roleId = null;
+
+            if (jQuery('#save-and-schedule-role-row').length != 0) {
+               roleId = kimble.parseId(jQuery('#save-and-schedule-role-row:visible select').val());
+
+                if (roleId == null || roleId == '' || roleId == '000000000000000')
+                {
+                    var errorMessage = ('{!JSENCODE($label.RequiredValue)}').replace('{0}', '{!JSENCODE($ObjectType.ActivityAssignment__c.Fields.ActivityRole__c.Label)}');
+                    alert(errorMessage);
+                    return;
+                }
+            }
+
+            var locationId = null;
+
+            if (jQuery('#save-and-schedule-location-row').length != 0) {
+               locationId = kimble.parseId(jQuery('#save-and-schedule-location-row:visible select').val());
+
+                if (locationId == null || locationId == '' || locationId == '000000000000000')
+                {
+                    var errorMessage = ('{!JSENCODE($label.RequiredValue)}').replace('{0}', '{!JSENCODE($ObjectType.ActivityAssignment__c.Fields.Location__c.Label)}');
+                    alert(errorMessage);
+                    return;
+                }
+            }
+
+            jQuery('#loadingIndicatorOuterContainer').parent().show();
+            jQuery('#save-and-schedule-assignment-container .btn').prop('disabled', true);
+
+            var scheduledDay;
+            var $c = jQuery('#save-and-schedule-details');
+
+            if ($c.find('#pct-toggle').prop('checked'))
+            {
+                scheduledDay = null;
+            }
+            else if ($c.find('#specific-toggle').prop('checked'))
+            {
+                scheduledDay = {scheduledValue: $c.find('#specific-toggle').parent().find('select').val(), CustomFields : getCustomFields()};
+            }
+            else if ($c.find('#time-toggle').prop('checked'))
+            {
+                scheduledDay = {scheduledValue: 0, StartTime:null, EndTime:null, TimeZoneSidKey:null, CustomFields:{}};
+
+                var timeDifference = timeDiff(jQuery('#scheduled-start-time').val(), jQuery('#scheduled-end-time').val());
+                var dayUsageKey = HoursToKeyUsagePatternMap[timeDifference.toFixed(2)];
+
+                if(dayUsageKey == undefined || dayUsageKey == null)
+                {
+                   var e = '{!JSENCODE($Label.InvalidTimeInterval)}';
+
+                    $c.find('#quick-add-assignment-error-text').append('<span>' + e + '</span>');
+                    $c.find('#quick-add-assignment-error').show();
+                    return;
+                }
+
+                jQuery('#sheduled-units').text(kimble.formatNumber(timeDifference, '0.00 '));
+
+                scheduledDay.ScheduledValue = KeyToHoursUsagePatternMap[dayUsageKey];
+
+                scheduledDay.StartTime = jQuery('#scheduled-start-time').val();
+                scheduledDay.EndTime = jQuery('#scheduled-end-time').val();
+
+                if (jQuery('#scheduled-time-zone').val() != '') scheduledDay.TimeZoneSidKey = jQuery('#scheduled-time-zone').val();
+            }
+            else if ($c.find('#off-toggle').prop('checked'))
+            {
+                scheduledDay = {scheduledValue: 0};
+            }
+
+            createActivityAssignmentRemoteAction(activityId, resourceId, roleId, locationId, dte, scheduledDay, function(result){jQuery.publish('kimble.assignmentChanged', {assignmentId:result});});
+        }
+
+        function closeSaveAndScheduleNewAssignment()
+        {
+            jQuery('.day-to-schedule').remove();
+        }
+
+        function createActivityAssignmentRemoteAction(scopingActivityId, resourceId, roleId, locationId, startDate, scheduledDay, oncomplete)
+        {
+            jQuery('#quick-add-assignment-error-text').text('');
+            jQuery('#quick-add-assignment-error').hide();
+
+            Visualforce.remoting.Manager.invokeAction('{!$RemoteAction.ActivityAssignmentQuickActionsController.CreateActivityAssignment}',
+                    scopingActivityId, resourceId, roleId, locationId, startDate, scheduledDay,
+                        function(result, event){
+                            if (event.status)
+                            {
+                                oncomplete(result);
+                            }
+                            else if (event.type === 'exception')
+                            {
+                                jQuery('#loadingIndicatorOuterContainer').parent().hide();
+                                jQuery('#quick-add-assignment-error-text').text(event.message);
+                                jQuery('#quick-add-assignment-error').show();
+                            }
+                            else
+                            {
+                                alert(event.message);
+                            }
+
+                            jQuery('#save-and-schedule-assignment-container .btn').prop('disabled', false);
+                    },
+                    {buffer: false, escape: true, timeout: 60000}
+                );
+        }
+
+    </script>
+    <style id="toolbar">
+
+            div.toolbar-button {
+					display: inline-block;
+					padding: 6px 10px 6px 10px;
+		 			background-color: white;
+					border: 1px solid #ccc;
+					border-radius: 2px;
+					cursor: pointer;
+				}
+				div.toolbar-button.active {
+					text-decoration: none;
+					color: white;
+					background-color: #1A9EFF;
+				}
+				div.toolbar-button:not(.active):hover {
+				    background-color: #f4f6f9;
+				}
+				div.toolbar-button.bigger-btn .fa {
+					font-size: 18px !important;
+					width: 20px;
+		     		text-align: center;
+		     		vertical-align:middle;
+				}
+				div.toolbar-button.bigger-btn{
+		    		padding: 6px;
+		    		height: 16px;
+                    font-size: 12px;
+				}
+				#view-controls .toolbar-button .fa {
+				    margin-right: 7px;
+				    vertical-align: middle;
+				    font-size: 0px;
+				}
+				.toolbar {
+				    display: table;
+				    width: 100%;
+				}
+				.control-cell {
+				    display: table-cell;
+				    vertical-align: middle;
+				    position: relative;
+				}
+				div#toolbar-container {
+				    margin-bottom: 6px;
+				    margin-right: 4px;
+				}
+
+            .toolbar-button span {
+                display: inline-block;
+                vertical-align: middle;
+            }
+            .toolbar-button .toolbar-icon
+            {
+                background-color: rgba(0, 0, 0, 0);
+                background-image: url({!URLFOR($Resource.AssignmentImages, 'Kimble_listtoggle_icons.png')});
+                height: 16px;
+                padding-right: 5px;
+                width: 18px;
+            }
+
+            .toolbar-button .gantt-icon {background-position: 0% -101px;}
+            .toolbar-button.active .gantt-icon {background-position: 0% -126px;}
+
+            .toolbar-button .usage-icon {background-position: 0% 0px;}
+            .toolbar-button.active .usage-icon {background-position: 0% -24px;}
+
+            .toolbar-button .chatter-icon {background-position: 0% -49px;}
+            .toolbar-button.active .chatter-icon {background-position: 0% -75px;}
+            /* Mutton */
+				.hover-mutton {
+				  display: inline-block;
+				  position: relative;
+				}
+				.hover-mutton label {
+                    padding-right: 4px;
+                }
+				.dd-btn {
+					display: inline-block;
+					border: 1px solid gray;
+					border-radius: 4px;
+					padding: 10px 30px 10px 20px;
+					background-color: #ffffff;
+					cursor: pointer;
+					white-space: nowrap;
+					padding-right: 16px !important;
+				}
+				.dd-btn:after {
+				  content: '';
+				  position: absolute;
+				  top: 50%;
+				  transform: translateY(-50%);
+				  width: 0;
+				  height: 0;
+				  border-left: 5px solid transparent;
+				  border-right: 5px solid transparent;
+				  border-top: 5px solid black;
+				}
+				.dd-btn:hover {
+				  background-color: #f4f6f9;
+				}
+				.dd-menu {
+				  position: absolute;
+				  top: 23px;
+				  left: 0px;
+				  border: 1px solid #ccc;
+				  border-radius: 4px;
+				  padding: 0;
+				  margin: 2px 0 0 0;
+				  box-shadow: 0 0 6px 0 rgba(0,0,0,0.1);
+				  background-color: #ffffff;
+				  list-style-type: none;
+				  text-align: left;
+				  z-index: 99;
+				  color: #015ba7;
+				}
+				.dd-menu li.disabled {
+				    color: lightgray;
+			        cursor: default;
+				}
+				.dd-btn > .dd-menu {
+				  display: none;
+				}
+				.dd-btn:hover > .dd-menu {
+				  display: block;
+				}
+				.dd-menu li {
+				  padding: 10px 20px;
+				  cursor: pointer;
+				  white-space: nowrap;
+				  margin-left: 0px;
+				}
+				.dd-menu li:hover {
+				  background-color: #f4f6f9;
+				}
+				.dd-menu li a {
+				  display: block;
+				  margin: -10px -20px;
+				  padding: 10px 20px;
+				}
+
+				#edit-schedule-button {display:none;}
+                #cancel-edit-schedule-button {display: none;}
+                #save-schedule-button {display: none;}
+                #edit-usage-button {display:none;}
+                #cancel-edit-usage-button {display: none;}
+                #save-usage-button {display: none;}
+
+                #container[mode="edit"] .toolbar a {display:none;}
+                #container[mode="edit"] .action-col a {display:none !important;}
+                #container[mode="edit"] .assignment-action {display:none;}
+
+                #container[view="gantt"][mode="view"][zoom="daily"] #edit-schedule-button {display:initial;}
+                #container[view="gantt"][mode="edit"] #cancel-edit-schedule-button {display:initial;}
+                #container[view="gantt"][mode="edit"] #save-schedule-button {display:initial;}
+
+                #container[view$="usage"][mode="view"] #edit-usage-button.all-usage {display:initial;}
+                #container[view$="model-usage"][mode="view"] #edit-usage-button {display:initial;}
+                #container[view$="usage"][mode="edit"] #cancel-edit-usage-button {display:initial;}
+                #container[view$="usage"][mode="edit"] #save-usage-button {display:initial;}
+
+                #container[view="gantt"] #gantt-view-button,  #container[view="usage"] #usage-view-button,  #container[view="model-usage"] #model-view-button, #container[view="chatter"] #chatter-view-button, #container[view="monthly"] #monthly-profile-button
+                {
+                    text-decoration: none;
+                    color: white;
+                    background-color: #1A9EFF;
+                }
+
+                #container[view="gantt"] #gantt-view-button .gantt-icon {background-position: 0% -126px;}
+                #container[view="usage"] #usage-view-button .usage-icon {background-position: 0% -24px;}
+                #container[view="monthly"] #monthly-profile-button .monthly-icon {background-position: 0% -24px;}
+                #container[view="model-usage"] #model-view-button .usage-icon {background-position: 0% -24px;}
+
+                #container[view$="usage"] .usage-hrs {display: block;}
+                #container[view="usage"] .usage-hrs .usage {display:initial;}
+                #container[view="usage"] .usage-hrs .model-usage {display:none}
+                #container[view="usage"] .assignment-period-usage .usage {display:initial;}
+                #container[view="usage"] .assignment-period-usage .model-usage {display:none}
+
+                #container[view="model-usage"] .resource-gantt-row {display:none;}
+
+                #container[view="model-usage"] .usage-hrs .model-usage {display:initial;}
+                #container[view="model-usage"] .usage-hrs .usage {display:none}
+                #container[view="model-usage"] .assignment-period-usage .model-usage {display:initial;}
+                #container[view="model-usage"] .assignment-period-usage .usage {display:none;}
+
+                #container[view="usage"] .usage-read-container .usage {display:initial;}
+                #container[view="usage"] .usage-read-container .model-usage {display:none}
+                #container[view="model-usage"] .usage-read-container .model-usage {display:initial;}
+                #container[view="model-usage"] .usage-read-container .usage {display:none}
+
+                #container[view$="usage"] .day-usage {display:none;}
+                #container[view$="usage"] .assignment-gantt {border:0;}
+                #container[view$="usage"] .utilisation {display:none;}
+                #container[view$="usage"] .scheduled-slot-container {display:none;}
+                #container[view$="usage"] .day-container .account {display: none;}
+                #container[view$="usage"] .resource-gantt-row {border: none;}
+                #container[view$="usage"] .agg-row {background:none;}
+                #container[view$="usage"] .outside-employment{background:none;}
+
+                #container[zoom="daily"] .day-name   {min-width: 40px;}
+                #container[zoom="daily"] .week-name  {width: calc(var(--numdays) * 41px - 1px);}
+                #container[zoom="daily"] .months   {display:none;}
+
+                #container[zoom="daily"] .gantt-cell   {min-width: 40px;}
+                #container[zoom="daily"] .gantt-cells, #container[zoom="daily"] .gantt-sep {width: calc(var(--numdays) * 41px);}
+                #container[zoom="daily"] .simple-gantt {width: calc(var(--numdays) * 41px);margin-left: calc(var(--startoffset) * 41px)}
+                #container[zoom="daily"] .assignment-gantt {width: calc(var(--numdays) * 41px);margin-left: calc(var(--startoffset) * 41px);}
+
+                #container[zoom="daily"] .day-container {width: 41px;}
+                #container[zoom="daily"] .scheduled-time{display:initial;}
+                #container[zoom="daily"] .scheduled-slot-container{display:initial;}
+                #container[zoom="daily"] .gantt-schedule-clash{display:initial;}
+                #container[zoom="daily"] .gantt-event{display:initial;}
+                #container[zoom="daily"] .gantt-warning{display:initial;}
+
+                //TODO:MOVE - width different per page view
+                #container[zoom="daily"] .usage-hrs {width: 36px;}
+
+                #container[zoom="weekly"] .month-name   {width: calc(var(--numdays) * 16px - 1px);}
+                #container[zoom="weekly"] .week-name  {width: calc(var(--numdays) * 16px - 1px);font-size: 10px;}
+                #container[zoom="weekly"] .days {display:none;}
+
+                #container[zoom="weekly"] .gantt-cell   {min-width: 16px;}
+                #container[zoom="weekly"] .gantt-cells, #container[zoom="weekly"] .gantt-sep {width: calc(var(--numdays) * 16px);}
+                #container[zoom="weekly"] .simple-gantt {width: calc(var(--numdays) * 16px);margin-left: calc(var(--startoffset) * 16px)}
+                #container[zoom="weekly"] .assignment-gantt {width: calc(var(--numdays) * 16px);margin-left: calc(var(--startoffset) * 16px);}
+                #container[zoom="weekly"] .day-container {width: 16px;}
+                #container[zoom="weekly"] .scheduled-time{display:none;}
+                #container[zoom="weekly"] .scheduled-slot-container{display:none;}
+                #container[zoom="weekly"] .over-utilised-assignment{display:none;}
+                #container[zoom="weekly"] .gantt-schedule-clash{display:none;}
+                #container[zoom="weekly"] .gantt-event{display:none;}
+                #container[zoom="weekly"] .gantt-warning{display:none;}
+
+                #container[zoom="monthly"] .days   {display:none}
+                #container[zoom="monthly"] .month-name   {width: calc(var(--numdays) * 5px - 1px);}
+                #container[zoom="monthly"] .week-name  {width: calc(var(--numdays) * 5px - 1px);font-size: 0px;}
+
+                #container[zoom="monthly"] .gantt-cell   {min-width: 5px;}
+                #container[zoom="monthly"] .gantt-cells, #container[zoom="monthly"] .gantt-sep {width: calc(var(--numdays) * 5px);}
+                #container[zoom="monthly"] .simple-gantt {width: calc(var(--numdays) * 5px);margin-left: calc(var(--startoffset) * 5px)}
+
+                #container[zoom="monthly"] .assignment-gantt {width: calc(var(--numdays) * 5px);margin-left: calc(var(--startoffset) * 5px);}
+                #container[zoom="monthly"] .day-container {width: 5px;}
+                #container[zoom="monthly"] .scheduled-time{display:none;}
+                #container[zoom="monthly"] .scheduled-slot-container{display:none;}
+                #container[zoom="monthly"] .over-utilised-assignment{display:none;}
+                #container[zoom="monthly"] .gantt-schedule-clash{display:none;}
+                #container[zoom="monthly"] .gantt-event{display:none;}
+                #container[zoom="monthly"] .gantt-warning{display:none;}
+
+                .gantt-week-usage {display:none;}
+                .gantt-month-usage {display:none;}
+
+                #container[view$="usage"][zoom="monthly"] .assignment-gantt {display:none;}
+                #container[view$="usage"][zoom="monthly"] .gantt-month-usage {display:initial;}
+
+                #container[view$="usage"][zoom="weekly"] .assignment-gantt {display:none;}
+                #container[view$="usage"][zoom="weekly"] .gantt-week-usage {display:initial;}
+
+                #container[view$="usage"][zoom="daily"][mode="edit"] .assignment-gantt {display:none;}
+                #container[view$="usage"][zoom="daily"][mode="edit"] .gantt-container-middle {display:none;}
+
+                .usage-outside-assignment {visibility: hidden;}
+                .usage-edit-container {display:none;}
+
+                #container[view$="usage"][mode="edit"] .assignment-period-usage .usage-outside-assignment {visibility:unset;}
+                #container[view$="usage"][mode="edit"] .assignment-period-usage .usage-read-container {display:none;}
+                #container[view$="usage"][mode="edit"] .assignment-period-usage .usage-edit-container {display: block;}
+                #container:not([zoom="daily"])[view$="usage"] .resource-gantt-row {display:none;}
+                #container[zoom="daily"][view$="usage"][mode="edit"] .resource-gantt-row {display:none;}
+
+                .gantt-daily-usage {display:none;}
+                .gantt-weekly-usage {display:none;}
+                .gantt-monthly-usage {display:none;}
+
+                #container[view$="usage"][zoom="daily"][mode="edit"] .gantt-daily-usage {display:table-cell;}
+                #container[view$="usage"][zoom="weekly"] .gantt-weekly-usage {display:table-cell;}
+                #container[view$="usage"][zoom="monthly"] .gantt-monthly-usage {display:table-cell;}
+
+                #container[view="model-usage"] .activity-assignment-gantt[show-modelling="false"] {display:none !important;}
+                #container[view="model-usage"] .assignment-gantt[show-modelling="false"] {display:none !important;}
+                #container[view="model-usage"] .assignment-period-usage[show-modelling="false"] {display:none !important;}
+
+        .schedule-assignments-card {
+	        padding: 5px;
+	        min-width: 300px;
+	    }
+        .schedule-assignments-header{
+            padding: 12px;
+            font-size: 14px;
+            background-color: #f1f1f1;
+            color: #454545;
+            font-weight: bold;
+            margin-bottom: 4px;
+            position: relative;
+        }
+        #edit-scheduled-day
+        {
+            outline: 3px dotted #4a4a56;
+            width: 36px;
+            height: 17px;
+            position: absolute;
+            z-index: 10;
+            top: 4px;
+            left: 3px;
+        }
+       .scheduled-usage-entry {
+            margin-bottom: 6px;
+        }
+
+        .scheduled-usage-entry label {
+            display: inline-block;
+            vertical-align: top;
+            padding-top: 3px;
+            padding-right: 4px;
+        }
+
+        .scheduled-usage-entry select {
+            vertical-align: top;
+        }
+
+        .scheduled-usage-entry .fa-thumb-tack, .scheduled-usage-entry .fa-clock-o
+        {
+            color: #4a4a56;
+            font-size: 16px;
+            display: inline-block;
+            margin-left: 4px;
+            margin-top: 2px;
+        }
+        td.edit-label {color: #4a4a56;font-weight: bold;font-size: 11px;text-align: right;padding-right: 8px;padding-left:30px;}
+
+        .schedule-cursor
+        {
+            cursor: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABEAAAARCAYAAAA7bUf6AAABB0lEQVQ4T93TsStGURzG8c8rKYnCZFdSbxn9CfIHKMVgJSWJXpOkLJKsFgolf4CSxSLZLJLRaDDZJHR0bl3XuffK6GznPL/f9zznub/b8HM10IP2hBaOXvCa10JDcU1iD90lkEvM4DHTU5BVbJYAwvE9JnBXBenCAuZxEG8diA03mMUtPqogQZvCMtawjpHYcB6157pM/hmkH3MxwFSwS7jGe1mww9jHaMUnDlIL23gLm/ycdGADKzWAbGrHcVWEhGccY+wXkFAyHeu/OWlDE305yBC2cITTAjxM7lPRScrAIE6wk92aKkr9O/m6XhxiFxdlz6yDdEYXAfQV4l+chJ5FnOGhDPIJ7Ls2Egugv6sAAAAASUVORK5CYII=") 0 0, pointer;
+        }
+        .quick-add-cursor
+        {
+            cursor: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAASBAMAAACk4JNkAAAAJ1BMVEUAAAAzNDUzNDUzNDUzNDUzNDUzNDUzNDUzNDUzNDUzNDUzNDUzNDV3rz4DAAAADHRSTlMAEB4fICJAbK+wsvkrc0uUAAAAVUlEQVQIW2Ngnn0GBHYoMPicgYBDDHOgrBMMe86cOc5Qc+bMaQYg9xhDDpDEzjqelsggllYDZB1gAAEeFBZCFq8pCNvWQF1wkiEGyjrMwLoazNjpAADPomNCx71u7gAAAABJRU5ErkJggg==") 0 0, cell;
+        }
+        .usage-edit-tip div {display:table-row}
+            .usage-edit-tip label {
+                font-weight:bold;
+                padding:4px 4px 6px 4px;
+                text-align:right;
+                display:table-cell;
+            }
+            .usage-edit-tip span {
+                display:table-cell;
+                padding-right:6px;
+            }
+            .scheduled-date-entry span {
+                font-weight: bold;
+                padding-right: 13px;
+            }
+
+            .scheduled-date-entry {
+                display:inline-block;
+            }
+            .scheduled-date-entry input[type="text"] {
+                width: 100px;
+            }
+            .schedule-save-buttons {
+                display: flex;
+                justify-content: flex-end;
+                margin-top: 6px;
+                padding-right: 0px;
+            }
+            .usage-units {
+                margin-left: 5px;
+            }
+
+            .required-input {
+                    display: inline-block;
+                    width: 3px;
+                    background-color: #c00;
+                    height: 19px;
+                    margin-right: 2px;
+                    vertical-align: middle;
+            }
+    </style>
+</apex:page>
