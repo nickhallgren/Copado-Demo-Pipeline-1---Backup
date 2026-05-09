@@ -22,6 +22,7 @@
             }
           window.industryPkgNSPrefix = '{!industryPkgNSPrefix}';
           window.isFoundationPackage = {!isFoundationPackage};
+          window.isOmniStudioHybridEnabled = {!isOmniStudioHybridEnabled};
       </script>
   </head>
   <style>
@@ -82,6 +83,50 @@
         angular.module('ouihome.core', [])
             .value('OmniScriptFieldMappingsNamespace', JSON.parse('{!JSENCODE(omniScriptFieldMappingsNamespace)}'));
     </script>
+    <apex:outputPanel rendered="{!isOmniStudioHybridEnabled}">
+        <apex:includeLightning />
+        <div class="via-slds" id="custom-slds-home-new-modal" style="display: none">
+            <div id="lightning" />
+        </div>
+        <script>
+            var ns = "{!namespacePrefix}".replace('__', '');
+            $Lightning.use(ns + ':ltngOutVF', function () {
+                creatNewIPForm();
+            });
+
+            function creatNewIPForm() {
+                $Lightning.createComponent(ns + ':omniDesignerNewIPForm',
+                    {
+                        isNavigationApiUnsupported: true
+                    },
+                    "lightning",
+                    function (cmp, status) {
+                        if (status === "SUCCESS") {
+                            var newform = document.getElementById('lightning');
+                            newform.addEventListener('ipnewnavigate', function (event) {
+                                vlocityOpenUrl(omniNewUrl + '?id=' + event.detail.recordId, null, false);
+                                event.stopPropagation();
+                                event.preventDefault();
+                            });
+                            newform.addEventListener('close', function (event) {
+                                cmp.destroy();
+                                Promise.resolve().then(function () {
+                                    var modalWrapper = document.getElementById('custom-slds-home-new-modal');
+                                    modalWrapper.style.display = 'none';
+                                    var newLightningEl = document.createElement('div');
+                                    newLightningEl.id = 'lightning';
+                                    modalWrapper.innerHTML = null;
+                                    modalWrapper.appendChild(newLightningEl);
+                                    creatNewIPForm();
+                                });
+                            });
+                            document.querySelector("#auraErrorMessage").innerHTML = "";
+                        }
+                    }
+                );
+            }
+        </script>
+    </apex:outputPanel>
   </body>
 
 </apex:page>

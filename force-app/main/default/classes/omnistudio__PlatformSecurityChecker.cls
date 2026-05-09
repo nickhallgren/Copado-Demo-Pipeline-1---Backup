@@ -84,10 +84,16 @@ global class PlatformSecurityChecker {
     global static Boolean isApexClassChecksForIPEnabled() {
         return null;
     }
+    global static Boolean isDMLoadFLSCheckRequired() {
+        return null;
+    }
     global static Boolean isEnableQueryWithFLSEnabled() {
         return null;
     }
     global static Boolean isEnforceDMFLSAndDataEncryptionEnabled() {
+        return null;
+    }
+    global static Boolean isRevertDMLoadFLSCheckEnabled() {
         return null;
     }
     global static Boolean isRollbackSecurityChangeEnabled() {

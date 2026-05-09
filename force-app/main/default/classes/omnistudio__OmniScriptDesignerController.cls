@@ -87,6 +87,11 @@ global class OmniScriptDesignerController {
     global static List<SObject> GetIPElements(String procedureId) {
         return null;
     }
+    @AuraEnabled
+    @RemoteAction
+    global static List<Map<String,String>> GetInterfaceObjects() {
+        return null;
+    }
     @RemoteAction
     global static List<String> GetMatrixHeaders(String matrixName) {
         return null;
@@ -167,6 +172,11 @@ global class OmniScriptDesignerController {
     global static Map<String,String> LoadIntegrationProcedureKeys2() {
         return null;
     }
+    @AuraEnabled
+    @RemoteAction
+    global static Map<String,String> LoadIntegrationProcedureKeysForHybrid(String recordId) {
+        return null;
+    }
     @RemoteAction
     global static Set<String> LoadIntegrationProcedureKeys() {
         return null;
@@ -242,6 +252,10 @@ global class OmniScriptDesignerController {
         return null;
     }
     @AuraEnabled
+    global static List<Object> getCoreFlexCardsWithRecordId(String recordId) {
+        return null;
+    }
+    @AuraEnabled
     global static List<Object> getCoreFlexCards() {
         return null;
     }
@@ -295,6 +309,16 @@ global class OmniScriptDesignerController {
     }
     @AuraEnabled
     @RemoteAction
+    global static List<Object> getMatchingDRBundlesForOmniScript(String name, List<String> types, String omniscriptId) {
+        return null;
+    }
+    @AuraEnabled
+    @RemoteAction
+    global static List<Object> getMatchingDRBundlesWithOmniProcessId(String name, List<String> types, String omniProcessId) {
+        return null;
+    }
+    @AuraEnabled
+    @RemoteAction
     global static List<SObject> getMatchingDRBundles(String name, List<String> types) {
         return null;
     }
@@ -336,6 +360,10 @@ global class OmniScriptDesignerController {
         return null;
     }
     @AuraEnabled
+    global static List<SObject> getReusableOmniScriptsForOmniScript(String parentOmniscriptId) {
+        return null;
+    }
+    @AuraEnabled
     global static List<SObject> getReusableOmniScriptsLwc2() {
         return null;
     }
@@ -373,6 +401,10 @@ global class OmniScriptDesignerController {
     }
     @RemoteAction
     global static Object testIntegrationProcedure(String procedureAPIName, String input, Map<String,Object> options) {
+        return null;
+    }
+    @RemoteAction
+    global static Boolean updateIsManagedUsingStdDesignerRemote(String recordId) {
         return null;
     }
     @RemoteAction

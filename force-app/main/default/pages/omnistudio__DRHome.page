@@ -23,6 +23,7 @@
           }
           window.industryPkgNSPrefix = '{!industryPkgNSPrefix}';
           window.isFoundationPackage = {!isFoundation};
+          window.isOmniStudioHybridEnabled = {!isOmniStudioHybridEnabled};
           window.DRNewUrl = "{!newUrl}";
       </script>
   </head>
@@ -63,6 +64,53 @@
       </slds-home>
     </div>
     <c:VFActionFunction />
+    <!-- New Data Mapper LWC modal: hybrid pref AND OmniStudio (bOmniStudio / same as isFoundation on this controller) -->
+    <apex:outputPanel rendered="{!isOmniStudioHybridEnabled && isFoundation}">
+        <apex:includeLightning />
+        <div class="via-slds" id="custom-slds-home-new-modal" style="display: none">
+            <div id="lightning" />
+        </div>
+        <script>
+            var ns = "{!namespacePrefix}".replace('__', '');
+            $Lightning.use(ns + ':ltngOutVF', function () {
+                creatNewDRForm();
+            });
+
+            function creatNewDRForm() {
+                $Lightning.createComponent(ns + ':omniDesignerNewDataRaptorForm',
+                    {
+                        isNavigationApiUnsupported: true
+                    },
+                    "lightning",
+                    function (cmp, status) {
+                        if (status === "SUCCESS") {
+                            var newform = document.getElementById('lightning');
+                            newform.addEventListener('drnewnavigate', function (event) {
+                                vlocityOpenUrl(window.DRNewUrl + '?id=' + event.detail.recordId, null, false);
+                                event.stopPropagation();
+                                event.preventDefault();
+                            });
+                            newform.addEventListener('close', function (event) {
+                                cmp.destroy();
+                                Promise.resolve().then(function () {
+                                    var modalWrapper = document.getElementById('custom-slds-home-new-modal');
+                                    modalWrapper.style.display = 'none';
+                                    var newLightningEl = document.createElement('div');
+                                    newLightningEl.id = 'lightning';
+                                    modalWrapper.innerHTML = null;
+                                    modalWrapper.appendChild(newLightningEl);
+                                    creatNewDRForm();
+                                });
+                            });
+                            if (document.querySelector("#auraErrorMessage")) {
+                                document.querySelector("#auraErrorMessage").innerHTML = "";
+                            }
+                        }
+                    }
+                );
+            }
+        </script>
+    </apex:outputPanel>
   <script>
        angular.module('DRHome.core', [])
            .value('IsFoundation', {!JSENCODE(IF(isFoundation, "true", "false"))})
